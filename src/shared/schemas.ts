@@ -5,7 +5,7 @@ import { z } from 'zod'
  * Chaque clé correspond à un fichier nexus_<key>.json sur disque.
  * Ajouter ici toute nouvelle entité à persister.
  */
-export const STORAGE_KEYS = ['settings', 'blocking', 'blocking_active'] as const
+export const STORAGE_KEYS = ['settings', 'blocking', 'blocking_active', 'schedule'] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
 
@@ -73,9 +73,45 @@ export const BlockingStateSchema = z.object({
 })
 export type BlockingState = z.infer<typeof BlockingStateSchema>
 
+// ─── Schedule (sous-projet 3) ──────────────────────────────────────────────
+
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/
+
+export const TimeRuleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(40),
+  color: z.string().regex(HEX_COLOR_REGEX),
+  icon: z.string().min(1).max(40).optional(),
+  linkedProfileId: z.string().uuid().nullable(),
+  createdAt: z.string().datetime(),
+})
+export type TimeRule = z.infer<typeof TimeRuleSchema>
+
+export const ScheduleEntrySchema = z
+  .object({
+    id: z.string().uuid(),
+    ruleId: z.string().uuid(),
+    dayOfWeek: z.number().int().min(0).max(6),
+    startMinute: z.number().int().min(0).max(1439),
+    endMinute: z.number().int().min(1).max(1440),
+    createdAt: z.string().datetime(),
+  })
+  .refine((e) => e.endMinute > e.startMinute, {
+    message: 'endMinute must be > startMinute',
+    path: ['endMinute'],
+  })
+export type ScheduleEntry = z.infer<typeof ScheduleEntrySchema>
+
+export const ScheduleStateSchema = z.object({
+  rules: z.array(TimeRuleSchema),
+  entries: z.array(ScheduleEntrySchema),
+})
+export type ScheduleState = z.infer<typeof ScheduleStateSchema>
+
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
   blocking: BlockingStateSchema,
   blocking_active: ActiveSessionSchema,
+  schedule: ScheduleStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Home, Target, Calendar, Shield, Settings, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { NexusLogo } from '@/components/NexusLogo'
 
 type NavItem = {
   to: string
@@ -30,8 +31,8 @@ export function Sidebar() {
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="px-3 pb-6">
-        <h1 className="text-lg font-semibold tracking-tight">Nexus</h1>
-        <p className="text-xs text-text-muted">Focus, par design.</p>
+        <NexusLogo size={26} />
+        <p className="mt-1 text-xs text-text-muted">Focus, par design.</p>
       </div>
 
       <nav
