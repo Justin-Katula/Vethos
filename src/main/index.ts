@@ -47,17 +47,27 @@ function createMainWindow(): BrowserWindow {
   return win
 }
 
-app.whenReady().then(() => {
+let mainWindow: BrowserWindow | null = null
+
+app.whenReady().then(async () => {
   // Sécurité : empêche les apps multiples dans certains cas extrêmes
   app.setAppUserModelId('com.nexus.app')
 
   const storage = createStorage(app.getPath('userData'))
-  registerAllIpcHandlers(storage)
+  await registerAllIpcHandlers(storage, () => mainWindow)
 
-  createMainWindow()
+  mainWindow = createMainWindow()
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createMainWindow()
+      mainWindow.on('closed', () => {
+        mainWindow = null
+      })
+    }
   })
 })
 

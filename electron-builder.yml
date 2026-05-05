@@ -21,6 +21,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-Setup-${version}.${ext}
+  requestedExecutionLevel: requireAdministrator
 
 nsis:
   oneClick: false
