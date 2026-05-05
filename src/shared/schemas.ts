@@ -5,7 +5,13 @@ import { z } from 'zod'
  * Chaque clé correspond à un fichier nexus_<key>.json sur disque.
  * Ajouter ici toute nouvelle entité à persister.
  */
-export const STORAGE_KEYS = ['settings', 'blocking', 'blocking_active', 'schedule'] as const
+export const STORAGE_KEYS = [
+  'settings',
+  'blocking',
+  'blocking_active',
+  'schedule',
+  'levels',
+] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
 
@@ -57,19 +63,18 @@ export const ActiveSessionSchema = z.object({
 })
 export type ActiveSession = z.infer<typeof ActiveSessionSchema>
 
+export const BlockingHistoryEntrySchema = z.object({
+  sessionId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime(),
+  completedNormally: z.boolean(),
+})
+export type BlockingHistoryEntry = z.infer<typeof BlockingHistoryEntrySchema>
+
 export const BlockingStateSchema = z.object({
   profiles: z.array(BlockingProfileSchema),
-  history: z
-    .array(
-      z.object({
-        sessionId: z.string().uuid(),
-        profileId: z.string().uuid(),
-        startedAt: z.string().datetime(),
-        endedAt: z.string().datetime(),
-        completedNormally: z.boolean(),
-      }),
-    )
-    .max(500),
+  history: z.array(BlockingHistoryEntrySchema).max(500),
 })
 export type BlockingState = z.infer<typeof BlockingStateSchema>
 
@@ -108,10 +113,46 @@ export const ScheduleStateSchema = z.object({
 })
 export type ScheduleState = z.infer<typeof ScheduleStateSchema>
 
+// ─── Levels & free time (sous-projet 4) ────────────────────────────────────
+
+export const ObjectiveSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(60),
+  description: z.string().max(500).optional(),
+  color: z.string().regex(HEX_COLOR_REGEX),
+  icon: z.string().min(1).max(40).optional(),
+  linkedRuleIds: z.array(z.string().uuid()),
+  xpMinutes: z.number().int().min(0),
+  createdAt: z.string().datetime(),
+})
+export type Objective = z.infer<typeof ObjectiveSchema>
+
+export const FreeTimeEntrySchema = z.object({
+  id: z.string().uuid(),
+  at: z.string().datetime(),
+  deltaMinutes: z.number().int(),
+  reason: z.string().max(200),
+})
+export type FreeTimeEntry = z.infer<typeof FreeTimeEntrySchema>
+
+export const FreeTimeBankSchema = z.object({
+  balanceMinutes: z.number().int().min(0),
+  entries: z.array(FreeTimeEntrySchema).max(500),
+})
+export type FreeTimeBank = z.infer<typeof FreeTimeBankSchema>
+
+export const LevelsStateSchema = z.object({
+  objectives: z.array(ObjectiveSchema),
+  freeTime: FreeTimeBankSchema,
+  lastProcessedSessionId: z.string().uuid().nullable(),
+})
+export type LevelsState = z.infer<typeof LevelsStateSchema>
+
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
   blocking: BlockingStateSchema,
   blocking_active: ActiveSessionSchema,
   schedule: ScheduleStateSchema,
+  levels: LevelsStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

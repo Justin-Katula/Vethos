@@ -4,7 +4,10 @@ import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { TimeCircle } from '@/components/interface/TimeCircle'
+import { FreeTimeWidget } from '@/components/levels/FreeTimeWidget'
 import { useScheduleStore } from '@/store/schedule.store'
+import { useLevelsStore } from '@/store/levels.store'
+import { useBlockingStore } from '@/store/blocking.store'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToHHMM, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
@@ -13,10 +16,26 @@ const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi
 
 export default function HomePage() {
   const { loaded, rules, entries, load } = useScheduleStore()
+  const levelsLoaded = useLevelsStore((s) => s.loaded)
+  const freeTime = useLevelsStore((s) => s.freeTime)
+  const loadLevels = useLevelsStore((s) => s.load)
+  const spendFreeTime = useLevelsStore((s) => s.spendFreeTime)
+  const reconcile = useLevelsStore((s) => s.reconcileWithHistory)
+  const blockingState = useBlockingStore((s) => s.state)
+  const loadBlocking = useBlockingStore((s) => s.load)
+  const blockingLoaded = useBlockingStore((s) => s.loaded)
 
   useEffect(() => {
     void load()
-  }, [load])
+    if (!levelsLoaded) void loadLevels()
+    if (!blockingLoaded) void loadBlocking()
+  }, [load, loadLevels, loadBlocking, levelsLoaded, blockingLoaded])
+
+  // Réconciliation auto au montage et lorsque l'historique change
+  useEffect(() => {
+    if (!levelsLoaded || !blockingLoaded) return
+    void reconcile(blockingState.history, rules)
+  }, [levelsLoaded, blockingLoaded, blockingState.history, rules, reconcile])
 
   const now = useMemo(() => new Date(), [])
   const dow = jsDateToDayOfWeek(now)
@@ -45,11 +64,12 @@ export default function HomePage() {
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">{"Aujourd'hui"}</h1>
         </header>
 
-        <div className="flex flex-col items-center gap-12 lg:flex-row lg:items-start lg:justify-around">
+        <div className="grid grid-cols-1 gap-10 xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,360px)] xl:items-start">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="flex justify-center"
           >
             <TimeCircle rules={rules} entries={entries} size={460} />
           </motion.div>
@@ -58,7 +78,7 @@ export default function HomePage() {
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="w-full max-w-md"
+            className="w-full"
           >
             <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
               Programme du jour
@@ -107,6 +127,15 @@ export default function HomePage() {
               </ul>
             )}
           </motion.section>
+
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-full"
+          >
+            <FreeTimeWidget bank={freeTime} onSpend={spendFreeTime} />
+          </motion.div>
         </div>
       </div>
     </PageTransition>
