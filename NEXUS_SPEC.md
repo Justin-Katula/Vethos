@@ -12,7 +12,7 @@ Stack : Electron 30 + React 18 + TypeScript + Tailwind 3.4 + Framer Motion + Zus
 | 2 | Système de blocage (hosts / process / firewall + détection dérive) | ✅ Livré (v0.2.0-blocking) | [2026-05-04-nexus-blocking-design.md](docs/superpowers/specs/2026-05-04-nexus-blocking-design.md) |
 | 3 | Interface principale (cercle 24h, calendrier, tableau couleurs) | ✅ Livré (v0.3.0-interface) | [2026-05-05-nexus-interface-design.md](docs/superpowers/specs/2026-05-05-nexus-interface-design.md) |
 | 4 | Système de niveaux + distribution du temps libre | ✅ Livré (v0.4.0-levels) | [2026-05-05-nexus-levels-design.md](docs/superpowers/specs/2026-05-05-nexus-levels-design.md) |
-| 5 | Onboarding (emploi du temps + objectifs + apps déclarées) | ⬜ À spec | — |
+| 5 | Onboarding (emploi du temps + objectifs + apps déclarées) | ✅ Livré (v0.5.0-onboarding) | [2026-05-05-nexus-onboarding-design.md](docs/superpowers/specs/2026-05-05-nexus-onboarding-design.md) |
 | 6 | Polish + persistance complète (tous les `nexus_*.json`) | ⬜ À spec | — |
 
 ## Conventions

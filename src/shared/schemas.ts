@@ -11,6 +11,7 @@ export const STORAGE_KEYS = [
   'blocking_active',
   'schedule',
   'levels',
+  'declared_apps',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -19,6 +20,8 @@ export const StorageKeySchema = z.enum(STORAGE_KEYS)
 export const SettingsSchema = z.object({
   username: z.string().max(100).optional(),
   savedAt: z.string().datetime().optional(),
+  /** True une fois l'onboarding terminé OU explicitement skippé. */
+  onboardingCompleted: z.boolean().optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -148,6 +151,24 @@ export const LevelsStateSchema = z.object({
 })
 export type LevelsState = z.infer<typeof LevelsStateSchema>
 
+// ─── Declared apps (sous-projet 5) ─────────────────────────────────────────
+
+export const DeclaredAppSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(60),
+  exeName: z.string().regex(EXE_NAME_REGEX),
+  linkedObjectiveId: z.string().uuid().nullable(),
+  /** Ratio XP par minute d'usage déclarée. 0..1, défaut 0.25. */
+  xpRatio: z.number().min(0).max(1),
+  createdAt: z.string().datetime(),
+})
+export type DeclaredApp = z.infer<typeof DeclaredAppSchema>
+
+export const DeclaredAppsStateSchema = z.object({
+  apps: z.array(DeclaredAppSchema),
+})
+export type DeclaredAppsState = z.infer<typeof DeclaredAppsStateSchema>
+
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
@@ -155,4 +176,5 @@ export const STORAGE_SCHEMAS = {
   blocking_active: ActiveSessionSchema,
   schedule: ScheduleStateSchema,
   levels: LevelsStateSchema,
+  declared_apps: DeclaredAppsStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

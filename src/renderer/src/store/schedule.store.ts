@@ -29,6 +29,8 @@ type ScheduleStore = {
   deleteRule: (id: string) => Promise<void>
   saveEntry: (draft: SaveEntryDraft) => Promise<ScheduleEntry>
   deleteEntry: (id: string) => Promise<void>
+  /** Remplace l'intégralité du schedule (rules + entries). Utilisé par l'onboarding. */
+  replaceAll: (rules: TimeRule[], entries: ScheduleEntry[]) => Promise<void>
 }
 
 function uuid(): string {
@@ -142,5 +144,10 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     const entries = get().entries.filter((e) => e.id !== id)
     set({ entries })
     await persist({ rules: get().rules, entries })
+  },
+
+  async replaceAll(rules, entries) {
+    set({ rules, entries })
+    await persist({ rules, entries })
   },
 }))
