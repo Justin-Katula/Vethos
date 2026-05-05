@@ -40,7 +40,7 @@ export default function SettingsPage() {
 
         <div className="max-w-md rounded-lg border border-border-subtle bg-bg-card p-6 shadow-card">
           <label className="block text-xs font-medium uppercase tracking-wider text-text-muted">
-            Nom d'utilisateur
+            {"Nom d'utilisateur"}
           </label>
           <input
             type="text"
