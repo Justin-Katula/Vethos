@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2 } from 'lucide-react'
 import type { BlockingProfile } from '@shared/schemas'
 import { cn } from '@/lib/cn'
+import { useShortcut } from '@/lib/use-shortcut'
 
 type PolicyType = BlockingProfile['unlockPolicy']['type']
 
@@ -26,6 +27,8 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
   const [minWords, setMinWords] = useState(100)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useShortcut('Escape', onClose, { enabled: open && !busy })
 
   useEffect(() => {
     if (!open) return

@@ -15,6 +15,9 @@ export const IPC_CHANNELS = {
   // Blocking — events main → renderer
   BLOCKING_EVENT_SESSION_CHANGED: 'blocking:event:sessionChanged',
   BLOCKING_EVENT_LAYER_DRIFT: 'blocking:event:layerDrift',
+  // App usage tracker
+  APP_USAGE_GET: 'appUsage:get',
+  APP_USAGE_EVENT_TICK: 'appUsage:event:tick',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

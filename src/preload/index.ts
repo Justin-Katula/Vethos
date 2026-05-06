@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { ActiveSession, BlockingProfile, BlockingState, StorageKey } from '@shared/schemas'
+import type {
+  ActiveSession,
+  BlockingProfile,
+  BlockingState,
+  DeclaredAppUsageState,
+  StorageKey,
+} from '@shared/schemas'
 
 export type LayerStatusValue = 'ok' | 'drifted' | 'error' | 'inactive'
 export type LayerStatus = {
@@ -49,6 +55,15 @@ const api = {
       const listener = (_: unknown, payload: { layer: string; restored: boolean }) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, listener)
+    },
+  },
+  appUsage: {
+    get: (): Promise<DeclaredAppUsageState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET),
+    onTick: (cb: (state: DeclaredAppUsageState) => void): (() => void) => {
+      const listener = (_: unknown, payload: DeclaredAppUsageState) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
     },
   },
 }

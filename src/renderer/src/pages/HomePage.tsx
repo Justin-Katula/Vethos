@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { TimeCircle } from '@/components/interface/TimeCircle'
 import { FreeTimeWidget } from '@/components/levels/FreeTimeWidget'
+import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { useBlockingStore } from '@/store/blocking.store'
@@ -45,9 +46,18 @@ export default function HomePage() {
   if (!loaded) {
     return (
       <PageTransition>
-        <div className="flex h-full items-center justify-center text-sm text-text-muted">
-          Chargement…
-        </div>
+        <PageSkeleton>
+          <div className="grid grid-cols-1 gap-8 xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,360px)]">
+            <Skeleton className="h-72 w-72 rounded-full" />
+            <div className="space-y-2">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+            <Skeleton className="h-64 rounded-xl" />
+          </div>
+        </PageSkeleton>
       </PageTransition>
     )
   }

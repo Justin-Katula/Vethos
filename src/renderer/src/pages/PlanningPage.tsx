@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Info } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { RuleTable } from '@/components/interface/RuleTable'
 import { WeekCalendar } from '@/components/interface/WeekCalendar'
 import { RuleEditor } from '@/components/interface/RuleEditor'
+import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useBlockingStore } from '@/store/blocking.store'
+import { useToast } from '@/lib/use-toast'
 import type { TimeRule } from '@shared/schemas'
 
 export default function PlanningPage() {
@@ -23,21 +24,15 @@ export default function PlanningPage() {
   const blockingState = useBlockingStore((s) => s.state)
   const loadBlocking = useBlockingStore((s) => s.load)
   const blockingLoaded = useBlockingStore((s) => s.loaded)
+  const toast = useToast()
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<TimeRule | null>(null)
-  const [errorToast, setErrorToast] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
     if (!blockingLoaded) void loadBlocking()
   }, [load, loadBlocking, blockingLoaded])
-
-  useEffect(() => {
-    if (!errorToast) return
-    const t = setTimeout(() => setErrorToast(null), 3000)
-    return () => clearTimeout(t)
-  }, [errorToast])
 
   const openEditor = (rule: TimeRule | null) => {
     setEditingRule(rule)
@@ -53,7 +48,7 @@ export default function PlanningPage() {
     try {
       await saveEntry(draft)
     } catch (err) {
-      setErrorToast((err as Error).message)
+      toast.error((err as Error).message)
     }
   }
 
@@ -72,7 +67,7 @@ export default function PlanningPage() {
         endMinute: patch.endMinute,
       })
     } catch (err) {
-      setErrorToast((err as Error).message)
+      toast.error((err as Error).message)
     }
   }
 
@@ -88,16 +83,27 @@ export default function PlanningPage() {
         endMinute: existing.endMinute,
       })
     } catch (err) {
-      setErrorToast((err as Error).message)
+      toast.error((err as Error).message)
     }
   }
 
   if (!loaded) {
     return (
       <PageTransition>
-        <div className="flex h-full items-center justify-center text-sm text-text-muted">
-          Chargement…
-        </div>
+        <PageSkeleton>
+          <div className="space-y-2">
+            <div className="h-8 w-40 animate-pulse rounded bg-bg-card" />
+            <div className="h-3 w-60 animate-pulse rounded bg-bg-card" />
+          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
+        </PageSkeleton>
       </PageTransition>
     )
   }
@@ -154,20 +160,6 @@ export default function PlanningPage() {
         onSave={saveRule}
         onDelete={deleteRule}
       />
-
-      <AnimatePresence>
-        {errorToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-6 right-6 z-30 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200 shadow-elevated"
-          >
-            {errorToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </PageTransition>
   )
 }

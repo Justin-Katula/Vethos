@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Plus, Target } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { ObjectiveCard } from '@/components/levels/ObjectiveCard'
 import { ObjectiveEditor } from '@/components/levels/ObjectiveEditor'
+import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
 import { useLevelsStore } from '@/store/levels.store'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useBlockingStore } from '@/store/blocking.store'
@@ -27,7 +28,6 @@ export default function ObjectivesPage(): JSX.Element {
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Objective | null>(null)
-  const [errorToast, setErrorToast] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
@@ -40,12 +40,6 @@ export default function ObjectivesPage(): JSX.Element {
     if (!loaded || !blockingLoaded) return
     void reconcileWithHistory(blockingState.history, rules)
   }, [loaded, blockingLoaded, blockingState.history, rules, reconcileWithHistory])
-
-  useEffect(() => {
-    if (!errorToast) return
-    const t = setTimeout(() => setErrorToast(null), 3000)
-    return () => clearTimeout(t)
-  }, [errorToast])
 
   const sorted = useMemo(
     () =>
@@ -64,9 +58,17 @@ export default function ObjectivesPage(): JSX.Element {
   if (!loaded) {
     return (
       <PageTransition>
-        <div className="flex h-full items-center justify-center text-sm text-text-muted">
-          Chargement…
-        </div>
+        <PageSkeleton>
+          <div className="space-y-2">
+            <div className="h-8 w-48 animate-pulse rounded bg-bg-card" />
+            <div className="h-3 w-72 animate-pulse rounded bg-bg-card" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </PageSkeleton>
       </PageTransition>
     )
   }
@@ -152,20 +154,6 @@ export default function ObjectivesPage(): JSX.Element {
         onSave={saveObjective}
         onDelete={deleteObjective}
       />
-
-      <AnimatePresence>
-        {errorToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-6 right-6 z-30 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200 shadow-elevated"
-          >
-            {errorToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </PageTransition>
   )
 }

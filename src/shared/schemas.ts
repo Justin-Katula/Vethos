@@ -12,6 +12,7 @@ export const STORAGE_KEYS = [
   'schedule',
   'levels',
   'declared_apps',
+  'declared_app_usage',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -148,6 +149,8 @@ export const LevelsStateSchema = z.object({
   objectives: z.array(ObjectiveSchema),
   freeTime: FreeTimeBankSchema,
   lastProcessedSessionId: z.string().uuid().nullable(),
+  /** Cursor par app déclarée pour idempotence du fold app-usage. Map appId → date YYYY-MM-DD. */
+  lastProcessedAppUsageByApp: z.record(z.string(), z.string().nullable()).optional(),
 })
 export type LevelsState = z.infer<typeof LevelsStateSchema>
 
@@ -169,6 +172,25 @@ export const DeclaredAppsStateSchema = z.object({
 })
 export type DeclaredAppsState = z.infer<typeof DeclaredAppsStateSchema>
 
+// ─── Declared app usage tracking (sous-projet 6) ───────────────────────────
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+export const DeclaredAppUsageEntrySchema = z.object({
+  appId: z.string().uuid(),
+  /** Date locale YYYY-MM-DD. Une seule entrée par (appId, date). */
+  date: z.string().regex(DATE_REGEX),
+  minutes: z.number().int().min(0).max(1440),
+})
+export type DeclaredAppUsageEntry = z.infer<typeof DeclaredAppUsageEntrySchema>
+
+export const DeclaredAppUsageStateSchema = z.object({
+  entries: z.array(DeclaredAppUsageEntrySchema).max(10000),
+  /** Dernier tick du tracker. ISO datetime. */
+  lastTickAt: z.string().datetime().nullable(),
+})
+export type DeclaredAppUsageState = z.infer<typeof DeclaredAppUsageStateSchema>
+
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
@@ -177,4 +199,5 @@ export const STORAGE_SCHEMAS = {
   schedule: ScheduleStateSchema,
   levels: LevelsStateSchema,
   declared_apps: DeclaredAppsStateSchema,
+  declared_app_usage: DeclaredAppUsageStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

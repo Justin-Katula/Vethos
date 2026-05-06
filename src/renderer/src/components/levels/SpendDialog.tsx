@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Wallet } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { durationLabel } from '@/lib/format-time'
+import { useShortcut } from '@/lib/use-shortcut'
 
 type Props = {
   open: boolean
@@ -24,6 +25,8 @@ export function SpendDialog({
   const [reason, setReason] = useState('Pause')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useShortcut('Escape', onClose, { enabled: open && !busy })
 
   useEffect(() => {
     if (!open) return

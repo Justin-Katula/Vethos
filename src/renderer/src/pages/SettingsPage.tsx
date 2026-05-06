@@ -4,6 +4,7 @@ import { PageTransition } from '@/components/PageTransition'
 import { useSettingsStore } from '@/store/settings.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { cn } from '@/lib/cn'
+import { useShortcut } from '@/lib/use-shortcut'
 
 export default function SettingsPage() {
   const { username, savedAt, loaded, load, save } = useSettingsStore()
@@ -30,6 +31,8 @@ export default function SettingsPage() {
       setSaving(false)
     }
   }
+
+  useShortcut('Mod+S', () => void handleSave(), { enabled: dirty && !saving })
 
   const handleRestart = async () => {
     setRestarting(true)

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { computeCredits } from './credit-engine'
-import type { BlockingHistoryEntry, Objective, TimeRule } from '@shared/schemas'
+import { computeCredits, computeCreditsFromAppUsage } from './credit-engine'
+import type {
+  BlockingHistoryEntry,
+  DeclaredApp,
+  Objective,
+  TimeRule,
+} from '@shared/schemas'
 
 const RULE_A = '11111111-1111-1111-1111-111111111111'
 const RULE_B = '22222222-2222-2222-2222-222222222222'
@@ -197,5 +202,138 @@ describe('computeCredits', () => {
     expect(out.objectiveDeltas.get(OBJ_2)).toBe(30)
     expect(out.freeTimeDelta).toBe(45)
     expect(out.freeTimeEntries).toHaveLength(2)
+  })
+})
+
+// ─── App usage credit ─────────────────────────────────────────────────────
+
+const APP_VSCODE: DeclaredApp = {
+  id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  name: 'VS Code',
+  exeName: 'Code.exe',
+  linkedObjectiveId: OBJ_1,
+  xpRatio: 0.5,
+  createdAt: '2026-05-01T00:00:00.000Z',
+}
+
+const APP_CHROME_FREE: DeclaredApp = {
+  id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  name: 'Chrome',
+  exeName: 'chrome.exe',
+  linkedObjectiveId: null,
+  xpRatio: 0.25,
+  createdAt: '2026-05-01T00:00:00.000Z',
+}
+
+describe('computeCreditsFromAppUsage', () => {
+  it('crédite un objectif lié avec ratio appliqué', () => {
+    const minutesByDay = new Map([['2026-05-04', 60]])
+    const out = computeCreditsFromAppUsage(
+      {
+        apps: [{ app: APP_VSCODE, minutesByDay, lastProcessedDate: null }],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(out.objectiveDeltas.get(OBJ_1)).toBe(30) // 60 * 0.5
+    expect(out.freeTimeDelta).toBe(0)
+    expect(out.newCursorByApp.get(APP_VSCODE.id)).toBe('2026-05-04')
+  })
+
+  it('crédite le free time si app non liée à un objectif', () => {
+    const minutesByDay = new Map([['2026-05-04', 40]])
+    const out = computeCreditsFromAppUsage(
+      {
+        apps: [
+          { app: APP_CHROME_FREE, minutesByDay, lastProcessedDate: null },
+        ],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(out.objectiveDeltas.size).toBe(0)
+    expect(out.freeTimeDelta).toBe(10) // 40 * 0.25
+    expect(out.freeTimeEntries).toHaveLength(1)
+  })
+
+  it("ignore le jour courant (incomplet)", () => {
+    const minutesByDay = new Map([
+      ['2026-05-04', 60],
+      ['2026-05-05', 30], // today, doit être ignoré
+    ])
+    const out = computeCreditsFromAppUsage(
+      {
+        apps: [{ app: APP_VSCODE, minutesByDay, lastProcessedDate: null }],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(out.objectiveDeltas.get(OBJ_1)).toBe(30) // seul le 2026-05-04
+    expect(out.newCursorByApp.get(APP_VSCODE.id)).toBe('2026-05-04')
+  })
+
+  it('idempotent via cursor : ne re-crédite pas les jours déjà traités', () => {
+    const minutesByDay = new Map([
+      ['2026-05-03', 60],
+      ['2026-05-04', 60],
+    ])
+    const out = computeCreditsFromAppUsage(
+      {
+        apps: [
+          { app: APP_VSCODE, minutesByDay, lastProcessedDate: '2026-05-03' },
+        ],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(out.objectiveDeltas.get(OBJ_1)).toBe(30) // seul le 2026-05-04
+    expect(out.newCursorByApp.get(APP_VSCODE.id)).toBe('2026-05-04')
+  })
+
+  it('multi-app : cursors séparés', () => {
+    const out = computeCreditsFromAppUsage(
+      {
+        apps: [
+          {
+            app: APP_VSCODE,
+            minutesByDay: new Map([['2026-05-04', 60]]),
+            lastProcessedDate: null,
+          },
+          {
+            app: APP_CHROME_FREE,
+            minutesByDay: new Map([['2026-05-03', 40]]),
+            lastProcessedDate: null,
+          },
+        ],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(out.objectiveDeltas.get(OBJ_1)).toBe(30)
+    expect(out.freeTimeDelta).toBe(10)
+    expect(out.newCursorByApp.get(APP_VSCODE.id)).toBe('2026-05-04')
+    expect(out.newCursorByApp.get(APP_CHROME_FREE.id)).toBe('2026-05-03')
+  })
+
+  it('aucune app à traiter = no-op', () => {
+    const out = computeCreditsFromAppUsage({ apps: [] }, { today: '2026-05-05' })
+    expect(out.objectiveDeltas.size).toBe(0)
+    expect(out.freeTimeDelta).toBe(0)
+    expect(out.freeTimeEntries).toHaveLength(0)
+    expect(out.newCursorByApp.size).toBe(0)
+  })
+
+  it('appel répété avec le nouveau cursor = no-op', () => {
+    const minutesByDay = new Map([['2026-05-04', 60]])
+    const first = computeCreditsFromAppUsage(
+      {
+        apps: [{ app: APP_VSCODE, minutesByDay, lastProcessedDate: null }],
+      },
+      { today: '2026-05-05' },
+    )
+    const cursor = first.newCursorByApp.get(APP_VSCODE.id) ?? null
+    const second = computeCreditsFromAppUsage(
+      {
+        apps: [{ app: APP_VSCODE, minutesByDay, lastProcessedDate: cursor }],
+      },
+      { today: '2026-05-05' },
+    )
+    expect(second.objectiveDeltas.size).toBe(0)
+    expect(second.freeTimeDelta).toBe(0)
   })
 })

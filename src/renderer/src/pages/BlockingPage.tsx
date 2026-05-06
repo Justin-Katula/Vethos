@@ -8,7 +8,9 @@ import { ProfileCard } from '@/components/blocking/ProfileCard'
 import { ProfileEditor } from '@/components/blocking/ProfileEditor'
 import { UnlockModal } from '@/components/blocking/UnlockModal'
 import { HistoryList } from '@/components/blocking/HistoryList'
+import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
 import { cn } from '@/lib/cn'
+import { useToast } from '@/lib/use-toast'
 import type { BlockingProfile } from '@shared/schemas'
 
 export default function BlockingPage() {
@@ -31,6 +33,7 @@ export default function BlockingPage() {
   const [editingProfile, setEditingProfile] = useState<BlockingProfile | null>(null)
   const [unlockOpen, setUnlockOpen] = useState(false)
   const [duration, setDuration] = useState(60)
+  const toast = useToast()
 
   useEffect(() => {
     void load()
@@ -45,8 +48,10 @@ export default function BlockingPage() {
 
   const handleStart = async (p: BlockingProfile) => {
     await startSession(p.id, duration).catch((err) => {
-      // eslint-disable-next-line no-alert
-      alert(`Démarrage impossible : ${(err as Error).message}`)
+      toast.error({
+        title: 'Démarrage impossible',
+        description: (err as Error).message,
+      })
     })
   }
 
@@ -58,9 +63,16 @@ export default function BlockingPage() {
   if (!loaded) {
     return (
       <PageTransition>
-        <div className="flex h-full items-center justify-center text-sm text-text-muted">
-          Chargement…
-        </div>
+        <PageSkeleton>
+          <div className="space-y-2">
+            <div className="h-8 w-40 animate-pulse rounded bg-bg-card" />
+            <div className="h-3 w-60 animate-pulse rounded bg-bg-card" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </PageSkeleton>
       </PageTransition>
     )
   }

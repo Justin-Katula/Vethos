@@ -4,6 +4,7 @@ import { X, Trash2, Check } from 'lucide-react'
 import type { BlockingProfile, TimeRule } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { PALETTE, ICON_OPTIONS } from '@/lib/rule-palette'
+import { useShortcut } from '@/lib/use-shortcut'
 
 type SaveDraft = {
   id?: string
@@ -32,6 +33,8 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  useShortcut('Escape', onClose, { enabled: open && !busy })
 
   useEffect(() => {
     if (!open) return

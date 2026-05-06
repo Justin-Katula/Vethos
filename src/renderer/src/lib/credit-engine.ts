@@ -1,5 +1,6 @@
 import type {
   BlockingHistoryEntry,
+  DeclaredApp,
   FreeTimeEntry,
   Objective,
   TimeRule,
@@ -124,4 +125,97 @@ export function computeCredits(inputs: CreditInputs): CreditOutputs {
     freeTimeEntries,
     newCursorSessionId,
   }
+}
+
+// ─── Crédit depuis l'usage des apps déclarées (sous-projet 6) ──────────────
+
+export type AppUsageCreditInputs = {
+  /** Une entrée par app à traiter, avec ses minutes par jour. */
+  apps: Array<{
+    app: DeclaredApp
+    /** Map date YYYY-MM-DD → minutes accumulées ce jour-là. */
+    minutesByDay: Map<string, number>
+    /** Cursor : dernière date déjà créditée pour cette app. */
+    lastProcessedDate: string | null
+  }>
+}
+
+export type AppUsageCreditOutputs = {
+  objectiveDeltas: Map<string, number>
+  freeTimeDelta: number
+  freeTimeEntries: FreeTimeEntry[]
+  /** Nouveau cursor par appId. */
+  newCursorByApp: Map<string, string>
+}
+
+/**
+ * Crédit XP / free time pour les apps déclarées.
+ *
+ * Pour chaque app :
+ * - Considère seulement les jours strictement > lastProcessedDate
+ * - Ignore le jour courant (incomplet) — la date d'aujourd'hui n'est pas créditée tant qu'elle n'est pas révolue
+ * - Multiplie minutes × xpRatio
+ * - Si app liée à un objectif : crédite l'objectif
+ * - Sinon : crédite le free time
+ * - Avance le cursor à la dernière date traitée (jour révolu le plus récent)
+ *
+ * Idempotent : appel multiple = même résultat tant que minutesByDay n'évolue pas.
+ */
+export function computeCreditsFromAppUsage(
+  inputs: AppUsageCreditInputs,
+  options: { today?: string } = {},
+): AppUsageCreditOutputs {
+  const today = options.today ?? localDateToday()
+  const objectiveDeltas = new Map<string, number>()
+  const freeTimeEntries: FreeTimeEntry[] = []
+  const newCursorByApp = new Map<string, string>()
+  let freeTimeDelta = 0
+
+  for (const { app, minutesByDay, lastProcessedDate } of inputs.apps) {
+    // Ne traite que les jours révolus (< today) et > cursor
+    const datesToProcess = [...minutesByDay.keys()]
+      .filter((d) => d < today)
+      .filter((d) => lastProcessedDate === null || d > lastProcessedDate)
+      .sort()
+
+    if (datesToProcess.length === 0) continue
+
+    let lastSeen: string | null = null
+    for (const date of datesToProcess) {
+      const minutes = minutesByDay.get(date) ?? 0
+      lastSeen = date
+      const xpMinutes = Math.round(minutes * app.xpRatio)
+      if (xpMinutes <= 0) continue
+
+      if (app.linkedObjectiveId) {
+        const prev = objectiveDeltas.get(app.linkedObjectiveId) ?? 0
+        objectiveDeltas.set(app.linkedObjectiveId, prev + xpMinutes)
+      } else {
+        freeTimeDelta += xpMinutes
+        freeTimeEntries.push({
+          id: genUuid(),
+          at: new Date(`${date}T23:59:59.000Z`).toISOString(),
+          deltaMinutes: xpMinutes,
+          reason: `Usage déclaré : ${app.name} (${minutes} min)`,
+        })
+      }
+    }
+
+    if (lastSeen) newCursorByApp.set(app.id, lastSeen)
+  }
+
+  return {
+    objectiveDeltas,
+    freeTimeDelta,
+    freeTimeEntries,
+    newCursorByApp,
+  }
+}
+
+function localDateToday(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
