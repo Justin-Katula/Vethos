@@ -15,8 +15,9 @@
     "baseUrl": ".",
     "paths": {
       "@main/*": ["src/main/*"],
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@service/*": ["src/service/*"]
     }
   },
-  "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
+  "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*", "src/service/**/*"]
 }
