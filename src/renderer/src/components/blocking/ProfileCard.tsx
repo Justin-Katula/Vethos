@@ -25,13 +25,6 @@ export function ProfileCard({ profile, disabled, onStart, onEdit }: Props) {
         !disabled && 'hover:bg-bg-card-hover',
       )}
     >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            'radial-gradient(circle at top right, rgba(99,102,241,0.12), transparent 60%)',
-        }}
-      />
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <h3 className="truncate text-base font-semibold tracking-tight text-text-primary">

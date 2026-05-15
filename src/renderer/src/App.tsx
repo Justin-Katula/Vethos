@@ -7,16 +7,20 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ToastViewport } from './components/ui/Toast'
 import { FloatingCredit } from './components/levels/FloatingCredit'
 import { useSettingsStore } from './store/settings.store'
-import { useScheduleStore } from './store/schedule.store'
+import { flushSettingsPersist } from './store/settings.store'
+import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
 import { useBlockingStore } from './store/blocking.store'
 import { useLevelsStore } from './store/levels.store'
 import { useDeclaredAppsStore } from './store/declared-apps.store'
-import { useAppUsageStore } from './store/app-usage.store'
+import { useTasksStore } from './store/tasks.store'
+import { nexus } from './lib/ipc'
+import { useToast } from './lib/use-toast'
 import HomePage from './pages/HomePage'
 import ObjectivesPage from './pages/ObjectivesPage'
 import PlanningPage from './pages/PlanningPage'
 import BlockingPage from './pages/BlockingPage'
 import SettingsPage from './pages/SettingsPage'
+import TasksPage from './pages/TasksPage'
 
 export default function App(): JSX.Element {
   const loaded = useSettingsStore((s) => s.loaded)
@@ -24,25 +28,13 @@ export default function App(): JSX.Element {
   const loadSettings = useSettingsStore((s) => s.load)
 
   const loadSchedule = useScheduleStore((s) => s.load)
-  const scheduleLoaded = useScheduleStore((s) => s.loaded)
-  const rules = useScheduleStore((s) => s.rules)
-
   const loadBlocking = useBlockingStore((s) => s.load)
-  const blockingLoaded = useBlockingStore((s) => s.loaded)
-  const blockingState = useBlockingStore((s) => s.state)
-
   const loadLevels = useLevelsStore((s) => s.load)
-  const levelsLoaded = useLevelsStore((s) => s.loaded)
-  const reconcileFully = useLevelsStore((s) => s.reconcileFully)
-
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
-  const declaredAppsLoaded = useDeclaredAppsStore((s) => s.loaded)
-  const declaredApps = useDeclaredAppsStore((s) => s.apps)
-
-  const loadAppUsage = useAppUsageStore((s) => s.load)
-  const appUsageLoaded = useAppUsageStore((s) => s.loaded)
-  const subscribeAppUsage = useAppUsageStore((s) => s.subscribe)
-  const usageEntries = useAppUsageStore((s) => s.entries)
+  const loadTasks = useTasksStore((s) => s.load)
+  const reconcileLevelZero = useTasksStore((s) => s.reconcileLevelZero)
+  const tasksLoaded = useTasksStore((s) => s.loaded)
+  const toast = useToast()
 
   // Boot — charge tous les stores au montage
   useEffect(() => {
@@ -51,43 +43,43 @@ export default function App(): JSX.Element {
     void loadBlocking()
     void loadLevels()
     void loadDeclaredApps()
-    void loadAppUsage()
-  }, [
-    loadSettings,
-    loadSchedule,
-    loadBlocking,
-    loadLevels,
-    loadDeclaredApps,
-    loadAppUsage,
-  ])
+    void loadTasks()
+  }, [loadSettings, loadSchedule, loadBlocking, loadLevels, loadDeclaredApps, loadTasks])
 
-  // Subscribe au tick app-usage en continu
+  // V2 P9 — Réconciliation niveau-0 au boot (une fois tasks chargées)
   useEffect(() => {
-    if (!appUsageLoaded) return
-    return subscribeAppUsage()
-  }, [appUsageLoaded, subscribeAppUsage])
+    if (!tasksLoaded) return
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
+    void reconcileLevelZero(`${y}-${m}-${d}`)
+  }, [tasksLoaded, reconcileLevelZero])
 
-  // Réconciliation globale dès que toutes les sources sont prêtes,
-  // puis à chaque évolution de l'historique de blocage ou des entrées d'usage
   useEffect(() => {
-    if (!levelsLoaded || !blockingLoaded || !scheduleLoaded || !declaredAppsLoaded) return
-    void reconcileFully({
-      history: blockingState.history,
-      rules,
-      apps: declaredApps,
-      usageEntries,
+    const offFlush = nexus.app.onFlushDebounces(() => {
+      void Promise.all([flushSchedulePersist(), flushSettingsPersist()])
     })
-  }, [
-    levelsLoaded,
-    blockingLoaded,
-    scheduleLoaded,
-    declaredAppsLoaded,
-    blockingState.history,
-    rules,
-    declaredApps,
-    usageEntries,
-    reconcileFully,
-  ])
+    const offClock = nexus.blocking.onClockTamper((event) => {
+      toast.error({
+        title: 'Horloge modifiée',
+        description: `Saut détecté : ${Math.round(event.driftMs / 1000)} secondes.`,
+      })
+    })
+    const offUpdateReady = nexus.app.onUpdateDownloaded((info) => {
+      toast.info({
+        title: 'Mise à jour prête',
+        description: info.version
+          ? `Nexus ${info.version} sera installé au prochain redémarrage.`
+          : 'Elle sera installée au prochain redémarrage.',
+      })
+    })
+    return () => {
+      offFlush()
+      offClock()
+      offUpdateReady()
+    }
+  }, [toast])
 
   const showOnboarding = loaded && onboardingCompleted !== true
 
@@ -96,6 +88,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="/tasks" element={<TasksPage />} />
           <Route path="/objectives" element={<ObjectivesPage />} />
           <Route path="/planning" element={<PlanningPage />} />
           <Route path="/blocking" element={<BlockingPage />} />
@@ -105,8 +98,8 @@ export default function App(): JSX.Element {
       <AnimatePresence>
         {showOnboarding && <OnboardingOverlay key="onboarding" />}
       </AnimatePresence>
-      <ToastViewport />
       <FloatingCredit />
+      <ToastViewport />
     </ErrorBoundary>
   )
 }

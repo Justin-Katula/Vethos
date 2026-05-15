@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { ActiveSession, BlockingState } from '@shared/schemas'
+import type { BlockingHistoryEntry } from '@shared/schemas'
 import type { SessionPhase } from './types'
 import { isCooldownReady } from './locks/cooldown'
 import { isJustificationValid } from './locks/justification'
+import { monotonicNowMs, remainingSessionMs } from './timer'
 
 export type HostsAdapter = {
   apply: (args: { sessionId: string; startedAt: string; domains: string[] }) => Promise<void>
@@ -15,6 +17,7 @@ export type ProcessAdapter = {
 export type FirewallAdapter = {
   applyAll: (sessionId: string, exes: string[]) => Promise<string[]>
   removeAll: () => Promise<void>
+  removeOrphansExcept: (validNames: string[]) => Promise<void>
   applied: () => string[]
 }
 export type PersistenceAdapter = {
@@ -43,7 +46,10 @@ export type SessionManager = {
   submitJustification: (text: string) => Promise<{ ok: true } | { ok: false; reason: string }>
   endSessionForce: (reason: 'timer' | 'unlock') => Promise<void>
   hydrateFromDisk: () => Promise<void>
-  on: (event: 'sessionChanged', cb: (s: ActiveSession | null) => void) => void
+  on: {
+    (event: 'sessionChanged', cb: (s: ActiveSession | null) => void): void
+    (event: 'sessionEnded', cb: (entry: BlockingHistoryEntry, session: ActiveSession) => void): void
+  }
 }
 
 export function createSessionManager(adapters: SessionManagerAdapters): SessionManager {
@@ -52,6 +58,7 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
   let watcherHandle: { stop: () => void } | null = null
   let endTimer: ReturnType<typeof setTimeout> | null = null
   const listeners: Array<(s: ActiveSession | null) => void> = []
+  const endedListeners: Array<(entry: BlockingHistoryEntry, session: ActiveSession) => void> = []
 
   function emit() {
     for (const l of listeners) l(active)
@@ -60,7 +67,7 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
   function scheduleEndTimer() {
     if (endTimer) clearTimeout(endTimer)
     if (!active) return
-    const ms = Date.parse(active.endsAt) - Date.now()
+    const ms = remainingSessionMs(active)
     if (ms <= 0) {
       void endSessionForce('timer')
       return
@@ -84,14 +91,19 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
 
     phase = 'starting'
     const id = randomUUID()
-    const startedAt = new Date().toISOString()
-    const endsAt = new Date(Date.now() + durationMinutes * 60_000).toISOString()
+    const startedAtWall = Date.now()
+    const startedAtMono = monotonicNowMs()
+    const startedAt = new Date(startedAtWall).toISOString()
+    const endsAt = new Date(startedAtWall + durationMinutes * 60_000).toISOString()
     const session: ActiveSession = {
       id,
       profileId,
       profileSnapshot: profile,
       startedAt,
       endsAt,
+      startedAtWall,
+      startedAtMono,
+      durationMinutes,
       unlockState: { phase: 'locked' },
       appliedFirewallRules: [],
     }
@@ -150,13 +162,15 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     await adapters.hosts.flushDns().catch(() => {})
 
     const state = await adapters.persistence.readState()
-    state.history.unshift({
+    const endedSession = active
+    const historyEntry: BlockingHistoryEntry = {
       sessionId: active.id,
       profileId: active.profileId,
       startedAt: active.startedAt,
       endedAt: new Date().toISOString(),
       completedNormally: reason === 'timer',
-    })
+    }
+    state.history.unshift(historyEntry)
     if (state.history.length > 500) state.history.length = 500
     await adapters.persistence.writeState(state)
     await adapters.persistence.clearActive()
@@ -164,6 +178,7 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     active = null
     phase = 'idle'
     emit()
+    for (const listener of endedListeners) listener(historyEntry, endedSession)
   }
 
   async function requestUnlock(): Promise<ActiveSession['unlockState']> {
@@ -228,8 +243,13 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
 
   async function hydrateFromDisk(): Promise<void> {
     const existing = await adapters.persistence.readActive()
-    if (!existing) return
-    if (Date.parse(existing.endsAt) <= Date.now()) {
+    if (!existing) {
+      await adapters.firewall.removeAll().catch(() => {})
+      await adapters.hosts.clear().catch(() => {})
+      await adapters.hosts.flushDns().catch(() => {})
+      return
+    }
+    if (remainingSessionMs(existing) <= 0) {
       await adapters.firewall.removeAll().catch(() => {})
       await adapters.hosts.clear().catch(() => {})
       await adapters.hosts.flushDns().catch(() => {})
@@ -243,11 +263,11 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     })
     await adapters.hosts.flushDns()
     watcherHandle = adapters.processes.start(existing.profileSnapshot.blockedProcesses)
-    await adapters.firewall.removeAll()
     const ruleNames = await adapters.firewall.applyAll(
       existing.id,
       existing.profileSnapshot.blockedNetworkApps,
     )
+    await adapters.firewall.removeOrphansExcept(ruleNames)
     existing.appliedFirewallRules = ruleNames
     await adapters.persistence.writeActive(existing)
     active = existing
@@ -264,6 +284,12 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     submitJustification,
     endSessionForce,
     hydrateFromDisk,
-    on: (_, cb) => listeners.push(cb),
+    on: (event: 'sessionChanged' | 'sessionEnded', cb: unknown) => {
+      if (event === 'sessionChanged') {
+        listeners.push(cb as (s: ActiveSession | null) => void)
+        return
+      }
+      endedListeners.push(cb as (entry: BlockingHistoryEntry, session: ActiveSession) => void)
+    },
   }
 }

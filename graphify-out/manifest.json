@@ -1,0 +1,526 @@
+{
+  "C:\\Users\\obedi\\Nexus\\electron.vite.config.ts": {
+    "mtime": 1777935390.522866,
+    "hash": "06d93ffa55f0d96d25b97f14b3ebc552"
+  },
+  "C:\\Users\\obedi\\Nexus\\postcss.config.js": {
+    "mtime": 1777935437.409875,
+    "hash": "ef3ba2a81ba19f8ea5ddf625521e96f0"
+  },
+  "C:\\Users\\obedi\\Nexus\\tailwind.config.ts": {
+    "mtime": 1777935435.6244872,
+    "hash": "46b150bce8bb9c0d15a3e24c658a79d2"
+  },
+  "C:\\Users\\obedi\\Nexus\\vitest.config.ts": {
+    "mtime": 1777971527.0245566,
+    "hash": "d32ce8dd5e3e1c8ac5578be007d412e2"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\index.ts": {
+    "mtime": 1777970453.927906,
+    "hash": "46233b182b3c72e0fc813d2682c715b6"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\elevation.ts": {
+    "mtime": 1777970179.6893003,
+    "hash": "72f61a55ef101dafb9aac0f41c9a5f06"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\firewall\\netsh.test.ts": {
+    "mtime": 1777970301.6361866,
+    "hash": "490df6904ea35ed65b313ad01063da39"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\firewall\\netsh.ts": {
+    "mtime": 1777970300.7292104,
+    "hash": "b29ecbf66e0d20812bc37eb759935ebe"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\firewall\\rule-tracker.ts": {
+    "mtime": 1777970301.1742854,
+    "hash": "83482479e735da2ba3bd696d36dcc3e6"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\flush-dns.ts": {
+    "mtime": 1777970235.023906,
+    "hash": "80c0e202780eb6f9c98d4ff2e2d9ccf6"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\parser.test.ts": {
+    "mtime": 1777970205.019284,
+    "hash": "5f1c2e45cb6559f8691b138d69e0368d"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\parser.ts": {
+    "mtime": 1777970712.2668185,
+    "hash": "398b3d69656da402eb26c812eff689b8"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\sentinels.ts": {
+    "mtime": 1777970204.124364,
+    "hash": "8a3621df9b1b6240338f729b5942e8a3"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\subdomains.ts": {
+    "mtime": 1777970234.5759063,
+    "hash": "ca2d8a2616001308c9d2aec71f4fdedd"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\writer.test.ts": {
+    "mtime": 1777970235.9234133,
+    "hash": "ea472a0c059ff539560a1f7e4c2dcea3"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\hosts\\writer.ts": {
+    "mtime": 1777970235.460415,
+    "hash": "daba4fefd537d1cf4c2b978bbb03a04e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\ipc\\blocking.handlers.ts": {
+    "mtime": 1777970442.3282442,
+    "hash": "47176aefc56e64a1a0fe6f3c6edd0bef"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\processes\\enumerator.test.ts": {
+    "mtime": 1777970262.24507,
+    "hash": "ba09c3f5ed36308c64358d81f5bd631c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\processes\\enumerator.ts": {
+    "mtime": 1777970261.7823434,
+    "hash": "880cdc12479a17f9cc27ea2547805507"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\processes\\killer.ts": {
+    "mtime": 1777970277.1669605,
+    "hash": "4d9f22402f4104394b459b6ab320204f"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\processes\\safe-list.ts": {
+    "mtime": 1777970261.3323417,
+    "hash": "6662cde86b27ac338d1ddfcd49317d5e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\processes\\watcher.ts": {
+    "mtime": 1777970277.6245644,
+    "hash": "06ef0e586732745978917ad761bddf9a"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\drift-detector.ts": {
+    "mtime": 1777970441.445321,
+    "hash": "5553d740e85dbeffc9b49ec6bc61cd57"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\manager.test.ts": {
+    "mtime": 1777970459.9524956,
+    "hash": "7be0362a2865366e87dab183d4b4e2aa"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\manager.ts": {
+    "mtime": 1777970405.7869005,
+    "hash": "1551fa554b51c527c7959374cc7c756b"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\persistence.ts": {
+    "mtime": 1777970355.5751777,
+    "hash": "de4cd7859cdb0eca752af04e1382f7bb"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\types.ts": {
+    "mtime": 1777970355.1246686,
+    "hash": "02ceadd05e41e309f64b7eada63af9c9"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\locks\\cooldown.ts": {
+    "mtime": 1777970325.9698198,
+    "hash": "5ccb7567046c28fccbee6d7cb7f55bfe"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\locks\\justification.ts": {
+    "mtime": 1777970326.4233594,
+    "hash": "8d27c7a242fd280bb381b67c3193a40c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\blocking\\session\\locks\\locks.test.ts": {
+    "mtime": 1777970338.2789013,
+    "hash": "162dc6d4ccb95f6a020adbc4c5a2609d"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\ipc\\index.ts": {
+    "mtime": 1778014283.780927,
+    "hash": "6102be6c5b9b5e4332b22803e50396d5"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\ipc\\storage.handlers.ts": {
+    "mtime": 1777935874.3777728,
+    "hash": "d87b6220d1af93bcdfea7a259bb28ddf"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\storage\\atomic.test.ts": {
+    "mtime": 1777935581.3689587,
+    "hash": "475e104adf67d6c4a7e1b247103e385b"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\storage\\atomic.ts": {
+    "mtime": 1777935601.746812,
+    "hash": "7d53d2708fe9eb108a2d1ebf5f06452c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\storage\\index.ts": {
+    "mtime": 1777935819.7413342,
+    "hash": "012221f379648e16d1d5ac6b9124a7b4"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\storage\\storage.test.ts": {
+    "mtime": 1777935804.4753263,
+    "hash": "a3bc941b3754d123808d4eb3a831bd58"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\tracking\\app-usage-tracker.test.ts": {
+    "mtime": 1778014180.7052014,
+    "hash": "28f2503a5406c84076d9a12b69af53ff"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\tracking\\app-usage-tracker.ts": {
+    "mtime": 1778014217.144095,
+    "hash": "7ce0e9d20d414945c9ee87c1c361a63b"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\main\\tracking\\handlers.ts": {
+    "mtime": 1778014275.5877116,
+    "hash": "6c217a127ddeca08f736d37ccc759753"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\preload\\global.d.ts": {
+    "mtime": 1777935951.8057404,
+    "hash": "1298dc7859cb09eb4b6682fb0e8d57c1"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\preload\\index.ts": {
+    "mtime": 1778014297.6576264,
+    "hash": "5f05259aa35ce2f7ca2c08e89bf9905d"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\App.tsx": {
+    "mtime": 1778031516.2645552,
+    "hash": "1401d66330b2612ca5d8f14b780a0e3c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\main.tsx": {
+    "mtime": 1777936000.249989,
+    "hash": "d51f7278448396de7e86e67c2007a3ad"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\Layout.tsx": {
+    "mtime": 1777936619.1046956,
+    "hash": "24a642e6450d40b9b7ffb5926a7ead3f"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\NexusLogo.tsx": {
+    "mtime": 1777971777.8105125,
+    "hash": "431e4e14f81c97f56607c1ca03d63062"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\PagePlaceholder.tsx": {
+    "mtime": 1777936622.1257825,
+    "hash": "22f42ceda20660a182aa88ed804bd123"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\PageTransition.tsx": {
+    "mtime": 1777936616.7527938,
+    "hash": "5188ee35806719917fec2a8c41bee7a0"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\Sidebar.tsx": {
+    "mtime": 1777971784.630397,
+    "hash": "9f564cfa6680312bbb3fc8078565b629"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\blocking\\ActiveSessionCard.tsx": {
+    "mtime": 1777970551.9626617,
+    "hash": "6f567c25d61179ff7718beef2719c1bd"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\blocking\\HistoryList.tsx": {
+    "mtime": 1777970712.7043388,
+    "hash": "b721e4ced02443f8cbeb79d3f7842434"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\blocking\\ProfileCard.tsx": {
+    "mtime": 1777970551.5337932,
+    "hash": "c1eae019dc130a0d0b6c8d5aa5065ebc"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\blocking\\ProfileEditor.tsx": {
+    "mtime": 1778014926.9019008,
+    "hash": "72c7e00af1b2e7232ae496ace1a1ecd2"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\blocking\\UnlockModal.tsx": {
+    "mtime": 1777970713.1550388,
+    "hash": "8339dd5f97a200af8953fb5434cd4f3e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\interface\\EntryQuickPicker.tsx": {
+    "mtime": 1777971663.405637,
+    "hash": "c64010f70e44855b30dd378e8a6626f7"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\interface\\RuleEditor.tsx": {
+    "mtime": 1778014935.9173627,
+    "hash": "a3f6abd04e0f7a1f6b7c3a8fa4c914f5"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\interface\\RuleTable.tsx": {
+    "mtime": 1777971649.251003,
+    "hash": "5cde96470971185e6b9f1105203d6be4"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\interface\\TimeCircle.tsx": {
+    "mtime": 1777971762.1558862,
+    "hash": "962142aa727f96fe3177c787d1f26553"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\interface\\WeekCalendar.tsx": {
+    "mtime": 1777971857.501535,
+    "hash": "a2866220acc1ca959b53b2ceb7d11465"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\FloatingCredit.tsx": {
+    "mtime": 1778015084.1679862,
+    "hash": "ed1dd72860820eea8f9434d5ca19f176"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\FreeTimeWidget.tsx": {
+    "mtime": 1777988608.414309,
+    "hash": "8165af2cf673d5e106c141f0a2be8116"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\LevelRing.tsx": {
+    "mtime": 1777988464.874621,
+    "hash": "5b0806c8a9dc17e9b219e94adb7222b9"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\ObjectiveCard.tsx": {
+    "mtime": 1777988540.6193893,
+    "hash": "a583cee9801b84484a6ad58f349e2682"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\ObjectiveEditor.tsx": {
+    "mtime": 1778014943.86699,
+    "hash": "b2d6fe1a802f674aafbb444b5499a447"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\levels\\SpendDialog.tsx": {
+    "mtime": 1778014952.7746408,
+    "hash": "d7dd7d669812d527376d0e2c23dcde2f"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\AppsStep.tsx": {
+    "mtime": 1778013302.19263,
+    "hash": "1c653230cd11b4f102086409ffbb7f8e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\DonePage.tsx": {
+    "mtime": 1778013324.9864001,
+    "hash": "42ed2c3ecdae68a5b55634d70a0bb8e0"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\ObjectiveStep.tsx": {
+    "mtime": 1778013258.0332086,
+    "hash": "d10760b92b9fcd4dde407d15915e7eaf"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\OnboardingOverlay.tsx": {
+    "mtime": 1777989421.3933842,
+    "hash": "d698be452140f243b7602ec712b18cb3"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\ScheduleStep.tsx": {
+    "mtime": 1777989501.5673842,
+    "hash": "fb2ac9df1815b3bb83fc50dd0a2c7655"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\UsernameStep.tsx": {
+    "mtime": 1777989447.7528093,
+    "hash": "0acaef3576b4dba8801ba9840ae22d70"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\onboarding\\WelcomeStep.tsx": {
+    "mtime": 1777989437.4024823,
+    "hash": "8939d65a162d206c9bc8d6c68552defe"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\ui\\ConfirmDialog.tsx": {
+    "mtime": 1778014542.7802982,
+    "hash": "fad8afcf80df91946e77f3f7ca875c0b"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\ui\\ErrorBoundary.tsx": {
+    "mtime": 1778014561.8710299,
+    "hash": "56b8bd8c545bb89b9abbac9e52316890"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\ui\\Skeleton.tsx": {
+    "mtime": 1778014579.4712577,
+    "hash": "a9e126c48b7429163eefc131b2cc9e49"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\components\\ui\\Toast.tsx": {
+    "mtime": 1778014523.2243805,
+    "hash": "b89f219cde9ca18eb8bb71148a568625"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\cn.ts": {
+    "mtime": 1777935996.216569,
+    "hash": "29a85703c58a9889341b1eb10dac5f05"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\credit-engine.test.ts": {
+    "mtime": 1778014432.1725843,
+    "hash": "d79f2fcf4c13a784443841358af8e6a6"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\credit-engine.ts": {
+    "mtime": 1778014398.1317897,
+    "hash": "4aa3e66c19a2651667b63d8f93558d9e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\format-time.test.ts": {
+    "mtime": 1777971549.1218903,
+    "hash": "fee8056d02bc0c3ce5a6462a9c905818"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\format-time.ts": {
+    "mtime": 1777971548.673896,
+    "hash": "0e075fca827b167dbe086542c7b94a56"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\ipc.ts": {
+    "mtime": 1777936128.9353292,
+    "hash": "d8a74383b521e469a2df3ae79525f5fc"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\levels.test.ts": {
+    "mtime": 1777988327.4714336,
+    "hash": "528608f29c65dfd4e740f8c5def9ca14"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\levels.ts": {
+    "mtime": 1777988311.4607022,
+    "hash": "7352ec3ac37d2a1d4648e92add07f6a6"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\onboarding-templates.test.ts": {
+    "mtime": 1778013508.4217281,
+    "hash": "a7b43ed2f7a5a6243ccbeeb8f4e4d5f5"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\onboarding-templates.ts": {
+    "mtime": 1777989279.4641688,
+    "hash": "4295af13c6b7f8f70a77aaa2b9906592"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\rule-palette.ts": {
+    "mtime": 1777971599.7675612,
+    "hash": "52cced4a6cabb7598eda39a1e4f01dd5"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\schedule-selectors.test.ts": {
+    "mtime": 1777971509.5771644,
+    "hash": "d9bee0d5fe90fee4bed9c86b18fece09"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\schedule-selectors.ts": {
+    "mtime": 1777971485.2940893,
+    "hash": "1de51d5cdbbb83547d63aa260b32b4bf"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\use-shortcut.test.ts": {
+    "mtime": 1778014913.044956,
+    "hash": "05e5fec77be27a9843825c322ce60596"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\use-shortcut.ts": {
+    "mtime": 1778014895.3023376,
+    "hash": "cb91e60cc650f6196d0cf3c9c853947d"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\lib\\use-toast.ts": {
+    "mtime": 1778014509.6963847,
+    "hash": "afcf3f8965978903c467d63503f5e56c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\pages\\BlockingPage.tsx": {
+    "mtime": 1778031612.1513543,
+    "hash": "c1c11a67bc7da7554c6024305cc5c95e"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\pages\\HomePage.tsx": {
+    "mtime": 1778014621.040946,
+    "hash": "d6eff449ac98c8bff4a8cad93c0cb3da"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\pages\\ObjectivesPage.tsx": {
+    "mtime": 1778031597.200503,
+    "hash": "18621d4ab8e6b5ab781ea9072fb864db"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\pages\\PlanningPage.tsx": {
+    "mtime": 1778031573.461704,
+    "hash": "98fdc2c91ecfec9850cc3fd4624240df"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\pages\\SettingsPage.tsx": {
+    "mtime": 1778014962.2885523,
+    "hash": "a168768cd8e5f00badd2b3b7341060b7"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\app-usage.store.test.ts": {
+    "mtime": 1778014359.0168328,
+    "hash": "419d6dd2a43f0c38367ee6fc814bc521"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\app-usage.store.ts": {
+    "mtime": 1778014341.2585044,
+    "hash": "c85f35b48f3ba4e07920e469d1ad375f"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\blocking.store.ts": {
+    "mtime": 1777970505.98694,
+    "hash": "c71aa5cc1a21749bff758f2917743dc4"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\declared-apps.store.test.ts": {
+    "mtime": 1777989337.5402505,
+    "hash": "5b64cfe3ee03fc09730b8b8b731931b9"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\declared-apps.store.ts": {
+    "mtime": 1777989325.196705,
+    "hash": "579d440012f58c8a51ae1ec08d164b73"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\levels.store.ts": {
+    "mtime": 1778014485.1599936,
+    "hash": "b75623f9be7d84ca73798c1e4ad49c30"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\onboarding.store.ts": {
+    "mtime": 1778013338.1258392,
+    "hash": "d2e9ac05ba855b871bf0f101722f8176"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\schedule.store.ts": {
+    "mtime": 1777989475.7104323,
+    "hash": "00fd4b6b4959f630ff968b1f98c8857c"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\settings.store.ts": {
+    "mtime": 1777989366.3940716,
+    "hash": "024711182bf40971264856f82c5b5204"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\src\\store\\toast.store.ts": {
+    "mtime": 1778014504.3159883,
+    "hash": "32fff9f9ebbf6b0d7351bef0d6388308"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\shared\\ipc-channels.ts": {
+    "mtime": 1778014255.7782414,
+    "hash": "2532f560ef203f0795671f56ce183f77"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\shared\\schemas.ts": {
+    "mtime": 1778014121.182833,
+    "hash": "7872e53d936e5835af03a6d38212f356"
+  },
+  "C:\\Users\\obedi\\Nexus\\2026-05-05.md": {
+    "mtime": 1778043794.6354983,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "C:\\Users\\obedi\\Nexus\\electron-builder.yml": {
+    "mtime": 1777970871.173339,
+    "hash": "a5f81f01e1613e26fb41405bdb273aee"
+  },
+  "C:\\Users\\obedi\\Nexus\\NEXUS_SPEC.md": {
+    "mtime": 1778031685.3341844,
+    "hash": "f7b2bc95211a2b681536f35a2b0935e0"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-02-nexus-foundation-plan.md": {
+    "mtime": 1777769829.301615,
+    "hash": "f88b03c3ff6cf2e3962a3c1e9fb5ca4e"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-04-nexus-blocking-plan.md": {
+    "mtime": 1777954721.260605,
+    "hash": "627c42c4f3d86b5f96dae0c84740f589"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-05-nexus-interface-plan.md": {
+    "mtime": 1777971417.569826,
+    "hash": "d531d0b3668e46510a7ceebedcd85aa2"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-05-nexus-levels-plan.md": {
+    "mtime": 1777988160.489852,
+    "hash": "25bf9eacb037372b697c78969c17cc02"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-05-nexus-onboarding-plan.md": {
+    "mtime": 1777989150.4066815,
+    "hash": "419e05edb36435e1cf405294e22e7e52"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\plans\\2026-05-05-nexus-polish-plan.md": {
+    "mtime": 1778014028.424454,
+    "hash": "c8dc417c4180a8de97d89f383718d89d"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-02-nexus-foundation-design.md": {
+    "mtime": 1777769608.5166793,
+    "hash": "270bb0c8965423ea50a87e64a746a4f1"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-04-nexus-blocking-design.md": {
+    "mtime": 1777954200.729797,
+    "hash": "53c6d8775a3dbba52c16e7853dd629c2"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-05-nexus-interface-design.md": {
+    "mtime": 1777971389.7839365,
+    "hash": "c395ee34bf10101bc766b021fde48fcb"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-05-nexus-levels-design.md": {
+    "mtime": 1777988145.2493699,
+    "hash": "839bcb6ea063b24df20212b8b8db1182"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-05-nexus-onboarding-design.md": {
+    "mtime": 1777989133.0674121,
+    "hash": "144d9f1e07aece7dd456578ffb35cee9"
+  },
+  "C:\\Users\\obedi\\Nexus\\docs\\superpowers\\specs\\2026-05-05-nexus-polish-design.md": {
+    "mtime": 1778013982.0013506,
+    "hash": "748d66355e26150ca9b9281ced9e9efc"
+  },
+  "C:\\Users\\obedi\\Nexus\\release\\builder-debug.yml": {
+    "mtime": 1778013551.7876492,
+    "hash": "098a5f142e142082c4cbe9309fa1624d"
+  },
+  "C:\\Users\\obedi\\Nexus\\release\\builder-effective-config.yaml": {
+    "mtime": 1777953117.065862,
+    "hash": "4539bab3efbcff47dced5a72fb1a7b9f"
+  },
+  "C:\\Users\\obedi\\Nexus\\release\\win-unpacked\\LICENSE.electron.txt": {
+    "mtime": 1778013538.3393097,
+    "hash": "4d42118d35941e0f664dddbd83f633c5"
+  },
+  "C:\\Users\\obedi\\Nexus\\release\\win-unpacked\\LICENSES.chromium.html": {
+    "mtime": 1778013538.3332355,
+    "hash": "0ff177fbf2a3873dd573077840e0b8f5"
+  },
+  "C:\\Users\\obedi\\Nexus\\src\\renderer\\index.html": {
+    "mtime": 1777935994.3208325,
+    "hash": "818c0c74c8e5806d3872f0b186a36ec1"
+  },
+  "C:\\Users\\obedi\\Nexus\\PDF\\Focus_Mode_Blueprint_Scientifique.pdf": {
+    "mtime": 1777550262.2664237,
+    "hash": "7e93b48a26eb28195962de68c2bbefa0"
+  },
+  "C:\\Users\\obedi\\Nexus\\PDF\\Focus_Mode_Guide_Complet_Blocage.pdf": {
+    "mtime": 1777687809.8493032,
+    "hash": "0d1e2cbe2484cb39ad949a5b7b9fd7f8"
+  },
+  "C:\\Users\\obedi\\Nexus\\Logo\\Logo et interface.png": {
+    "mtime": 1777933781.0166996,
+    "hash": "fdbe2a62f0a5b6970ce65ad928d4a779"
+  }
+}

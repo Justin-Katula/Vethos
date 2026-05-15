@@ -108,26 +108,24 @@ function CreditPulse({
 }): JSX.Element {
   return (
     <AnimatePresence>
-      {event && (event.freeTimeDelta > 0 || event.objectiveDeltas.length > 0) && (
+      {event && event.objectiveDeltas.length > 0 && (
         <motion.div
           key={event.at}
           initial={{ opacity: 0, y: 12, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.95 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           className="pointer-events-none fixed bottom-10 left-1/2 z-[180] -translate-x-1/2"
         >
           <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-elevated backdrop-blur-md ring-1 ring-emerald-500/20">
             <motion.span
               animate={{ rotate: [0, 18, -10, 0], scale: [1, 1.15, 1] }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
             >
               <Sparkles size={16} className="text-emerald-300" />
             </motion.span>
             <span className="tabular-nums">
-              {event.freeTimeDelta > 0
-                ? `+${durationLabel(event.freeTimeDelta)} libre`
-                : `+${event.objectiveDeltas.reduce((s, d) => s + d.minutes, 0)} XP objectifs`}
+              +{durationLabel(event.objectiveDeltas.reduce((s, d) => s + d.minutes, 0))} objectifs
             </span>
           </div>
         </motion.div>
@@ -149,7 +147,7 @@ function SessionStartBanner({
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -16 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           className="pointer-events-none fixed left-1/2 top-6 z-[180] -translate-x-1/2"
         >
           <div className="flex items-center gap-2 rounded-full border border-accent/30 bg-accent/15 px-4 py-2 text-sm font-semibold text-accent shadow-elevated backdrop-blur-md ring-1 ring-accent/20">

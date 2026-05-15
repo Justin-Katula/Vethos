@@ -1,4 +1,4 @@
-appId: com.nexus.app
+appId: com.nexus.blocking
 productName: Nexus
 directories:
   output: release
@@ -6,6 +6,7 @@ directories:
 
 files:
   - 'out/**/*'
+  - 'package.json'
   - '!**/.vscode/*'
   - '!**/{.DS_Store,.git,.gitkeep,.gitignore,.npmrc,.eslintrc.cjs,.prettierrc}'
   - '!**/{README.md,docs}'
@@ -20,16 +21,24 @@ win:
     - target: portable
       arch:
         - x64
-  artifactName: ${productName}-Setup-${version}.${ext}
   requestedExecutionLevel: requireAdministrator
 
 nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
+  perMachine: true
+  allowElevation: true
+  allowToChangeInstallationDirectory: false
+  guid: a8e0b9da-61a1-4be1-9c1e-6ad8d7994e0f
   deleteAppDataOnUninstall: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Nexus
 
-publish: null
+portable:
+  artifactName: ${productName}-Portable-${version}.${ext}
+
+publish:
+  provider: github
+  owner: obedi
+  repo: Nexus

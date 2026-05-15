@@ -58,11 +58,11 @@ export function DonePage(): JSX.Element {
             initial={{ y: `${c.y}vh`, x: `${c.x}vw`, opacity: 1, rotate: c.rot }}
             animate={{
               y: '110vh',
-              rotate: c.rot + 720,
+              rotate: c.rot + 90,
               opacity: [1, 1, 0],
             }}
             transition={{
-              duration: 2.4,
+              duration: 0.3,
               delay: c.delay,
               ease: [0.4, 0, 0.6, 1],
             }}
@@ -80,21 +80,16 @@ export function DonePage(): JSX.Element {
       <motion.div
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
         className="relative flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400"
       >
-        <motion.div
-          animate={{ scale: [1, 1.4], opacity: [0.5, 0] }}
-          transition={{ duration: 1.4, repeat: Infinity }}
-          className="absolute inset-0 rounded-full bg-emerald-500/30"
-        />
         <CheckCircle2 size={48} strokeWidth={2.4} />
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
+        transition={{ delay: 0.25, duration: 0.25 }}
       >
         <h1 className="text-4xl font-bold tracking-tight text-text-primary">
           Tout est prêt.

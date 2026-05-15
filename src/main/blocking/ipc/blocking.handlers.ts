@@ -10,8 +10,18 @@ import { startProcessWatcher } from '../processes/watcher'
 import { applyNexusBlock, clearNexusBlock } from '../hosts/writer'
 import { flushDns } from '../hosts/flush-dns'
 import { createBlockingPersistence } from '../session/persistence'
-import { isElevated } from '../elevation'
+import { isElevated, requestElevatedRelaunch } from '../elevation'
 import { isSafeListed } from '../processes/safe-list'
+import { startAppLockerBlocker } from '../applocker/policy'
+import { evaluateSessionRules } from '../session/rules'
+import {
+  notifyBreakRequired,
+  notifyClockTamper,
+  notifySessionEnd,
+  notifySessionStart,
+} from '../../notifications'
+import { startClockMonitor } from '../session/clock-monitor'
+import log from '@main/logging/setup'
 
 export async function registerBlockingHandlers(
   storage: Storage,
@@ -19,12 +29,28 @@ export async function registerBlockingHandlers(
 ): Promise<void> {
   const persistence = createBlockingPersistence(storage)
   const firewall = createFirewallTracker()
+  const elevatedAtBoot = await isElevated()
+  const settings = await storage.read('settings')
+  const appLockerMode = settings?.strictBlocking === false ? 'AuditOnly' : 'Enabled'
   const manager = createSessionManager({
     hosts: { apply: applyNexusBlock, clear: clearNexusBlock, flushDns },
-    processes: { start: startProcessWatcher },
+    processes: {
+      start: (forbidden) => {
+        if (elevatedAtBoot) {
+          const appLocker = startAppLockerBlocker(forbidden, appLockerMode)
+          if (appLocker.applied) return { stop: appLocker.stop }
+          log.warn(
+            '[blocking] AppLocker unavailable, falling back to process watcher',
+            appLocker.error,
+          )
+        }
+        return startProcessWatcher(forbidden)
+      },
+    },
     firewall: {
       applyAll: firewall.applyAll,
       removeAll: firewall.removeAll,
+      removeOrphansExcept: firewall.removeOrphansExcept,
       applied: firewall.applied,
     },
     persistence,
@@ -32,6 +58,22 @@ export async function registerBlockingHandlers(
 
   manager.on('sessionChanged', (s) => {
     getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, s)
+  })
+  manager.on('sessionEnded', async (entry, session) => {
+    const durationMin = Math.max(
+      0,
+      Math.round((new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime()) / 60_000),
+    )
+    if (entry.completedNormally) {
+      notifySessionEnd(session.profileSnapshot.name, durationMin, getMainWindow)
+      const stats = await storage.read('stats')
+      await storage.write('stats', {
+        totalFocusMinutes: (stats?.totalFocusMinutes ?? 0) + durationMin,
+        totalSessions: (stats?.totalSessions ?? 0) + 1,
+        longestStreak: Math.max(stats?.longestStreak ?? 0, await computeLongestStreak(persistence)),
+        lastUpdated: new Date().toISOString(),
+      })
+    }
   })
 
   const drift = createDriftDetector()
@@ -41,15 +83,22 @@ export async function registerBlockingHandlers(
   drift.start(
     () => manager.getActive(),
     async (s) => {
-      await firewall.removeAll().catch(() => {})
       const names = await firewall.applyAll(s.id, s.profileSnapshot.blockedNetworkApps)
+      await firewall.removeOrphansExcept(names).catch(() => {})
       s.appliedFirewallRules = names
       await persistence.writeActive(s)
     },
   )
 
+  startClockMonitor((event) => {
+    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, {
+      driftMs: event.driftMs,
+    })
+    notifyClockTamper(event.driftMs, getMainWindow)
+  })
+
   await manager.hydrateFromDisk().catch((err) => {
-    console.error('[blocking] hydrate failed', err)
+    log.error('[blocking] hydrate failed', err)
   })
 
   ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_INITIAL_STATE, async () => {
@@ -86,7 +135,25 @@ export async function registerBlockingHandlers(
   ipcMain.handle(
     IPC_CHANNELS.BLOCKING_START_SESSION,
     async (_e, args: { profileId: string; durationMinutes: number }) => {
-      return manager.startSession(args)
+      const latestSettings = await storage.read('settings')
+      if (!elevatedAtBoot) {
+        throw new Error('Blocage non opérationnel — droits administrateur requis')
+      }
+      if (latestSettings?.sessionRulesEnabled !== false) {
+        const state = await persistence.readState()
+        const decision = evaluateSessionRules({
+          history: state.history,
+          profileId: args.profileId,
+          requestedMinutes: args.durationMinutes,
+        })
+        if (!decision.ok) {
+          notifyBreakRequired(decision.restMinutes, getMainWindow)
+          throw new Error(decision.reason)
+        }
+      }
+      const session = await manager.startSession(args)
+      notifySessionStart(session.profileSnapshot.name, args.durationMinutes, getMainWindow)
+      return session
     },
   )
 
@@ -102,5 +169,32 @@ export async function registerBlockingHandlers(
     return { hosts: 'ok', processes: 'ok', firewall: 'ok' }
   })
 
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, async () => isElevated())
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, async () => elevatedAtBoot)
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION, async () =>
+    requestElevatedRelaunch(),
+  )
+}
+
+async function computeLongestStreak(persistence: ReturnType<typeof createBlockingPersistence>): Promise<number> {
+  const state = await persistence.readState()
+  const days = [
+    ...new Set(
+      state.history
+        .filter((entry) => entry.completedNormally)
+        .map((entry) => {
+          const date = new Date(entry.endedAt)
+          return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+        }),
+    ),
+  ].sort((a, b) => a - b)
+
+  let longest = 0
+  let current = 0
+  let prev: number | null = null
+  for (const day of days) {
+    current = prev !== null && day - prev === 86_400_000 ? current + 1 : 1
+    longest = Math.max(longest, current)
+    prev = day
+  }
+  return longest
 }

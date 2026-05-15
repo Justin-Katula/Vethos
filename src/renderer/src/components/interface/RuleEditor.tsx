@@ -11,6 +11,7 @@ type SaveDraft = {
   name: string
   color: string
   icon?: string
+  categoryType?: TimeRule['categoryType']
   linkedProfileId?: string | null
 }
 
@@ -29,6 +30,7 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
   const [name, setName] = useState('')
   const [color, setColor] = useState(PALETTE[0]!)
   const [icon, setIcon] = useState<string | undefined>(undefined)
+  const [categoryType, setCategoryType] = useState<TimeRule['categoryType']>('custom')
   const [linkedProfileId, setLinkedProfileId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,11 +44,13 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
       setName(initial.name)
       setColor(initial.color)
       setIcon(initial.icon)
+      setCategoryType(initial.categoryType ?? 'custom')
       setLinkedProfileId(initial.linkedProfileId)
     } else {
       setName('')
       setColor(PALETTE[0]!)
       setIcon(undefined)
+      setCategoryType('custom')
       setLinkedProfileId(null)
     }
     setError(null)
@@ -64,6 +68,7 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
         name: name.trim(),
         color,
         icon,
+        categoryType,
         linkedProfileId,
       }
       if (initial?.id) draft.id = initial.id
@@ -200,6 +205,21 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                     )
                   })}
                 </div>
+              </Field>
+
+              <Field label="Catégorie" hint="Le calcul du temps libre soustrait sommeil, école, travail et engagements.">
+                <select
+                  value={categoryType ?? 'custom'}
+                  onChange={(e) => setCategoryType(e.target.value as TimeRule['categoryType'])}
+                  className={inputCls}
+                >
+                  <option value="custom">Personnalisé</option>
+                  <option value="sleep">Sommeil</option>
+                  <option value="school">École</option>
+                  <option value="work">Travail</option>
+                  <option value="commitment">Engagement protégé</option>
+                  <option value="free">Temps libre</option>
+                </select>
               </Field>
 
               <Field label="Profil de blocage lié" hint="Optionnel — purement informatif (l'auto-déclenchement viendra plus tard)">

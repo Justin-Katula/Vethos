@@ -31,77 +31,23 @@ export type Template = {
 
 const M = (h: number, m = 0): number => h * 60 + m
 
-const STUDENT: Template = {
-  id: 'student',
-  label: 'Étudiant',
-  description: 'Cours, révisions, sport et soirées libres.',
+const BASE: Template = {
+  id: 'student', // keep ID for compatibility
+  label: 'Base Incompressible',
+  description: 'Tes 3 piliers fixes : Sommeil, École, Travail. Nexus gérera le reste.',
   rules: [
-    { id: 'r-deep', name: 'Étude profonde', color: '#6366f1', icon: 'Book' },
-    { id: 'r-light', name: 'Révisions', color: '#06b6d4', icon: 'Brain' },
-    { id: 'r-sport', name: 'Sport', color: '#10b981', icon: 'Dumbbell' },
-    { id: 'r-rest', name: 'Récup', color: '#f97316', icon: 'Coffee' },
+    { id: 'r-sleep', name: 'Sommeil', color: '#1E2530', icon: 'Moon' },
+    { id: 'r-school', name: 'École', color: '#3BA3FF', icon: 'Book' },
+    { id: 'r-work', name: 'Travail', color: '#FF8A00', icon: 'Briefcase' },
   ],
   entries: [
-    { ruleId: 'r-deep', dayOfWeek: 0, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-light', dayOfWeek: 0, startMinute: M(14), endMinute: M(16) },
-    { ruleId: 'r-deep', dayOfWeek: 1, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-sport', dayOfWeek: 1, startMinute: M(17), endMinute: M(18, 30) },
-    { ruleId: 'r-deep', dayOfWeek: 2, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-light', dayOfWeek: 2, startMinute: M(14), endMinute: M(16) },
-    { ruleId: 'r-deep', dayOfWeek: 3, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-sport', dayOfWeek: 3, startMinute: M(17), endMinute: M(18, 30) },
-    { ruleId: 'r-light', dayOfWeek: 4, startMinute: M(10), endMinute: M(12) },
-    { ruleId: 'r-rest', dayOfWeek: 5, startMinute: M(11), endMinute: M(13) },
+    { ruleId: 'r-sleep', dayOfWeek: 0, startMinute: M(23), endMinute: M(7) + 1440 }, // simplified
+    { ruleId: 'r-school', dayOfWeek: 0, startMinute: M(8), endMinute: M(12) },
+    { ruleId: 'r-work', dayOfWeek: 1, startMinute: M(14), endMinute: M(18) },
   ],
 }
 
-const PRO: Template = {
-  id: 'pro',
-  label: 'Pro hybride',
-  description: 'Travail deep, réunions, coupures saines, weekend libre.',
-  rules: [
-    { id: 'r-deep', name: 'Travail deep', color: '#3b82f6', icon: 'Code' },
-    { id: 'r-meetings', name: 'Réunions', color: '#a855f7', icon: 'Briefcase' },
-    { id: 'r-sport', name: 'Sport', color: '#10b981', icon: 'Bike' },
-  ],
-  entries: [
-    { ruleId: 'r-deep', dayOfWeek: 0, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-meetings', dayOfWeek: 0, startMinute: M(14), endMinute: M(16) },
-    { ruleId: 'r-deep', dayOfWeek: 1, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-sport', dayOfWeek: 1, startMinute: M(18), endMinute: M(19) },
-    { ruleId: 'r-deep', dayOfWeek: 2, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-meetings', dayOfWeek: 2, startMinute: M(14), endMinute: M(16) },
-    { ruleId: 'r-deep', dayOfWeek: 3, startMinute: M(9), endMinute: M(12) },
-    { ruleId: 'r-sport', dayOfWeek: 3, startMinute: M(18), endMinute: M(19) },
-    { ruleId: 'r-deep', dayOfWeek: 4, startMinute: M(9), endMinute: M(12) },
-  ],
-}
-
-const BALANCED: Template = {
-  id: 'balanced',
-  label: 'Vie équilibrée',
-  description: 'Concentration, créativité, temps en famille, sommeil tôt.',
-  rules: [
-    { id: 'r-focus', name: 'Concentration', color: '#8b5cf6', icon: 'Brain' },
-    { id: 'r-create', name: 'Création', color: '#ec4899', icon: 'Music' },
-    { id: 'r-rest', name: 'Famille / repos', color: '#84cc16', icon: 'Heart' },
-    { id: 'r-sport', name: 'Sport', color: '#10b981', icon: 'Dumbbell' },
-  ],
-  entries: [
-    { ruleId: 'r-focus', dayOfWeek: 0, startMinute: M(9), endMinute: M(11) },
-    { ruleId: 'r-create', dayOfWeek: 0, startMinute: M(15), endMinute: M(17) },
-    { ruleId: 'r-focus', dayOfWeek: 1, startMinute: M(9), endMinute: M(11) },
-    { ruleId: 'r-sport', dayOfWeek: 1, startMinute: M(18), endMinute: M(19) },
-    { ruleId: 'r-focus', dayOfWeek: 2, startMinute: M(9), endMinute: M(11) },
-    { ruleId: 'r-create', dayOfWeek: 2, startMinute: M(15), endMinute: M(17) },
-    { ruleId: 'r-focus', dayOfWeek: 3, startMinute: M(9), endMinute: M(11) },
-    { ruleId: 'r-sport', dayOfWeek: 3, startMinute: M(18), endMinute: M(19) },
-    { ruleId: 'r-rest', dayOfWeek: 5, startMinute: M(10), endMinute: M(12) },
-    { ruleId: 'r-rest', dayOfWeek: 6, startMinute: M(10), endMinute: M(12) },
-  ],
-}
-
-export const TEMPLATES: readonly Template[] = [STUDENT, PRO, BALANCED]
+export const TEMPLATES: readonly Template[] = [BASE]
 
 /**
  * Convertit un template en données prêtes à insérer dans le store de schedule.

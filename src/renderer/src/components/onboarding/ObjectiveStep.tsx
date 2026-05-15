@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn'
 import { PALETTE } from '@/lib/rule-palette'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
+import { areColorsSimilar } from '@/lib/color-similarity'
 
 type Props = {
   preselectedRuleIds: string[]
@@ -22,15 +23,17 @@ export function ObjectiveStep({
   const objectives = useLevelsStore((s) => s.objectives)
 
   const initialColor = useMemo(() => {
-    if (preselectedRuleIds.length === 0) return PALETTE[10]! // violet par défaut
+    if (preselectedRuleIds.length === 0) return PALETTE[6]!
     const firstRule = rules.find((r) => r.id === preselectedRuleIds[0])
-    return firstRule?.color ?? PALETTE[10]!
+    return firstRule?.color ?? PALETTE[6]!
   }, [preselectedRuleIds, rules])
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(initialColor)
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>(preselectedRuleIds)
+  const [level, setLevel] = useState(5)
+  const [deadline, setDeadline] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +61,8 @@ export function ObjectiveStep({
             description: description.trim() || undefined,
             color,
             linkedRuleIds,
+            level,
+            deadline: deadline || undefined,
           })
         } catch (err) {
           setError((err as Error).message)
@@ -65,7 +70,7 @@ export function ObjectiveStep({
       })()
     }, 500)
     return () => clearTimeout(t)
-  }, [savedId, name, description, color, linkedRuleIds, saveObjective])
+  }, [savedId, name, description, color, linkedRuleIds, level, deadline, saveObjective])
 
   const toggleRule = (id: string): void => {
     setLinkedRuleIds((prev) =>
@@ -84,6 +89,8 @@ export function ObjectiveStep({
         description: description.trim() || undefined,
         color,
         linkedRuleIds,
+        level,
+        deadline: deadline || undefined,
       })
       setSavedId(created.id)
       onObjectiveCreated(created.id, color)
@@ -96,6 +103,9 @@ export function ObjectiveStep({
 
   const alreadyExists = objectives.length > 0 && !savedId
   const canCreate = name.trim().length > 0 && !busy && !savedId
+  const closeColorWarning = objectives.some((objective) =>
+    objective.id !== savedId && areColorsSimilar(objective.color, color),
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,6 +221,52 @@ export function ObjectiveStep({
             </div>
           )}
         </div>
+
+        <div className="space-y-4 pt-2">
+          <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
+            Intensité (Niveau recommandé: 5)
+          </label>
+          <div className="flex items-center justify-between">
+             <span className="text-3xl font-bold text-text-primary">{level}</span>
+             <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}>
+                {level === 5 ? 'Recommandé' : 'Manuel'}
+             </span>
+          </div>
+          <input
+            type="range"
+            min="3"
+            max="7"
+            step="1"
+            value={level}
+            onChange={(e) => setLevel(parseInt(e.target.value))}
+            className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-text-muted font-mono">
+            <span>3</span>
+            <span>4</span>
+            <span className="text-accent font-bold">5</span>
+            <span>6</span>
+            <span>7</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
+            Deadline optionnelle
+          </label>
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-base px-4 py-3 text-sm text-text-primary outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+          />
+        </div>
+
+        {closeColorWarning && (
+          <div className="rounded-md border border-orange/40 bg-orange/10 px-3 py-2 text-xs text-orange">
+            Cette couleur ressemble beaucoup à un objectif existant. Tu peux la garder, mais elle sera moins lisible sur le cercle.
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">

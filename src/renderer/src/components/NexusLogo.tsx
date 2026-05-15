@@ -50,7 +50,6 @@ export function NexusLogo({ size = 28, className }: Props) {
       </svg>
       <span
         className="text-base font-semibold tracking-tight text-text-primary"
-        style={{ letterSpacing: '-0.02em' }}
       >
         Nexus
       </span>

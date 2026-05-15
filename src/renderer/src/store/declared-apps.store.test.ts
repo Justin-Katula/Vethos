@@ -44,7 +44,6 @@ describe('useDeclaredAppsStore', () => {
           name: 'VS Code',
           exeName: 'Code.exe',
           linkedObjectiveId: null,
-          xpRatio: 0.5,
           createdAt: '2026-05-01T00:00:00.000Z',
         },
       ],
@@ -55,12 +54,11 @@ describe('useDeclaredAppsStore', () => {
   })
 
   it('saveApp() crée une app avec UUID + persiste', async () => {
-    mockStorage.write.mockResolvedValue(undefined)
+    mockStorage.write.mockResolvedValue({ ok: true })
     const created = await useDeclaredAppsStore.getState().saveApp({
       name: 'Notion',
       exeName: 'Notion.exe',
       linkedObjectiveId: null,
-      xpRatio: 0.25,
     })
     expect(created.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
@@ -78,24 +76,21 @@ describe('useDeclaredAppsStore', () => {
       name: 'Old',
       exeName: 'old.exe',
       linkedObjectiveId: null,
-      xpRatio: 0.25,
       createdAt: '2026-01-01T00:00:00.000Z',
     }
     useDeclaredAppsStore.setState({ loaded: true, apps: [original] })
-    mockStorage.write.mockResolvedValue(undefined)
+    mockStorage.write.mockResolvedValue({ ok: true })
 
     const updated = await useDeclaredAppsStore.getState().saveApp({
       id: original.id,
       name: 'New',
       exeName: 'new.exe',
       linkedObjectiveId: null,
-      xpRatio: 0.5,
     })
     expect(updated.id).toBe(original.id)
     expect(updated.createdAt).toBe('2026-01-01T00:00:00.000Z')
     expect(updated.name).toBe('New')
     expect(updated.exeName).toBe('new.exe')
-    expect(updated.xpRatio).toBe(0.5)
   })
 
   it('deleteApp() retire et persiste', async () => {
@@ -104,11 +99,10 @@ describe('useDeclaredAppsStore', () => {
       name: 'X',
       exeName: 'x.exe',
       linkedObjectiveId: null,
-      xpRatio: 0.25,
       createdAt: '2026-01-01T00:00:00.000Z',
     }
     useDeclaredAppsStore.setState({ loaded: true, apps: [app] })
-    mockStorage.write.mockResolvedValue(undefined)
+    mockStorage.write.mockResolvedValue({ ok: true })
 
     await useDeclaredAppsStore.getState().deleteApp(app.id)
     expect(useDeclaredAppsStore.getState().apps).toHaveLength(0)
@@ -123,7 +117,6 @@ describe('useDeclaredAppsStore', () => {
         name: 'X',
         exeName: 'x.exe',
         linkedObjectiveId: null,
-        xpRatio: 0.5,
       }),
     ).rejects.toThrow()
   })

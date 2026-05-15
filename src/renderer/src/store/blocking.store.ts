@@ -20,6 +20,7 @@ type BlockingStore = {
   requestUnlock: () => Promise<void>
   submitJustification: (text: string) => Promise<{ ok: true } | { ok: false; reason: string }>
   refreshLayerStatus: () => Promise<void>
+  requestElevation: () => Promise<void>
 }
 
 export const useBlockingStore = create<BlockingStore>((set, get) => ({
@@ -81,5 +82,9 @@ export const useBlockingStore = create<BlockingStore>((set, get) => ({
   async refreshLayerStatus() {
     const s = await nexus.blocking.getLayerStatus()
     set({ layerStatus: s })
+  },
+
+  async requestElevation() {
+    await nexus.blocking.requestElevation()
   },
 }))

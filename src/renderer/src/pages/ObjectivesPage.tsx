@@ -44,7 +44,7 @@ export default function ObjectivesPage(): JSX.Element {
   const sorted = useMemo(
     () =>
       [...objectives].sort((a, b) => {
-        if (b.xpMinutes !== a.xpMinutes) return b.xpMinutes - a.xpMinutes
+        if (b.level !== a.level) return b.level - a.level
         return a.createdAt.localeCompare(b.createdAt)
       }),
     [objectives],
@@ -80,7 +80,7 @@ export default function ObjectivesPage(): JSX.Element {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Mes objectifs</h1>
             <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-              {"Le travail concentré te fait monter en niveau. Chaque session terminée crédite tes objectifs liés et alimente ta banque de temps libre."}
+              {"Tes objectifs donnent le cap. Le temps libre quotidien est calculé depuis ton planning, puis réparti vers tes tâches actives."}
             </p>
           </div>
           {sorted.length > 0 && (
@@ -100,7 +100,7 @@ export default function ObjectivesPage(): JSX.Element {
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.25 }}
               className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-dashed border-border-subtle bg-bg-elevated/40 p-10 text-center"
             >
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
@@ -149,6 +149,7 @@ export default function ObjectivesPage(): JSX.Element {
       <ObjectiveEditor
         open={editorOpen}
         initial={editing}
+        existingObjectives={objectives}
         rules={rules}
         onClose={() => setEditorOpen(false)}
         onSave={saveObjective}

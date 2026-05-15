@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import type { ScheduleEntry, ScheduleState, TimeRule } from '@shared/schemas'
 import {
   dateToMinuteOfDay,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/schedule-selectors'
 import { formatCountdown, minuteToHHMM } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
+import { useLevelsStore } from '@/store/levels.store'
 
 type Props = {
   rules: TimeRule[]
@@ -50,12 +52,14 @@ function minuteToAngle(minute: number): number {
 }
 
 export function TimeCircle({ rules, entries, size = 480 }: Props) {
+  const navigate = useNavigate()
+  const objectives = useLevelsStore((s) => s.objectives)
   const [now, setNow] = useState(() => new Date())
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const id = setInterval(() => setNow(new Date()), 10_000)
+    const id = setInterval(() => setNow(new Date()), 1_000)
     return () => clearInterval(id)
   }, [])
 
@@ -73,6 +77,15 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
     [entries, dow],
   )
   const ruleById = useMemo(() => new Map(rules.map((r) => [r.id, r])), [rules])
+  const objectiveByRuleId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const objective of objectives) {
+      for (const ruleId of objective.linkedRuleIds) {
+        map.set(ruleId, objective.id)
+      }
+    }
+    return map
+  }, [objectives])
 
   const state: ScheduleState = useMemo(() => ({ rules, entries }), [rules, entries])
   const current = getCurrentEntry(state, now)
@@ -98,13 +111,6 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
             <stop offset="60%" stopColor="hsl(220 16% 8%)" stopOpacity="0" />
             <stop offset="100%" stopColor="hsl(220 16% 6%)" stopOpacity="0.6" />
           </radialGradient>
-          <filter id="tc-glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="6" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
         {/* halo de fond */}
@@ -125,6 +131,10 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
         {todayEntries.map((e) => {
           const rule = ruleById.get(e.ruleId)
           if (!rule) return null
+          const objectiveId = objectiveByRuleId.get(e.ruleId)
+          const clickable =
+            Boolean(objectiveId) &&
+            !['sleep', 'school', 'work', 'commitment'].includes(rule.categoryType ?? '')
           const startA = minuteToAngle(e.startMinute)
           const endA = minuteToAngle(e.endMinute)
           // si arc proche de 360°, on dessine un cercle complet
@@ -139,6 +149,10 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
                 stroke={rule.color}
                 strokeWidth={STROKE}
                 opacity={0.9}
+                role={clickable ? 'button' : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined}
+                className={clickable ? 'cursor-pointer transition-opacity hover:opacity-100' : undefined}
               />
             )
           }
@@ -149,11 +163,24 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
               fill="none"
               stroke={rule.color}
               strokeWidth={STROKE}
-              strokeLinecap="round"
+              strokeLinecap="butt"
               opacity={current?.entry.id === e.id ? 1 : 0.7}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined}
+              onKeyDown={
+                clickable
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        navigate(`/objectives?objective=${objectiveId}`)
+                      }
+                    }
+                  : undefined
+              }
+              className={clickable ? 'cursor-pointer transition-opacity hover:opacity-100' : undefined}
               style={{
-                filter: current?.entry.id === e.id ? 'url(#tc-glow)' : undefined,
-                transition: 'opacity 300ms',
+                transition: 'opacity 250ms',
               }}
             />
           )
@@ -203,7 +230,7 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
         <motion.g
           initial={false}
           animate={{ rotate: mounted ? (minuteOfDay / 1440) * 360 : 0 }}
-          transition={{ duration: mounted ? 1 : 1.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: mounted ? 0.25 : 0.25, ease: 'linear' }}
           style={{ originX: `${cx}px`, originY: `${cy}px` }}
         >
           <line

@@ -2,12 +2,15 @@ import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type { ScheduleEntry, ScheduleState, TimeRule } from '@shared/schemas'
 import { hasOverlap } from '@/lib/schedule-selectors'
+import { assertStorageWrite } from '@/lib/storage-write'
+import { useToastStore } from './toast.store'
 
 type SaveRuleDraft = {
   id?: string
   name: string
   color: string
   icon?: string
+  categoryType?: TimeRule['categoryType']
   linkedProfileId?: string | null
 }
 
@@ -33,12 +36,63 @@ type ScheduleStore = {
   replaceAll: (rules: TimeRule[], entries: ScheduleEntry[]) => Promise<void>
 }
 
+const SCHEDULE_DEBOUNCE_MS = 500
+
+let pendingState: ScheduleState | null = null
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let pendingResolvers: Array<{
+  resolve: () => void
+  reject: (err: unknown) => void
+}> = []
+
 function uuid(): string {
   return crypto.randomUUID()
 }
 
-async function persist(state: ScheduleState): Promise<void> {
-  await nexus.storage.write('schedule', state)
+function notifyPersistError(err: unknown): void {
+  useToastStore.getState().push({
+    variant: 'error',
+    title: 'Sauvegarde planning échouée',
+    description: err instanceof Error ? err.message : String(err),
+  })
+}
+
+async function writeSchedule(state: ScheduleState): Promise<void> {
+  const result = await nexus.storage.write('schedule', state)
+  assertStorageWrite(result, 'schedule')
+}
+
+export async function flushSchedulePersist(): Promise<void> {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  if (!pendingState) return
+
+  const state = pendingState
+  const waiters = pendingResolvers
+  pendingState = null
+  pendingResolvers = []
+
+  try {
+    await writeSchedule(state)
+    waiters.forEach(({ resolve }) => resolve())
+  } catch (err) {
+    notifyPersistError(err)
+    waiters.forEach(({ reject }) => reject(err))
+  }
+}
+
+function persistDebounced(state: ScheduleState): Promise<void> {
+  pendingState = state
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => {
+    void flushSchedulePersist()
+  }, SCHEDULE_DEBOUNCE_MS)
+
+  return new Promise((resolve, reject) => {
+    pendingResolvers.push({ resolve, reject })
+  })
 }
 
 export const useScheduleStore = create<ScheduleStore>((set, get) => ({
@@ -67,6 +121,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
         name: draft.name,
         color: draft.color,
         icon: draft.icon,
+        categoryType: draft.categoryType ?? rules[i]!.categoryType,
         linkedProfileId: draft.linkedProfileId ?? null,
       }
       rules[i] = saved
@@ -76,13 +131,14 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
         name: draft.name,
         color: draft.color,
         icon: draft.icon,
+        categoryType: draft.categoryType ?? 'custom',
         linkedProfileId: draft.linkedProfileId ?? null,
         createdAt: now,
       }
       rules.push(saved)
     }
     set({ rules })
-    await persist({ rules, entries: get().entries })
+    await persistDebounced({ rules, entries: get().entries })
     return saved
   },
 
@@ -90,7 +146,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     const rules = get().rules.filter((r) => r.id !== id)
     const entries = get().entries.filter((e) => e.ruleId !== id)
     set({ rules, entries })
-    await persist({ rules, entries })
+    await persistDebounced({ rules, entries })
   },
 
   async saveEntry(draft) {
@@ -136,18 +192,18 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       entries.push(saved)
     }
     set({ entries })
-    await persist({ rules: get().rules, entries })
+    await persistDebounced({ rules: get().rules, entries })
     return saved
   },
 
   async deleteEntry(id) {
     const entries = get().entries.filter((e) => e.id !== id)
     set({ entries })
-    await persist({ rules: get().rules, entries })
+    await persistDebounced({ rules: get().rules, entries })
   },
 
   async replaceAll(rules, entries) {
     set({ rules, entries })
-    await persist({ rules, entries })
+    await persistDebounced({ rules, entries })
   },
 }))

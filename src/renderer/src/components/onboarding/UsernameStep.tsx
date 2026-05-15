@@ -24,7 +24,7 @@ export function UsernameStep(): JSX.Element {
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.25 }}
         className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/15 text-accent"
       >
         <User size={28} />

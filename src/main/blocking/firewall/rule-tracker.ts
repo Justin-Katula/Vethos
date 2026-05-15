@@ -4,6 +4,7 @@ export type FirewallTracker = {
   applied: () => string[]
   applyAll: (sessionId: string, exes: string[]) => Promise<string[]>
   removeAll: () => Promise<void>
+  removeOrphansExcept: (validNames: string[]) => Promise<void>
   hydrate: (existing: string[]) => void
 }
 
@@ -31,6 +32,15 @@ export function createFirewallTracker(): FirewallTracker {
         await deleteRuleByName(name).catch(() => {})
       }
       applied = []
+    },
+    async removeOrphansExcept(validNames) {
+      const valid = new Set(validNames)
+      const all = await listRuleNames().catch(() => [] as string[])
+      const orphans = all.filter((n) => n.startsWith('Nexus_Block_') && !valid.has(n))
+      for (const name of orphans) {
+        await deleteRuleByName(name).catch(() => {})
+      }
+      applied = validNames.slice()
     },
   }
 }

@@ -1,0 +1,485 @@
+{
+  "communities": {
+    "0": [
+      "blocking_profilecard_profilecard",
+      "blocking_unlockmodal_handlesubmit",
+      "interface_ruleeditor_handledelete",
+      "interface_ruleeditor_handlesave",
+      "levels_objectiveeditor_togglerule",
+      "levels_spenddialog_handlespend",
+      "lib_cn_cn",
+      "onboarding_appsstep_findbyexe",
+      "onboarding_appsstep_handleaddcustom",
+      "onboarding_appsstep_handletoggle",
+      "onboarding_appsstep_handleupdate",
+      "onboarding_appsstep_isadded",
+      "onboarding_appsstep_setbusy",
+      "onboarding_objectivestep_handlecreate",
+      "src_renderer_src_components_blocking_profileeditor_tsx",
+      "src_renderer_src_components_blocking_unlockmodal_tsx",
+      "src_renderer_src_components_interface_ruleeditor_tsx",
+      "src_renderer_src_components_levels_objectiveeditor_tsx",
+      "src_renderer_src_components_levels_spenddialog_tsx",
+      "src_renderer_src_components_onboarding_appsstep_tsx",
+      "src_renderer_src_components_onboarding_objectivestep_tsx",
+      "src_renderer_src_components_ui_toast_tsx",
+      "src_renderer_src_lib_cn_ts",
+      "ui_toast_toastitem"
+    ],
+    "1": [
+      "blocking_elevation_iselevated",
+      "firewall_rule_tracker_createfirewalltracker",
+      "hosts_flush_dns_flushdns",
+      "hosts_parser_parsehostsfile",
+      "hosts_subdomains_expanddomain",
+      "hosts_writer_applynexusblock",
+      "hosts_writer_atomicwritehosts",
+      "hosts_writer_clearnexusblock",
+      "hosts_writer_ensurebackup",
+      "hosts_writer_ensuretrailingnewline",
+      "hosts_writer_rendernexusblock",
+      "ipc_blocking_handlers_registerblockinghandlers",
+      "session_drift_detector_createdriftdetector",
+      "session_persistence_createblockingpersistence",
+      "src_main_blocking_elevation_ts",
+      "src_main_blocking_hosts_parser_test_ts",
+      "src_main_blocking_hosts_parser_ts",
+      "src_main_blocking_hosts_subdomains_ts",
+      "src_main_blocking_hosts_writer_test_ts",
+      "src_main_blocking_hosts_writer_ts",
+      "src_main_blocking_ipc_blocking_handlers_ts",
+      "src_main_blocking_session_drift_detector_ts",
+      "src_main_blocking_session_persistence_ts"
+    ],
+    "2": [
+      "ipc_index_registerallipchandlers",
+      "ipc_storage_handlers_registerstoragehandlers",
+      "main_index_createmainwindow",
+      "src_main_index_ts",
+      "src_main_ipc_storage_handlers_ts",
+      "src_main_storage_atomic_test_ts",
+      "src_main_storage_atomic_ts",
+      "src_main_storage_storage_test_ts",
+      "src_main_tracking_app_usage_tracker_ts",
+      "src_main_tracking_handlers_ts",
+      "src_renderer_src_store_app_usage_store_test_ts",
+      "storage_atomic_atomicread",
+      "storage_atomic_atomicwrite",
+      "storage_atomic_isnoentryerror",
+      "storage_index_createstorage",
+      "tracking_app_usage_tracker_createtracker",
+      "tracking_app_usage_tracker_daysbetween",
+      "tracking_app_usage_tracker_entrykey",
+      "tracking_app_usage_tracker_test_makemocks",
+      "tracking_app_usage_tracker_todaylocal",
+      "tracking_handlers_registerappusagehandlers"
+    ],
+    "3": [
+      "lib_credit_engine_computecredits",
+      "lib_credit_engine_computecreditsfromappusage",
+      "lib_credit_engine_durationminutes",
+      "lib_credit_engine_genuuid",
+      "lib_credit_engine_localdatetoday",
+      "lib_credit_engine_test_objective",
+      "lib_credit_engine_test_rule",
+      "lib_credit_engine_test_session",
+      "src_renderer_src_lib_credit_engine_test_ts",
+      "src_renderer_src_lib_credit_engine_ts",
+      "src_renderer_src_store_app_usage_store_ts",
+      "store_app_usage_store_selectminutesbyday",
+      "store_app_usage_store_selectminutesthisweek",
+      "store_app_usage_store_selectminutestoday"
+    ],
+    "4": [
+      "interface_weekcalendar_async",
+      "interface_weekcalendar_handlepickrule",
+      "interface_weekcalendar_minutefromy",
+      "interface_weekcalendar_oncellmousedown",
+      "interface_weekcalendar_onmove",
+      "interface_weekcalendar_onresizemousedown",
+      "lib_format_time_durationlabel",
+      "lib_format_time_formatcountdown",
+      "lib_schedule_selectors_snapto15",
+      "pages_homepage_minutetohhmm",
+      "src_renderer_src_components_interface_weekcalendar_tsx",
+      "src_renderer_src_lib_format_time_test_ts",
+      "src_renderer_src_lib_format_time_ts",
+      "src_renderer_src_pages_homepage_tsx"
+    ],
+    "5": [
+      "interface_timecircle_describearc",
+      "interface_timecircle_minutetoangle",
+      "interface_timecircle_polartocartesian",
+      "interface_timecircle_timecircle",
+      "lib_schedule_selectors_datetominuteofday",
+      "lib_schedule_selectors_datetominuteofweek",
+      "lib_schedule_selectors_entriesforday",
+      "lib_schedule_selectors_getcurrententry",
+      "lib_schedule_selectors_getnextchange",
+      "lib_schedule_selectors_jsdatetodayofweek",
+      "lib_schedule_selectors_test_entry",
+      "src_renderer_src_lib_schedule_selectors_ts"
+    ],
+    "6": [
+      "processes_enumerator_listprocesses",
+      "processes_enumerator_parsecsvline",
+      "processes_enumerator_parsetasklistcsv",
+      "processes_killer_killbyimagename",
+      "processes_safe_list_issafelisted",
+      "processes_watcher_startprocesswatcher",
+      "src_main_blocking_processes_enumerator_test_ts",
+      "src_main_blocking_processes_enumerator_ts",
+      "src_main_blocking_processes_killer_ts",
+      "src_main_blocking_processes_safe_list_ts",
+      "src_main_blocking_processes_watcher_ts"
+    ],
+    "7": [
+      "locks_cooldown_iscooldownready",
+      "locks_cooldown_remainingms",
+      "locks_justification_countwords",
+      "locks_justification_isjustificationvalid",
+      "session_manager_createsessionmanager",
+      "session_manager_test_makeadapters",
+      "src_main_blocking_session_locks_cooldown_ts",
+      "src_main_blocking_session_locks_justification_ts",
+      "src_main_blocking_session_locks_locks_test_ts",
+      "src_main_blocking_session_manager_test_ts",
+      "src_main_blocking_session_manager_ts"
+    ],
+    "8": [
+      "components_layout_layout",
+      "onboarding_onboardingoverlay_onboardingoverlay",
+      "onboarding_usernamestep_usernamestep",
+      "src_renderer_src_app_tsx",
+      "src_renderer_src_components_layout_tsx",
+      "src_renderer_src_components_onboarding_onboardingoverlay_tsx",
+      "src_renderer_src_components_ui_errorboundary_tsx",
+      "ui_errorboundary_errorboundary",
+      "ui_errorboundary_errorboundary_componentdidcatch",
+      "ui_errorboundary_errorboundary_getderivedstatefromerror",
+      "ui_errorboundary_errorboundary_render"
+    ],
+    "9": [
+      "firewall_netsh_addblockrule",
+      "firewall_netsh_deleterulebyname",
+      "firewall_netsh_listrulenames",
+      "firewall_netsh_parsenetshshowrules",
+      "firewall_netsh_rulenamefor",
+      "src_main_blocking_firewall_netsh_test_ts",
+      "src_main_blocking_firewall_netsh_ts",
+      "src_main_blocking_firewall_rule_tracker_ts"
+    ],
+    "10": [
+      "interface_weekcalendar_onup",
+      "lib_onboarding_templates_applytemplate",
+      "lib_onboarding_templates_m",
+      "lib_schedule_selectors_hasoverlap",
+      "onboarding_schedulestep_handleselect",
+      "onboarding_schedulestep_minutetoy",
+      "src_renderer_src_components_onboarding_schedulestep_tsx",
+      "src_renderer_src_lib_onboarding_templates_ts"
+    ],
+    "11": [
+      "lib_use_shortcut_ismac",
+      "lib_use_shortcut_ismacplatform",
+      "lib_use_shortcut_matchescombo",
+      "lib_use_shortcut_test_mk",
+      "lib_use_shortcut_useshortcut",
+      "pages_settingspage_settingspage",
+      "src_renderer_src_lib_use_shortcut_test_ts",
+      "src_renderer_src_pages_settingspage_tsx"
+    ],
+    "12": [
+      "src_renderer_src_store_declared_apps_store_ts",
+      "src_renderer_src_store_levels_store_ts",
+      "src_renderer_src_store_schedule_store_ts",
+      "src_renderer_src_store_settings_store_ts",
+      "store_levels_store_buildminutesbydaymap",
+      "store_levels_store_persist",
+      "store_levels_store_uuid"
+    ],
+    "13": [
+      "pages_blockingpage_handlerequestunlock",
+      "pages_blockingpage_handlestart",
+      "pages_blockingpage_openeditor",
+      "src_renderer_src_pages_blockingpage_tsx",
+      "src_renderer_src_pages_objectivespage_tsx"
+    ],
+    "14": [
+      "components_pageplaceholder_pageplaceholder",
+      "components_pagetransition_pagetransition",
+      "src_renderer_src_components_pagetransition_tsx"
+    ],
+    "15": [
+      "interface_entryquickpicker_onclickaway",
+      "interface_entryquickpicker_onkey",
+      "src_renderer_src_components_interface_entryquickpicker_tsx"
+    ],
+    "16": [
+      "levels_freetimewidget_buildheatmap",
+      "levels_freetimewidget_weektotalcredited",
+      "src_renderer_src_components_levels_freetimewidget_tsx"
+    ],
+    "17": [
+      "ui_skeleton_skeleton",
+      "ui_skeleton_skeletonring",
+      "ui_skeleton_skeletonrow"
+    ],
+    "18": [
+      "lib_levels_getlevelinfo",
+      "src_renderer_src_lib_levels_test_ts",
+      "src_renderer_src_lib_levels_ts"
+    ],
+    "19": [
+      "lib_use_toast_normalize",
+      "lib_use_toast_usetoast",
+      "pages_planningpage_planningpage"
+    ],
+    "20": [
+      "components_nexuslogo_nexuslogo",
+      "src_renderer_src_components_nexuslogo_tsx"
+    ],
+    "21": [
+      "blocking_historylist_formatduration",
+      "src_renderer_src_components_blocking_historylist_tsx"
+    ],
+    "22": [
+      "levels_objectivecard_minutesthisweek",
+      "src_renderer_src_components_levels_objectivecard_tsx"
+    ],
+    "23": [
+      "onboarding_donepage_generateconfetti",
+      "src_renderer_src_components_onboarding_donepage_tsx"
+    ],
+    "24": [
+      "src_renderer_src_components_ui_confirmdialog_tsx",
+      "ui_confirmdialog_handler"
+    ],
+    "25": [
+      "lib_rule_palette_iconbyname",
+      "src_renderer_src_lib_rule_palette_ts"
+    ],
+    "26": [
+      "src_renderer_src_store_onboarding_store_ts",
+      "store_onboarding_store_indexof"
+    ],
+    "27": [
+      "electron_vite_config_ts"
+    ],
+    "28": [
+      "postcss_config_js"
+    ],
+    "29": [
+      "tailwind_config_ts"
+    ],
+    "30": [
+      "vitest_config_ts"
+    ],
+    "31": [
+      "src_main_blocking_hosts_sentinels_ts"
+    ],
+    "32": [
+      "src_main_blocking_session_types_ts"
+    ],
+    "33": [
+      "src_preload_global_d_ts"
+    ],
+    "34": [
+      "src_renderer_src_main_tsx"
+    ],
+    "35": [
+      "src_renderer_src_components_sidebar_tsx"
+    ],
+    "36": [
+      "blocking_activesessioncard_activesessioncard"
+    ],
+    "37": [
+      "src_renderer_src_components_interface_ruletable_tsx"
+    ],
+    "38": [
+      "src_renderer_src_components_levels_floatingcredit_tsx"
+    ],
+    "39": [
+      "src_renderer_src_components_levels_levelring_tsx"
+    ],
+    "40": [
+      "src_renderer_src_components_onboarding_welcomestep_tsx"
+    ],
+    "41": [
+      "src_renderer_src_lib_ipc_ts"
+    ],
+    "42": [
+      "src_renderer_src_store_blocking_store_ts"
+    ],
+    "43": [
+      "src_renderer_src_store_toast_store_ts"
+    ],
+    "44": [
+      "src_shared_ipc_channels_ts"
+    ],
+    "45": [
+      "src_shared_schemas_ts"
+    ]
+  },
+  "cohesion": {
+    "0": 0.12,
+    "1": 0.15,
+    "2": 0.12,
+    "3": 0.21,
+    "4": 0.2,
+    "5": 0.32,
+    "6": 0.25,
+    "7": 0.27,
+    "8": 0.18,
+    "9": 0.43,
+    "10": 0.25,
+    "11": 0.32,
+    "12": 0.38,
+    "13": 0.4,
+    "14": 0.67,
+    "15": 0.67,
+    "16": 0.67,
+    "17": 0.67,
+    "18": 0.67,
+    "19": 0.67,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0
+  },
+  "gods": [
+    {
+      "id": "lib_cn_cn",
+      "label": "cn()",
+      "degree": 12
+    },
+    {
+      "id": "hosts_writer_applynexusblock",
+      "label": "applyNexusBlock()",
+      "degree": 8
+    },
+    {
+      "id": "interface_timecircle_timecircle",
+      "label": "TimeCircle()",
+      "degree": 8
+    },
+    {
+      "id": "onboarding_appsstep_setbusy",
+      "label": "setBusy()",
+      "degree": 7
+    },
+    {
+      "id": "hosts_parser_parsehostsfile",
+      "label": "parseHostsFile()",
+      "degree": 6
+    },
+    {
+      "id": "ipc_blocking_handlers_registerblockinghandlers",
+      "label": "registerBlockingHandlers()",
+      "degree": 6
+    },
+    {
+      "id": "processes_safe_list_issafelisted",
+      "label": "isSafeListed()",
+      "degree": 5
+    },
+    {
+      "id": "ui_errorboundary_errorboundary",
+      "label": "ErrorBoundary",
+      "degree": 5
+    },
+    {
+      "id": "lib_schedule_selectors_datetominuteofweek",
+      "label": "dateToMinuteOfWeek()",
+      "degree": 5
+    },
+    {
+      "id": "firewall_netsh_listrulenames",
+      "label": "listRuleNames()",
+      "degree": 4
+    }
+  ],
+  "surprises": [
+    {
+      "source": "registerBlockingHandlers()",
+      "target": "createSessionManager()",
+      "source_files": [
+        "src/main/blocking/ipc/blocking.handlers.ts",
+        "src/main/blocking/session/manager.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "registerBlockingHandlers()",
+      "target": "registerAllIpcHandlers()",
+      "source_files": [
+        "src/main/blocking/ipc/blocking.handlers.ts",
+        "src/main/ipc/index.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "handleSubmit()",
+      "target": "setBusy()",
+      "source_files": [
+        "src/renderer/src/components/blocking/UnlockModal.tsx",
+        "src/renderer/src/components/onboarding/AppsStep.tsx"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `handleSubmit()` unexpectedly reaches hub `setBusy()`"
+    },
+    {
+      "source": "handleSpend()",
+      "target": "setBusy()",
+      "source_files": [
+        "src/renderer/src/components/levels/SpendDialog.tsx",
+        "src/renderer/src/components/onboarding/AppsStep.tsx"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `handleSpend()` unexpectedly reaches hub `setBusy()`"
+    },
+    {
+      "source": "setBusy()",
+      "target": "handleCreate()",
+      "source_files": [
+        "src/renderer/src/components/onboarding/AppsStep.tsx",
+        "src/renderer/src/components/onboarding/ObjectiveStep.tsx"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `handleCreate()` unexpectedly reaches hub `setBusy()`"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

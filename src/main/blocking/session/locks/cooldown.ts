@@ -5,5 +5,5 @@ export function remainingMs(startedAtIso: string, minutes: number, nowMs: number
 }
 
 export function isCooldownReady(startedAtIso: string, minutes: number, nowMs: number): boolean {
-  return remainingMs(startedAtIso, minutes, nowMs) === 0
+  return remainingMs(startedAtIso, minutes, nowMs) <= 0
 }

@@ -11,7 +11,6 @@ import { WelcomeStep } from './WelcomeStep'
 import { UsernameStep } from './UsernameStep'
 import { ScheduleStep } from './ScheduleStep'
 import { ObjectiveStep } from './ObjectiveStep'
-import { AppsStep } from './AppsStep'
 import { DonePage } from './DonePage'
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
@@ -19,7 +18,6 @@ const STEP_LABELS: Record<OnboardingStep, string> = {
   username: 'Toi',
   schedule: 'Programme',
   objective: 'Objectif',
-  apps: 'Apps',
   done: 'Terminé',
 }
 
@@ -78,7 +76,7 @@ export function OnboardingOverlay(): JSX.Element {
                   <div
                     key={s}
                     className={cn(
-                      'h-1 flex-1 rounded-full transition-colors duration-500',
+                      'h-1 flex-1 rounded-full transition-colors duration-300',
                       reached ? 'bg-accent' : 'bg-border-subtle',
                     )}
                   />
@@ -107,7 +105,7 @@ export function OnboardingOverlay(): JSX.Element {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="flex w-full max-w-3xl flex-col"
           >
             {step === 'welcome' && <WelcomeStep onContinue={next} />}
@@ -126,9 +124,6 @@ export function OnboardingOverlay(): JSX.Element {
                   setCaptured((c) => ({ ...c, objectiveId: id, objectiveColor: color }))
                 }
               />
-            )}
-            {step === 'apps' && (
-              <AppsStep defaultObjectiveId={captured.objectiveId} />
             )}
             {step === 'done' && <DonePage />}
           </motion.div>

@@ -8,6 +8,8 @@ import type {
   StorageKey,
 } from '@shared/schemas'
 
+export type StorageWriteResult = { ok: true } | { ok: false; error: string }
+
 export type LayerStatusValue = 'ok' | 'drifted' | 'error' | 'inactive'
 export type LayerStatus = {
   hosts: LayerStatusValue
@@ -19,13 +21,29 @@ const api = {
   storage: {
     read: <T>(key: StorageKey): Promise<T | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.STORAGE_READ, key),
-    write: <T>(key: StorageKey, data: T): Promise<void> =>
+    write: <T>(key: StorageKey, data: T): Promise<StorageWriteResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.STORAGE_WRITE, key, data),
     exists: (key: StorageKey): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.STORAGE_EXISTS, key),
   },
   app: {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
+    openLogs: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS),
+    onFlushDebounces: (cb: () => void): (() => void) => {
+      const listener = () => cb()
+      ipcRenderer.on(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)
+    },
+    onUpdateAvailable: (cb: (info: { version?: string }) => void): (() => void) => {
+      const listener = (_: unknown, payload: { version?: string }) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.UPDATER_EVENT_AVAILABLE, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_EVENT_AVAILABLE, listener)
+    },
+    onUpdateDownloaded: (cb: (info: { version?: string }) => void): (() => void) => {
+      const listener = (_: unknown, payload: { version?: string }) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
+    },
   },
   blocking: {
     getInitialState: (): Promise<{ state: BlockingState; active: ActiveSession | null }> =>
@@ -45,6 +63,8 @@ const api = {
     getLayerStatus: (): Promise<LayerStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS),
     isElevated: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_IS_ELEVATED),
+    requestElevation: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION),
     onSessionChanged: (cb: (s: ActiveSession | null) => void): (() => void) => {
       const listener = (_: unknown, payload: ActiveSession | null) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, listener)
@@ -56,6 +76,12 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, listener)
     },
+    onClockTamper: (cb: (e: { driftMs: number }) => void): (() => void) => {
+      const listener = (_: unknown, payload: { driftMs: number }) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
+    },
   },
   appUsage: {
     get: (): Promise<DeclaredAppUsageState> =>
@@ -65,6 +91,17 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
     },
+  },
+  tasks: {
+    /** V2 P9 — Demande au main de fire une notification native pour cet event. */
+    notify: (
+      event:
+        | { type: 'task-hit-zero'; taskTitle: string }
+        | { type: 'task-auto-rescued'; taskTitle: string; daysLeft: number }
+        | { type: 'task-forced-three'; taskTitle: string }
+        | { type: 'task-degraded'; taskTitle: string; newLevel: number }
+        | { type: 'task-urgent'; taskTitle: string; daysLeft: number },
+    ): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.TASKS_NOTIFY, event),
   },
 }
 

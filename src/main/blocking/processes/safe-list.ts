@@ -18,7 +18,6 @@ export const SYSTEM_SAFE_LIST = new Set([
   'fontdrvhost.exe',
   'searchhost.exe',
   'searchindexer.exe',
-  'taskmgr.exe',
 ])
 
 export function isSafeListed(name: string): boolean {

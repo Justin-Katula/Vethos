@@ -3,6 +3,10 @@ export const IPC_CHANNELS = {
   STORAGE_WRITE: 'storage:write',
   STORAGE_EXISTS: 'storage:exists',
   APP_GET_VERSION: 'app:getVersion',
+  APP_OPEN_LOGS: 'app:openLogs',
+  APP_FLUSH_DEBOUNCES: 'app:flushDebounces',
+  UPDATER_EVENT_AVAILABLE: 'updater:event:available',
+  UPDATER_EVENT_DOWNLOADED: 'updater:event:downloaded',
   // Blocking — invoke
   BLOCKING_GET_INITIAL_STATE: 'blocking:getInitialState',
   BLOCKING_SAVE_PROFILE: 'blocking:saveProfile',
@@ -12,12 +16,16 @@ export const IPC_CHANNELS = {
   BLOCKING_SUBMIT_JUSTIFICATION: 'blocking:submitJustification',
   BLOCKING_GET_LAYER_STATUS: 'blocking:getLayerStatus',
   BLOCKING_IS_ELEVATED: 'blocking:isElevated',
+  BLOCKING_REQUEST_ELEVATION: 'blocking:requestElevation',
   // Blocking — events main → renderer
   BLOCKING_EVENT_SESSION_CHANGED: 'blocking:event:sessionChanged',
   BLOCKING_EVENT_LAYER_DRIFT: 'blocking:event:layerDrift',
+  BLOCKING_EVENT_CLOCK_TAMPER: 'blocking:event:clockTamper',
   // App usage tracker
   APP_USAGE_GET: 'appUsage:get',
   APP_USAGE_EVENT_TICK: 'appUsage:event:tick',
+  // Tasks (renderer → main : déclencher notification native)
+  TASKS_NOTIFY: 'tasks:notify',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

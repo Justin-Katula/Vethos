@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Info } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Calendar, Grid3X3 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { RuleTable } from '@/components/interface/RuleTable'
 import { WeekCalendar } from '@/components/interface/WeekCalendar'
@@ -8,6 +9,7 @@ import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useBlockingStore } from '@/store/blocking.store'
 import { useToast } from '@/lib/use-toast'
+import { cn } from '@/lib/cn'
 import type { TimeRule } from '@shared/schemas'
 
 export default function PlanningPage() {
@@ -28,6 +30,7 @@ export default function PlanningPage() {
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<TimeRule | null>(null)
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
 
   useEffect(() => {
     void load()
@@ -111,11 +114,42 @@ export default function PlanningPage() {
   return (
     <PageTransition>
       <div className="flex h-full flex-col gap-6 overflow-y-auto px-12 pb-16 pt-16">
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Mon planning</h1>
-          <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-            {"Dessine ta semaine en blocs colorés. Une règle = une couleur. Glisse pour créer, redimensionne pour ajuster, clique pour supprimer."}
-          </p>
+        <header className="flex items-end justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Mon planning</h1>
+            <p className="mt-2 max-w-2xl text-sm text-text-secondary">
+              {"Visualise et ajuste ton emploi du temps. Clique sur le calendrier pour modifier tes blocs."}
+            </p>
+          </div>
+          {/* Toggle semaine / mois */}
+          <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-card p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('week')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                viewMode === 'week'
+                  ? 'bg-accent text-white'
+                  : 'text-text-secondary hover:text-text-primary',
+              )}
+            >
+              <Calendar size={12} />
+              Semaine
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('month')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                viewMode === 'month'
+                  ? 'bg-accent text-white'
+                  : 'text-text-secondary hover:text-text-primary',
+              )}
+            >
+              <Grid3X3 size={12} />
+              Mois
+            </button>
+          </div>
         </header>
 
         <section>
@@ -131,24 +165,23 @@ export default function PlanningPage() {
         </section>
 
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-              Semaine
-            </h2>
-            <div className="inline-flex items-center gap-1.5 text-xs text-text-muted">
-              <Info size={11} />
-              {"Glisse sur une cellule vide pour créer un bloc · pas de 15 min"}
-            </div>
-          </div>
-          <WeekCalendar
-            rules={rules}
-            entries={entries}
-            onCreateEntry={handleCreateEntry}
-            onUpdateEntry={handleUpdateEntry}
-            onChangeRule={handleChangeRule}
-            onDeleteEntry={deleteEntry}
-            onCreateRule={() => openEditor(null)}
-          />
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
+            {viewMode === 'week' ? 'Semaine' : 'Mois'}
+          </h2>
+
+          {viewMode === 'week' ? (
+            <WeekCalendar
+              rules={rules}
+              entries={entries}
+              onCreateEntry={handleCreateEntry}
+              onUpdateEntry={handleUpdateEntry}
+              onChangeRule={handleChangeRule}
+              onDeleteEntry={deleteEntry}
+              onCreateRule={() => openEditor(null)}
+            />
+          ) : (
+            <MonthView rules={rules} entries={entries} />
+          )}
         </section>
       </div>
 
@@ -161,5 +194,103 @@ export default function PlanningPage() {
         onDelete={deleteRule}
       />
     </PageTransition>
+  )
+}
+
+// ─── Vue mois ───────────────────────────────────────────────────────────────
+
+function MonthView({
+  rules: _rules,
+  entries,
+}: {
+  rules: import('@shared/schemas').TimeRule[]
+  entries: import('@shared/schemas').ScheduleEntry[]
+}) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const daysInMonth = lastDay.getDate()
+
+  // Décalage pour commencer un lundi (0=lundi dans notre système)
+  const firstDayOfWeek = (firstDay.getDay() + 6) % 7
+
+  const DAYS_HEADER = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+  const MONTH_NAMES = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+  ]
+
+  // Calculer la charge par jour de la semaine
+  const loadByDow = new Map<number, number>()
+  for (let dow = 0; dow < 7; dow++) {
+    const dayEntries = entries.filter((e) => e.dayOfWeek === dow)
+    const totalMinutes = dayEntries.reduce((sum, e) => sum + (e.endMinute - e.startMinute), 0)
+    loadByDow.set(dow, totalMinutes)
+  }
+
+  const getLoadColor = (dow: number): string => {
+    const minutes = loadByDow.get(dow) ?? 0
+    if (minutes < 240) return 'bg-emerald-500/30 text-emerald-300' // < 4h → vert
+    if (minutes < 480) return 'bg-yellow/30 text-yellow' // 4-8h → jaune
+    if (minutes < 720) return 'bg-orange/30 text-orange' // 8-12h → orange
+    return 'bg-red-500/30 text-red-400' // 12h+ → rouge feu
+  }
+
+  const cells: (number | null)[] = []
+  for (let i = 0; i < firstDayOfWeek; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  return (
+    <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+      <div className="mb-4 text-center text-sm font-semibold text-text-primary">
+        {MONTH_NAMES[month]} {year}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {DAYS_HEADER.map((d, i) => (
+          <div key={i} className="py-2 text-center text-[10px] font-medium uppercase tracking-widest text-text-muted">
+            {d}
+          </div>
+        ))}
+        {cells.map((day, i) => {
+          if (day === null) {
+            return <div key={i} className="h-12" />
+          }
+          const dow = i % 7
+          const isToday = day === now.getDate()
+          return (
+            <motion.div
+              key={i}
+              whileHover={{ scale: 1.05 }}
+              className={cn(
+                'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                getLoadColor(dow),
+                isToday && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-card',
+              )}
+            >
+              {day}
+            </motion.div>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/50" /> Peu chargé
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-yellow/50" /> Moyen
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-orange/50" /> Chargé
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-500/50" /> Très chargé
+        </span>
+      </div>
+    </div>
   )
 }

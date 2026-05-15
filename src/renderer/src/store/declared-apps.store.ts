@@ -1,13 +1,14 @@
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type { DeclaredApp, DeclaredAppsState } from '@shared/schemas'
+import { assertStorageWrite } from '@/lib/storage-write'
+import { useToastStore } from './toast.store'
 
 type SaveDraft = {
   id?: string
   name: string
   exeName: string
   linkedObjectiveId: string | null
-  xpRatio: number
 }
 
 type DeclaredAppsStore = {
@@ -24,7 +25,17 @@ function uuid(): string {
 
 async function persist(apps: DeclaredApp[]): Promise<void> {
   const state: DeclaredAppsState = { apps }
-  await nexus.storage.write('declared_apps', state)
+  const result = await nexus.storage.write('declared_apps', state)
+  try {
+    assertStorageWrite(result, 'declared_apps')
+  } catch (err) {
+    useToastStore.getState().push({
+      variant: 'error',
+      title: 'Sauvegarde apps échouée',
+      description: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
 }
 
 export const useDeclaredAppsStore = create<DeclaredAppsStore>((set, get) => ({
@@ -51,7 +62,6 @@ export const useDeclaredAppsStore = create<DeclaredAppsStore>((set, get) => ({
         name: draft.name,
         exeName: draft.exeName,
         linkedObjectiveId: draft.linkedObjectiveId,
-        xpRatio: draft.xpRatio,
       }
       apps[i] = saved
     } else {
@@ -60,7 +70,6 @@ export const useDeclaredAppsStore = create<DeclaredAppsStore>((set, get) => ({
         name: draft.name,
         exeName: draft.exeName,
         linkedObjectiveId: draft.linkedObjectiveId,
-        xpRatio: draft.xpRatio,
         createdAt: new Date().toISOString(),
       }
       apps.push(saved)

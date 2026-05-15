@@ -23,6 +23,7 @@ function makeAdapters() {
     firewall: {
       applyAll: vi.fn().mockResolvedValue(['rule1']),
       removeAll: vi.fn().mockResolvedValue(undefined),
+      removeOrphansExcept: vi.fn().mockResolvedValue(undefined),
       applied: vi.fn().mockReturnValue(['rule1']),
     },
     persistence: {
@@ -88,5 +89,16 @@ describe('SessionManager', () => {
     expect(a.hosts.clear).toHaveBeenCalled()
     expect(a.firewall.removeAll).toHaveBeenCalled()
     expect(m.getPhase()).toBe('idle')
+  })
+
+  it('cleans orphan blocking layers at boot when no active session exists', async () => {
+    const a = makeAdapters()
+    const m = createSessionManager(a)
+
+    await m.hydrateFromDisk()
+
+    expect(a.firewall.removeAll).toHaveBeenCalled()
+    expect(a.hosts.clear).toHaveBeenCalled()
+    expect(a.hosts.flushDns).toHaveBeenCalled()
   })
 })

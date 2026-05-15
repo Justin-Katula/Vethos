@@ -11,8 +11,8 @@ describe('minuteToHHMM', () => {
   it('formats 1439 → 23:59', () => {
     expect(minuteToHHMM(1439)).toBe('23:59')
   })
-  it('formats 1440 → 24:00', () => {
-    expect(minuteToHHMM(1440)).toBe('24:00')
+  it('clamps 1440 to the last minute of the day', () => {
+    expect(minuteToHHMM(1440)).toBe('23:59')
   })
   it('clamps negatives', () => {
     expect(minuteToHHMM(-5)).toBe('00:00')
@@ -20,9 +20,9 @@ describe('minuteToHHMM', () => {
 })
 
 describe('durationLabel', () => {
-  it('< 1h → "X min"', () => {
-    expect(durationLabel(30)).toBe('30 min')
-    expect(durationLabel(0)).toBe('0 min')
+  it('< 1h → "Xmin"', () => {
+    expect(durationLabel(30)).toBe('30min')
+    expect(durationLabel(0)).toBe('0min')
   })
   it('exact hour → "Xh"', () => {
     expect(durationLabel(60)).toBe('1h')

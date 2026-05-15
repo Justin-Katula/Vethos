@@ -17,10 +17,26 @@ export type BlockingPersistence = {
 export function createBlockingPersistence(storage: Storage): BlockingPersistence {
   return {
     async readState() {
-      return (await storage.read('blocking')) ?? EMPTY_STATE
+      const [blocking, history] = await Promise.all([
+        storage.read('blocking'),
+        storage.read('blocking_history'),
+      ])
+      if (!blocking) return history ? { profiles: [], history: history.history } : EMPTY_STATE
+      const merged = {
+        profiles: blocking.profiles,
+        history: history?.history ?? blocking.history ?? [],
+      }
+      if (!history && blocking.history.length > 0) {
+        await storage.write('blocking_history', { history: blocking.history })
+        await storage.write('blocking', { profiles: blocking.profiles, history: [] })
+      }
+      return merged
     },
     async writeState(state) {
-      await storage.write('blocking', state)
+      await Promise.all([
+        storage.write('blocking', { profiles: state.profiles, history: [] }),
+        storage.write('blocking_history', { history: state.history }),
+      ])
     },
     async readActive() {
       return (await storage.read('blocking_active')) ?? null

@@ -28,19 +28,8 @@ export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestS
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-xl border border-accent/30 bg-bg-card p-6 shadow-elevated"
-      style={{
-        boxShadow: '0 0 0 1px rgba(99,102,241,0.15), 0 20px 40px -20px rgba(99,102,241,0.25)',
-      }}
+      className="relative overflow-hidden rounded-xl border border-accent/30 bg-bg-card p-6 shadow-card"
     >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            'radial-gradient(circle at 20% 0%, rgba(99,102,241,0.18), transparent 50%)',
-        }}
-      />
-
       <div className="relative">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">
@@ -78,7 +67,7 @@ export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestS
             className="h-full bg-accent"
             initial={{ width: 0 }}
             animate={{ width: `${elapsed * 100}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
           />
         </div>
 
@@ -149,7 +138,7 @@ function LayerDot({
               className={cn('absolute inset-0 rounded-full', color)}
               initial={{ scale: 1, opacity: 0.7 }}
               animate={{ scale: 3, opacity: 0 }}
-              transition={{ duration: 1.4, ease: 'easeOut' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
             />
           )}
         </AnimatePresence>

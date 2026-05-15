@@ -6,7 +6,6 @@ export const ONBOARDING_STEPS = [
   'username',
   'schedule',
   'objective',
-  'apps',
   'done',
 ] as const
 

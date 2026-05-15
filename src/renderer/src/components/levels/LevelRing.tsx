@@ -41,15 +41,6 @@ export function LevelRing({
       className="relative inline-flex items-center justify-center"
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <defs>
-          <filter id={`ring-glow-${level}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
         {/* Track */}
         <circle
           cx={cx}
@@ -71,9 +62,8 @@ export function LevelRing({
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: dashOffset }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
           transform={`rotate(-90 ${cx} ${cy})`}
-          style={{ filter: `url(#ring-glow-${level})` }}
         />
       </svg>
 

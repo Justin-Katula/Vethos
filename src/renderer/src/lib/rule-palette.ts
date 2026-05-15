@@ -14,20 +14,20 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-/** 12 couleurs cohérentes avec le thème sombre Nexus. */
+/** Palette arc-en-ciel pour objectifs et règles utilisateur. */
 export const PALETTE: string[] = [
-  '#3b82f6', // blue-500
-  '#06b6d4', // cyan-500
-  '#10b981', // emerald-500
-  '#84cc16', // lime-500
-  '#eab308', // yellow-500
-  '#f97316', // orange-500
-  '#ef4444', // red-500
-  '#ec4899', // pink-500
-  '#a855f7', // purple-500
-  '#6366f1', // indigo-500
-  '#8b5cf6', // violet-500
-  '#64748b', // slate-500
+  '#E74C3C',
+  '#E67E22',
+  '#F1C40F',
+  '#27AE60',
+  '#1ABC9C',
+  '#5DADE2',
+  '#8E44AD',
+  '#E91E63',
+  '#795548',
+  '#607D8B',
+  '#34495E',
+  '#00D1FF',
 ]
 
 export const ICON_OPTIONS: Array<{ name: string; Icon: LucideIcon }> = [

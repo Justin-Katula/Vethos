@@ -4,6 +4,8 @@ import type { Storage } from '@main/storage'
 import type { DeclaredAppsState, DeclaredAppUsageState } from '@shared/schemas'
 import { listProcesses } from '../blocking/processes/enumerator'
 import { createTracker, type Tracker } from './app-usage-tracker'
+import { createSiteTracker } from './site-tracker'
+import log from '@main/logging/setup'
 
 export async function registerAppUsageHandlers(
   storage: Storage,
@@ -34,6 +36,35 @@ export async function registerAppUsageHandlers(
 
   // Démarre le tick (60s) + flush (30s)
   tracker.start()
+
+  const siteTracker = createSiteTracker()
+  siteTracker.on('site-detected', async ({ domain }) => {
+    const now = new Date().toISOString()
+    const state = (await storage.read('discovered_sites')) ?? { sites: [] }
+    const existing = state.sites.find((site) => site.domain === domain)
+    if (existing) {
+      existing.lastSeenAt = now
+      existing.visitCount += 1
+    } else {
+      state.sites.push({
+        domain,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        visitCount: 1,
+        blocked: false,
+      })
+    }
+    state.sites = state.sites
+      .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt))
+      .slice(0, 2000)
+    await storage.write('discovered_sites', state)
+  })
+  const settings = await storage.read('settings')
+  if (settings?.browserHistoryScanEnabled) {
+    siteTracker.start()
+  } else {
+    log.info('browser history scanner disabled until explicit opt-in')
+  }
 
   return tracker
 }

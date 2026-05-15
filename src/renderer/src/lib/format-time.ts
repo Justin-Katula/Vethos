@@ -1,15 +1,15 @@
-/** 0 → '00:00', 90 → '01:30', 1439 → '23:59'. Plafond 1440 → '24:00' (utile pour limites). */
+/** 0 → '00:00', 90 → '01:30', 1439+ → '23:59'. */
 export function minuteToHHMM(m: number): string {
-  const clamped = Math.max(0, Math.min(1440, Math.round(m)))
+  const clamped = Math.max(0, Math.min(1439, Math.round(m)))
   const h = Math.floor(clamped / 60)
   const mm = clamped % 60
   return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
-/** 30 → '30 min', 60 → '1h', 90 → '1h30'. */
+/** 30 → '30min', 60 → '1h', 90 → '1h30'. */
 export function durationLabel(minutes: number): string {
   const m = Math.max(0, Math.round(minutes))
-  if (m < 60) return `${m} min`
+  if (m < 60) return `${m}min`
   const h = Math.floor(m / 60)
   const rem = m % 60
   if (rem === 0) return `${h}h`

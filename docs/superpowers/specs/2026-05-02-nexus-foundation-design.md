@@ -6,7 +6,7 @@
 
 ## Contexte
 
-Nexus est une application desktop Windows de productivité/focus inspirée d'Opal, à construire en 6 sous-projets indépendants :
+Nexus est une application desktop Windows de productivité/focus de pointe, à construire en 6 sous-projets indépendants :
 
 1. **Fondation** ← *ce document*
 2. Système de blocage (hosts / process kill / firewall + détection de dérive)
@@ -271,4 +271,4 @@ Si cette démo fonctionne, la chaîne est bonne pour les 5 sous-projets suivants
 - Une app Electron qui boot avec un thème sombre soigné, navigation animée entre 5 pages placeholder
 - Un système de stockage JSON atomique prouvé via une démo dans la page Paramètres
 - Un build Windows installable produit par `npm run build`
-- Le ton visuel "10-11/10 inspiré Opal" est posé : tout sous-projet UI suivant héritera de ce socle
+- Le ton visuel "10-11/10" est posé : tout sous-projet UI suivant héritera de ce socle

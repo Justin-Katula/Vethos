@@ -3,10 +3,12 @@ import type {
   DeclaredAppUsageEntry,
   DeclaredAppUsageState,
 } from '@shared/schemas'
+import log from '@main/logging/setup'
 
 const RETENTION_DAYS = 90
 const DEFAULT_TICK_MS = 60_000
 const DEFAULT_FLUSH_MS = 30_000
+const tlog = log.scope('app-usage-tracker')
 
 export type TrackerStorage = {
   read: () => Promise<DeclaredAppUsageState | null>
@@ -137,10 +139,10 @@ export function createTracker(deps: TrackerDeps): Tracker {
   function start(intervalMs = DEFAULT_TICK_MS, flushMs = DEFAULT_FLUSH_MS): void {
     if (tickHandle || flushHandle) stop()
     tickHandle = setInterval(() => {
-      void tick()
+      tick().catch((err) => tlog.error('tick failed', err))
     }, intervalMs)
     flushHandle = setInterval(() => {
-      void flushNow()
+      flushNow().catch((err) => tlog.error('flush failed', err))
     }, flushMs)
   }
 

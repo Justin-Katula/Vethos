@@ -1,57 +1,29 @@
 import { motion } from 'framer-motion'
 import type { BlockingHistoryEntry, Objective, TimeRule } from '@shared/schemas'
 import { iconByName } from '@/lib/rule-palette'
-import { getLevelInfo } from '@/lib/levels'
 import { LevelRing } from './LevelRing'
 
 type Props = {
   objective: Objective
   rules: TimeRule[]
+  /**
+   * Historique de sessions de blocage. Réservé pour un affichage futur des
+   * minutes effectives sur 7 jours (la fonction `minutesThisWeek` a été
+   * retirée en attendant que la carte affiche cette information).
+   */
   history: BlockingHistoryEntry[]
   onClick?: () => void
-}
-
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
-
-/**
- * Calcule les minutes effectives sur les 7 derniers jours en filtrant
- * l'historique par les règles liées à cet objectif.
- */
-function minutesThisWeek(
-  objective: Objective,
-  rules: TimeRule[],
-  history: BlockingHistoryEntry[],
-): number {
-  const linkedRuleIds = new Set(objective.linkedRuleIds)
-  const profileIds = new Set(
-    rules
-      .filter((r) => linkedRuleIds.has(r.id) && r.linkedProfileId !== null)
-      .map((r) => r.linkedProfileId!),
-  )
-  if (profileIds.size === 0) return 0
-
-  const cutoff = Date.now() - SEVEN_DAYS_MS
-  let total = 0
-  for (const h of history) {
-    if (!h.completedNormally) continue
-    if (!profileIds.has(h.profileId)) continue
-    const ended = new Date(h.endedAt).getTime()
-    if (ended < cutoff) continue
-    const start = new Date(h.startedAt).getTime()
-    total += Math.max(0, Math.round((ended - start) / 60000))
-  }
-  return total
 }
 
 export function ObjectiveCard({
   objective,
   rules,
-  history,
+  history: _history,
   onClick,
 }: Props): JSX.Element {
   const Icon = iconByName(objective.icon)
-  const info = getLevelInfo(objective.xpMinutes)
-  const weekMin = minutesThisWeek(objective, rules, history)
+  const integerLevel = Math.floor(objective.level)
+  const progress = objective.level - integerLevel
   const linkedNames = rules
     .filter((r) => objective.linkedRuleIds.includes(r.id))
     .map((r) => r.name)
@@ -90,28 +62,34 @@ export function ObjectiveCard({
         </div>
 
         <LevelRing
-          level={info.level}
-          progress={info.progress}
+          level={integerLevel}
+          progress={progress}
           size={56}
           color={objective.color}
-          isMax={info.isMax}
+          isMax={integerLevel >= 10}
         />
       </div>
 
-      <div className="flex items-end justify-between gap-3 border-t border-border-subtle pt-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-text-muted">
-            Cette semaine
-          </div>
-          <div className="mt-0.5 text-lg font-bold tabular-nums text-text-primary">
-            {weekMin > 0 ? `${weekMin} min` : '—'}
+      <div className="flex flex-col gap-1.5 border-t border-border-subtle pt-3">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-widest text-text-muted">Niveau actuel</div>
+          <div className="text-sm font-bold tabular-nums text-text-primary">
+            {objective.level.toFixed(1)}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-widest text-text-muted">XP total</div>
-          <div className="mt-0.5 text-lg font-bold tabular-nums text-text-primary">
-            {objective.xpMinutes}
-          </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(objective.level / 10) * 100}%` }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className={`h-full ${
+              objective.level <= 4
+                ? 'bg-emerald-500'
+                : objective.level <= 5.5
+                ? 'bg-yellow'
+                : 'bg-red-500'
+            }`}
+          />
         </div>
       </div>
 

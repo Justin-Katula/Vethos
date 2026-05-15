@@ -5,6 +5,7 @@ import type { Objective, TimeRule } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { PALETTE, ICON_OPTIONS } from '@/lib/rule-palette'
 import { useShortcut } from '@/lib/use-shortcut'
+import { areColorsSimilar } from '@/lib/color-similarity'
 
 type SaveDraft = {
   id?: string
@@ -13,11 +14,14 @@ type SaveDraft = {
   color: string
   icon?: string
   linkedRuleIds?: string[]
+  level: number
+  deadline?: string
 }
 
 type Props = {
   open: boolean
   initial: Objective | null
+  existingObjectives: Objective[]
   rules: TimeRule[]
   onClose: () => void
   onSave: (draft: SaveDraft) => Promise<Objective>
@@ -29,6 +33,7 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/
 export function ObjectiveEditor({
   open,
   initial,
+  existingObjectives,
   rules,
   onClose,
   onSave,
@@ -39,6 +44,8 @@ export function ObjectiveEditor({
   const [color, setColor] = useState(PALETTE[0]!)
   const [icon, setIcon] = useState<string | undefined>(undefined)
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>([])
+  const [level, setLevel] = useState(5)
+  const [deadline, setDeadline] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -53,12 +60,16 @@ export function ObjectiveEditor({
       setColor(initial.color)
       setIcon(initial.icon)
       setLinkedRuleIds(initial.linkedRuleIds)
+      setLevel(initial.level)
+      setDeadline(initial.deadline ?? '')
     } else {
       setName('')
       setDescription('')
       setColor(PALETTE[0]!)
       setIcon(undefined)
       setLinkedRuleIds([])
+      setLevel(5)
+      setDeadline('')
     }
     setError(null)
     setConfirmDelete(false)
@@ -66,6 +77,9 @@ export function ObjectiveEditor({
 
   const colorValid = HEX_RE.test(color)
   const canSave = !busy && name.trim().length > 0 && colorValid
+  const closeColorWarning = existingObjectives.some((objective) =>
+    objective.id !== initial?.id && areColorsSimilar(objective.color, color),
+  )
 
   const toggleRule = (id: string): void => {
     setLinkedRuleIds((prev) =>
@@ -83,6 +97,8 @@ export function ObjectiveEditor({
         color,
         icon,
         linkedRuleIds,
+        level,
+        deadline: deadline || undefined,
       }
       if (initial?.id) draft.id = initial.id
       await onSave(draft)
@@ -197,6 +213,11 @@ export function ObjectiveEditor({
                     )
                   })}
                 </div>
+                {closeColorWarning && (
+                  <div className="mt-3 rounded-md border border-orange/40 bg-orange/10 px-3 py-2 text-xs text-orange">
+                    Cette couleur ressemble beaucoup à un objectif existant.
+                  </div>
+                )}
               </Field>
 
               <Field label="Icône">
@@ -264,6 +285,42 @@ export function ObjectiveEditor({
                     })}
                   </div>
                 )}
+              </Field>
+
+              <Field label="Deadline" hint="Optionnel — les tâches gardent la priorité pour le calcul quotidien">
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              
+              <Field label="Intensité (Niveau)" hint="Le niveau recommandé est 5. Plus le niveau est haut, plus cet objectif consommera de temps libre.">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                     <span className="text-2xl font-bold text-text-primary">{level}</span>
+                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}>
+                        {level === 5 ? 'Recommandé' : 'Manuel'}
+                     </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="3"
+                    max="7"
+                    step="1"
+                    value={level}
+                    onChange={(e) => setLevel(parseInt(e.target.value))}
+                    className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-text-muted font-mono">
+                    <span>3</span>
+                    <span>4</span>
+                    <span className="text-accent font-bold">5</span>
+                    <span>6</span>
+                    <span>7</span>
+                  </div>
+                </div>
               </Field>
 
               {error && (

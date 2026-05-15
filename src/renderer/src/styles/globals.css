@@ -7,30 +7,36 @@
 @layer base {
   :root {
     /* Backgrounds */
-    --bg-base: #0a0a0c;
-    --bg-elevated: #131318;
-    --bg-card: #1a1a20;
-    --bg-card-hover: #1f1f27;
+    --bg-base: #0B0F14;
+    --bg-elevated: #0F141B;
+    --bg-card: #0F141B;
+    --bg-card-hover: #161D26;
 
     /* Borders */
-    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-subtle: #1E2530;
     --border-strong: rgba(255, 255, 255, 0.12);
 
     /* Text */
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
+    --text-primary: #FFFFFF;
+    --text-secondary: #8E9BAE;
+    --text-muted: #5A6B80;
 
-    /* Accent (indigo) */
-    --accent: #6366f1;
-    --accent-hover: #818cf8;
-    --accent-glow: rgba(99, 102, 241, 0.2);
+    /* Accent (Bleu principal) */
+    --accent: #3BA3FF;
+    --accent-hover: #69BEFF;
+    --accent-soft: rgba(59, 163, 255, 0.2);
+
+    /* Spec Colors */
+    --color-cyan: #00D1FF;
+    --color-orange: #FF8A00;
+    --color-yellow: #FFD54F;
+    --color-dark-grey: #1E2530;
 
     /* Radii */
-    --radius-sm: 8px;
+    --radius-sm: 12px;
     --radius-md: 12px;
     --radius-lg: 20px;
-    --radius-xl: 28px;
+    --radius-xl: 20px;
 
     /* Shadows */
     --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -38,9 +44,9 @@
 
     /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --duration-fast: 150ms;
+    --duration-fast: 200ms;
     --duration-normal: 250ms;
-    --duration-slow: 400ms;
+    --duration-slow: 300ms;
   }
 
   html, body, #root {
@@ -50,7 +56,7 @@
   }
 
   body {
-    background: radial-gradient(at 30% 0%, #12121a 0%, #0a0a0c 60%);
+    background: var(--bg-base);
     background-attachment: fixed;
     color: var(--text-primary);
     font-family: 'Inter', system-ui, sans-serif;
@@ -88,13 +94,13 @@
 
   /* Sélection texte */
   ::selection {
-    background: var(--accent-glow);
+    background: var(--accent-soft);
     color: var(--text-primary);
   }
 
-  /* Titres : tracking serré */
+  /* Titres : pas de letter-spacing négatif. */
   h1, h2, h3, h4 {
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 
   /* Texte sélectionnable dans les inputs */

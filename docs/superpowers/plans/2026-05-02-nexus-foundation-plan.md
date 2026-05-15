@@ -96,7 +96,7 @@ nexus-data-dev/
   "name": "nexus",
   "version": "0.1.0",
   "private": true,
-  "description": "Nexus — application desktop de focus inspirée d'Opal",
+  "description": "Nexus — application desktop de focus",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -1809,7 +1809,7 @@ git commit -m "chore(build): electron-builder config for NSIS + portable Windows
 ```markdown
 # Nexus — Spec d'ensemble
 
-Application desktop Windows de productivité/focus inspirée d'Opal.
+Application desktop Windows de productivité/focus de pointe.
 
 Stack : Electron 30 + React 18 + TypeScript + Tailwind 3.4 + Framer Motion + Zustand.
 

@@ -1,30 +1,35 @@
 import { describe, it, expect } from 'vitest'
-import {
-  TEMPLATES,
-  applyTemplate,
-  type TemplateId,
-} from './onboarding-templates'
+import { TEMPLATES, applyTemplate } from './onboarding-templates'
 import { hasOverlap } from './schedule-selectors'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-describe('TEMPLATES', () => {
-  it('contient 3 templates : student, pro, balanced', () => {
-    expect(TEMPLATES).toHaveLength(3)
-    const ids = TEMPLATES.map((t) => t.id)
-    expect(ids).toContain('student')
-    expect(ids).toContain('pro')
-    expect(ids).toContain('balanced')
+/**
+ * V2 P2 : les 3 templates STUDENT / PRO / BALANCED ont été remplacés
+ * par un seul template `BASE` (id conservé `'student'` pour rétrocompat).
+ * L'onboarding fait désormais saisir l'utilisateur directement plutôt
+ * que choisir parmi des presets.
+ *
+ * Ce fichier teste seulement l'invariant structurel du template et le
+ * comportement de `applyTemplate` (UUID regen, mapping rule→entry, dates).
+ */
+
+describe('TEMPLATES (V2 P2 — single BASE template)', () => {
+  it('contient au moins un template (BASE)', () => {
+    expect(TEMPLATES.length).toBeGreaterThanOrEqual(1)
   })
 
-  it.each<TemplateId>(['student', 'pro', 'balanced'])(
-    'template "%s" : ≥3 règles, ≥6 entrées, pas de chevauchement',
-    (id) => {
-      const tpl = TEMPLATES.find((t) => t.id === id)!
-      expect(tpl.rules.length).toBeGreaterThanOrEqual(3)
-      expect(tpl.entries.length).toBeGreaterThanOrEqual(6)
+  it('chaque template référence ses propres ruleIds dans ses entries', () => {
+    for (const tpl of TEMPLATES) {
+      const ruleIds = new Set(tpl.rules.map((r) => r.id))
+      for (const e of tpl.entries) {
+        expect(ruleIds.has(e.ruleId)).toBe(true)
+      }
+    }
+  })
 
-      // No overlap
+  it("les entries de chaque template n'ont pas de chevauchement intra-template", () => {
+    for (const tpl of TEMPLATES) {
       const accumulated: Array<{
         id: string
         createdAt: string
@@ -50,19 +55,8 @@ describe('TEMPLATES', () => {
           endMinute: e.endMinute,
         })
       }
-    },
-  )
-
-  it.each<TemplateId>(['student', 'pro', 'balanced'])(
-    'template "%s" : chaque entry référence un ruleId existant',
-    (id) => {
-      const tpl = TEMPLATES.find((t) => t.id === id)!
-      const ruleIds = new Set(tpl.rules.map((r) => r.id))
-      for (const e of tpl.entries) {
-        expect(ruleIds.has(e.ruleId)).toBe(true)
-      }
-    },
-  )
+    }
+  })
 })
 
 describe('applyTemplate', () => {
@@ -77,8 +71,6 @@ describe('applyTemplate', () => {
     const tpl = TEMPLATES[0]!
     const out = applyTemplate(tpl)
 
-    // Pour chaque entry du template original, on retrouve l'entry correspondante
-    // dans out.entries (même position) liée à la nouvelle règle correspondante.
     for (let i = 0; i < tpl.entries.length; i++) {
       const original = tpl.entries[i]!
       const applied = out.entries[i]!

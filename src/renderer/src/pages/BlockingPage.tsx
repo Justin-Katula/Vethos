@@ -27,6 +27,7 @@ export default function BlockingPage() {
     startSession,
     requestUnlock,
     submitJustification,
+    requestElevation,
   } = useBlockingStore()
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -91,15 +92,22 @@ export default function BlockingPage() {
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+            className="flex items-start gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
           >
             <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
             <div>
-              <div className="font-medium text-amber-100">Mode administrateur requis</div>
-              <p className="mt-0.5 text-xs text-amber-200/80">
+              <div className="font-medium text-red-100">Blocage non opérationnel — admin requis</div>
+              <p className="mt-0.5 text-xs text-red-200/80">
                 {"Les couches de blocage (hosts, processus, firewall) ne peuvent pas être appliquées sans privilèges admin. Relance Nexus avec « Exécuter en tant qu'administrateur »."}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => void requestElevation()}
+              className="ml-auto rounded-md border border-red-400/40 px-3 py-1.5 text-xs font-medium text-red-100 transition-colors hover:border-red-300 hover:bg-red-400/10"
+            >
+              Relancer en admin
+            </button>
           </motion.div>
         )}
 

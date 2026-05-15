@@ -1,6 +1,9 @@
 import { listProcesses } from './enumerator'
 import { killByImageName } from './killer'
 import { isSafeListed } from './safe-list'
+import log from '@main/logging/setup'
+
+const wlog = log.scope('process-watcher')
 
 export type WatcherHandle = { stop: () => void }
 
@@ -23,12 +26,12 @@ export function startProcessWatcher(forbidden: string[]): WatcherHandle {
         if (set.has(p.name) && !seen.has(p.name)) {
           seen.add(p.name)
           await killByImageName(p.name).catch(() => {
-            /* swallow — sera retenté */
+            wlog.warn('kill failed, will retry', p.name)
           })
         }
       }
-    } catch {
-      /* swallow */
+    } catch (err) {
+      wlog.error('tick failed', err)
     }
   }
 

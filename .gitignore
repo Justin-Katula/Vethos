@@ -12,3 +12,4 @@ coverage/
 *.tsbuildinfo
 nexus-data-dev/
 .claude/
+.codex-runroot/

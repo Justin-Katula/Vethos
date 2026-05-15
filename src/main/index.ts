@@ -1,9 +1,38 @@
+import log, { setupLogging } from './logging/setup'
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
 import { createStorage } from './storage'
 import { registerAllIpcHandlers } from './ipc'
+import { ensureElevatedAtStartup } from './blocking/elevation'
+import { focusWindow } from './notifications'
+import { startUpdater } from './updater/setup'
+import { IPC_CHANNELS } from '@shared/ipc-channels'
+
+// Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
+// du module paresseux).
+setupLogging()
 
 const isDev = !app.isPackaged
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.nexus.blocking')
+}
+
+function sendWindowsDummyKeystrokeIfAvailable(): void {
+  if (process.platform !== 'win32') return
+  try {
+    const require = createRequire(import.meta.url)
+    const mod = require('windows-dummy-keystroke') as {
+      sendDummyKeystroke?: () => void
+      default?: { sendDummyKeystroke?: () => void }
+    }
+    const send = mod.sendDummyKeystroke ?? mod.default?.sendDummyKeystroke
+    send?.()
+  } catch (err) {
+    log.debug('windows-dummy-keystroke unavailable', err)
+  }
+}
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -48,10 +77,10 @@ function createMainWindow(): BrowserWindow {
 }
 
 let mainWindow: BrowserWindow | null = null
+let quitAfterDebounceFlush = false
 
 app.whenReady().then(async () => {
-  // Sécurité : empêche les apps multiples dans certains cas extrêmes
-  app.setAppUserModelId('com.nexus.app')
+  await ensureElevatedAtStartup()
 
   const storage = createStorage(app.getPath('userData'))
   await registerAllIpcHandlers(storage, () => mainWindow)
@@ -61,6 +90,8 @@ app.whenReady().then(async () => {
     mainWindow = null
   })
 
+  startUpdater(() => mainWindow)
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow()
@@ -69,8 +100,36 @@ app.whenReady().then(async () => {
       })
     }
   })
+}).catch((err) => {
+  log.error('app boot failed', err)
+  app.quit()
 })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+sendWindowsDummyKeystrokeIfAvailable()
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      focusWindow(mainWindow)
+    }
+  })
+}
+
+app.on('before-quit', (event) => {
+  if (quitAfterDebounceFlush) return
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+
+  event.preventDefault()
+  win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
+  setTimeout(() => {
+    quitAfterDebounceFlush = true
+    app.quit()
+  }, 650)
 })
