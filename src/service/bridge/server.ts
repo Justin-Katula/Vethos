@@ -67,13 +67,7 @@ export function createBridgeServer(opts: {
       resolve({
         broadcast(event) {
           const line = encodeMessage({ kind: 'event', ...event })
-          // On Windows, the server connection callback may not have fired yet
-          // when broadcast is called immediately after client connect.
-          // We defer to the next poll+check cycle so the connection callback
-          // can register the socket first.
-          setTimeout(() => {
-            for (const s of sockets) if (!s.destroyed) s.write(line)
-          }, 0)
+          for (const s of sockets) if (!s.destroyed) s.write(line)
         },
         close() {
           return new Promise<void>((res) => {

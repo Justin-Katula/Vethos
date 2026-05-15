@@ -61,10 +61,16 @@ describe('createBridgeServer', () => {
 
   it('broadcast pousse un événement aux clients connectés', async () => {
     const pipe = testPipe()
-    server = await createBridgeServer({ pipePath: pipe, handlers: {} })
+    server = await createBridgeServer({
+      pipePath: pipe,
+      handlers: { PING: async () => 'pong' },
+    })
     const client = net.createConnection(pipe)
     const inbox = collect(client)
-    await new Promise((r) => client.once('connect', r))
+    // Un aller-retour PING garantit que le serveur a enregistré la connexion
+    // avant le broadcast (sinon course entre 'connect' client et callback serveur).
+    client.write(encodeMessage({ kind: 'request', id: 'p0', type: 'PING' }))
+    await inbox.next()
     server.broadcast({ type: 'SESSION_CHANGED', payload: { foo: 1 } })
     const evt = await inbox.next()
     expect(evt).toEqual({ kind: 'event', type: 'SESSION_CHANGED', payload: { foo: 1 } })
