@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs'
 import * as path from 'node:path'
 import { blockingDataDir } from '../blocking-paths'
-import type { Storage } from '@main/storage'
+import type { Storage } from '../../storage'
 import type { ActiveSession, BlockingState } from '@shared/schemas'
 
 const EMPTY_STATE: BlockingState = {

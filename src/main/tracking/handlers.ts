@@ -1,6 +1,6 @@
 import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { Storage } from '@main/storage'
+import type { Storage } from '@service/storage'
 import type { DeclaredAppsState, DeclaredAppUsageState } from '@shared/schemas'
 import { listProcesses } from '@service/blocking/processes/enumerator'
 import { createTracker, type Tracker } from './app-usage-tracker'

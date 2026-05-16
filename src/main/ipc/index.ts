@@ -1,6 +1,6 @@
 import { ipcMain, app, shell, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { Storage } from '@main/storage'
+import type { Storage } from '@service/storage'
 import { getLogFilePath } from '@main/logging/setup'
 import { notifyTaskEvent, type TaskNotifyEvent } from '@main/notifications'
 import { discoverInstalledApps } from '@main/tracking/app-discovery'
