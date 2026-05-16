@@ -19,6 +19,8 @@ export default defineConfig({
       formats: ['cjs'],
       fileName: () => 'index.js',
     },
-    rollupOptions: { external: ['electron'] },
+    // `node:*` builtins doivent rester externes (fournis par le runtime Node) :
+    // externalizeDepsPlugin ne couvre que les paquets npm, pas les builtins.
+    rollupOptions: { external: ['electron', /^node:/] },
   },
 })
