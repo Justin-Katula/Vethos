@@ -12,7 +12,6 @@ type SettingsState = {
   sleepStart: string
   sleepEnd: string
   sessionRulesEnabled: boolean
-  strictBlocking: boolean
   autoSave: boolean
   browserHistoryScanEnabled: boolean
   defaultUnlockCooldownMinutes: number
@@ -39,7 +38,6 @@ function buildPayload(state: SettingsState): Settings {
     sleepStart: state.sleepStart,
     sleepEnd: state.sleepEnd,
     sessionRulesEnabled: state.sessionRulesEnabled,
-    strictBlocking: state.strictBlocking,
     autoSave: state.autoSave,
     browserHistoryScanEnabled: state.browserHistoryScanEnabled,
     defaultUnlockCooldownMinutes: state.defaultUnlockCooldownMinutes,
@@ -49,8 +47,13 @@ function buildPayload(state: SettingsState): Settings {
 }
 
 async function persist(state: SettingsState): Promise<void> {
-  const result = await nexus.storage.write<Settings>('settings', buildPayload(state))
-  assertStorageWrite(result, 'settings')
+  try {
+    const result = await nexus.storage.write<Settings>('settings', buildPayload(state))
+    assertStorageWrite(result, 'settings')
+  } catch (err) {
+    notifyPersistError(err)
+    throw err
+  }
 }
 
 const USERNAME_DEBOUNCE_MS = 400
@@ -84,7 +87,6 @@ export async function flushSettingsPersist(): Promise<void> {
     await persist(state)
     waiters.forEach(({ resolve }) => resolve())
   } catch (err) {
-    notifyPersistError(err)
     waiters.forEach(({ reject }) => reject(err))
   }
 }
@@ -109,7 +111,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   sleepStart: '23:30',
   sleepEnd: '07:00',
   sessionRulesEnabled: true,
-  strictBlocking: true,
   autoSave: true,
   browserHistoryScanEnabled: false,
   defaultUnlockCooldownMinutes: 10,
@@ -128,7 +129,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       sleepStart: data?.sleepStart ?? '23:30',
       sleepEnd: data?.sleepEnd ?? '07:00',
       sessionRulesEnabled: data?.sessionRulesEnabled ?? true,
-      strictBlocking: data?.strictBlocking ?? true,
       autoSave: data?.autoSave ?? true,
       browserHistoryScanEnabled: data?.browserHistoryScanEnabled ?? false,
       defaultUnlockCooldownMinutes: data?.defaultUnlockCooldownMinutes ?? 10,
@@ -152,17 +152,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   async setOnboardingCompleted(completed: boolean) {
     set({ onboardingCompleted: completed })
-    await persist(get()).catch((err) => {
-      notifyPersistError(err)
-      throw err
-    })
+    await persist(get())
   },
 
   async updateSettings(patch) {
     set((s) => ({ ...s, ...patch }))
-    await persist(get()).catch((err) => {
-      notifyPersistError(err)
-      throw err
-    })
+    await persist(get())
   },
 }))

@@ -5,7 +5,7 @@ import {
   clampManualLevelChange,
   getMinimumLevel,
   reconcileLevelZeroTasks,
-} from '@/lib/level-distribution'
+} from '@/lib/free-time-calculator'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { useToastStore } from './toast.store'
 
@@ -15,7 +15,7 @@ type TasksStore = {
 
   load: () => Promise<void>
   addTask: (title: string, deadline: string, linkedObjectiveId: string | null) => Promise<Task>
-  saveTask: (draft: Partial<Task> & { title: string, deadline: string }) => Promise<Task>
+  saveTask: (draft: Partial<Task> & { title: string; deadline: string }) => Promise<Task>
   deleteTask: (id: string) => Promise<void>
   markTaskCompleted: (id: string) => Promise<void>
   updateTaskLevel: (id: string, newLevel: number) => Promise<void>
@@ -33,8 +33,8 @@ function uuid(): string {
 }
 
 async function persistTasks(tasks: Task[]): Promise<void> {
-  const result = await nexus.storage.write<TasksState>('tasks', { tasks })
   try {
+    const result = await nexus.storage.write<TasksState>('tasks', { tasks })
     assertStorageWrite(result, 'tasks')
   } catch (err) {
     useToastStore.getState().push({
@@ -63,13 +63,13 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     const newTask: Task = {
       id: uuid(),
       title,
-        deadline,
-        linkedObjectiveId,
-        level: 5,
-        degradationPool: 0,
-        totalDegradation: 0,
-        status: 'active',
-        createdAt: new Date().toISOString()
+      deadline,
+      linkedObjectiveId,
+      level: 5,
+      degradationPool: 0,
+      totalDegradation: 0,
+      status: 'active',
+      createdAt: new Date().toISOString(),
     }
     const newTasks = [...get().tasks, newTask]
     set({ tasks: newTasks })
@@ -81,27 +81,27 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     let tasks = get().tasks
     let saved: Task
     if (draft.id) {
-      tasks = tasks.map(t => {
+      tasks = tasks.map((t) => {
         if (t.id === draft.id) {
-           saved = { ...t, ...draft } as Task
-           return saved
+          saved = { ...t, ...draft } as Task
+          return saved
         }
         return t
       })
       // If it somehow wasn't found, fallback
       if (!saved!) {
-         saved = {
-           id: draft.id,
-           title: draft.title,
-           deadline: draft.deadline,
-           linkedObjectiveId: draft.linkedObjectiveId ?? null,
-           level: draft.level ?? 5,
-           degradationPool: draft.degradationPool ?? 0,
-           totalDegradation: draft.totalDegradation ?? 0,
-           status: draft.status ?? 'active',
-           createdAt: draft.createdAt ?? new Date().toISOString()
-         }
-         tasks.push(saved)
+        saved = {
+          id: draft.id,
+          title: draft.title,
+          deadline: draft.deadline,
+          linkedObjectiveId: draft.linkedObjectiveId ?? null,
+          level: draft.level ?? 5,
+          degradationPool: draft.degradationPool ?? 0,
+          totalDegradation: draft.totalDegradation ?? 0,
+          status: draft.status ?? 'active',
+          createdAt: draft.createdAt ?? new Date().toISOString(),
+        }
+        tasks.push(saved)
       }
     } else {
       saved = {
@@ -113,7 +113,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
         degradationPool: draft.degradationPool ?? 0,
         totalDegradation: draft.totalDegradation ?? 0,
         status: 'active',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       }
       tasks = [...tasks, saved]
     }
@@ -123,24 +123,24 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
   },
 
   async deleteTask(id) {
-    const tasks = get().tasks.filter(t => t.id !== id)
+    const tasks = get().tasks.filter((t) => t.id !== id)
     set({ tasks })
     await persistTasks(tasks)
   },
 
   async markTaskCompleted(id) {
-    const tasks = get().tasks.map(t => t.id === id ? { ...t, status: 'history' as const } : t)
+    const tasks = get().tasks.map((t) => (t.id === id ? { ...t, status: 'history' as const } : t))
     set({ tasks })
     await persistTasks(tasks)
   },
 
   async updateTaskLevel(id, desiredLevel) {
-    const tasks = get().tasks.map(t => {
+    const tasks = get().tasks.map((t) => {
       if (t.id !== id) return t
       if (!canChangeLevel(t.lastLevelChangeAt)) return t
       const safeLevel = clampManualLevelChange(t.level, desiredLevel)
-      return { 
-        ...t, 
+      return {
+        ...t,
         level: safeLevel,
         lastLevelChangeAt: new Date().toISOString(),
       }
@@ -151,7 +151,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
 
   async applySessionDegradation(completedTaskIds) {
     const degradedEvents: Array<{ title: string; newLevel: number; hitZero: boolean }> = []
-    const tasks = get().tasks.map(t => {
+    const tasks = get().tasks.map((t) => {
       if (!completedTaskIds.includes(t.id)) return t
       if (t.totalDegradation >= 5) return t
       const nextPool = (t.degradationPool ?? 0) + 0.5
@@ -221,7 +221,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
       }
       // task-accomplished et task-still-zero : pas de notif (transition douce).
     }
-  }
+  },
 }))
 
 function canChangeLevel(lastLevelChangeAt: string | undefined): boolean {

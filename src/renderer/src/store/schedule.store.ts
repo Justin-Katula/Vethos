@@ -58,8 +58,13 @@ function notifyPersistError(err: unknown): void {
 }
 
 async function writeSchedule(state: ScheduleState): Promise<void> {
-  const result = await nexus.storage.write('schedule', state)
-  assertStorageWrite(result, 'schedule')
+  try {
+    const result = await nexus.storage.write('schedule', state)
+    assertStorageWrite(result, 'schedule')
+  } catch (err) {
+    notifyPersistError(err)
+    throw err
+  }
 }
 
 export async function flushSchedulePersist(): Promise<void> {
@@ -78,7 +83,6 @@ export async function flushSchedulePersist(): Promise<void> {
     await writeSchedule(state)
     waiters.forEach(({ resolve }) => resolve())
   } catch (err) {
-    notifyPersistError(err)
     waiters.forEach(({ reject }) => reject(err))
   }
 }

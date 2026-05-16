@@ -42,10 +42,7 @@ type LevelsStore = {
   deleteObjective: (id: string) => Promise<void>
   changeObjectiveLevel: (id: string, newLevel: number) => Promise<{ ok: boolean; reason?: string }>
   setCalculatedFreeTime: (minutes: number, date: string) => Promise<void>
-  reconcileWithHistory: (
-    history: BlockingHistoryEntry[],
-    rules: TimeRule[],
-  ) => Promise<void>
+  reconcileWithHistory: (history: BlockingHistoryEntry[], rules: TimeRule[]) => Promise<void>
   consumeProgressEvent: () => void
 }
 
@@ -64,8 +61,8 @@ function buildLevelsPayload(state: LevelsStore): LevelsState {
 }
 
 async function persistObjectives(objectives: Objective[]): Promise<void> {
-  const result = await nexus.storage.write<ObjectivesState>('objectives', { objectives })
   try {
+    const result = await nexus.storage.write<ObjectivesState>('objectives', { objectives })
     assertStorageWrite(result, 'objectives')
   } catch (err) {
     useToastStore.getState().push({
@@ -78,8 +75,8 @@ async function persistObjectives(objectives: Objective[]): Promise<void> {
 }
 
 async function persistLevels(state: LevelsStore): Promise<void> {
-  const result = await nexus.storage.write<LevelsState>('levels', buildLevelsPayload(state))
   try {
+    const result = await nexus.storage.write<LevelsState>('levels', buildLevelsPayload(state))
     assertStorageWrite(result, 'levels')
   } catch (err) {
     useToastStore.getState().push({
@@ -209,9 +206,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
     const sorted = [...history].sort(
       (a, b) => new Date(a.endedAt).getTime() - new Date(b.endedAt).getTime(),
     )
-    const startIndex = cursor
-      ? Math.max(0, sorted.findIndex((h) => h.sessionId === cursor) + 1)
-      : 0
+    const startIndex = cursor ? Math.max(0, sorted.findIndex((h) => h.sessionId === cursor) + 1) : 0
     const objectiveDeltas = new Map<string, number>()
     let newCursor = cursor
 

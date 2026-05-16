@@ -25,8 +25,8 @@ function uuid(): string {
 
 async function persist(apps: DeclaredApp[]): Promise<void> {
   const state: DeclaredAppsState = { apps }
-  const result = await nexus.storage.write('declared_apps', state)
   try {
+    const result = await nexus.storage.write('declared_apps', state)
     assertStorageWrite(result, 'declared_apps')
   } catch (err) {
     useToastStore.getState().push({
