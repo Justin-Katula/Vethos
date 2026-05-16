@@ -7,6 +7,7 @@ import { registerAllIpcHandlers } from './ipc'
 import { ensureElevatedAtStartup } from './blocking/elevation'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
+import { createServiceClient } from './service-client/client'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
 
@@ -111,6 +112,16 @@ app.whenReady().then(async () => {
 
   if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
   startUpdater(() => mainWindow, runtime.isSessionActive)
+
+  // Phase 1 P16 : on vérifie seulement que le pont service répond.
+  // Le blocage reste dans le main jusqu'à la Phase 2.
+  const serviceClient = createServiceClient()
+  setTimeout(() => {
+    serviceClient
+      .request('GET_SERVICE_INFO')
+      .then((info) => log.info('[main] service joignable', info))
+      .catch((err) => log.warn('[main] service injoignable', err.message))
+  }, 1500)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
