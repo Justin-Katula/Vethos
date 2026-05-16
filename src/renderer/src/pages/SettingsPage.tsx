@@ -4,7 +4,6 @@ import {
   RefreshCw,
   Moon,
   Clock,
-  Shield,
   FileText,
   History,
   type LucideProps,
@@ -68,7 +67,6 @@ export default function SettingsPage() {
     sleepStart,
     sleepEnd,
     sessionRulesEnabled,
-    strictBlocking,
     browserHistoryScanEnabled,
     loaded,
     load,
@@ -212,13 +210,6 @@ export default function SettingsPage() {
               }
               void updateSettings({ sessionRulesEnabled: v })
             }}
-          />
-          <ToggleRow
-            icon={Shield}
-            label="Blocage strict"
-            description="Empêche tout contournement pendant les sessions actives"
-            value={strictBlocking}
-            onChange={(v) => void updateSettings({ strictBlocking: v })}
           />
           <ToggleRow
             icon={History}
