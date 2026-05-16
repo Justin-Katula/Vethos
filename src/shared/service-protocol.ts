@@ -27,6 +27,33 @@ export type ServiceInfo = {
   uptimeMs: number
 }
 
+/**
+ * Types de requêtes UI → Service. Phase 1 : PING, GET_SERVICE_INFO.
+ * Lot 3+ : commandes de blocage. L'enveloppe `ServiceRequest.type` reste un
+ * `string` générique ; ce type sert à typer la table de handlers du service.
+ */
+export type ServiceRequestType =
+  | 'PING'
+  | 'GET_SERVICE_INFO'
+  | 'GET_STATE'
+  | 'SAVE_PROFILE'
+  | 'DELETE_PROFILE'
+  | 'START_SESSION'
+  | 'REQUEST_UNLOCK'
+  | 'SUBMIT_JUSTIFICATION'
+  | 'GET_LAYER_STATUS'
+
+/**
+ * Types d'événements poussés Service → UI (Lot 3+). L'UI les re-transmet au
+ * renderer sur les canaux IPC `BLOCKING_EVENT_*` existants.
+ */
+export type ServiceEventType =
+  | 'SESSION_CHANGED'
+  | 'SESSION_ENDED'
+  | 'LAYER_DRIFT'
+  | 'CLOCK_TAMPER'
+  | 'BREAK_REQUIRED'
+
 /** Sérialise un message en ligne JSON terminée par `\n`. */
 export function encodeMessage(msg: ServiceMessage): string {
   return JSON.stringify(msg) + '\n'
