@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Moon, Briefcase, GraduationCap, Clock } from 'lucide-react'
+import { Calendar, Moon, Briefcase, GraduationCap, Clock, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -15,6 +15,13 @@ const DAYS_SHORT = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 type ProfileType = 'student' | 'worker' | 'both' | 'other'
 type DaySchedule = { start: string; end: string; enabled: boolean }
+type CommitmentDraft = {
+  id: string
+  name: string
+  dayOfWeek: number
+  start: string
+  end: string
+}
 
 const DEFAULT_SCHOOL: DaySchedule = { start: '08:00', end: '16:00', enabled: true }
 const DEFAULT_WORK: DaySchedule = { start: '09:00', end: '17:00', enabled: true }
@@ -40,6 +47,8 @@ const COLORS = {
   health: '#FF8A00',    // Orange
 }
 
+const COMMITMENT_COLORS = ['#10B981', '#FF8A00', '#A855F7', '#06B6D4']
+
 function timeToMinute(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return (h ?? 0) * 60 + (m ?? 0)
@@ -56,6 +65,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
   const [sleepEnd, setSleepEnd] = useState('07:00')
   const [schoolDays, setSchoolDays] = useState<DaySchedule[]>([...DEFAULT_SCHOOL_WEEK])
   const [workDays, setWorkDays] = useState<DaySchedule[]>([...DEFAULT_WORK_WEEK])
+  const [commitments, setCommitments] = useState<CommitmentDraft[]>([])
   const [applied, setApplied] = useState(false)
 
   useEffect(() => {
@@ -70,7 +80,41 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
     idx: number,
     patch: Partial<DaySchedule>,
   ) => {
-    setter((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
+    setter((prev) => {
+      const current = prev[idx]
+      return prev.map((d, i) => {
+        if (i === idx) return { ...d, ...patch }
+        let next = d
+        if (current && patch.start !== undefined && d.enabled && d.start === current.start) {
+          next = { ...next, start: patch.start }
+        }
+        if (current && patch.end !== undefined && d.enabled && d.end === current.end) {
+          next = { ...next, end: patch.end }
+        }
+        return next
+      })
+    })
+  }
+
+  const addCommitment = () => {
+    setCommitments((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name: '',
+        dayOfWeek: 0,
+        start: '18:00',
+        end: '19:00',
+      },
+    ])
+  }
+
+  const updateCommitment = (id: string, patch: Partial<CommitmentDraft>) => {
+    setCommitments((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
+  }
+
+  const removeCommitment = (id: string) => {
+    setCommitments((prev) => prev.filter((item) => item.id !== id))
   }
 
   // Calcul du temps libre par jour
@@ -95,9 +139,15 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         const w = workDays[i]!
         usedMinutes += timeToMinute(w.end) - timeToMinute(w.start)
       }
+      for (const commitment of commitments) {
+        if (commitment.dayOfWeek !== i) continue
+        const start = timeToMinute(commitment.start)
+        const end = timeToMinute(commitment.end)
+        if (end > start) usedMinutes += end - start
+      }
       return Math.max(0, 1440 - usedMinutes)
     })
-  }, [sleepStart, sleepEnd, schoolDays, workDays, showSchool, showWork])
+  }, [sleepStart, sleepEnd, schoolDays, workDays, showSchool, showWork, commitments])
 
   const totalWeekFree = freeTimeByDay.reduce((s, m) => s + m, 0)
 
@@ -216,6 +266,32 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
       }
     }
 
+    // Entrées engagements protégés
+    commitments.forEach((commitment, index) => {
+      const name = commitment.name.trim()
+      const start = timeToMinute(commitment.start)
+      const end = timeToMinute(commitment.end)
+      if (!name || end <= start) return
+      const rule: TimeRule = {
+        id: crypto.randomUUID(),
+        name,
+        color: COMMITMENT_COLORS[index % COMMITMENT_COLORS.length]!,
+        icon: 'ShieldCheck',
+        categoryType: 'commitment',
+        linkedProfileId: null,
+        createdAt: now,
+      }
+      rules.push(rule)
+      entries.push({
+        id: crypto.randomUUID(),
+        ruleId: rule.id,
+        dayOfWeek: commitment.dayOfWeek,
+        startMinute: start,
+        endMinute: end,
+        createdAt: now,
+      })
+    })
+
     await replaceAll(rules, entries)
     await updateSettings({
       userProfile: profileType,
@@ -229,7 +305,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-accent">
           <Calendar size={22} />
         </div>
         <h1 className="text-3xl font-bold tracking-tight">Ton emploi du temps</h1>
@@ -321,6 +397,76 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         />
       )}
 
+      <div className="rounded-xl border border-border-subtle bg-bg-elevated p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Calendar size={16} className="text-text-muted" />
+          <span className="text-xs font-medium uppercase tracking-widest text-text-muted">
+            Engagements non-négociables
+          </span>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-text-secondary">
+          Y a-t-il des activités de ta routine que tu veux préserver ?
+        </p>
+        <div className="space-y-2">
+          {commitments.map((commitment) => (
+            <div
+              key={commitment.id}
+              className="grid grid-cols-[minmax(0,1fr)_120px_92px_92px_32px] items-center gap-2"
+            >
+              <input
+                type="text"
+                value={commitment.name}
+                onChange={(e) => updateCommitment(commitment.id, { name: e.target.value })}
+                placeholder="Sport, musique, famille..."
+                maxLength={40}
+                className="rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-xs text-text-primary outline-none focus:border-accent"
+              />
+              <select
+                value={commitment.dayOfWeek}
+                onChange={(e) =>
+                  updateCommitment(commitment.id, { dayOfWeek: Number(e.target.value) })
+                }
+                className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-xs text-text-primary outline-none focus:border-accent"
+              >
+                {DAYS_FR.map((day, index) => (
+                  <option key={day} value={index}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="time"
+                value={commitment.start}
+                onChange={(e) => updateCommitment(commitment.id, { start: e.target.value })}
+                className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-xs text-text-primary outline-none focus:border-accent"
+              />
+              <input
+                type="time"
+                value={commitment.end}
+                onChange={(e) => updateCommitment(commitment.id, { end: e.target.value })}
+                className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-xs text-text-primary outline-none focus:border-accent"
+              />
+              <button
+                type="button"
+                onClick={() => removeCommitment(commitment.id)}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-300"
+                aria-label="Retirer cet engagement"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={addCommitment}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-bg-base px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+        >
+          <Plus size={13} />
+          Ajouter un engagement
+        </button>
+      </div>
+
       {/* Aperçu temps libre */}
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
         <div className="mb-3 text-xs font-medium uppercase tracking-widest text-accent">
@@ -381,7 +527,7 @@ function DayGrid({
         <span className="text-xs font-medium uppercase tracking-widest text-text-muted">
           {label}
         </span>
-        <div className="ml-auto h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+        <div className="ml-auto h-3 w-3 rounded-2xl" style={{ backgroundColor: color }} />
       </div>
       <div className="space-y-2">
         {DAYS_FR.map((day, i) => (

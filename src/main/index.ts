@@ -1,13 +1,14 @@
 import log, { setupLogging } from './logging/setup'
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
-import { createRequire } from 'node:module'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from './storage'
 import { registerAllIpcHandlers } from './ipc'
 import { ensureElevatedAtStartup } from './blocking/elevation'
-import { focusWindow } from './notifications'
+import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
+import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -19,19 +20,32 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.nexus.blocking')
 }
 
-function sendWindowsDummyKeystrokeIfAvailable(): void {
-  if (process.platform !== 'win32') return
+function crashMarkerPath(): string {
+  return join(app.getPath('userData'), 'nexus-main-alive.marker')
+}
+
+function writeCrashMarker(): void {
   try {
-    const require = createRequire(import.meta.url)
-    const mod = require('windows-dummy-keystroke') as {
-      sendDummyKeystroke?: () => void
-      default?: { sendDummyKeystroke?: () => void }
-    }
-    const send = mod.sendDummyKeystroke ?? mod.default?.sendDummyKeystroke
-    send?.()
+    writeFileSync(crashMarkerPath(), new Date().toISOString(), 'utf8')
   } catch (err) {
-    log.debug('windows-dummy-keystroke unavailable', err)
+    log.warn('unable to write crash marker', err)
   }
+}
+
+function clearCrashMarker(): void {
+  try {
+    rmSync(crashMarkerPath(), { force: true })
+  } catch (err) {
+    log.warn('unable to clear crash marker', err)
+  }
+}
+
+function handleFatalProcessError(label: string, err: unknown): void {
+  log.error(label, err)
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
+  }
+  app.exit(1)
 }
 
 function createMainWindow(): BrowserWindow {
@@ -81,16 +95,22 @@ let quitAfterDebounceFlush = false
 
 app.whenReady().then(async () => {
   await ensureElevatedAtStartup()
+  const recoveredFromCrash = existsSync(crashMarkerPath())
+  writeCrashMarker()
 
   const storage = createStorage(app.getPath('userData'))
-  await registerAllIpcHandlers(storage, () => mainWindow)
+  await recalculateFreeTimeAtBoot(storage).catch((err) => {
+    log.warn('boot free-time recalculation failed', err)
+  })
+  const runtime = await registerAllIpcHandlers(storage, () => mainWindow)
 
   mainWindow = createMainWindow()
   mainWindow.on('closed', () => {
     mainWindow = null
   })
 
-  startUpdater(() => mainWindow)
+  if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
+  startUpdater(() => mainWindow, runtime.isSessionActive)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -109,7 +129,6 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-sendWindowsDummyKeystrokeIfAvailable()
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
@@ -122,14 +141,39 @@ if (!gotLock) {
 }
 
 app.on('before-quit', (event) => {
-  if (quitAfterDebounceFlush) return
+  if (quitAfterDebounceFlush) {
+    clearCrashMarker()
+    return
+  }
   const win = mainWindow
-  if (!win || win.isDestroyed()) return
+  if (!win || win.isDestroyed()) {
+    clearCrashMarker()
+    return
+  }
 
   event.preventDefault()
   win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
   setTimeout(() => {
     quitAfterDebounceFlush = true
+    clearCrashMarker()
     app.quit()
   }, 650)
+})
+
+process.on('uncaughtException', (err) => {
+  handleFatalProcessError('uncaught exception', err)
+})
+
+process.on('unhandledRejection', (err) => {
+  handleFatalProcessError('unhandled rejection', err)
+})
+
+process.on('SIGINT', () => {
+  clearCrashMarker()
+  app.quit()
+})
+
+process.on('SIGTERM', () => {
+  clearCrashMarker()
+  app.quit()
 })

@@ -1,6 +1,6 @@
 import { differenceCiede2000, parse } from 'culori'
 
-const SIMILARITY_THRESHOLD = 5
+const CIEDE2000_SIMILARITY_THRESHOLD = 5
 
 export function colorDelta(hexA: string, hexB: string): number {
   const a = parse(hexA)
@@ -10,7 +10,7 @@ export function colorDelta(hexA: string, hexB: string): number {
 }
 
 export function areColorsSimilar(hexA: string, hexB: string): boolean {
-  return colorDelta(hexA, hexB) < SIMILARITY_THRESHOLD
+  return colorDelta(hexA, hexB) < CIEDE2000_SIMILARITY_THRESHOLD
 }
 
 export function checkPaletteCollisions(colors: string[]): Array<[string, string]> {

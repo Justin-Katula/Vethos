@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Trash2 } from 'lucide-react'
-import type { BlockingProfile } from '@shared/schemas'
+import { RefreshCw, X, Trash2 } from 'lucide-react'
+import type { BlockingProfile, DiscoveredSite } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
+import { useSettingsStore } from '@/store/settings.store'
+import { nexus } from '@/lib/ipc'
 
 type PolicyType = BlockingProfile['unlockPolicy']['type']
 
@@ -17,16 +19,23 @@ type Props = {
   onDelete?: (id: string) => Promise<void>
 }
 
+type DiscoveredApp = Awaited<ReturnType<typeof nexus.app.discoverInstalledApps>>[number]
+
 export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Props) {
   const [name, setName] = useState('')
   const [sites, setSites] = useState('')
   const [procs, setProcs] = useState('')
   const [apps, setApps] = useState('')
   const [policyType, setPolicyType] = useState<PolicyType>('cooldown_and_justification')
-  const [minutes, setMinutes] = useState(5)
-  const [minWords, setMinWords] = useState(100)
+  const [minutes, setMinutes] = useState(10)
+  const [minWords, setMinWords] = useState(50)
   const [busy, setBusy] = useState(false)
+  const [scanningApps, setScanningApps] = useState(false)
+  const [discoveredApps, setDiscoveredApps] = useState<DiscoveredApp[]>([])
+  const [discoveredSites, setDiscoveredSites] = useState<DiscoveredSite[]>([])
   const [error, setError] = useState<string | null>(null)
+  const defaultCooldownMinutes = useSettingsStore((s) => s.defaultUnlockCooldownMinutes)
+  const defaultJustificationWords = useSettingsStore((s) => s.defaultUnlockJustificationWords)
 
   useShortcut('Escape', onClose, { enabled: open && !busy })
 
@@ -38,19 +47,30 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
       setProcs(initial.blockedProcesses.join('\n'))
       setApps(initial.blockedNetworkApps.join('\n'))
       setPolicyType(initial.unlockPolicy.type)
-      if ('minutes' in initial.unlockPolicy) setMinutes(initial.unlockPolicy.minutes)
-      if ('minWords' in initial.unlockPolicy) setMinWords(initial.unlockPolicy.minWords)
+      setMinutes(
+        'minutes' in initial.unlockPolicy
+          ? initial.unlockPolicy.minutes
+          : defaultCooldownMinutes,
+      )
+      setMinWords(
+        'minWords' in initial.unlockPolicy
+          ? initial.unlockPolicy.minWords
+          : defaultJustificationWords,
+      )
     } else {
       setName('')
       setSites('')
       setProcs('')
       setApps('')
       setPolicyType('cooldown_and_justification')
-      setMinutes(5)
-      setMinWords(100)
+      setMinutes(defaultCooldownMinutes)
+      setMinWords(defaultJustificationWords)
     }
     setError(null)
-  }, [open, initial])
+    void nexus.storage.read<{ sites: DiscoveredSite[] }>('discovered_sites').then((state) => {
+      setDiscoveredSites(state?.sites.slice(0, 12) ?? [])
+    })
+  }, [open, initial, defaultCooldownMinutes, defaultJustificationWords])
 
   const handleSave = async () => {
     setBusy(true)
@@ -79,6 +99,32 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
       setError((err as Error).message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const appendLine = (
+    setter: React.Dispatch<React.SetStateAction<string>>,
+    value: string,
+  ): void => {
+    const clean = value.trim()
+    if (!clean) return
+    setter((current) => {
+      const lines = splitLines(current)
+      if (lines.some((line) => line.toLowerCase() === clean.toLowerCase())) return current
+      return [...lines, clean].join('\n')
+    })
+  }
+
+  const handleScanApps = async (): Promise<void> => {
+    setScanningApps(true)
+    setError(null)
+    try {
+      const apps = await nexus.app.discoverInstalledApps()
+      setDiscoveredApps(apps.slice(0, 20))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setScanningApps(false)
     }
   }
 
@@ -135,6 +181,20 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                   rows={4}
                   className={cn(inputCls, 'font-mono text-xs leading-relaxed')}
                 />
+                {discoveredSites.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {discoveredSites.map((site) => (
+                      <button
+                        key={site.domain}
+                        type="button"
+                        onClick={() => appendLine(setSites, site.domain)}
+                        className="rounded-2xl border border-border-subtle bg-bg-base px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+                      >
+                        {site.domain}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Field>
 
               <Field
@@ -159,6 +219,56 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                   rows={3}
                   className={cn(inputCls, 'font-mono text-xs leading-relaxed')}
                 />
+              </Field>
+
+              <Field label="Scanner les applications" hint="Lit le registre Windows localement et propose les apps trouvées.">
+                <button
+                  type="button"
+                  onClick={() => void handleScanApps()}
+                  disabled={scanningApps}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-md border border-border-subtle px-3 py-2 text-xs font-medium transition-colors',
+                    scanningApps
+                      ? 'cursor-wait text-text-muted'
+                      : 'text-text-secondary hover:border-border-strong hover:text-text-primary',
+                  )}
+                >
+                  <RefreshCw size={13} className={scanningApps ? 'animate-spin' : undefined} />
+                  {scanningApps ? 'Scan...' : 'Scanner mes applications'}
+                </button>
+                {discoveredApps.length > 0 && (
+                  <div className="mt-3 max-h-52 overflow-y-auto rounded-lg border border-border-subtle bg-bg-base">
+                    {discoveredApps.map((app) => (
+                      <div
+                        key={`${app.exePath}-${app.exeName}`}
+                        className="flex items-center gap-3 border-b border-border-subtle px-3 py-2 last:border-b-0"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-medium text-text-primary">
+                            {app.name}
+                          </div>
+                          <div className="truncate font-mono text-[10px] text-text-muted">
+                            {app.exeName}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => appendLine(setProcs, app.exeName)}
+                          className="rounded-md border border-border-subtle px-2 py-1 text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+                        >
+                          Lancement
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => appendLine(setApps, app.exePath)}
+                          className="rounded-md border border-border-subtle px-2 py-1 text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
+                        >
+                          Réseau
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Field>
 
               <Field label="Politique d'arrêt anticipé">
@@ -325,7 +435,7 @@ function RadioRow({
     >
       <div
         className={cn(
-          'mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 transition-colors',
+          'mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded-2xl border-2 transition-colors',
           isSelected ? 'border-accent bg-accent' : 'border-border-strong',
         )}
       />

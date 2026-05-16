@@ -148,7 +148,7 @@ export function ObjectiveEditor({
             <header className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
               <div className="flex items-center gap-3">
                 <div
-                  className="h-8 w-8 rounded-full ring-2 ring-bg-base transition-colors"
+                  className="h-8 w-8 rounded-2xl ring-2 ring-bg-base transition-colors"
                   style={{ backgroundColor: colorValid ? color : '#404040' }}
                 />
                 <h2 className="text-lg font-semibold tracking-tight">
@@ -246,7 +246,7 @@ export function ObjectiveEditor({
 
               <Field
                 label="Règles liées"
-                hint="Sessions terminées sur ces règles créditeront cet objectif"
+                hint="Sessions terminées sur ces règles feront progresser cet objectif"
               >
                 {rules.length === 0 ? (
                   <p className="rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-xs text-text-muted">
@@ -262,7 +262,7 @@ export function ObjectiveEditor({
                           type="button"
                           onClick={() => toggleRule(r.id)}
                           className={cn(
-                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                            'inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1 text-xs font-medium transition-colors',
                             selected
                               ? 'border-transparent text-white'
                               : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
@@ -274,7 +274,7 @@ export function ObjectiveEditor({
                           }
                         >
                           <span
-                            className="h-2 w-2 rounded-full"
+                            className="h-2 w-2 rounded-2xl"
                             style={{
                               backgroundColor: selected ? 'white' : r.color,
                             }}
@@ -311,7 +311,7 @@ export function ObjectiveEditor({
                     step="1"
                     value={level}
                     onChange={(e) => setLevel(parseInt(e.target.value))}
-                    className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
+                    className="w-full accent-accent h-1.5 rounded-2xl bg-bg-base appearance-none cursor-pointer"
                   />
                   <div className="flex justify-between text-[10px] text-text-muted font-mono">
                     <span>3</span>

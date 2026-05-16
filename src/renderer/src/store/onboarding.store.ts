@@ -17,7 +17,6 @@ type OnboardingStore = {
   finishing: boolean
   next: () => void
   prev: () => void
-  jumpTo: (s: OnboardingStep) => void
   /** Skip = marquer comme terminé sans poser le drapeau "finishing". */
   skip: () => Promise<void>
   /** Finish = afficher l'écran "done" puis marquer comme terminé. */
@@ -48,10 +47,6 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
       const prevStep = ONBOARDING_STEPS[Math.max(i - 1, 0)]!
       return { step: prevStep }
     })
-  },
-
-  jumpTo(s) {
-    set({ step: s })
   },
 
   async skip() {

@@ -13,7 +13,8 @@
  *   - Si trajet retour → sommeil : max 30 min de transition
  */
 
-import type { ScheduleEntry, TimeRule, Task } from '@shared/schemas'
+import type { Objective, ScheduleEntry, TimeRule, Task } from '@shared/schemas'
+import { distributeFreeTime, getDeadlineMultiplier } from './level-distribution'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,22 +36,20 @@ export type TimeDistribution = {
   level: number
 }
 
+export type ObjectiveTimeDistribution = {
+  objectiveId: string
+  objectiveName: string
+  color: string
+  scoreReel: number
+  allocatedMinutes: number
+  deadlineDays: number | null
+  level: number
+}
+
 export type DailyFreeTimeResult = {
   totalFreeMinutes: number
   slots: FreeTimeSlot[]
   distributions: TimeDistribution[]
-}
-
-// ─── Multiplicateurs deadline ───────────────────────────────────────────────
-
-export function getDeadlineMultiplier(deadlineStr: string, todayStr: string): number {
-  const diffDays = daysBetweenLocalDates(todayStr, deadlineStr)
-
-  if (diffDays < 0) return 1.0
-  if (diffDays > 7) return 1.0
-  if (diffDays >= 4 && diffDays <= 7) return 1.3
-  if (diffDays >= 2 && diffDays <= 3) return 1.6
-  return 2.0
 }
 
 // ─── Calcul des créneaux libres ─────────────────────────────────────────────
@@ -62,10 +61,17 @@ function isFixedActivity(rule: TimeRule): boolean {
   }
   const n = rule.name.toLowerCase()
   return (
-    n.includes('école') || n.includes('ecole') || n.includes('school') ||
-    n.includes('travail') || n.includes('work') || n.includes('job') ||
-    n.includes('sommeil') || n.includes('sleep') || n.includes('dodo') ||
-    n.includes('cours') || n.includes('class')
+    n.includes('école') ||
+    n.includes('ecole') ||
+    n.includes('school') ||
+    n.includes('travail') ||
+    n.includes('work') ||
+    n.includes('job') ||
+    n.includes('sommeil') ||
+    n.includes('sleep') ||
+    n.includes('dodo') ||
+    n.includes('cours') ||
+    n.includes('class')
   )
 }
 
@@ -80,9 +86,14 @@ function isSchoolOrWorkRule(rule: TimeRule): boolean {
   if (rule.categoryType) return rule.categoryType === 'school' || rule.categoryType === 'work'
   const n = rule.name.toLowerCase()
   return (
-    n.includes('école') || n.includes('ecole') || n.includes('school') ||
-    n.includes('travail') || n.includes('work') || n.includes('job') ||
-    n.includes('cours') || n.includes('class')
+    n.includes('école') ||
+    n.includes('ecole') ||
+    n.includes('school') ||
+    n.includes('travail') ||
+    n.includes('work') ||
+    n.includes('job') ||
+    n.includes('cours') ||
+    n.includes('class')
   )
 }
 
@@ -123,7 +134,9 @@ export function computeFreeTimeSlots(
     .sort((a, b) => a.startMinute - b.startMinute)
 
   if (dayEntries.length === 0) {
-    return [{ dayOfWeek, startMinute: 0, endMinute: 1440, durationMinutes: 1440, isPreparation: false }]
+    return [
+      { dayOfWeek, startMinute: 0, endMinute: 1440, durationMinutes: 1440, isPreparation: false },
+    ]
   }
 
   const slots: FreeTimeSlot[] = []
@@ -198,9 +211,7 @@ export function computeDayFreeMinutes(
   rules: TimeRule[],
 ): number {
   const slots = computeFreeTimeSlots(dayOfWeek, entries, rules)
-  return slots
-    .filter((s) => !s.isPreparation)
-    .reduce((sum, s) => sum + s.durationMinutes, 0)
+  return slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
 }
 
 // ─── Distribution du temps libre ────────────────────────────────────────────
@@ -217,33 +228,57 @@ export function distributeTimeToTasks(
   totalFreeMinutes: number,
   todayStr: string,
 ): TimeDistribution[] {
-  const activeTasks = tasks.filter((t) => t.status === 'active' && t.level > 0)
-  if (activeTasks.length === 0 || totalFreeMinutes <= 0) return []
+  if (totalFreeMinutes <= 0) return []
 
-  const scored = activeTasks.map((task) => {
-    const deadlineDays = daysBetweenLocalDates(todayStr, task.deadline)
-    const multiplier = getDeadlineMultiplier(task.deadline, todayStr)
-    const scoreReel = task.level * multiplier
-    return { task, scoreReel, deadlineDays, multiplier }
-  })
+  const activeTasks = tasks.filter((task) => task.status === 'active' && task.level > 0)
+  if (activeTasks.length === 0) return []
 
-  const totalScore = scored.reduce((sum, s) => sum + s.scoreReel, 0)
-  if (totalScore === 0) return []
-
-  // Trier par score réel décroissant (écrêtage : score réel prime sur niveau brut)
-  scored.sort((a, b) => b.scoreReel - a.scoreReel)
-
-  const distributions = scored.map(({ task, scoreReel, deadlineDays }) => {
-    const rawMinutes = (scoreReel / totalScore) * totalFreeMinutes
-    // Arrondi au multiple de 5 minutes le plus proche
-    const allocatedMinutes = Math.round(rawMinutes / 5) * 5
+  const taskById = new Map(activeTasks.map((task) => [task.id, task]))
+  return distributeFreeTime(activeTasks, totalFreeMinutes, todayStr).map((item) => {
+    const task = taskById.get(item.taskId)!
     return {
       taskId: task.id,
       taskTitle: task.title,
-      scoreReel,
-      allocatedMinutes,
-      deadlineDays,
+      scoreReel: item.scoreReel,
+      allocatedMinutes: item.minutes,
+      deadlineDays: daysBetweenLocalDates(todayStr, task.deadline),
       level: task.level,
+    }
+  })
+}
+
+export function distributeTimeToObjectives(
+  objectives: Objective[],
+  totalFreeMinutes: number,
+  todayStr: string,
+): ObjectiveTimeDistribution[] {
+  const activeObjectives = objectives.filter((objective) => objective.level > 0)
+  if (activeObjectives.length === 0 || totalFreeMinutes <= 0) return []
+
+  const scored = activeObjectives.map((objective) => {
+    const deadlineDays = objective.deadline
+      ? daysBetweenLocalDates(todayStr, objective.deadline)
+      : null
+    const multiplier = objective.deadline ? getDeadlineMultiplier(objective.deadline, todayStr) : 1
+    const scoreReel = objective.level * multiplier
+    return { objective, scoreReel, deadlineDays }
+  })
+
+  const totalScore = scored.reduce((sum, item) => sum + item.scoreReel, 0)
+  if (totalScore === 0) return []
+
+  scored.sort((a, b) => b.scoreReel - a.scoreReel)
+
+  const distributions = scored.map(({ objective, scoreReel, deadlineDays }) => {
+    const rawMinutes = (scoreReel / totalScore) * totalFreeMinutes
+    return {
+      objectiveId: objective.id,
+      objectiveName: objective.name,
+      color: objective.color,
+      scoreReel,
+      allocatedMinutes: Math.round(rawMinutes / 5) * 5,
+      deadlineDays,
+      level: objective.level,
     }
   })
 

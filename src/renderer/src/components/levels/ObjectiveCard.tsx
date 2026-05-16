@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import type { BlockingHistoryEntry, Objective, TimeRule } from '@shared/schemas'
 import { iconByName } from '@/lib/rule-palette'
+import { daysUntilLevelChange } from '@/lib/free-time-calculator'
+import { cn } from '@/lib/cn'
 import { LevelRing } from './LevelRing'
 
 type Props = {
@@ -12,6 +14,7 @@ type Props = {
    * retirée en attendant que la carte affiche cette information).
    */
   history: BlockingHistoryEntry[]
+  urgency?: 'warning' | 'critical'
   onClick?: () => void
 }
 
@@ -19,6 +22,7 @@ export function ObjectiveCard({
   objective,
   rules,
   history: _history,
+  urgency,
   onClick,
 }: Props): JSX.Element {
   const Icon = iconByName(objective.icon)
@@ -27,6 +31,13 @@ export function ObjectiveCard({
   const linkedNames = rules
     .filter((r) => objective.linkedRuleIds.includes(r.id))
     .map((r) => r.name)
+  const cooldownDays = daysUntilLevelChange(objective.lastLevelChangeAt)
+  const urgencyBorder =
+    urgency === 'critical'
+      ? 'border-red-500/70'
+      : urgency === 'warning'
+        ? 'border-orange/70'
+        : 'border-border-subtle'
 
   return (
     <motion.button
@@ -34,7 +45,10 @@ export function ObjectiveCard({
       onClick={onClick}
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
-      className="group relative flex w-full flex-col gap-4 overflow-hidden rounded-xl border border-border-subtle bg-bg-elevated p-5 text-left shadow-card transition-colors hover:border-border-strong"
+      className={cn(
+        'group relative flex w-full flex-col gap-4 overflow-hidden rounded-xl border bg-bg-elevated p-5 text-left shadow-card transition-colors hover:border-border-strong',
+        urgencyBorder,
+      )}
     >
       {/* Color bar */}
       <div
@@ -77,7 +91,7 @@ export function ObjectiveCard({
             {objective.level.toFixed(1)}
           </div>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
+        <div className="h-1.5 w-full overflow-hidden rounded-2xl bg-bg-base">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${(objective.level / 10) * 100}%` }}
@@ -93,18 +107,24 @@ export function ObjectiveCard({
         </div>
       </div>
 
+      {cooldownDays > 0 && (
+        <div className="rounded-md border border-orange/30 bg-orange/10 px-3 py-2 text-[10px] font-medium text-orange">
+          Impossible de redescendre avant {cooldownDays} jour{cooldownDays > 1 ? 's' : ''}.
+        </div>
+      )}
+
       {linkedNames.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {linkedNames.slice(0, 3).map((n) => (
             <span
               key={n}
-              className="rounded-full border border-border-subtle bg-bg-base px-2 py-0.5 text-[10px] text-text-secondary"
+              className="rounded-2xl border border-border-subtle bg-bg-base px-2 py-0.5 text-[10px] text-text-secondary"
             >
               {n}
             </span>
           ))}
           {linkedNames.length > 3 && (
-            <span className="rounded-full border border-border-subtle bg-bg-base px-2 py-0.5 text-[10px] text-text-muted">
+            <span className="rounded-2xl border border-border-subtle bg-bg-base px-2 py-0.5 text-[10px] text-text-muted">
               +{linkedNames.length - 3}
             </span>
           )}

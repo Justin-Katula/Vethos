@@ -9,6 +9,7 @@ import {
   Heart,
   Bike,
   Moon,
+  ShieldCheck,
   Sun,
   Zap,
   type LucideIcon,
@@ -41,6 +42,7 @@ export const ICON_OPTIONS: Array<{ name: string; Icon: LucideIcon }> = [
   { name: 'Heart', Icon: Heart },
   { name: 'Bike', Icon: Bike },
   { name: 'Moon', Icon: Moon },
+  { name: 'ShieldCheck', Icon: ShieldCheck },
   { name: 'Sun', Icon: Sun },
   { name: 'Zap', Icon: Zap },
 ]

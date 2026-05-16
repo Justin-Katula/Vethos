@@ -36,7 +36,7 @@ export function HistoryList({ items, profiles }: Props) {
             >
               <div
                 className={cn(
-                  'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full',
+                  'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-2xl',
                   it.completedNormally
                     ? 'bg-emerald-500/15 text-emerald-400'
                     : 'bg-amber-500/15 text-amber-400',

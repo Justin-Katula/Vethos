@@ -9,7 +9,6 @@ type BlockingStore = {
   state: BlockingState
   active: ActiveSession | null
   layerStatus: LayerStatus
-  driftToast: { layer: string; at: number } | null
 
   load: () => Promise<void>
   saveProfile: (
@@ -26,10 +25,9 @@ type BlockingStore = {
 export const useBlockingStore = create<BlockingStore>((set, get) => ({
   loaded: false,
   elevated: false,
-  state: { profiles: [], history: [] },
+  state: { profiles: [], history: [], nextSessionPenaltyMinutes: 0 },
   active: null,
   layerStatus: { hosts: 'inactive', processes: 'inactive', firewall: 'inactive' },
-  driftToast: null,
 
   async load() {
     const [elevated, initial] = await Promise.all([
@@ -39,9 +37,16 @@ export const useBlockingStore = create<BlockingStore>((set, get) => ({
     set({ loaded: true, elevated, state: initial.state, active: initial.active })
     nexus.blocking.onSessionChanged((s) => {
       set({ active: s })
+      if (!s) {
+        void nexus.blocking.getInitialState().then((next) => {
+          set({ state: next.state, active: next.active })
+        })
+      }
       void get().refreshLayerStatus()
     })
-    nexus.blocking.onLayerDrift((e) => set({ driftToast: { layer: e.layer, at: Date.now() } }))
+    nexus.blocking.onLayerDrift(() => {
+      void get().refreshLayerStatus()
+    })
     void get().refreshLayerStatus()
   },
 

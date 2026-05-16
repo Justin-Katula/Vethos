@@ -5,7 +5,6 @@ import {
   Moon,
   Clock,
   Shield,
-  HardDrive,
   FileText,
   History,
   type LucideProps,
@@ -46,13 +45,13 @@ function ToggleRow({
         type="button"
         onClick={() => onChange(!value)}
         className={cn(
-          'relative h-6 w-11 rounded-full transition-colors duration-200',
+          'relative h-6 w-11 rounded-2xl transition-colors duration-200',
           value ? 'bg-accent' : 'bg-border-subtle',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200',
+            'absolute top-0.5 left-0.5 h-5 w-5 rounded-2xl bg-white shadow transition-transform duration-200',
             value && 'translate-x-5',
           )}
         />
@@ -70,8 +69,6 @@ export default function SettingsPage() {
     sleepEnd,
     sessionRulesEnabled,
     strictBlocking,
-    antiBypass,
-    autoSave,
     browserHistoryScanEnabled,
     loaded,
     load,
@@ -222,20 +219,6 @@ export default function SettingsPage() {
             description="Empêche tout contournement pendant les sessions actives"
             value={strictBlocking}
             onChange={(v) => void updateSettings({ strictBlocking: v })}
-          />
-          <ToggleRow
-            icon={Shield}
-            label="Anti-bypass"
-            description="Bloque regedit, Task Manager et nouveaux navigateurs pendant sessions"
-            value={antiBypass}
-            onChange={(v) => void updateSettings({ antiBypass: v })}
-          />
-          <ToggleRow
-            icon={HardDrive}
-            label="Sauvegarde auto"
-            description="Sauvegarde automatique de toutes les données en continu"
-            value={autoSave}
-            onChange={(v) => void updateSettings({ autoSave: v })}
           />
           <ToggleRow
             icon={History}

@@ -29,6 +29,9 @@ const api = {
   app: {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     openLogs: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS),
+    discoverInstalledApps: (): Promise<
+      Array<{ name: string; exeName: string; exePath: string; publisher: string }>
+    > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),
     onFlushDebounces: (cb: () => void): (() => void) => {
       const listener = () => cb()
       ipcRenderer.on(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)
@@ -81,6 +84,15 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
       return () =>
         ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
+    },
+    onBreakRequired: (
+      cb: (e: { reason: string; restMinutes: number }) => void,
+    ): (() => void) => {
+      const listener = (_: unknown, payload: { reason: string; restMinutes: number }) =>
+        cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
+      return () =>
+        ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
     },
   },
   appUsage: {

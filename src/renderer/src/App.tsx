@@ -5,7 +5,7 @@ import { Layout } from './components/Layout'
 import { OnboardingOverlay } from './components/onboarding/OnboardingOverlay'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ToastViewport } from './components/ui/Toast'
-import { FloatingCredit } from './components/levels/FloatingCredit'
+import { ProgressPulse } from './components/levels/ProgressPulse'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
 import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
@@ -15,6 +15,8 @@ import { useDeclaredAppsStore } from './store/declared-apps.store'
 import { useTasksStore } from './store/tasks.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
+import { computeDailyFreeTime } from './lib/free-time-calculator'
+import { jsDateToDayOfWeek } from './lib/schedule-selectors'
 import HomePage from './pages/HomePage'
 import ObjectivesPage from './pages/ObjectivesPage'
 import PlanningPage from './pages/PlanningPage'
@@ -22,16 +24,33 @@ import BlockingPage from './pages/BlockingPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
 
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function App(): JSX.Element {
   const loaded = useSettingsStore((s) => s.loaded)
   const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const loadSettings = useSettingsStore((s) => s.load)
 
   const loadSchedule = useScheduleStore((s) => s.load)
+  const scheduleLoaded = useScheduleStore((s) => s.loaded)
+  const scheduleRules = useScheduleStore((s) => s.rules)
+  const scheduleEntries = useScheduleStore((s) => s.entries)
   const loadBlocking = useBlockingStore((s) => s.load)
+  const blockingLoaded = useBlockingStore((s) => s.loaded)
+  const blockingHistory = useBlockingStore((s) => s.state.history)
   const loadLevels = useLevelsStore((s) => s.load)
+  const levelsLoaded = useLevelsStore((s) => s.loaded)
+  const lastCalculatedDate = useLevelsStore((s) => s.lastCalculatedDate)
+  const setCalculatedFreeTime = useLevelsStore((s) => s.setCalculatedFreeTime)
+  const reconcileWithHistory = useLevelsStore((s) => s.reconcileWithHistory)
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
   const loadTasks = useTasksStore((s) => s.load)
+  const tasks = useTasksStore((s) => s.tasks)
   const reconcileLevelZero = useTasksStore((s) => s.reconcileLevelZero)
   const tasksLoaded = useTasksStore((s) => s.loaded)
   const toast = useToast()
@@ -56,6 +75,46 @@ export default function App(): JSX.Element {
     void reconcileLevelZero(`${y}-${m}-${d}`)
   }, [tasksLoaded, reconcileLevelZero])
 
+  // V2 P1 — Le temps libre est recalculé au boot si la date locale a changé,
+  // sans dépendre d'une visite de la page d'accueil.
+  useEffect(() => {
+    if (!scheduleLoaded || !levelsLoaded || !tasksLoaded) return
+    const today = new Date()
+    const todayStr = localDateKey(today)
+    if (lastCalculatedDate === todayStr) return
+    const result = computeDailyFreeTime(
+      jsDateToDayOfWeek(today),
+      scheduleEntries,
+      scheduleRules,
+      tasks,
+      todayStr,
+    )
+    void setCalculatedFreeTime(result.totalFreeMinutes, todayStr)
+  }, [
+    scheduleLoaded,
+    levelsLoaded,
+    tasksLoaded,
+    lastCalculatedDate,
+    scheduleEntries,
+    scheduleRules,
+    tasks,
+    setCalculatedFreeTime,
+  ])
+
+  // Progression des objectifs : traitée au niveau app, pas seulement
+  // quand l'utilisateur visite la page Objectifs.
+  useEffect(() => {
+    if (!scheduleLoaded || !levelsLoaded || !blockingLoaded) return
+    void reconcileWithHistory(blockingHistory, scheduleRules)
+  }, [
+    scheduleLoaded,
+    levelsLoaded,
+    blockingLoaded,
+    blockingHistory,
+    scheduleRules,
+    reconcileWithHistory,
+  ])
+
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {
       void Promise.all([flushSchedulePersist(), flushSettingsPersist()])
@@ -64,6 +123,12 @@ export default function App(): JSX.Element {
       toast.error({
         title: 'Horloge modifiée',
         description: `Saut détecté : ${Math.round(event.driftMs / 1000)} secondes.`,
+      })
+    })
+    const offBreakRequired = nexus.blocking.onBreakRequired((event) => {
+      toast.error({
+        title: 'Pause obligatoire',
+        description: `${event.reason} Repos requis : ${event.restMinutes} min.`,
       })
     })
     const offUpdateReady = nexus.app.onUpdateDownloaded((info) => {
@@ -77,6 +142,7 @@ export default function App(): JSX.Element {
     return () => {
       offFlush()
       offClock()
+      offBreakRequired()
       offUpdateReady()
     }
   }, [toast])
@@ -95,10 +161,8 @@ export default function App(): JSX.Element {
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
-      <AnimatePresence>
-        {showOnboarding && <OnboardingOverlay key="onboarding" />}
-      </AnimatePresence>
-      <FloatingCredit />
+      <AnimatePresence>{showOnboarding && <OnboardingOverlay key="onboarding" />}</AnimatePresence>
+      <ProgressPulse />
       <ToastViewport />
     </ErrorBoundary>
   )

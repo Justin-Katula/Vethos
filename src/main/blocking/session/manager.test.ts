@@ -27,7 +27,11 @@ function makeAdapters() {
       applied: vi.fn().mockReturnValue(['rule1']),
     },
     persistence: {
-      readState: vi.fn().mockResolvedValue({ profiles: [PROFILE], history: [] }),
+      readState: vi.fn().mockResolvedValue({
+        profiles: [PROFILE],
+        history: [],
+        nextSessionPenaltyMinutes: 0,
+      }),
       writeState: vi.fn().mockResolvedValue(undefined),
       readActive: vi.fn().mockResolvedValue(null),
       writeActive: vi.fn().mockResolvedValue(undefined),
@@ -89,6 +93,21 @@ describe('SessionManager', () => {
     expect(a.hosts.clear).toHaveBeenCalled()
     expect(a.firewall.removeAll).toHaveBeenCalled()
     expect(m.getPhase()).toBe('idle')
+  })
+
+  it('adds a 15 minute penalty after early unlock', async () => {
+    const a = makeAdapters()
+    const m = createSessionManager(a)
+    await m.startSession({ profileId: PROFILE.id, durationMinutes: 60 })
+    await m.requestUnlock()
+    vi.setSystemTime(new Date('2026-05-04T10:06:00.000Z'))
+    const txt = Array(60).fill('mot').join(' ')
+
+    await m.submitJustification(txt)
+
+    expect(a.persistence.writeState).toHaveBeenCalledWith(
+      expect.objectContaining({ nextSessionPenaltyMinutes: 15 }),
+    )
   })
 
   it('cleans orphan blocking layers at boot when no active session exists', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Target, Check } from 'lucide-react'
+import { Target, Check, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { PALETTE } from '@/lib/rule-palette'
 import { useScheduleStore } from '@/store/schedule.store'
@@ -11,6 +11,15 @@ type Props = {
   preselectedRuleIds: string[]
   onObjectiveCreated: (id: string, color: string) => void
 }
+
+const COMMITMENT_OPTIONS = [
+  'Sommeil',
+  'Repas',
+  'Cours / travail',
+  'Famille',
+  'Sport / santé',
+  'Transport',
+] as const
 
 export function ObjectiveStep({
   preselectedRuleIds,
@@ -34,6 +43,8 @@ export function ObjectiveStep({
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>(preselectedRuleIds)
   const [level, setLevel] = useState(5)
   const [deadline, setDeadline] = useState('')
+  const [selectedCommitments, setSelectedCommitments] = useState<string[]>([])
+  const [customCommitments, setCustomCommitments] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +58,14 @@ export function ObjectiveStep({
     setColor(initialColor)
     setLinkedRuleIds(preselectedRuleIds)
   }, [initialColor, preselectedRuleIds])
+
+  const protectedCommitments = useMemo(() => {
+    const custom = customCommitments
+      .split(/[\n,;]/u)
+      .map((item) => item.trim())
+      .filter(Boolean)
+    return [...new Set([...selectedCommitments, ...custom])].slice(0, 12)
+  }, [customCommitments, selectedCommitments])
 
   // Auto-update si l'objectif a déjà été créé et qu'un champ change
   useEffect(() => {
@@ -63,6 +82,7 @@ export function ObjectiveStep({
             linkedRuleIds,
             level,
             deadline: deadline || undefined,
+            protectedCommitments,
           })
         } catch (err) {
           setError((err as Error).message)
@@ -70,11 +90,29 @@ export function ObjectiveStep({
       })()
     }, 500)
     return () => clearTimeout(t)
-  }, [savedId, name, description, color, linkedRuleIds, level, deadline, saveObjective])
+  }, [
+    savedId,
+    name,
+    description,
+    color,
+    linkedRuleIds,
+    level,
+    deadline,
+    protectedCommitments,
+    saveObjective,
+  ])
 
   const toggleRule = (id: string): void => {
     setLinkedRuleIds((prev) =>
       prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
+    )
+  }
+
+  const toggleCommitment = (commitment: string): void => {
+    setSelectedCommitments((prev) =>
+      prev.includes(commitment)
+        ? prev.filter((item) => item !== commitment)
+        : [...prev, commitment],
     )
   }
 
@@ -91,6 +129,7 @@ export function ObjectiveStep({
         linkedRuleIds,
         level,
         deadline: deadline || undefined,
+        protectedCommitments,
       })
       setSavedId(created.id)
       onObjectiveCreated(created.id, color)
@@ -111,7 +150,7 @@ export function ObjectiveStep({
     <div className="flex flex-col gap-6">
       <header className="flex flex-col items-center gap-3 text-center">
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-full"
+          className="flex h-12 w-12 items-center justify-center rounded-2xl"
           style={{ backgroundColor: `${color}22`, color }}
         >
           <Target size={22} />
@@ -123,6 +162,49 @@ export function ObjectiveStep({
           {"Crée un objectif. Chaque minute concentrée sur les règles liées le fera grandir vers le niveau 10."}
         </p>
       </header>
+
+      <section className="rounded-xl border border-accent/25 bg-accent/5 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <ShieldCheck size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold text-text-primary">
+              Quels engagements sont non-négociables ?
+            </h2>
+            <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+              Garde visibles les activités que Nexus doit t’aider à préserver avant de remplir ton objectif.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {COMMITMENT_OPTIONS.map((commitment) => {
+            const selected = selectedCommitments.includes(commitment)
+            return (
+              <button
+                key={commitment}
+                type="button"
+                onClick={() => toggleCommitment(commitment)}
+                className={cn(
+                  'rounded-2xl border px-3 py-1.5 text-xs font-medium transition-colors',
+                  selected
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
+                )}
+              >
+                {commitment}
+              </button>
+            )
+          })}
+        </div>
+        <textarea
+          value={customCommitments}
+          onChange={(e) => setCustomCommitments(e.target.value)}
+          placeholder="Autres engagements à préserver, un par ligne..."
+          maxLength={500}
+          className="mt-3 min-h-[64px] w-full resize-y rounded-lg border border-border-subtle bg-bg-base px-4 py-3 text-sm text-text-primary outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+        />
+      </section>
 
       <div className="flex flex-col gap-4 rounded-xl border border-border-subtle bg-bg-elevated p-5">
         <div>
@@ -191,7 +273,7 @@ export function ObjectiveStep({
           </label>
           {rules.length === 0 ? (
             <p className="mt-2 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-xs text-text-muted">
-              {"Aucune règle. Reviens à l’étape précédente pour choisir un template."}
+              {"Aucune règle liée pour l’instant. Tu peux continuer et les relier plus tard."}
             </p>
           ) : (
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -203,7 +285,7 @@ export function ObjectiveStep({
                     type="button"
                     onClick={() => toggleRule(r.id)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                      'inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1 text-xs font-medium transition-colors',
                       selected
                         ? 'border-transparent text-white'
                         : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
@@ -211,7 +293,7 @@ export function ObjectiveStep({
                     style={selected ? { backgroundColor: r.color } : undefined}
                   >
                     <span
-                      className="h-2 w-2 rounded-full"
+                      className="h-2 w-2 rounded-2xl"
                       style={{ backgroundColor: selected ? 'white' : r.color }}
                     />
                     {r.name}
@@ -239,7 +321,7 @@ export function ObjectiveStep({
             step="1"
             value={level}
             onChange={(e) => setLevel(parseInt(e.target.value))}
-            className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
+            className="w-full accent-accent h-1.5 rounded-2xl bg-bg-base appearance-none cursor-pointer"
           />
           <div className="flex justify-between text-[10px] text-text-muted font-mono">
             <span>3</span>
@@ -280,7 +362,7 @@ export function ObjectiveStep({
               ? '✓ Sauvegardé. Tu peux encore ajuster.'
               : alreadyExists
               ? 'Tu as déjà un objectif. Cette étape est optionnelle.'
-              : 'Tu peux aussi sauter cette étape.'}
+              : 'Tu pourras créer des objectifs plus tard depuis l’onglet Mes objectifs.'}
           </p>
           <motion.button
             type="button"

@@ -1,4 +1,5 @@
 import { ipcMain, type BrowserWindow } from 'electron'
+import { promises as fsp } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { BlockingProfileSchema } from '@shared/schemas'
@@ -6,45 +7,89 @@ import type { Storage } from '@main/storage'
 import { createSessionManager } from '../session/manager'
 import { createDriftDetector } from '../session/drift-detector'
 import { createFirewallTracker } from '../firewall/rule-tracker'
-import { startProcessWatcher } from '../processes/watcher'
+import { listRuleNames } from '../firewall/netsh'
 import { applyNexusBlock, clearNexusBlock } from '../hosts/writer'
+import { HOSTS_PATH } from '../hosts/writer'
+import { parseHostsFile } from '../hosts/parser'
 import { flushDns } from '../hosts/flush-dns'
 import { createBlockingPersistence } from '../session/persistence'
 import { isElevated, requestElevatedRelaunch } from '../elevation'
 import { isSafeListed } from '../processes/safe-list'
-import { startAppLockerBlocker } from '../applocker/policy'
+import { startProcessKiller } from '../processes/killer'
+import { getWindowsEdition, pickBlockingStrategy, startAppLockerBlocker } from '../applocker/policy'
 import { evaluateSessionRules } from '../session/rules'
 import {
   notifyBreakRequired,
   notifyClockTamper,
+  notifyServiceNotStarted,
   notifySessionEnd,
   notifySessionStart,
 } from '../../notifications'
 import { startClockMonitor } from '../session/clock-monitor'
 import log from '@main/logging/setup'
+import { getPreviousFreeMinutesByDate } from '@main/free-time/recalculate'
 
 export async function registerBlockingHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
-): Promise<void> {
+): Promise<{ isSessionActive: () => boolean }> {
   const persistence = createBlockingPersistence(storage)
   const firewall = createFirewallTracker()
   const elevatedAtBoot = await isElevated()
+  const windowsEdition = getWindowsEdition()
   const settings = await storage.read('settings')
-  const appLockerMode = settings?.strictBlocking === false ? 'AuditOnly' : 'Enabled'
+  let currentStrictBlocking = settings?.strictBlocking !== false
+  let processLayerStatus: 'inactive' | 'ok' | 'error' = 'inactive'
+  let liveRuleNotifiedFor: string | null = null
   const manager = createSessionManager({
     hosts: { apply: applyNexusBlock, clear: clearNexusBlock, flushDns },
     processes: {
       start: (forbidden) => {
-        if (elevatedAtBoot) {
-          const appLocker = startAppLockerBlocker(forbidden, appLockerMode)
-          if (appLocker.applied) return { stop: appLocker.stop }
-          log.warn(
-            '[blocking] AppLocker unavailable, falling back to process watcher',
-            appLocker.error,
-          )
+        if (forbidden.length === 0) {
+          processLayerStatus = 'inactive'
+          return { stop: () => undefined }
         }
-        return startProcessWatcher(forbidden)
+
+        const strategy = pickBlockingStrategy({
+          elevated: elevatedAtBoot,
+          strictBlocking: currentStrictBlocking,
+          edition: windowsEdition,
+        })
+        if (strategy.processLayer !== 'applocker') {
+          processLayerStatus = 'ok'
+          log.warn('[blocking] AppLocker unavailable, falling back to process kill', strategy.reason)
+          const killer = startProcessKiller(forbidden)
+          return {
+            stop: () => {
+              killer.stop()
+              processLayerStatus = 'inactive'
+            },
+          }
+        }
+
+        const appLocker = startAppLockerBlocker(forbidden, strategy.appLockerMode)
+        if (appLocker.applied) {
+          processLayerStatus = 'ok'
+          return {
+            stop: () => {
+              appLocker.stop()
+              processLayerStatus = 'inactive'
+            },
+          }
+        }
+
+        processLayerStatus = 'error'
+        log.warn('[blocking] AppLocker unavailable', appLocker.error)
+        notifyServiceNotStarted('AppLocker', getMainWindow)
+        const killer = startProcessKiller(forbidden)
+        if (forbidden.length === 0) return { stop: () => undefined }
+        processLayerStatus = 'ok'
+        return {
+          stop: () => {
+            killer.stop()
+            processLayerStatus = 'inactive'
+          },
+        }
       },
     },
     firewall: {
@@ -57,6 +102,7 @@ export async function registerBlockingHandlers(
   })
 
   manager.on('sessionChanged', (s) => {
+    if (!s) liveRuleNotifiedFor = null
     getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, s)
   })
   manager.on('sessionEnded', async (entry, session) => {
@@ -97,6 +143,33 @@ export async function registerBlockingHandlers(
     notifyClockTamper(event.driftMs, getMainWindow)
   })
 
+  setInterval(async () => {
+    const active = manager.getActive()
+    if (!active || liveRuleNotifiedFor === active.id) return
+
+    const latestSettings = await storage.read('settings')
+    if (latestSettings?.sessionRulesEnabled === false) return
+
+    const state = await persistence.readState()
+    const elapsedMinutes = Math.max(
+      0,
+      Math.ceil((Date.now() - new Date(active.startedAt).getTime()) / 60_000),
+    )
+    const decision = evaluateSessionRules({
+      history: state.history,
+      profileId: active.profileId,
+      requestedMinutes: elapsedMinutes,
+    })
+    if (decision.ok) return
+
+    liveRuleNotifiedFor = active.id
+    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, {
+      reason: decision.reason,
+      restMinutes: decision.restMinutes,
+    })
+    notifyBreakRequired(decision.restMinutes, getMainWindow)
+  }, 60_000)
+
   await manager.hydrateFromDisk().catch((err) => {
     log.error('[blocking] hydrate failed', err)
   })
@@ -136,23 +209,35 @@ export async function registerBlockingHandlers(
     IPC_CHANNELS.BLOCKING_START_SESSION,
     async (_e, args: { profileId: string; durationMinutes: number }) => {
       const latestSettings = await storage.read('settings')
+      currentStrictBlocking = latestSettings?.strictBlocking !== false
+      const state = await persistence.readState()
+      const penaltyMinutes = state.nextSessionPenaltyMinutes ?? 0
+      const durationMinutes = Math.min(24 * 60, args.durationMinutes + penaltyMinutes)
       if (!elevatedAtBoot) {
         throw new Error('Blocage non opérationnel — droits administrateur requis')
       }
       if (latestSettings?.sessionRulesEnabled !== false) {
-        const state = await persistence.readState()
+        const freeMinutesByDate = await getPreviousFreeMinutesByDate(storage).catch((err) => {
+          log.warn('[blocking] free-time lookup failed for session rules', err)
+          return undefined
+        })
         const decision = evaluateSessionRules({
           history: state.history,
           profileId: args.profileId,
-          requestedMinutes: args.durationMinutes,
+          requestedMinutes: durationMinutes,
+          freeMinutesByDate,
         })
         if (!decision.ok) {
           notifyBreakRequired(decision.restMinutes, getMainWindow)
           throw new Error(decision.reason)
         }
       }
-      const session = await manager.startSession(args)
-      notifySessionStart(session.profileSnapshot.name, args.durationMinutes, getMainWindow)
+      const session = await manager.startSession({ ...args, durationMinutes })
+      if (penaltyMinutes > 0) {
+        const latestState = await persistence.readState()
+        await persistence.writeState({ ...latestState, nextSessionPenaltyMinutes: 0 })
+      }
+      notifySessionStart(session.profileSnapshot.name, durationMinutes, getMainWindow)
       return session
     },
   )
@@ -166,13 +251,42 @@ export async function registerBlockingHandlers(
   ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS, async () => {
     const active = manager.getActive()
     if (!active) return { hosts: 'inactive', processes: 'inactive', firewall: 'inactive' }
-    return { hosts: 'ok', processes: 'ok', firewall: 'ok' }
+    let hosts: 'ok' | 'drifted' | 'error' = 'ok'
+    let firewallStatus: 'ok' | 'drifted' | 'error' = 'ok'
+
+    try {
+      const rawHosts = await fsp.readFile(HOSTS_PATH, 'utf8')
+      const parsed = parseHostsFile(rawHosts)
+      const expectedEntryCount = active.profileSnapshot.blockedSites.length * 8
+      if (
+        expectedEntryCount > 0 &&
+        (!parsed.nexusBlock || parsed.nexusBlock.entries.length !== expectedEntryCount)
+      ) {
+        hosts = 'drifted'
+      }
+    } catch {
+      hosts = 'error'
+    }
+
+    try {
+      const appliedNames = active.appliedFirewallRules
+      const existing = new Set(await listRuleNames())
+      if (appliedNames.some((name) => !existing.has(name))) {
+        firewallStatus = 'drifted'
+      }
+    } catch {
+      firewallStatus = 'error'
+    }
+
+    return { hosts, processes: processLayerStatus, firewall: firewallStatus }
   })
 
   ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, async () => elevatedAtBoot)
   ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION, async () =>
     requestElevatedRelaunch(),
   )
+
+  return { isSessionActive: () => manager.getActive() !== null }
 }
 
 async function computeLongestStreak(persistence: ReturnType<typeof createBlockingPersistence>): Promise<number> {

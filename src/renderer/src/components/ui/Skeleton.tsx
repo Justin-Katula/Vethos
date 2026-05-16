@@ -25,7 +25,7 @@ export function SkeletonCard({ className }: SkeletonProps): JSX.Element {
       )}
     >
       <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-10 w-10 rounded-2xl" />
         <div className="flex-1 space-y-2">
           <Skeleton className="h-3 w-32" />
           <Skeleton className="h-2 w-20" />
@@ -40,13 +40,13 @@ export function SkeletonCard({ className }: SkeletonProps): JSX.Element {
 }
 
 export function SkeletonRing(): JSX.Element {
-  return <Skeleton className="h-56 w-56 rounded-full" />
+  return <Skeleton className="h-56 w-56 rounded-2xl" />
 }
 
 export function SkeletonRow(): JSX.Element {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-elevated px-4 py-3">
-      <Skeleton className="h-3 w-3 rounded-full" />
+      <Skeleton className="h-3 w-3 rounded-2xl" />
       <Skeleton className="h-3 flex-1" />
       <Skeleton className="h-3 w-16" />
     </div>

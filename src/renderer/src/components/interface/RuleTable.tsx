@@ -34,7 +34,7 @@ export function RuleTable({ rules, entries, onCreate, onEdit }: Props) {
               style={{ backgroundColor: r.color }}
             />
             <div
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ring-2 ring-bg-base"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ring-2 ring-bg-base"
               style={{ backgroundColor: r.color }}
             >
               {Icon ? <Icon size={16} className="text-white drop-shadow" /> : null}

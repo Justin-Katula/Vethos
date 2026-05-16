@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAppLockerPolicyXml } from './policy'
+import { buildAppLockerPolicyXml, pickBlockingStrategy } from './policy'
 
 describe('buildAppLockerPolicyXml', () => {
   it('creates deny file path rules for unique exe names', () => {
@@ -18,5 +18,35 @@ describe('buildAppLockerPolicyXml', () => {
     expect(xml).toContain('Nexus allow Windows')
     expect(xml).toContain('%WINDIR%\\*')
     expect(xml).toContain('Nexus allow Program Files')
+  })
+})
+
+describe('pickBlockingStrategy', () => {
+  it('uses AppLocker when elevated and edition supports it', () => {
+    expect(
+      pickBlockingStrategy({
+        elevated: true,
+        strictBlocking: true,
+        edition: {
+          productName: 'Windows 11 Pro',
+          editionId: 'Professional',
+          supportsAppLocker: true,
+        },
+      }),
+    ).toEqual({ processLayer: 'applocker', appLockerMode: 'Enabled' })
+  })
+
+  it('stays unavailable on unsupported editions', () => {
+    expect(
+      pickBlockingStrategy({
+        elevated: true,
+        strictBlocking: false,
+        edition: {
+          productName: 'Windows 11 Home',
+          editionId: 'Core',
+          supportsAppLocker: false,
+        },
+      }),
+    ).toMatchObject({ processLayer: 'unavailable', appLockerMode: 'AuditOnly' })
   })
 })

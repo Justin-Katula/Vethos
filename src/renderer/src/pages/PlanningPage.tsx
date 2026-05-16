@@ -279,16 +279,16 @@ function MonthView({
 
       <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/50" /> Peu chargé
+          <span className="h-2.5 w-2.5 rounded-2xl bg-emerald-500/50" /> Peu chargé
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-yellow/50" /> Moyen
+          <span className="h-2.5 w-2.5 rounded-2xl bg-yellow/50" /> Moyen
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-orange/50" /> Chargé
+          <span className="h-2.5 w-2.5 rounded-2xl bg-orange/50" /> Chargé
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-500/50" /> Très chargé
+          <span className="h-2.5 w-2.5 rounded-2xl bg-red-500/50" /> Très chargé
         </span>
       </div>
     </div>

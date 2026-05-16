@@ -1,21 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { minuteToHHMM, durationLabel, formatCountdown } from './format-time'
+import { minuteToClockLabel, durationLabel, formatCountdown } from './format-time'
 
-describe('minuteToHHMM', () => {
+describe('minuteToClockLabel', () => {
   it('formats midnight', () => {
-    expect(minuteToHHMM(0)).toBe('00:00')
+    expect(minuteToClockLabel(0)).toBe('0h00')
   })
-  it('formats 90 → 01:30', () => {
-    expect(minuteToHHMM(90)).toBe('01:30')
+  it('formats 90 as 1h30', () => {
+    expect(minuteToClockLabel(90)).toBe('1h30')
   })
-  it('formats 1439 → 23:59', () => {
-    expect(minuteToHHMM(1439)).toBe('23:59')
+  it('formats 1439 as 23h59', () => {
+    expect(minuteToClockLabel(1439)).toBe('23h59')
   })
   it('clamps 1440 to the last minute of the day', () => {
-    expect(minuteToHHMM(1440)).toBe('23:59')
+    expect(minuteToClockLabel(1440)).toBe('23h59')
   })
   it('clamps negatives', () => {
-    expect(minuteToHHMM(-5)).toBe('00:00')
+    expect(minuteToClockLabel(-5)).toBe('0h00')
   })
 })
 
@@ -35,16 +35,16 @@ describe('durationLabel', () => {
 })
 
 describe('formatCountdown', () => {
-  it('< 1h → MM:SS', () => {
-    expect(formatCountdown(0)).toBe('00:00')
-    expect(formatCountdown(65_000)).toBe('01:05')
-    expect(formatCountdown(59 * 60 * 1000 + 59_000)).toBe('59:59')
+  it('formats under one hour without colon notation', () => {
+    expect(formatCountdown(0)).toBe('0s')
+    expect(formatCountdown(65_000)).toBe('1min05s')
+    expect(formatCountdown(59 * 60 * 1000 + 59_000)).toBe('59min59s')
   })
-  it('>= 1h → HH:MM:SS', () => {
-    expect(formatCountdown(3_600_000)).toBe('01:00:00')
-    expect(formatCountdown(3_725_000)).toBe('01:02:05')
+  it('formats one hour and above without colon notation', () => {
+    expect(formatCountdown(3_600_000)).toBe('1h00min00s')
+    expect(formatCountdown(3_725_000)).toBe('1h02min05s')
   })
   it('clamps negatives to zero', () => {
-    expect(formatCountdown(-1000)).toBe('00:00')
+    expect(formatCountdown(-1000)).toBe('0s')
   })
 })

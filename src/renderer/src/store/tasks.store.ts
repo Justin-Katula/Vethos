@@ -150,7 +150,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
   },
 
   async applySessionDegradation(completedTaskIds) {
-    const degradedTitles: Array<{ title: string; newLevel: number }> = []
+    const degradedEvents: Array<{ title: string; newLevel: number; hitZero: boolean }> = []
     const tasks = get().tasks.map(t => {
       if (!completedTaskIds.includes(t.id)) return t
       if (t.totalDegradation >= 5) return t
@@ -161,7 +161,11 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
       const minLevel = getMinimumLevel(t.level)
       const degradedLevel = Math.max(minLevel, t.level - 1)
       if (degradedLevel !== t.level) {
-        degradedTitles.push({ title: t.title, newLevel: degradedLevel })
+        degradedEvents.push({
+          title: t.title,
+          newLevel: degradedLevel,
+          hitZero: degradedLevel === 0,
+        })
       }
       return {
         ...t,
@@ -173,9 +177,13 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     set({ tasks })
     await persistTasks(tasks)
     // V2 P9 — notif native pour chaque dégradation effective
-    for (const { title, newLevel } of degradedTitles) {
+    for (const { title, newLevel, hitZero } of degradedEvents) {
       void nexus.tasks
-        ?.notify({ type: 'task-degraded', taskTitle: title, newLevel })
+        ?.notify(
+          hitZero
+            ? { type: 'task-hit-zero', taskTitle: title }
+            : { type: 'task-degraded', taskTitle: title, newLevel },
+        )
         .catch(() => {
           /* silencieux : la notif est complémentaire au state, le store ne doit pas
              refuser la dégradation si le main n'est pas joignable */

@@ -99,23 +99,6 @@ export function notifySessionEnd(
   )
 }
 
-export function notifyDriftWarning(
-  level: 'soft' | 'firm',
-  processName: string,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  const title = level === 'soft' ? 'Petite distraction' : 'Attention'
-  const body =
-    level === 'soft'
-      ? `Tu es sur ${processName}. Reviens à ton travail.`
-      : `${processName} sera fermé dans 30 secondes si tu ne reviens pas.`
-
-  sendNativeNotification(
-    { title, body, payload: { type: 'drift-warning', level, processName } },
-    getMainWindow,
-  )
-}
-
 export function notifyBreakRequired(
   restMinutes: number,
   getMainWindow: () => BrowserWindow | null,
@@ -139,6 +122,31 @@ export function notifyClockTamper(
       title: 'Horloge modifiée',
       body: `Nexus a détecté un saut d'horloge de ${Math.round(driftMs / 1000)} secondes.`,
       payload: { type: 'clock-tamper', driftMs },
+    },
+    getMainWindow,
+  )
+}
+
+export function notifyCrashRecovered(getMainWindow: () => BrowserWindow | null): void {
+  sendNativeNotification(
+    {
+      title: 'Crash récupéré',
+      body: 'Nexus a restauré son état après un arrêt inattendu.',
+      payload: { type: 'crash-recovered' },
+    },
+    getMainWindow,
+  )
+}
+
+export function notifyServiceNotStarted(
+  serviceName: string,
+  getMainWindow: () => BrowserWindow | null,
+): void {
+  sendNativeNotification(
+    {
+      title: 'Service non démarré',
+      body: `${serviceName} n'a pas pu être activé. Le blocage continue avec les couches disponibles.`,
+      payload: { type: 'service-not-started', serviceName },
     },
     getMainWindow,
   )
@@ -168,7 +176,7 @@ export function notifyTaskUrgent(
   sendNativeNotification(
     {
       title: 'Tâche urgente',
-      body: `"${taskTitle}" est due dans ${daysLeft <= 0 ? 'aujourd\'hui' : daysLeft === 1 ? 'demain' : `${daysLeft} jours`} !`,
+      body: `"${taskTitle}" est due dans ${daysLeft <= 0 ? "aujourd'hui" : daysLeft === 1 ? 'demain' : `${daysLeft} jours`} !`,
       payload: { type: 'task-urgent', taskTitle, daysLeft },
     },
     getMainWindow,

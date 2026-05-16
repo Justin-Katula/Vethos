@@ -13,16 +13,21 @@ type SettingsState = {
   sleepEnd: string
   sessionRulesEnabled: boolean
   strictBlocking: boolean
-  antiBypass: boolean
   autoSave: boolean
   browserHistoryScanEnabled: boolean
+  defaultUnlockCooldownMinutes: number
+  defaultUnlockJustificationWords: number
   firstLaunchDate: string | null
   loaded: boolean
 
   load: () => Promise<void>
   save: (username: string) => Promise<void>
   setOnboardingCompleted: (completed: boolean) => Promise<void>
-  updateSettings: (patch: Partial<Omit<SettingsState, 'loaded' | 'load' | 'save' | 'setOnboardingCompleted' | 'updateSettings'>>) => Promise<void>
+  updateSettings: (
+    patch: Partial<
+      Omit<SettingsState, 'loaded' | 'load' | 'save' | 'setOnboardingCompleted' | 'updateSettings'>
+    >,
+  ) => Promise<void>
 }
 
 function buildPayload(state: SettingsState): Settings {
@@ -35,9 +40,10 @@ function buildPayload(state: SettingsState): Settings {
     sleepEnd: state.sleepEnd,
     sessionRulesEnabled: state.sessionRulesEnabled,
     strictBlocking: state.strictBlocking,
-    antiBypass: state.antiBypass,
     autoSave: state.autoSave,
     browserHistoryScanEnabled: state.browserHistoryScanEnabled,
+    defaultUnlockCooldownMinutes: state.defaultUnlockCooldownMinutes,
+    defaultUnlockJustificationWords: state.defaultUnlockJustificationWords,
     firstLaunchDate: state.firstLaunchDate ?? undefined,
   }
 }
@@ -104,9 +110,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   sleepEnd: '07:00',
   sessionRulesEnabled: true,
   strictBlocking: true,
-  antiBypass: true,
   autoSave: true,
   browserHistoryScanEnabled: false,
+  defaultUnlockCooldownMinutes: 10,
+  defaultUnlockJustificationWords: 50,
   firstLaunchDate: null,
   loaded: false,
 
@@ -122,9 +129,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       sleepEnd: data?.sleepEnd ?? '07:00',
       sessionRulesEnabled: data?.sessionRulesEnabled ?? true,
       strictBlocking: data?.strictBlocking ?? true,
-      antiBypass: data?.antiBypass ?? true,
       autoSave: data?.autoSave ?? true,
       browserHistoryScanEnabled: data?.browserHistoryScanEnabled ?? false,
+      defaultUnlockCooldownMinutes: data?.defaultUnlockCooldownMinutes ?? 10,
+      defaultUnlockJustificationWords: data?.defaultUnlockJustificationWords ?? 50,
       firstLaunchDate: firstLaunch,
       loaded: true,
     })

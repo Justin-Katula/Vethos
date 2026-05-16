@@ -9,6 +9,18 @@ const ADMINS_SID = 'S-1-5-32-544'
 
 export type AppLockerMode = 'AuditOnly' | 'Enabled'
 
+export type WindowsEdition = {
+  productName: string
+  editionId: string
+  supportsAppLocker: boolean
+}
+
+export type BlockingStrategy = {
+  processLayer: 'applocker' | 'unavailable'
+  appLockerMode: AppLockerMode
+  reason?: string
+}
+
 export type AppLockerHandle = {
   stop: () => void
   applied: boolean
@@ -74,6 +86,75 @@ function runPowerShell(command: string): void {
     ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
     { stdio: 'pipe', windowsHide: true },
   )
+}
+
+function readPowerShell(command: string): string {
+  return execFileSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
+    { stdio: 'pipe', windowsHide: true, encoding: 'utf8' },
+  )
+}
+
+export function getWindowsEdition(): WindowsEdition {
+  if (process.platform !== 'win32') {
+    return {
+      productName: process.platform,
+      editionId: 'non-windows',
+      supportsAppLocker: false,
+    }
+  }
+
+  try {
+    const raw = readPowerShell(
+      "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty ProductName), (Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' | Select-Object -ExpandProperty EditionID)",
+    )
+    const [productName = 'Windows', editionId = 'Unknown'] = raw
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+    const normalizedEdition = editionId.toLowerCase()
+    const normalizedProduct = productName.toLowerCase()
+    const isHomeLike =
+      normalizedEdition.includes('core') ||
+      normalizedEdition.includes('home') ||
+      normalizedProduct.includes('home')
+
+    return {
+      productName,
+      editionId,
+      supportsAppLocker: !isHomeLike,
+    }
+  } catch {
+    return {
+      productName: 'Windows',
+      editionId: 'Unknown',
+      supportsAppLocker: false,
+    }
+  }
+}
+
+export function pickBlockingStrategy(args: {
+  elevated: boolean
+  strictBlocking: boolean
+  edition: WindowsEdition
+}): BlockingStrategy {
+  const appLockerMode: AppLockerMode = args.strictBlocking ? 'Enabled' : 'AuditOnly'
+  if (!args.elevated) {
+    return {
+      processLayer: 'unavailable',
+      appLockerMode,
+      reason: 'Droits administrateur requis pour AppLocker.',
+    }
+  }
+  if (!args.edition.supportsAppLocker) {
+    return {
+      processLayer: 'unavailable',
+      appLockerMode,
+      reason: `AppLocker non disponible sur ${args.edition.productName} (${args.edition.editionId}).`,
+    }
+  }
+  return { processLayer: 'applocker', appLockerMode }
 }
 
 export function startAppLockerBlocker(

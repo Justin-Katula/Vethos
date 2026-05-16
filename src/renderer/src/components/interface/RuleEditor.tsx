@@ -119,7 +119,7 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
             <header className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
               <div className="flex items-center gap-3">
                 <div
-                  className="h-8 w-8 rounded-full ring-2 ring-bg-base transition-colors"
+                  className="h-8 w-8 rounded-2xl ring-2 ring-bg-base transition-colors"
                   style={{ backgroundColor: colorValid ? color : '#404040' }}
                 />
                 <h2 className="text-lg font-semibold tracking-tight">

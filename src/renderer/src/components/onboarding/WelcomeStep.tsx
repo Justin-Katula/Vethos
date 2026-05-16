@@ -50,7 +50,7 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
         transition={{ delay: 0.2, duration: 0.25 }}
         className="flex flex-col gap-3"
       >
-        <div className="inline-flex items-center justify-center gap-1.5 self-center rounded-full border border-border-subtle bg-bg-elevated px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-400">
+        <div className="inline-flex items-center justify-center gap-1.5 self-center rounded-2xl border border-border-subtle bg-bg-elevated px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-400">
           <Sparkles size={12} />
           Premier lancement
         </div>

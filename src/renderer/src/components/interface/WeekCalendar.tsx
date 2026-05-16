@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2 } from 'lucide-react'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
 import { hasOverlap, snapTo15 } from '@/lib/schedule-selectors'
-import { minuteToHHMM, durationLabel } from '@/lib/format-time'
+import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import { cn } from '@/lib/cn'
 import { EntryQuickPicker } from './EntryQuickPicker'
@@ -237,7 +237,7 @@ export function WeekCalendar({
           </div>
           {liveHeight > 28 && (
             <div className="text-[10px] leading-tight opacity-80">
-              {minuteToHHMM(eff.startMinute)} — {minuteToHHMM(eff.endMinute)}
+              {minuteToClockLabel(eff.startMinute)} — {minuteToClockLabel(eff.endMinute)}
               {liveHeight > 50 && (
                 <> · {durationLabel(eff.endMinute - eff.startMinute)}</>
               )}
@@ -267,7 +267,7 @@ export function WeekCalendar({
                   className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-primary hover:bg-bg-card"
                 >
                   <span
-                    className="h-2.5 w-2.5 rounded-full"
+                    className="h-2.5 w-2.5 rounded-2xl"
                     style={{ backgroundColor: r.color }}
                   />
                   <span className="truncate">{r.name}</span>
@@ -311,7 +311,7 @@ export function WeekCalendar({
         style={{ top, height }}
       >
         <div className="px-1.5 py-1 text-[10px] text-white">
-          {minuteToHHMM(drag.startMinute)} — {minuteToHHMM(drag.endMinute)}
+          {minuteToClockLabel(drag.startMinute)} — {minuteToClockLabel(drag.endMinute)}
         </div>
       </div>
     )

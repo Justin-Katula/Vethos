@@ -87,7 +87,7 @@ describe('free-time-calculator', () => {
     ])
   })
 
-  it('formats allocated time without HH:MM', () => {
+  it('formats allocated time without clock notation', () => {
     expect(formatAllocatedTime(45)).toBe('45min')
     expect(formatAllocatedTime(150)).toBe('2h30')
   })

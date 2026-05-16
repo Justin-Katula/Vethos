@@ -37,43 +37,43 @@ export function evaluateSessionRules(args: {
   profileId: string
   requestedMinutes: number
   now?: Date
+  freeMinutesByDate?: Record<string, number | undefined>
 }): SessionRuleDecision {
   const now = args.now ?? new Date()
   const todayHistory = args.history.filter((entry) => sameLocalDay(new Date(entry.endedAt), now))
+  const sameProjectEntries = todayHistory.filter(
+    (entry) => entry.profileId === args.profileId && entry.completedNormally,
+  )
   const sameProjectMinutes =
-    todayHistory
-      .filter((entry) => entry.profileId === args.profileId && entry.completedNormally)
-      .reduce((sum, entry) => sum + minutes(entry), 0) + args.requestedMinutes
+    sameProjectEntries.reduce((sum, entry) => sum + minutes(entry), 0) + args.requestedMinutes
   if (sameProjectMinutes > 240) {
-    return {
-      ok: false,
-      title: 'Pause obligatoire',
-      reason: 'Maximum 4h sur le même projet atteint. Prends 1h de pause avant de continuer.',
+    const decision = restDecision({
+      entries: sameProjectEntries,
+      now,
       restMinutes: 60,
-    }
+      reason: 'Maximum 4h sur le même projet atteint. Prends une vraie pause avant de continuer.',
+    })
+    if (decision) return decision
   }
 
+  const completedEntries = todayHistory.filter((entry) => entry.completedNormally)
   const allProjectMinutes =
-    todayHistory
-      .filter((entry) => entry.completedNormally)
-      .reduce((sum, entry) => sum + minutes(entry), 0) + args.requestedMinutes
+    completedEntries.reduce((sum, entry) => sum + minutes(entry), 0) + args.requestedMinutes
   if (allProjectMinutes > 360) {
-    return {
-      ok: false,
-      title: 'Pause obligatoire',
-      reason: 'Maximum 6h tous projets atteint. Prends 2h de pause avant de relancer une session.',
+    const decision = restDecision({
+      entries: completedEntries,
+      now,
       restMinutes: 120,
-    }
+      reason: 'Maximum 6h tous projets atteint. Prends une vraie pause avant de relancer une session.',
+    })
+    if (decision) return decision
   }
 
   const yesterday = localDateKey(addDays(now, -1))
   const dayBefore = localDateKey(addDays(now, -2))
-  const daysWithFocus = new Set(
-    args.history
-      .filter((entry) => entry.completedNormally && minutes(entry) > 0)
-      .map((entry) => localDateKey(new Date(entry.endedAt))),
-  )
-  if (daysWithFocus.has(yesterday) && daysWithFocus.has(dayBefore)) {
+  const yesterdayFree = args.freeMinutesByDate?.[yesterday]
+  const dayBeforeFree = args.freeMinutesByDate?.[dayBefore]
+  if (yesterdayFree === 0 && dayBeforeFree === 0) {
     return {
       ok: false,
       title: 'Pause obligatoire',
@@ -83,4 +83,35 @@ export function evaluateSessionRules(args: {
   }
 
   return { ok: true }
+}
+
+function restDecision(args: {
+  entries: BlockingHistoryEntry[]
+  now: Date
+  restMinutes: number
+  reason: string
+}): SessionRuleDecision | null {
+  const latestEndedAt = args.entries
+    .map((entry) => new Date(entry.endedAt).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((a, b) => b - a)[0]
+  if (latestEndedAt === undefined) {
+    return {
+      ok: false,
+      title: 'Pause obligatoire',
+      reason: args.reason,
+      restMinutes: args.restMinutes,
+    }
+  }
+
+  const elapsedMinutes = Math.max(0, (args.now.getTime() - latestEndedAt) / 60_000)
+  const remaining = Math.ceil(args.restMinutes - elapsedMinutes)
+  if (remaining <= 0) return null
+
+  return {
+    ok: false,
+    title: 'Pause obligatoire',
+    reason: `${args.reason} Repos restant : ${remaining} min.`,
+    restMinutes: remaining,
+  }
 }

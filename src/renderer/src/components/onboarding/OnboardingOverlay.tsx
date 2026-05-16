@@ -76,7 +76,7 @@ export function OnboardingOverlay(): JSX.Element {
                   <div
                     key={s}
                     className={cn(
-                      'h-1 flex-1 rounded-full transition-colors duration-300',
+                      'h-1 flex-1 rounded-2xl transition-colors duration-300',
                       reached ? 'bg-accent' : 'bg-border-subtle',
                     )}
                   />

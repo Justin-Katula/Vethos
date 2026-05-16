@@ -144,7 +144,7 @@ export function UnlockModal({ open, session, onClose, onSubmit }: Props) {
                   <span className="text-text-muted">
                     {words} / {minWords} mots
                   </span>
-                  <div className="h-1 flex-1 mx-4 overflow-hidden rounded-full bg-bg-base">
+                  <div className="h-1 flex-1 mx-4 overflow-hidden rounded-2xl bg-bg-base">
                     <div
                       className={cn(
                         'h-full transition-all duration-300',

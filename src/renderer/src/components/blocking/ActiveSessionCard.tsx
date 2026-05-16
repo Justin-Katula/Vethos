@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Shield, Globe, Cpu, Wifi } from 'lucide-react'
 import type { ActiveSession } from '@shared/schemas'
 import type { LayerStatus } from '../../../../preload/index'
@@ -8,11 +8,10 @@ import { cn } from '@/lib/cn'
 type Props = {
   session: ActiveSession
   layerStatus: LayerStatus
-  driftPulse: { layer: string; at: number } | null
   onRequestStop: () => void
 }
 
-export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestStop }: Props) {
+export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -62,7 +61,7 @@ export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestS
         </div>
 
         {/* Progress bar */}
-        <div className="mt-5 h-1 overflow-hidden rounded-full bg-bg-base">
+        <div className="mt-5 h-1 overflow-hidden rounded-2xl bg-bg-base">
           <motion.div
             className="h-full bg-accent"
             initial={{ width: 0 }}
@@ -77,17 +76,14 @@ export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestS
             <LayerDot
               label="hosts"
               status={layerStatus.hosts}
-              pulse={driftPulse?.layer === 'hosts' ? driftPulse.at : null}
             />
             <LayerDot
               label="processes"
               status={layerStatus.processes}
-              pulse={driftPulse?.layer === 'processes' ? driftPulse.at : null}
             />
             <LayerDot
               label="firewall"
               status={layerStatus.firewall}
-              pulse={driftPulse?.layer === 'firewall' ? driftPulse.at : null}
             />
           </div>
 
@@ -113,11 +109,9 @@ export function ActiveSessionCard({ session, layerStatus, driftPulse, onRequestS
 function LayerDot({
   label,
   status,
-  pulse,
 }: {
   label: string
   status: 'ok' | 'drifted' | 'error' | 'inactive'
-  pulse: number | null
 }) {
   const color =
     status === 'ok'
@@ -130,18 +124,7 @@ function LayerDot({
   return (
     <div className="flex items-center gap-2">
       <div className="relative h-2 w-2">
-        <div className={cn('absolute inset-0 rounded-full', color)} />
-        <AnimatePresence>
-          {pulse && Date.now() - pulse < 2000 && (
-            <motion.div
-              key={pulse}
-              className={cn('absolute inset-0 rounded-full', color)}
-              initial={{ scale: 1, opacity: 0.7 }}
-              animate={{ scale: 3, opacity: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            />
-          )}
-        </AnimatePresence>
+        <div className={cn('absolute inset-0 rounded-2xl', color)} />
       </div>
       <span className="text-xs text-text-muted">{label}</span>
     </div>

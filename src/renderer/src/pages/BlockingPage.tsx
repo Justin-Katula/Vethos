@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Plus, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useBlockingStore } from '@/store/blocking.store'
@@ -9,7 +9,6 @@ import { ProfileEditor } from '@/components/blocking/ProfileEditor'
 import { UnlockModal } from '@/components/blocking/UnlockModal'
 import { HistoryList } from '@/components/blocking/HistoryList'
 import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
-import { cn } from '@/lib/cn'
 import { useToast } from '@/lib/use-toast'
 import type { BlockingProfile } from '@shared/schemas'
 
@@ -20,7 +19,6 @@ export default function BlockingPage() {
     state,
     active,
     layerStatus,
-    driftToast,
     load,
     saveProfile,
     deleteProfile,
@@ -115,7 +113,6 @@ export default function BlockingPage() {
           <ActiveSessionCard
             session={active}
             layerStatus={layerStatus}
-            driftPulse={driftToast}
             onRequestStop={handleRequestUnlock}
           />
         ) : (
@@ -127,6 +124,11 @@ export default function BlockingPage() {
             <ShieldCheck size={18} className="text-emerald-400" />
             <span>Aucune session active. Choisis un profile pour commencer.</span>
             <div className="ml-auto flex items-center gap-2">
+              {state.nextSessionPenaltyMinutes > 0 && (
+                <span className="rounded-md border border-orange/30 bg-orange/10 px-2 py-1 text-xs font-medium text-orange">
+                  +{state.nextSessionPenaltyMinutes} min prochaine session
+                </span>
+              )}
               <label className="text-xs text-text-muted">Durée :</label>
               <select
                 value={duration}
@@ -210,26 +212,6 @@ export default function BlockingPage() {
         onClose={() => setUnlockOpen(false)}
         onSubmit={submitJustification}
       />
-
-      {/* Drift toast */}
-      <AnimatePresence>
-        {driftToast && Date.now() - driftToast.at < 4000 && (
-          <motion.div
-            key={driftToast.at}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className={cn(
-              'fixed bottom-6 right-6 z-30 flex items-center gap-2 rounded-lg border',
-              'border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 shadow-elevated',
-            )}
-          >
-            <ShieldCheck size={16} className="text-emerald-400" />
-            <span>Couche {driftToast.layer} restaurée</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </PageTransition>
   )
 }

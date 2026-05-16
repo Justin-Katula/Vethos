@@ -20,9 +20,10 @@ type SaveObjectiveDraft = {
   linkedRuleIds?: string[]
   level?: number
   deadline?: string
+  protectedCommitments?: string[]
 }
 
-export type CreditEvent = {
+export type ProgressEvent = {
   at: string
   objectiveDeltas: Array<{ objectiveId: string; minutes: number }>
 }
@@ -34,7 +35,7 @@ type LevelsStore = {
   calculatedAt: string | null
   lastCalculatedDate: string | null
   lastProcessedSessionId: string | null
-  lastCreditEvent: CreditEvent | null
+  lastProgressEvent: ProgressEvent | null
 
   load: () => Promise<void>
   saveObjective: (draft: SaveObjectiveDraft) => Promise<Objective>
@@ -45,7 +46,7 @@ type LevelsStore = {
     history: BlockingHistoryEntry[],
     rules: TimeRule[],
   ) => Promise<void>
-  consumeCreditEvent: () => void
+  consumeProgressEvent: () => void
 }
 
 function uuid(): string {
@@ -103,7 +104,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
   calculatedAt: null,
   lastCalculatedDate: null,
   lastProcessedSessionId: null,
-  lastCreditEvent: null,
+  lastProgressEvent: null,
 
   async load() {
     const [objectiveState, levels] = await Promise.all([
@@ -142,6 +143,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
         color: draft.color,
         icon: draft.icon,
         deadline: draft.deadline || undefined,
+        protectedCommitments: draft.protectedCommitments ?? objectives[i]!.protectedCommitments,
         linkedRuleIds: draft.linkedRuleIds ?? objectives[i]!.linkedRuleIds,
       }
       objectives[i] = saved
@@ -155,6 +157,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
         linkedRuleIds: draft.linkedRuleIds ?? [],
         level: draft.level ?? 5,
         deadline: draft.deadline || undefined,
+        protectedCommitments: draft.protectedCommitments,
         createdAt: now,
       }
       objectives.push(saved)
@@ -242,7 +245,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
     }))
     if (deltas.length > 0) {
       set({
-        lastCreditEvent: {
+        lastProgressEvent: {
           at: new Date().toISOString(),
           objectiveDeltas: deltas,
         },
@@ -250,7 +253,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
     }
   },
 
-  consumeCreditEvent() {
-    set({ lastCreditEvent: null })
+  consumeProgressEvent() {
+    set({ lastProgressEvent: null })
   },
 }))

@@ -1,16 +1,17 @@
 import { execSync } from 'node:child_process'
 import { app, dialog } from 'electron'
-import isElevatedFast from 'is-elevated'
 import { exec as sudoExec } from 'sudo-prompt'
 import log from '@main/logging/setup'
 
 /**
  * Détecte si le process Electron tourne avec privilèges administrateur.
- * Stratégie rapide via API Windows, avec fallback `net session`.
+ * Stratégie rapide via API Windows (is-elevated est pure ESM, donc dynamic import
+ * obligatoire depuis ce module CJS), avec fallback `net session`.
  */
 export async function isElevated(): Promise<boolean> {
   if (process.platform !== 'win32') return true
   try {
+    const { default: isElevatedFast } = await import('is-elevated')
     return await isElevatedFast()
   } catch (err) {
     log.warn('fast elevation check failed, falling back to net session', err)

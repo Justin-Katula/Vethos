@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
   APP_GET_VERSION: 'app:getVersion',
   APP_OPEN_LOGS: 'app:openLogs',
   APP_FLUSH_DEBOUNCES: 'app:flushDebounces',
+  APP_DISCOVERY_LIST: 'app:discoverInstalledApps',
   UPDATER_EVENT_AVAILABLE: 'updater:event:available',
   UPDATER_EVENT_DOWNLOADED: 'updater:event:downloaded',
   // Blocking — invoke
@@ -21,6 +22,7 @@ export const IPC_CHANNELS = {
   BLOCKING_EVENT_SESSION_CHANGED: 'blocking:event:sessionChanged',
   BLOCKING_EVENT_LAYER_DRIFT: 'blocking:event:layerDrift',
   BLOCKING_EVENT_CLOCK_TAMPER: 'blocking:event:clockTamper',
+  BLOCKING_EVENT_BREAK_REQUIRED: 'blocking:event:breakRequired',
   // App usage tracker
   APP_USAGE_GET: 'appUsage:get',
   APP_USAGE_EVENT_TICK: 'appUsage:event:tick',

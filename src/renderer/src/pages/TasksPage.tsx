@@ -6,6 +6,7 @@ import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
 import { useTasksStore } from '@/store/tasks.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { getDeadlineMultiplier } from '@/lib/level-distribution'
+import { daysUntilLevelChange } from '@/lib/free-time-calculator'
 import type { Objective, Task } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 
@@ -141,6 +142,7 @@ function TaskCard({ task, objectives, onEdit, onComplete }: { task: Task; object
   const today = new Date().toISOString().split('T')[0] || ''
   const diffDays = Math.ceil((new Date(task.deadline).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24))
   const multiplier = getDeadlineMultiplier(task.deadline, today)
+  const cooldownDays = daysUntilLevelChange(task.lastLevelChangeAt)
   
   let dlLabel = `${diffDays} jours`
   if (diffDays <= 0) dlLabel = 'En retard'
@@ -186,6 +188,11 @@ function TaskCard({ task, objectives, onEdit, onComplete }: { task: Task; object
           {dlLabel}
         </div>
       </div>
+      {cooldownDays > 0 && (
+        <div className="rounded-md border border-orange/30 bg-orange/10 px-3 py-2 text-[10px] font-medium text-orange">
+          Impossible de redescendre avant {cooldownDays} jour{cooldownDays > 1 ? 's' : ''}.
+        </div>
+      )}
     </div>
   )
 }

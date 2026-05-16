@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-5 px-8 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/15 text-red-300">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/15 text-red-300">
             <AlertOctagon size={28} />
           </div>
           <div>

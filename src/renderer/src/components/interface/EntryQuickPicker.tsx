@@ -38,7 +38,7 @@ export function EntryQuickPicker({ rules, x, y, onPick, onCreateNew, onCancel }:
       ref={ref}
       initial={{ opacity: 0, y: 8, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className="absolute z-30 flex max-w-[260px] flex-col gap-1 rounded-lg border border-border-subtle bg-bg-elevated p-2 shadow-elevated"
       style={{ left: x, top: y }}
     >
@@ -56,7 +56,7 @@ export function EntryQuickPicker({ rules, x, y, onPick, onCreateNew, onCancel }:
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-text-primary transition-colors hover:bg-bg-card"
         >
           <span
-            className="h-3 w-3 flex-shrink-0 rounded-full ring-2 ring-bg-base"
+            className="h-3 w-3 flex-shrink-0 rounded-2xl ring-2 ring-bg-base"
             style={{ backgroundColor: r.color }}
           />
           <span className="truncate">{r.name}</span>

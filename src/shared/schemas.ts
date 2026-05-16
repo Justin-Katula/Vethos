@@ -30,20 +30,21 @@ export const SettingsSchema = z.object({
   onboardingCompleted: z.boolean().optional(),
   /** Profil utilisateur : étudiant, travailleur, les deux, autre. */
   userProfile: z.enum(['student', 'worker', 'both', 'other']).optional(),
-  /** Heure de coucher (HH:MM). */
+  /** Heure de coucher, telle que fournie par le champ horaire natif. */
   sleepStart: z.string().optional(),
-  /** Heure de réveil (HH:MM). */
+  /** Heure de réveil, telle que fournie par le champ horaire natif. */
   sleepEnd: z.string().optional(),
   /** Règles de session (pauses obligatoires). */
   sessionRulesEnabled: z.boolean().optional(),
   /** Blocage strict ON/OFF. */
   strictBlocking: z.boolean().optional(),
-  /** Anti-bypass ON/OFF. */
-  antiBypass: z.boolean().optional(),
   /** Sauvegarde auto ON/OFF. */
   autoSave: z.boolean().optional(),
   /** Opt-in explicite pour scanner l'historique navigateur local. */
   browserHistoryScanEnabled: z.boolean().optional(),
+  /** Valeurs par défaut des verrous adaptatifs pour les nouveaux profils. */
+  defaultUnlockCooldownMinutes: z.number().int().min(1).max(60).optional(),
+  defaultUnlockJustificationWords: z.number().int().min(50).max(500).optional(),
   /** Date du premier lancement (pour la première semaine). */
   firstLaunchDate: z.string().datetime().optional(),
 })
@@ -82,7 +83,12 @@ export const ActiveSessionSchema = z.object({
   endsAt: z.string().datetime(),
   startedAtWall: z.number().int().optional(),
   startedAtMono: z.number().int().optional(),
-  durationMinutes: z.number().int().min(1).max(24 * 60).optional(),
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60)
+    .optional(),
   unlockState: z.discriminatedUnion('phase', [
     z.object({ phase: z.literal('locked') }),
     z.object({ phase: z.literal('cooldown'), startedAt: z.string().datetime() }),
@@ -106,6 +112,8 @@ export const BlockingStateSchema = z.object({
   profiles: z.array(BlockingProfileSchema),
   /** Legacy compatibility: V2 stores this in nexus_blocking_history.json. */
   history: z.array(BlockingHistoryEntrySchema).max(500).default([]),
+  /** Pénalité appliquée à la prochaine session après un arrêt anticipé. */
+  nextSessionPenaltyMinutes: z.number().int().min(0).max(240).default(0),
 })
 export type BlockingState = z.infer<typeof BlockingStateSchema>
 
@@ -124,9 +132,7 @@ export const TimeRuleSchema = z.object({
   name: z.string().min(1).max(40),
   color: z.string().regex(HEX_COLOR_REGEX),
   icon: z.string().min(1).max(40).optional(),
-  categoryType: z
-    .enum(['sleep', 'school', 'work', 'commitment', 'free', 'custom'])
-    .optional(),
+  categoryType: z.enum(['sleep', 'school', 'work', 'commitment', 'free', 'custom']).optional(),
   linkedProfileId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
 })
@@ -162,10 +168,15 @@ export const ObjectiveSchema = z.object({
   color: z.string().regex(HEX_COLOR_REGEX),
   icon: z.string().min(1).max(40).optional(),
   linkedRuleIds: z.array(z.string().uuid()),
-  /** The manual level (e.g., 3 to 7 default, up to 10). Replaces xpMinutes. */
+  /** Niveau manuel (3 à 7 par défaut, jusqu'à 10). */
   level: z.number().min(0).max(10).default(5),
   /** Optional ISO date used as context; task deadlines drive the main distribution. */
-  deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  deadline: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  /** Activités personnelles que l'utilisateur veut préserver autour de cet objectif. */
+  protectedCommitments: z.array(z.string().min(1).max(80)).max(12).optional(),
   /** Date du dernier changement de niveau (cooldown 2 jours). */
   lastLevelChangeAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),

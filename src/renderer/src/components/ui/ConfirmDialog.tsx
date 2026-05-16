@@ -62,7 +62,7 @@ export function ConfirmDialog({
             <div className="flex items-start gap-4">
               <div
                 className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl',
                   variant === 'danger'
                     ? 'bg-red-500/15 text-red-400'
                     : 'bg-accent/15 text-accent',

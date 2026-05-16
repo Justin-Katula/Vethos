@@ -69,7 +69,7 @@ export function selectMinutesThisWeek(
   return total
 }
 
-/** Sélecteur : map appId → minutes par jour, utilisée par le credit engine. */
+/** Sélecteur : map appId → minutes par jour, utilisée par les progressions. */
 export function selectMinutesByDay(
   state: AppUsageStore,
   appId: string,

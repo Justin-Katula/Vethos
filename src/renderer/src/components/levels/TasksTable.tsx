@@ -51,7 +51,7 @@ export function TasksTable({ tasks }: Props) {
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex flex-col items-center gap-1">
-                     <div className="h-1 w-16 rounded-full bg-bg-base overflow-hidden">
+                     <div className="h-1 w-16 rounded-2xl bg-bg-base overflow-hidden">
                         <div 
                           className={`h-full ${task.level >= 6 ? 'bg-red-500' : task.level >= 4 ? 'bg-yellow' : 'bg-emerald-500'}`}
                           style={{ width: `${(task.level / 10) * 100}%` }}

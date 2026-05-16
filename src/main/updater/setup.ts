@@ -9,7 +9,10 @@ const STARTUP_GRACE_MS = 60_000
 
 let started = false
 
-export function startUpdater(getMainWindow: () => BrowserWindow | null): void {
+export function startUpdater(
+  getMainWindow: () => BrowserWindow | null,
+  isSessionActive: () => boolean = () => false,
+): void {
   if (started || !app.isPackaged) return
   started = true
 
@@ -18,6 +21,11 @@ export function startUpdater(getMainWindow: () => BrowserWindow | null): void {
   autoUpdater.autoInstallOnAppQuit = true
 
   const check = (): void => {
+    const sessionActive = isSessionActive()
+    if (sessionActive) {
+      log.info('updater check skipped while a focus session is active')
+      return
+    }
     autoUpdater.checkForUpdates().catch((err) => {
       log.warn('updater check failed', err)
     })
@@ -33,6 +41,13 @@ export function startUpdater(getMainWindow: () => BrowserWindow | null): void {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
+    const sessionActive = isSessionActive()
+    if (sessionActive) {
+      autoUpdater.autoInstallOnAppQuit = false
+      log.info('updater skipRestart: active focus session')
+    } else {
+      autoUpdater.autoInstallOnAppQuit = true
+    }
     getMainWindow()?.webContents.send(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, info)
   })
 

@@ -10,14 +10,17 @@ import { useLevelsStore } from '@/store/levels.store'
 import { useBlockingStore } from '@/store/blocking.store'
 import { useTasksStore } from '@/store/tasks.store'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
-import { minuteToHHMM, durationLabel } from '@/lib/format-time'
+import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import {
   computeDailyFreeTime,
+  distributeTimeToObjectives,
   formatAllocatedTime,
+  type ObjectiveTimeDistribution,
   type TimeDistribution,
 } from '@/lib/free-time-calculator'
 import { cn } from '@/lib/cn'
+import { checkPaletteCollisions } from '@/lib/color-similarity'
 
 const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
@@ -67,12 +70,27 @@ export default function HomePage() {
     (e) => currentMinute >= e.startMinute && currentMinute < e.endMinute,
   )
   const currentRule = currentEntry ? ruleById.get(currentEntry.ruleId) : null
+  const currentObjective = currentRule
+    ? objectives.find((objective) => objective.linkedRuleIds.includes(currentRule.id))
+    : undefined
 
   // ─── CORE: Time distribution calculation ───
   const dailyResult = useMemo(
     () => computeDailyFreeTime(dow, entries, rules, tasks, todayStr),
     [dow, entries, rules, tasks, todayStr],
   )
+  const objectiveDistributions = useMemo(
+    () => distributeTimeToObjectives(objectives, dailyResult.totalFreeMinutes, todayStr),
+    [objectives, dailyResult.totalFreeMinutes, todayStr],
+  )
+  const colorCollisions = useMemo(() => {
+    const colors = todayEntries
+      .map((entry) => ruleById.get(entry.ruleId))
+      .filter((rule): rule is NonNullable<typeof rule> => Boolean(rule))
+      .map((rule) => displayColorForRule(rule).color)
+      .filter((color) => color !== 'transparent')
+    return checkPaletteCollisions(colors)
+  }, [ruleById, todayEntries])
 
   useEffect(() => {
     if (!loaded || !tasksLoaded) return
@@ -88,13 +106,14 @@ export default function HomePage() {
   // Tasks accomplished
   const activeTasks = tasks.filter((t) => t.status === 'active')
   const completedToday = tasks.filter((t) => t.status === 'history')
+  const sessionRuleProgress = getSessionRuleProgress(blockingState.history, active, now)
 
   if (!loaded) {
     return (
       <PageTransition>
         <PageSkeleton>
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,360px)]">
-            <Skeleton className="h-72 w-72 rounded-full" />
+            <Skeleton className="h-72 w-72 rounded-2xl" />
             <div className="space-y-2">
               <SkeletonRow />
               <SkeletonRow />
@@ -143,7 +162,9 @@ export default function HomePage() {
               </div>
               {currentRule && currentEntry && (
                 <div className="mt-0.5 text-xs text-text-muted">
-                  Niveau {currentRule ? '—' : '—'} · {minuteToHHMM(currentEntry.startMinute)} — {minuteToHHMM(currentEntry.endMinute)}
+                  {currentObjective
+                    ? `Niveau ${currentObjective.level.toFixed(1)}${currentObjective.deadline ? ` · ${formatDeadline(currentObjective.deadline)}` : ''}`
+                    : `${minuteToClockLabel(currentEntry.startMinute)} — ${minuteToClockLabel(currentEntry.endMinute)}`}
                 </div>
               )}
             </div>
@@ -173,6 +194,7 @@ export default function HomePage() {
                   if (!rule) return null
                   const Icon = iconByName(rule.icon)
                   const isNow = currentMinute >= e.startMinute && currentMinute < e.endMinute
+                  const display = displayColorForRule(rule)
                   return (
                     <motion.li
                       key={e.id}
@@ -183,23 +205,42 @@ export default function HomePage() {
                           : 'border-border-subtle bg-bg-card'
                       }`}
                     >
-                      <div className="h-10 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: rule.color }} />
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: rule.color + '22', color: rule.color }}>
+                      <div className="h-10 w-1.5 flex-shrink-0 rounded-2xl" style={{ backgroundColor: display.color, opacity: display.opacity }} />
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: display.color === 'transparent' ? 'rgba(255,255,255,0.06)' : display.color + '22', color: display.color === 'transparent' ? 'var(--text-muted)' : display.color }}>
                         {Icon ? <Icon size={14} /> : null}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-text-primary">
                           {rule.name}
-                          {isNow && <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                          {isNow && <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-2xl bg-accent" />}
                         </div>
                         <div className="text-xs text-text-muted">
-                          {minuteToHHMM(e.startMinute)} — {minuteToHHMM(e.endMinute)} · {durationLabel(e.endMinute - e.startMinute)}
+                          {minuteToClockLabel(e.startMinute)} — {minuteToClockLabel(e.endMinute)} · {durationLabel(e.endMinute - e.startMinute)}
                         </div>
                       </div>
                     </motion.li>
                   )
                 })}
               </ul>
+            )}
+            {colorCollisions.length > 0 && (
+              <div className="mt-3 rounded-lg border border-orange/40 bg-orange/10 px-3 py-2 text-xs text-orange">
+                Attention : certaines couleurs se ressemblent.
+              </div>
+            )}
+
+            {objectiveDistributions.length > 0 && (
+              <div className="mt-8">
+                <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
+                  <Target size={14} />
+                  Répartition par objectif
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {objectiveDistributions.map((dist) => (
+                    <ObjectiveDistributionCard key={dist.objectiveId} dist={dist} />
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* ─── DISTRIBUTION DU TEMPS — LE CŒUR ─── */}
@@ -253,12 +294,12 @@ export default function HomePage() {
                 <SessionRuleItem
                   label="Max 4h même projet"
                   description="Pause 1h obligatoire après"
-                  progress={0}
+                  progress={sessionRuleProgress.sameProject}
                 />
                 <SessionRuleItem
                   label="Max 6h multi-projets"
                   description="Pause 2h obligatoire après"
-                  progress={0}
+                  progress={sessionRuleProgress.allProjects}
                 />
                 <div className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-base/50 p-2.5">
                   <Timer size={14} className="text-orange" />
@@ -281,7 +322,7 @@ export default function HomePage() {
               {active ? (
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-2xl bg-red-500" />
                     <span className="text-sm font-semibold text-red-400">BLOCAGE ACTIF</span>
                   </div>
                   <div className="text-xs text-text-muted">
@@ -290,7 +331,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="mt-3 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-text-muted" />
+                  <span className="h-2.5 w-2.5 rounded-2xl bg-text-muted" />
                   <span className="text-sm text-text-secondary">Inactif</span>
                 </div>
               )}
@@ -384,6 +425,46 @@ function DistributionCard({ dist }: { dist: TimeDistribution }) {
   )
 }
 
+function ObjectiveDistributionCard({ dist }: { dist: ObjectiveTimeDistribution }) {
+  const deadlineLabel =
+    dist.deadlineDays === null
+      ? 'Sans deadline'
+      : dist.deadlineDays <= 0
+      ? 'Aujourd’hui'
+      : dist.deadlineDays === 1
+      ? 'Demain'
+      : `${dist.deadlineDays} jours`
+
+  return (
+    <motion.div
+      whileHover={{ x: 2 }}
+      className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4 transition-colors hover:border-border-strong"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="h-9 w-1.5 shrink-0 rounded-2xl" style={{ backgroundColor: dist.color }} />
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-text-primary">
+            {dist.objectiveName}
+          </div>
+          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-text-muted">
+            <span>Niveau {dist.level.toFixed(1)}</span>
+            <span>·</span>
+            <span>{deadlineLabel}</span>
+            <span>·</span>
+            <span>Score: {dist.scoreReel.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-lg font-bold tabular-nums text-text-primary">
+          {formatAllocatedTime(dist.allocatedMinutes)}
+        </div>
+        <div className="text-[10px] text-text-muted">alloué</div>
+      </div>
+    </motion.div>
+  )
+}
+
 // ─── Helper components ──────────────────────────────────────────────────────
 
 function StatMini({ label, value }: { label: string; value: number }) {
@@ -413,7 +494,7 @@ function SessionRuleItem({ label, description, progress }: { label: string; desc
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-text-primary">{label}</div>
       </div>
-      <div className="h-1 w-full rounded-full bg-bg-base overflow-hidden">
+      <div className="h-1 w-full rounded-2xl bg-bg-base overflow-hidden">
         <div className="h-full bg-accent" style={{ width: `${progress}%` }} />
       </div>
       <div className="text-[10px] text-text-muted">{description}</div>
@@ -438,6 +519,63 @@ function formatProductiveTime(
     return `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}`
   }
   return `${totalMin}min`
+}
+
+function getSessionRuleProgress(
+  history: Array<{
+    profileId: string
+    startedAt: string
+    endedAt: string
+    completedNormally: boolean
+  }>,
+  active: { profileId: string; startedAt: string } | null,
+  now: Date,
+): { sameProject: number; allProjects: number } {
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
+  const byProfile = new Map<string, number>()
+  let allMinutes = 0
+
+  for (const entry of history) {
+    if (!entry.completedNormally) continue
+    const ended = new Date(entry.endedAt)
+    if (ended < startOfToday) continue
+    const minutes = Math.max(
+      0,
+      Math.round((ended.getTime() - new Date(entry.startedAt).getTime()) / 60_000),
+    )
+    allMinutes += minutes
+    byProfile.set(entry.profileId, (byProfile.get(entry.profileId) ?? 0) + minutes)
+  }
+
+  if (active) {
+    const activeMinutes = Math.max(
+      0,
+      Math.round((now.getTime() - new Date(active.startedAt).getTime()) / 60_000),
+    )
+    allMinutes += activeMinutes
+    byProfile.set(active.profileId, (byProfile.get(active.profileId) ?? 0) + activeMinutes)
+  }
+
+  const sameProjectMinutes = Math.max(0, ...byProfile.values())
+  return {
+    sameProject: Math.min(100, Math.round((sameProjectMinutes / 240) * 100)),
+    allProjects: Math.min(100, Math.round((allMinutes / 360) * 100)),
+  }
+}
+
+function displayColorForRule(rule: { color: string; categoryType?: string }) {
+  if (rule.categoryType === 'sleep') return { color: '#1E3A8A', opacity: 1 }
+  if (rule.categoryType === 'school') return { color: '#FFFFFF', opacity: 0.7 }
+  if (rule.categoryType === 'work') return { color: '#3BA3FF', opacity: 1 }
+  if (rule.categoryType === 'free') return { color: 'transparent', opacity: 1 }
+  return { color: rule.color, opacity: 1 }
+}
+
+function formatDeadline(deadline: string): string {
+  const [year, month, day] = deadline.split('-')
+  if (!year || !month || !day) return deadline
+  return `${day}/${month}/${year}`
 }
 
 function EmptyHint() {

@@ -2,6 +2,18 @@ node_modules/
 out/
 dist/
 release/
+App/
+build/
+locales/
+resources/
+Nexus.exe
+Uninstall Nexus.exe
+chrome_*.pak
+*.dll
+*.dat
+*.bin
+resources.pak
+vk_swiftshader_icd.json
 *.log
 .DS_Store
 .vscode/

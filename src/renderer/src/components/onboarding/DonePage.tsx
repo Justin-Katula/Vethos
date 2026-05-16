@@ -1,7 +1,6 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2 } from 'lucide-react'
-import { useOnboardingStore } from '@/store/onboarding.store'
 
 const CONFETTI_COLORS = [
   '#3b82f6',
@@ -39,14 +38,6 @@ function generateConfetti(count: number): Confetto[] {
 
 export function DonePage(): JSX.Element {
   const confetti = useMemo(() => generateConfetti(60), [])
-  const restart = useOnboardingStore((s) => s.jumpTo)
-
-  // Réinitialiser le step au démontage pour permettre une réouverture propre
-  useEffect(() => {
-    return () => {
-      restart('welcome')
-    }
-  }, [restart])
 
   return (
     <div className="relative flex h-full min-h-[500px] flex-col items-center justify-center gap-6 text-center">
@@ -81,7 +72,7 @@ export function DonePage(): JSX.Element {
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400"
+        className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400"
       >
         <CheckCircle2 size={48} strokeWidth={2.4} />
       </motion.div>
@@ -95,7 +86,7 @@ export function DonePage(): JSX.Element {
           Tout est prêt.
         </h1>
         <p className="mt-3 text-base text-text-secondary">
-          Termine une session de focus pour voir ton premier crédit XP.
+          Termine une session de focus pour voir tes premiers progrès.
         </p>
       </motion.div>
     </div>

@@ -172,6 +172,12 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     }
     state.history.unshift(historyEntry)
     if (state.history.length > 500) state.history.length = 500
+    if (reason === 'unlock') {
+      state.nextSessionPenaltyMinutes = Math.min(
+        240,
+        (state.nextSessionPenaltyMinutes ?? 0) + 15,
+      )
+    }
     await adapters.persistence.writeState(state)
     await adapters.persistence.clearActive()
 

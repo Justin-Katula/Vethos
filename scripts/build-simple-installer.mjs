@@ -11,7 +11,7 @@ const version4 = version.split('.').concat(['0', '0', '0']).slice(0, 4).join('.'
 
 const sourceDir = join(root, 'release', 'win-unpacked')
 const outFile = join(root, 'release', `Nexus-Setup-${version}.exe`)
-const script = join(root, 'build', 'nexus-simple-installer.nsi')
+const script = join(root, 'scripts', 'nexus-simple-installer.nsi')
 
 if (!existsSync(sourceDir)) {
   throw new Error(`Missing ${sourceDir}. Run electron-builder --win --dir first.`)
