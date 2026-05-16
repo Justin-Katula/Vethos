@@ -14,7 +14,6 @@
  */
 
 import type { Objective, ScheduleEntry, TimeRule, Task } from '@shared/schemas'
-import { distributeFreeTime, getDeadlineMultiplier } from './level-distribution'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +111,16 @@ function daysBetweenLocalDates(fromDateStr: string, toDateStr: string): number {
   const from = parseLocalDate(fromDateStr)
   const to = parseLocalDate(toDateStr)
   return Math.ceil((to.getTime() - from.getTime()) / 86_400_000)
+}
+
+export function getDeadlineMultiplier(deadlineDateStr: string, todayStr: string): number {
+  const diffDays = daysBetweenLocalDates(todayStr, deadlineDateStr)
+
+  if (diffDays < 0) return 1.0
+  if (diffDays > 7) return 1.0
+  if (diffDays >= 4 && diffDays <= 7) return 1.3
+  if (diffDays >= 2 && diffDays <= 3) return 1.6
+  return 2.0
 }
 
 /**
@@ -233,18 +242,34 @@ export function distributeTimeToTasks(
   const activeTasks = tasks.filter((task) => task.status === 'active' && task.level > 0)
   if (activeTasks.length === 0) return []
 
-  const taskById = new Map(activeTasks.map((task) => [task.id, task]))
-  return distributeFreeTime(activeTasks, totalFreeMinutes, todayStr).map((item) => {
-    const task = taskById.get(item.taskId)!
+  const scored = activeTasks.map((task) => ({
+    task,
+    scoreReel: task.level * getDeadlineMultiplier(task.deadline, todayStr),
+  }))
+  const totalScore = scored.reduce((sum, item) => sum + item.scoreReel, 0)
+  if (totalScore === 0) return []
+
+  const distributions = scored.map(({ task, scoreReel }) => {
+    const rawMinutes = (scoreReel / totalScore) * totalFreeMinutes
     return {
       taskId: task.id,
       taskTitle: task.title,
-      scoreReel: item.scoreReel,
-      allocatedMinutes: item.minutes,
+      scoreReel,
+      allocatedMinutes: Math.round(rawMinutes / 5) * 5,
       deadlineDays: daysBetweenLocalDates(todayStr, task.deadline),
       level: task.level,
     }
   })
+
+  const allocatedTotal = distributions.reduce((sum, item) => sum + item.allocatedMinutes, 0)
+  const diff = totalFreeMinutes - allocatedTotal
+  if (diff !== 0) {
+    const top = scored.slice().sort((a, b) => b.scoreReel - a.scoreReel)[0]
+    const target = top ? distributions.find((item) => item.taskId === top.task.id) : undefined
+    if (target) target.allocatedMinutes = Math.max(0, target.allocatedMinutes + diff)
+  }
+
+  return distributions
 }
 
 export function distributeTimeToObjectives(
@@ -375,4 +400,70 @@ export function formatAllocatedTime(minutes: number): string {
     return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
   }
   return `${safeMinutes}min`
+}
+
+// ─── Réconciliation niveau 0 ────────────────────────────────────────────────
+
+/**
+ * Évent généré par la réconciliation niveau 0 (V2 P9). Permet à
+ * `tasks.store` de fire la notification native correspondante.
+ */
+export type LevelZeroEvent =
+  | { type: 'task-forced-three'; taskId: string; taskTitle: string }
+  | { type: 'task-auto-rescued'; taskId: string; taskTitle: string; daysLeft: number }
+  | { type: 'task-accomplished'; taskId: string; taskTitle: string }
+  | { type: 'task-still-zero'; taskId: string; taskTitle: string }
+
+export type LevelZeroReconciliation = {
+  updated: Task[]
+  events: LevelZeroEvent[]
+}
+
+/**
+ * Pour chaque tâche au niveau 0 active, applique la règle V2 P9 :
+ *
+ * - Deadline passée → marquée `'history'` (accomplie même à 0).
+ * - Deadline < 1 jour → niveau forcé à 3 (urgent).
+ * - 2-6 jours avant deadline → niveau remonté à 1 automatiquement.
+ * - ≥ 7 jours → reste à 0 (visible sur l'accueil, hors distribution).
+ *
+ * Pure : prend la liste de tâches + une date locale, renvoie la liste
+ * modifiée + les évents pour le caller (tasks.store) qui s'occupe du
+ * persist et des notifs.
+ */
+export function reconcileLevelZeroTasks(tasks: Task[], todayStr: string): LevelZeroReconciliation {
+  const events: LevelZeroEvent[] = []
+  const updated = tasks.map((task) => {
+    if (task.status !== 'active' || task.level !== 0) return task
+    const daysLeft = daysBetweenLocalDates(todayStr, task.deadline)
+
+    if (daysLeft < 0) {
+      events.push({ type: 'task-accomplished', taskId: task.id, taskTitle: task.title })
+      return { ...task, status: 'history' as const }
+    }
+    if (daysLeft < 1) {
+      events.push({ type: 'task-forced-three', taskId: task.id, taskTitle: task.title })
+      return {
+        ...task,
+        level: 3,
+        lastLevelChangeAt: new Date().toISOString(),
+      }
+    }
+    if (daysLeft >= 2 && daysLeft <= 6) {
+      events.push({
+        type: 'task-auto-rescued',
+        taskId: task.id,
+        taskTitle: task.title,
+        daysLeft,
+      })
+      return {
+        ...task,
+        level: 1,
+        lastLevelChangeAt: new Date().toISOString(),
+      }
+    }
+    events.push({ type: 'task-still-zero', taskId: task.id, taskTitle: task.title })
+    return task
+  })
+  return { updated, events }
 }
