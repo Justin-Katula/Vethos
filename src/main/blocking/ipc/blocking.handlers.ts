@@ -1,4 +1,5 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { ipcMain, app, type BrowserWindow } from 'electron'
+import { setBlockingDataDir } from '@service/blocking/blocking-paths'
 import { promises as fsp } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
@@ -33,6 +34,9 @@ export async function registerBlockingHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
 ): Promise<{ isSessionActive: () => boolean }> {
+  // Le moteur de blocage tourne encore dans le main (jusqu'au Lot 4) : on lui
+  // fait pointer son répertoire de données sur le userData de l'app, comme avant.
+  setBlockingDataDir(app.getPath('userData'))
   const persistence = createBlockingPersistence(storage)
   const firewall = createFirewallTracker()
   const elevatedAtBoot = await isElevated()
