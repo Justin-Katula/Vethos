@@ -1,6 +1,6 @@
 import { promises as fsp } from 'node:fs'
 import * as path from 'node:path'
-import { app } from 'electron'
+import { blockingDataDir } from '../blocking-paths'
 import type { Storage } from '@main/storage'
 import type { ActiveSession, BlockingState } from '@shared/schemas'
 
@@ -62,7 +62,7 @@ export function createBlockingPersistence(storage: Storage): BlockingPersistence
       await storage.write('blocking_active', s)
     },
     async clearActive() {
-      const file = path.join(app.getPath('userData'), 'nexus_blocking_active.json')
+      const file = path.join(blockingDataDir(), 'nexus_blocking_active.json')
       await fsp.unlink(file).catch(() => {})
     },
   }

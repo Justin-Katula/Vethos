@@ -13,7 +13,7 @@ import { applyNexusBlock, clearNexusBlock } from '@service/blocking/hosts/writer
 import { HOSTS_PATH } from '@service/blocking/hosts/writer'
 import { parseHostsFile } from '@service/blocking/hosts/parser'
 import { flushDns } from '@service/blocking/hosts/flush-dns'
-import { createBlockingPersistence } from '../session/persistence'
+import { createBlockingPersistence } from '@service/blocking/session/persistence'
 import { isElevated, requestElevatedRelaunch } from '../elevation'
 import { isSafeListed } from '@service/blocking/processes/safe-list'
 import { startProcessKiller } from '@service/blocking/processes/killer'
