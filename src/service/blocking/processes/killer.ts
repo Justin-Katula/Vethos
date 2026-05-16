@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import log from '@main/logging/setup'
+import log from '../engine-log'
 import { listProcesses } from './enumerator'
 import { isSafeListed } from './safe-list'
 
