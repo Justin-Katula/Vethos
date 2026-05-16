@@ -159,7 +159,133 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
 
   const state: ScheduleState = useMemo(() => ({ rules, entries }), [rules, entries])
   const current = getCurrentEntry(state, now)
-  const cursorColor = current ? displayColorForRule(current.rule).color : 'hsl(220 8% 80%)'
+  const currentEntryId = current?.entry.id
+
+  const segments = useMemo(
+    () =>
+      todayEntries.map((e) => {
+        const rule = ruleById.get(e.ruleId)
+        if (!rule) return null
+        const objectiveId = objectiveByRuleId.get(e.ruleId)
+        const urgency = objectiveId ? urgencyByObjectiveId.get(objectiveId) : undefined
+        const urgencyStroke = urgency ? URGENCY_STYLES[urgency].stroke : null
+        const display = displayColorForRule(rule)
+        const clickable =
+          Boolean(objectiveId) &&
+          !['sleep', 'school', 'work', 'commitment'].includes(rule.categoryType ?? '')
+        const startMinute = Math.max(0, e.startMinute - ARC_JOIN_OVERLAP_MINUTES)
+        const endMinute = Math.min(1440, e.endMinute + ARC_JOIN_OVERLAP_MINUTES)
+        const startA = minuteToAngle(startMinute)
+        const endA = minuteToAngle(endMinute)
+
+        if (e.endMinute - e.startMinute >= 1439) {
+          return (
+            <g
+              key={e.id}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={
+                clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined
+              }
+              onKeyDown={
+                clickable
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        navigate(`/objectives?objective=${objectiveId}`)
+                      }
+                    }
+                  : undefined
+              }
+              className={clickable ? 'cursor-pointer' : undefined}
+            >
+              {urgencyStroke && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={trackRadius}
+                  fill="none"
+                  stroke={urgencyStroke}
+                  strokeWidth={STROKE + 8}
+                  strokeLinecap="round"
+                  opacity={0.9}
+                  pointerEvents="none"
+                />
+              )}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={trackRadius}
+                fill="none"
+                stroke={display.color}
+                strokeWidth={STROKE}
+                strokeLinecap="round"
+                opacity={display.opacity}
+                className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
+                pointerEvents={clickable ? 'stroke' : undefined}
+              />
+            </g>
+          )
+        }
+
+        const pathD = describeArc(cx, cy, trackRadius, startA, endA)
+        return (
+          <g
+            key={e.id}
+            role={clickable ? 'button' : undefined}
+            tabIndex={clickable ? 0 : undefined}
+            onClick={clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined}
+            onKeyDown={
+              clickable
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      navigate(`/objectives?objective=${objectiveId}`)
+                    }
+                  }
+                : undefined
+            }
+            className={clickable ? 'cursor-pointer' : undefined}
+          >
+            {urgencyStroke && (
+              <path
+                d={pathD}
+                fill="none"
+                stroke={urgencyStroke}
+                strokeWidth={STROKE + 8}
+                strokeLinecap="round"
+                opacity={0.85}
+                pointerEvents="none"
+              />
+            )}
+            <path
+              d={pathD}
+              fill="none"
+              stroke={display.color}
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              opacity={currentEntryId === e.id ? 1 : Math.min(display.opacity, 0.7)}
+              className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
+              pointerEvents={clickable ? 'stroke' : undefined}
+              style={{
+                transition: 'opacity 250ms',
+              }}
+            />
+          </g>
+        )
+      }),
+    [
+      currentEntryId,
+      cx,
+      cy,
+      navigate,
+      objectiveByRuleId,
+      ruleById,
+      todayEntries,
+      trackRadius,
+      urgencyByObjectiveId,
+    ],
+  )
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -186,118 +312,7 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
         />
 
         {/* arcs colorés du jour */}
-        {todayEntries.map((e) => {
-          const rule = ruleById.get(e.ruleId)
-          if (!rule) return null
-          const objectiveId = objectiveByRuleId.get(e.ruleId)
-          const urgency = objectiveId ? urgencyByObjectiveId.get(objectiveId) : undefined
-          const urgencyStroke = urgency ? URGENCY_STYLES[urgency].stroke : null
-          const display = displayColorForRule(rule)
-          const clickable =
-            Boolean(objectiveId) &&
-            !['sleep', 'school', 'work', 'commitment'].includes(rule.categoryType ?? '')
-          const startMinute = Math.max(0, e.startMinute - ARC_JOIN_OVERLAP_MINUTES)
-          const endMinute = Math.min(1440, e.endMinute + ARC_JOIN_OVERLAP_MINUTES)
-          const startA = minuteToAngle(startMinute)
-          const endA = minuteToAngle(endMinute)
-          // si arc proche de 360°, on dessine un cercle complet
-          if (e.endMinute - e.startMinute >= 1439) {
-            return (
-              <g
-                key={e.id}
-                role={clickable ? 'button' : undefined}
-                tabIndex={clickable ? 0 : undefined}
-                onClick={
-                  clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined
-                }
-                onKeyDown={
-                  clickable
-                    ? (event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          navigate(`/objectives?objective=${objectiveId}`)
-                        }
-                      }
-                    : undefined
-                }
-                className={clickable ? 'cursor-pointer' : undefined}
-              >
-                {urgencyStroke && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={trackRadius}
-                    fill="none"
-                    stroke={urgencyStroke}
-                    strokeWidth={STROKE + 8}
-                    strokeLinecap="round"
-                    opacity={0.9}
-                    pointerEvents="none"
-                  />
-                )}
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={trackRadius}
-                  fill="none"
-                  stroke={display.color}
-                  strokeWidth={STROKE}
-                  strokeLinecap="round"
-                  opacity={display.opacity}
-                  className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
-                  pointerEvents={clickable ? 'stroke' : undefined}
-                />
-              </g>
-            )
-          }
-          const pathD = describeArc(cx, cy, trackRadius, startA, endA)
-          return (
-            <g
-              key={e.id}
-              role={clickable ? 'button' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onClick={
-                clickable ? () => navigate(`/objectives?objective=${objectiveId}`) : undefined
-              }
-              onKeyDown={
-                clickable
-                  ? (event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        navigate(`/objectives?objective=${objectiveId}`)
-                      }
-                    }
-                  : undefined
-              }
-              className={clickable ? 'cursor-pointer' : undefined}
-            >
-              {urgencyStroke && (
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke={urgencyStroke}
-                  strokeWidth={STROKE + 8}
-                  strokeLinecap="round"
-                  opacity={0.85}
-                  pointerEvents="none"
-                />
-              )}
-              <path
-                d={pathD}
-                fill="none"
-                stroke={display.color}
-                strokeWidth={STROKE}
-                strokeLinecap="round"
-                opacity={current?.entry.id === e.id ? 1 : Math.min(display.opacity, 0.7)}
-                className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
-                pointerEvents={clickable ? 'stroke' : undefined}
-                style={{
-                  transition: 'opacity 250ms',
-                }}
-              />
-            </g>
-          )
-        })}
+        {segments}
 
         {/* tick marks 24h */}
         {Array.from({ length: 24 }, (_, h) => {
@@ -339,7 +354,7 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
           )
         })}
 
-        <TimeCircleNeedle cx={cx} cy={cy} trackRadius={trackRadius} color={cursorColor} />
+        <TimeCircleNeedle cx={cx} cy={cy} trackRadius={trackRadius} />
       </svg>
 
       {/* Centre : heure + label + countdown */}
@@ -364,36 +379,28 @@ function TimeCircleNeedle({
   cx,
   cy,
   trackRadius,
-  color,
 }: {
   cx: number
   cy: number
   trackRadius: number
-  color: string
 }): JSX.Element {
   const now = useSecondNow()
-  const minuteOfDay = dateToMinuteOfDay(now) + now.getSeconds() / 60
-  const cursorDegrees = (minuteOfDay / 1440) * 360
+  const minuteOfDay = dateToMinuteOfDay(now) + now.getSeconds() / 60 + now.getMilliseconds() / 60000
+  const angle = minuteToAngle(minuteOfDay)
+  const inner = polarToCartesian(cx, cy, trackRadius - STROKE / 2 - 2, angle)
+  const outer = polarToCartesian(cx, cy, trackRadius + STROKE / 2 + 2, angle)
 
   return (
-    <g
-      style={{
-        transform: `rotate(${cursorDegrees}deg)`,
-        transformOrigin: `${cx}px ${cy}px`,
-        transition: 'transform 250ms linear',
-      }}
-    >
-      <line
-        x1={cx}
-        y1={cy - trackRadius - STROKE / 2 - 2}
-        x2={cx}
-        y2={cy - trackRadius + STROKE / 2 + 2}
-        stroke="white"
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-      <circle cx={cx} cy={cy - trackRadius} r={6} fill="white" stroke={color} strokeWidth={3} />
-    </g>
+    <line
+      x1={inner.x}
+      y1={inner.y}
+      x2={outer.x}
+      y2={outer.y}
+      stroke="white"
+      strokeWidth={2}
+      strokeLinecap="round"
+      pointerEvents="none"
+    />
   )
 }
 
