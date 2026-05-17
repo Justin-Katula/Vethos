@@ -49,4 +49,14 @@ describe('computeLongestStreak', () => {
     // 11 et 13 comptent, 12 non → pas de série de 3, max = 1
     expect(streak).toBe(1)
   })
+
+  it('dé-duplique plusieurs sessions le même jour', () => {
+    const streak = computeLongestStreak([
+      entry('2026-05-11T08:00:00.000Z'),
+      entry('2026-05-11T14:00:00.000Z'),
+      entry('2026-05-12T10:00:00.000Z'),
+    ])
+    // deux sessions le 11 + une le 12 → série de 2, pas 3
+    expect(streak).toBe(2)
+  })
 })
