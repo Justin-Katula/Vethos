@@ -64,10 +64,12 @@ export function createProcessControl(cfg: {
           },
         }
       }
+      // AppLocker (blocage fort) a échoué. Le process kill prend le relais, mais
+      // la couche n'est pas pleinement opérationnelle : on reste en 'error' pour
+      // que GET_LAYER_STATUS le reflète honnêtement (ne pas remettre 'ok').
       status = 'error'
       log.warn('[blocking] AppLocker indisponible', appLocker.error)
       const killer = startProcessKiller(forbidden)
-      status = 'ok'
       return {
         stop: () => {
           killer.stop()
