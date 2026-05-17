@@ -20,7 +20,16 @@ export function createStorage(baseDir: string) {
   return {
     async read<K extends StorageKey>(key: K): Promise<ValueFor<K> | null> {
       const filePath = fileFor(key)
-      const raw = await atomicRead<unknown>(filePath)
+      let raw: unknown | null
+      try {
+        raw = await atomicRead<unknown>(filePath)
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          await fs.copyFile(filePath, `${filePath}.bak`).catch(() => undefined)
+          return null
+        }
+        throw err
+      }
       if (raw === null) return null
 
       const schema = STORAGE_SCHEMAS[key]

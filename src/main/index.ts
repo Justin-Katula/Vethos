@@ -95,7 +95,9 @@ let mainWindow: BrowserWindow | null = null
 let quitAfterDebounceFlush = false
 
 app.whenReady().then(async () => {
-  await ensureElevatedAtStartup()
+  const shouldContinueBoot = await ensureElevatedAtStartup()
+  if (!shouldContinueBoot) return
+
   const recoveredFromCrash = existsSync(crashMarkerPath())
   writeCrashMarker()
 

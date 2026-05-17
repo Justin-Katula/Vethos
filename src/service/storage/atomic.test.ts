@@ -35,6 +35,17 @@ describe('atomic storage', () => {
     expect(result).toEqual({ v: 2 })
   })
 
+  it('handles concurrent writes without sharing a temp path', async () => {
+    const file = join(dir, 'data.json')
+    await Promise.all(
+      Array.from({ length: 20 }, (_, v) => atomicWrite(file, { v })),
+    )
+    const result = await atomicRead<{ v: number }>(file)
+    expect(typeof result?.v).toBe('number')
+    const entries = await fs.readdir(dir)
+    expect(entries.filter((e) => e.endsWith('.tmp'))).toHaveLength(0)
+  })
+
   it('does not leave .tmp files after successful write', async () => {
     const file = join(dir, 'data.json')
     await atomicWrite(file, { ok: true })

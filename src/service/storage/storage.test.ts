@@ -44,6 +44,15 @@ describe('storage with Zod validation', () => {
     expect(await fs.readFile(`${file}.bak`, 'utf8')).toBe('{"username": 123}')
   })
 
+  it('returns null and creates .bak when JSON is malformed', async () => {
+    const storage = createStorage(dir)
+    const file = join(dir, 'nexus_settings.json')
+    await fs.writeFile(file, '{"username": "obed"} trailing', 'utf8')
+    const result = await storage.read('settings')
+    expect(result).toBeNull()
+    expect(await fs.readFile(`${file}.bak`, 'utf8')).toBe('{"username": "obed"} trailing')
+  })
+
   it('rejects writes that fail Zod validation', async () => {
     const storage = createStorage(dir)
     // username dépasse 100 chars

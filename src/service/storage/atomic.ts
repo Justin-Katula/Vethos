@@ -1,17 +1,40 @@
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 
+let writeCounter = 0
+const writeQueues = new Map<string, Promise<void>>()
+
 /**
  * Écrit `data` en JSON dans `filePath` de façon atomique.
- * Stratégie : écrire dans `<filePath>.tmp` puis `rename` (atomique sur NTFS).
+ * Stratégie : écrire dans un fichier temporaire unique puis `rename`
+ * (atomique sur NTFS).
  * Si le process crash entre les deux, le fichier original reste intact.
  */
-export async function atomicWrite<T>(filePath: string, data: T): Promise<void> {
+async function writeAtomically<T>(filePath: string, data: T): Promise<void> {
   await fs.mkdir(dirname(filePath), { recursive: true })
-  const tmpPath = `${filePath}.tmp`
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.${writeCounter++}.tmp`
   const json = JSON.stringify(data, null, 2)
-  await fs.writeFile(tmpPath, json, 'utf8')
-  await fs.rename(tmpPath, filePath)
+  try {
+    await fs.writeFile(tmpPath, json, 'utf8')
+    await fs.rename(tmpPath, filePath)
+  } catch (err) {
+    await fs.rm(tmpPath, { force: true }).catch(() => undefined)
+    throw err
+  }
+}
+
+export function atomicWrite<T>(filePath: string, data: T): Promise<void> {
+  const previous = writeQueues.get(filePath) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(() => writeAtomically(filePath, data))
+  writeQueues.set(filePath, next)
+  next
+    .finally(() => {
+      if (writeQueues.get(filePath) === next) {
+        writeQueues.delete(filePath)
+      }
+    })
+    .catch(() => undefined)
+  return next
 }
 
 /**
