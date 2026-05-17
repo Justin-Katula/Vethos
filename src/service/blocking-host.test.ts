@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   createBlockingHost,
+  createBlockingHandlers,
   type BlockingHostDeps,
   type BlockingHostEvent,
 } from './blocking-host'
 import type { BlockingProfile, BlockingState } from '@shared/schemas'
+import net from 'node:net'
+import { createBridgeServer, type BridgeServer } from './bridge/server'
+import { encodeMessage, createMessageDecoder, type ServiceMessage } from '@shared/service-protocol'
 
 const PROFILE: BlockingProfile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -350,5 +354,110 @@ describe('createBlockingHost', () => {
     const status = await host.getLayerStatus()
     expect(status.hosts).toBe('error')
     expect(status.firewall).toBe('error')
+  })
+})
+
+describe('createBlockingHandlers (pont nommé)', () => {
+  let server: BridgeServer | null = null
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') })
+  })
+  afterEach(async () => {
+    await server?.close()
+    server = null
+    vi.useRealTimers()
+  })
+
+  const testPipe = (): string =>
+    `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+
+  function collect(socket: net.Socket): { next: () => Promise<ServiceMessage> } {
+    const decode = createMessageDecoder()
+    const queue: ServiceMessage[] = []
+    const waiters: Array<(m: ServiceMessage) => void> = []
+    socket.setEncoding('utf8')
+    socket.on('data', (chunk: string) => {
+      for (const m of decode(chunk)) {
+        const w = waiters.shift()
+        if (w) w(m)
+        else queue.push(m)
+      }
+    })
+    return {
+      next: () =>
+        new Promise<ServiceMessage>((resolve) => {
+          const m = queue.shift()
+          if (m) resolve(m)
+          else waiters.push(resolve)
+        }),
+    }
+  }
+
+  it("GET_STATE renvoie l'état du host", async () => {
+    const host = createBlockingHost(makeDeps())
+    const pipe = testPipe()
+    server = await createBridgeServer({ pipePath: pipe, handlers: createBlockingHandlers(host) })
+    const client = net.createConnection(pipe)
+    const inbox = collect(client)
+    client.write(encodeMessage({ kind: 'request', id: 'g1', type: 'GET_STATE' }))
+    const res = await inbox.next()
+    expect(res).toMatchObject({ kind: 'response', id: 'g1', ok: true })
+    client.destroy()
+  })
+
+  it('SAVE_PROFILE persiste le profil envoyé par le pont', async () => {
+    const host = createBlockingHost(makeDeps())
+    const pipe = testPipe()
+    server = await createBridgeServer({ pipePath: pipe, handlers: createBlockingHandlers(host) })
+    const client = net.createConnection(pipe)
+    const inbox = collect(client)
+    client.write(
+      encodeMessage({
+        kind: 'request',
+        id: 's1',
+        type: 'SAVE_PROFILE',
+        payload: {
+          name: 'Pont',
+          blockedSites: [],
+          blockedProcesses: [],
+          blockedNetworkApps: [],
+          unlockPolicy: { type: 'none' },
+        },
+      }),
+    )
+    const res = await inbox.next()
+    expect(res).toMatchObject({ kind: 'response', id: 's1', ok: true })
+    client.destroy()
+  })
+
+  it('diffuse SESSION_CHANGED après un START_SESSION sur le pont', async () => {
+    const host = createBlockingHost(makeDeps())
+    const pipe = testPipe()
+    server = await createBridgeServer({ pipePath: pipe, handlers: createBlockingHandlers(host) })
+    host.on((e) => server?.broadcast({ type: e.type, payload: e.payload }))
+    const client = net.createConnection(pipe)
+    const inbox = collect(client)
+    client.write(
+      encodeMessage({
+        kind: 'request',
+        id: 'st1',
+        type: 'START_SESSION',
+        payload: {
+          profileId: PROFILE.id,
+          durationMinutes: 60,
+          sessionRulesEnabled: false,
+          strictBlocking: true,
+        },
+      }),
+    )
+    // Deux trames attendues : la réponse START_SESSION et l'événement
+    // SESSION_CHANGED diffusé (l'ordre d'arrivée n'est pas garanti).
+    const messages = [await inbox.next(), await inbox.next()]
+    expect(messages).toContainEqual(
+      expect.objectContaining({ kind: 'event', type: 'SESSION_CHANGED' }),
+    )
+    client.destroy()
+    host.stop()
   })
 })

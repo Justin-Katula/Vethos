@@ -27,6 +27,8 @@ import { isSafeListed } from './blocking/processes/safe-list'
 import { parseHostsFile } from './blocking/hosts/parser'
 import { INACTIVE_LAYERS, type LayerStatus, type LayerStatusValue } from './blocking/session/types'
 import type { BlockingPersistence } from './blocking/session/persistence'
+import type { ServiceRequest } from '@shared/service-protocol'
+import type { RequestHandler } from './bridge/server'
 import log from './blocking/engine-log'
 
 // ── Types injectables ───────────────────────────────────────────────────────
@@ -281,5 +283,25 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
       drift.stop()
       clock.stop()
     },
+  }
+}
+
+/**
+ * Table de handlers du pont pour les commandes de blocage. À fusionner avec les
+ * handlers système (`PING`, `GET_SERVICE_INFO`) dans `index.ts`. Chaque handler
+ * dépaquète `req.payload` et délègue au host ; les erreurs remontent telles
+ * quelles (le bridge les transforme en réponse `ok: false`).
+ */
+export function createBlockingHandlers(host: BlockingHost): Record<string, RequestHandler> {
+  return {
+    GET_STATE: () => host.getState(),
+    SAVE_PROFILE: (req: ServiceRequest) => host.saveProfile(req.payload),
+    DELETE_PROFILE: (req: ServiceRequest) =>
+      host.deleteProfile((req.payload as { id: string }).id),
+    START_SESSION: (req: ServiceRequest) => host.startSession(req.payload as StartSessionArgs),
+    REQUEST_UNLOCK: () => host.requestUnlock(),
+    SUBMIT_JUSTIFICATION: (req: ServiceRequest) =>
+      host.submitJustification((req.payload as { text: string }).text),
+    GET_LAYER_STATUS: () => host.getLayerStatus(),
   }
 }
