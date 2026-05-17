@@ -6,9 +6,9 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build && electron-builder --win --dir && node scripts/build-simple-installer.mjs",
-    "build:unpack": "electron-vite build && electron-builder --win --dir",
-    "build:portable": "electron-vite build && electron-builder --win portable",
+    "build": "electron-vite build && npm run build:service && electron-builder --win --dir && node scripts/build-simple-installer.mjs",
+    "build:unpack": "electron-vite build && npm run build:service && electron-builder --win --dir",
+    "build:portable": "electron-vite build && npm run build:service && electron-builder --win portable",
     "build:service": "vite build --config electron.vite.service.config.ts",
     "dev:service": "node scripts/run-service-dev.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",

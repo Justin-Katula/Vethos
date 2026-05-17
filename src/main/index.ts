@@ -9,6 +9,7 @@ import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
+import { ensureServiceRunning } from './service-launcher'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -97,6 +98,12 @@ app.whenReady().then(async () => {
   await ensureElevatedAtStartup()
   const recoveredFromCrash = existsSync(crashMarkerPath())
   writeCrashMarker()
+
+  // P16 Lot 4b : lance le service de blocage (process détaché) s'il ne tourne
+  // pas déjà, après migration des données vers C:\ProgramData\Nexus. Placé
+  // après ensureElevatedAtStartup (la migration écrit dans ProgramData) et
+  // avant registerAllIpcHandlers (dont le relais se connectera au service).
+  await ensureServiceRunning()
 
   const storage = createStorage(app.getPath('userData'))
   await recalculateFreeTimeAtBoot(storage).catch((err) => {
