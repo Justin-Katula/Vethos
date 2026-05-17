@@ -1,4 +1,4 @@
-import { promises as fsp } from 'node:fs'
+import { promises as fsp, constants } from 'node:fs'
 import { join } from 'node:path'
 
 /**
@@ -36,6 +36,13 @@ export async function migrateBlockingData(fromDir: string, toDir: string): Promi
     if (await fileExists(dest)) continue
     const src = join(fromDir, name)
     if (!(await fileExists(src))) continue
-    await fsp.copyFile(src, dest)
+    try {
+      // COPYFILE_EXCL : la copie échoue (EEXIST) si dest est apparu entre le
+      // check fileExists et ici — course avec un service déjà en cours. On ne
+      // clobbe alors jamais : EEXIST signifie que la cible existe, résultat voulu.
+      await fsp.copyFile(src, dest, constants.COPYFILE_EXCL)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    }
   }
 }
