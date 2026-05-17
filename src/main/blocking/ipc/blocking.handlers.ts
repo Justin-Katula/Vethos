@@ -79,6 +79,9 @@ export async function registerBlockingHandlers(
     entry: BlockingHistoryEntry
     session: ActiveSession
   }): Promise<void> {
+    // Défensif : SESSION_CHANGED(null) a normalement déjà remis sessionActive
+    // à false, mais on ne dépend pas de l'ordre d'arrivée des événements.
+    sessionActive = false
     const { entry, session } = payload
     if (!entry.completedNormally) return
     const durationMin = Math.max(
@@ -88,6 +91,8 @@ export async function registerBlockingHandlers(
       ),
     )
     notifySessionEnd(session.profileSnapshot.name, durationMin, getMainWindow)
+    // Cycle lecture-écriture de stats non sérialisé entre événements : en
+    // pratique les sessions se terminent une à une, donc sans course.
     const { state } = (await client.request('GET_STATE')) as {
       state: { history: BlockingHistoryEntry[] }
     }
@@ -95,7 +100,10 @@ export async function registerBlockingHandlers(
     await storage.write('stats', {
       totalFocusMinutes: (stats?.totalFocusMinutes ?? 0) + durationMin,
       totalSessions: (stats?.totalSessions ?? 0) + 1,
-      longestStreak: Math.max(stats?.longestStreak ?? 0, computeLongestStreak(state.history)),
+      longestStreak: Math.max(
+        stats?.longestStreak ?? 0,
+        computeLongestStreak(state.history ?? []),
+      ),
       lastUpdated: new Date().toISOString(),
     })
   }
@@ -104,6 +112,7 @@ export async function registerBlockingHandlers(
     const win = getMainWindow()
     switch (event.type) {
       case 'SESSION_CHANGED':
+        // Le service émet SESSION_CHANGED(null) avant SESSION_ENDED en fin de session.
         sessionActive = event.payload !== null
         win?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, event.payload)
         return
@@ -129,6 +138,7 @@ export async function registerBlockingHandlers(
       }
       default:
         log.warn('[blocking-relay] événement service inconnu', event.type)
+        return
     }
   }
 
