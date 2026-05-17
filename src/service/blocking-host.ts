@@ -85,6 +85,8 @@ export type BlockingHost = {
   getLayerStatus: () => Promise<LayerStatus>
   /** Ré-applique une session active trouvée sur disque, ou nettoie les orphelins. */
   hydrate: () => Promise<void>
+  /** Abonne un écouteur. Pas de désabonnement : le service enregistre un seul
+   *  écouteur au démarrage (cf. index.ts). */
   on: (cb: (e: BlockingHostEvent) => void) => void
   /** Arrête les timers de fond (intervalle de règles, drift, clock monitor). */
   stop: () => void
@@ -106,7 +108,9 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
     for (const l of listeners) l(event)
   }
 
-  // Réglages de la session courante, reçus dans le payload de START_SESSION.
+  // Réglage de la session courante, reçu dans le payload de START_SESSION. La
+  // valeur initiale n'a pas d'effet : checkSessionRules sort tôt tant qu'aucune
+  // session n'est active.
   let sessionRulesEnabled = true
   // Empêche d'émettre BREAK_REQUIRED en boucle pour la même session.
   let liveRuleNotifiedFor: string | null = null
@@ -197,14 +201,16 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
     },
 
     async startSession(args) {
+      // Garde d'élévation en premier : aucune mutation d'état avant de savoir
+      // si la session peut démarrer.
+      if (!elevated) {
+        throw new Error('Blocage non opérationnel — droits administrateur requis')
+      }
       processes.setStrictBlocking(args.strictBlocking)
       sessionRulesEnabled = args.sessionRulesEnabled
       const state = await persistence.readState()
       const penaltyMinutes = state.nextSessionPenaltyMinutes ?? 0
       const durationMinutes = Math.min(24 * 60, args.durationMinutes + penaltyMinutes)
-      if (!elevated) {
-        throw new Error('Blocage non opérationnel — droits administrateur requis')
-      }
       if (args.sessionRulesEnabled) {
         // Pas de freeMinutesByDate : le service re-valide avec son propre
         // historique (spec §4.3) — il ne voit pas les données d'app-usage de l'UI.
@@ -238,6 +244,7 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
       try {
         const raw = await layerProbe.readHostsFile()
         const parsed = parseHostsFile(raw)
+        // 8 entrées attendues par site : 4 préfixes de sous-domaine × 2 familles d'IP.
         const expectedEntryCount = active.profileSnapshot.blockedSites.length * 8
         if (
           expectedEntryCount > 0 &&

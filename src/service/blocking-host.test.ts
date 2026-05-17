@@ -301,4 +301,54 @@ describe('createBlockingHost', () => {
     await vi.advanceTimersByTimeAsync(120_000)
     expect(vi.mocked(deps.persistence.readState).mock.calls.length).toBe(callsBefore)
   })
+
+  it("relaie l'événement SESSION_ENDED quand une session se termine", async () => {
+    const host = createBlockingHost(makeDeps())
+    const events: BlockingHostEvent[] = []
+    host.on((e) => events.push(e))
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    await host.requestUnlock() // profil unlockPolicy 'none' → termine la session
+    const ended = events.find((e) => e.type === 'SESSION_ENDED')
+    expect(ended).toBeDefined()
+    expect(ended?.payload).toMatchObject({
+      entry: { profileId: PROFILE.id },
+      session: { profileId: PROFILE.id },
+    })
+  })
+
+  it('hydrate délègue à hydrateFromDisk et nettoie les orphelins', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    await host.hydrate()
+    expect(deps.firewall.removeAll).toHaveBeenCalled()
+    expect(deps.hosts.clear).toHaveBeenCalled()
+  })
+
+  it('hydrate avale les erreurs de hydrateFromDisk', async () => {
+    const deps = makeDeps()
+    deps.persistence.readActive = vi.fn().mockRejectedValue(new Error('disk fail'))
+    const host = createBlockingHost(deps)
+    await expect(host.hydrate()).resolves.toBeUndefined()
+  })
+
+  it('getLayerStatus renvoie error quand les sondes OS échouent', async () => {
+    const deps = makeDeps()
+    deps.layerProbe.readHostsFile = vi.fn().mockRejectedValue(new Error('hosts verrouillé'))
+    deps.layerProbe.listFirewallRules = vi.fn().mockRejectedValue(new Error('netsh KO'))
+    const host = createBlockingHost(deps)
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    const status = await host.getLayerStatus()
+    expect(status.hosts).toBe('error')
+    expect(status.firewall).toBe('error')
+  })
 })
