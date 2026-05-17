@@ -404,6 +404,7 @@ describe('createBlockingHandlers (pont nommé)', () => {
     const res = await inbox.next()
     expect(res).toMatchObject({ kind: 'response', id: 'g1', ok: true })
     client.destroy()
+    host.stop()
   })
 
   it('SAVE_PROFILE persiste le profil envoyé par le pont', async () => {
@@ -429,6 +430,7 @@ describe('createBlockingHandlers (pont nommé)', () => {
     const res = await inbox.next()
     expect(res).toMatchObject({ kind: 'response', id: 's1', ok: true })
     client.destroy()
+    host.stop()
   })
 
   it('diffuse SESSION_CHANGED après un START_SESSION sur le pont', async () => {
