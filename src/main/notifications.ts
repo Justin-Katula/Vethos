@@ -138,20 +138,6 @@ export function notifyCrashRecovered(getMainWindow: () => BrowserWindow | null):
   )
 }
 
-export function notifyServiceNotStarted(
-  serviceName: string,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Service non démarré',
-      body: `${serviceName} n'a pas pu être activé. Le blocage continue avec les couches disponibles.`,
-      payload: { type: 'service-not-started', serviceName },
-    },
-    getMainWindow,
-  )
-}
-
 export function notifyUpdateReady(
   version: string | undefined,
   getMainWindow: () => BrowserWindow | null,
