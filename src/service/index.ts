@@ -35,13 +35,16 @@ async function main(): Promise<void> {
     server.broadcast({ type: event.type, payload: event.payload })
   })
 
+  log.info('[service] bridge listening')
   await host.hydrate()
-  log.info('[service] bridge listening, blocking host ready')
 
   const shutdown = (signal: string): void => {
     log.info('[service] shutting down', { signal })
+    // host.stop() arrête les timers de fond ; les couches de blocage OS (hosts,
+    // firewall) restent en place — au prochain démarrage, hydrate() les ré-applique
+    // ou les nettoie selon l'état persisté.
     host.stop()
-    void server.close().then(() => process.exit(0))
+    void server.close().finally(() => process.exit(0))
   }
   process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
