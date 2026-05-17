@@ -1,314 +1,154 @@
 import { ipcMain, type BrowserWindow } from 'electron'
-import { promises as fsp } from 'node:fs'
-import { randomUUID } from 'node:crypto'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import { BlockingProfileSchema } from '@shared/schemas'
-import type { Storage } from '@main/storage'
-import { createSessionManager } from '../session/manager'
-import { createDriftDetector } from '../session/drift-detector'
-import { createFirewallTracker } from '../firewall/rule-tracker'
-import { listRuleNames } from '../firewall/netsh'
-import { applyNexusBlock, clearNexusBlock } from '../hosts/writer'
-import { HOSTS_PATH } from '../hosts/writer'
-import { parseHostsFile } from '../hosts/parser'
-import { flushDns } from '../hosts/flush-dns'
-import { createBlockingPersistence } from '../session/persistence'
+import type { ServiceEvent } from '@shared/service-protocol'
+import type { ActiveSession, BlockingHistoryEntry } from '@shared/schemas'
+import type { Storage } from '@service/storage'
+import { createServiceClient } from '../../service-client/client'
 import { isElevated, requestElevatedRelaunch } from '../elevation'
-import { isSafeListed } from '../processes/safe-list'
-import { startProcessKiller } from '../processes/killer'
-import { getWindowsEdition, pickBlockingStrategy, startAppLockerBlocker } from '../applocker/policy'
-import { evaluateSessionRules } from '../session/rules'
+import { computeLongestStreak } from '../streak'
 import {
   notifyBreakRequired,
   notifyClockTamper,
-  notifyServiceNotStarted,
   notifySessionEnd,
   notifySessionStart,
 } from '../../notifications'
-import { startClockMonitor } from '../session/clock-monitor'
 import log from '@main/logging/setup'
-import { getPreviousFreeMinutesByDate } from '@main/free-time/recalculate'
 
+/**
+ * Relais de blocage : le blocage tourne dans le service Windows (cf. Lot 3).
+ * Le `main` ne fait plus aucun blocage — il relaie les appels IPC `BLOCKING_*`
+ * du renderer vers le service via le named pipe, et re-diffuse au renderer les
+ * événements du service. Réf. spec §4.1, §6.
+ */
 export async function registerBlockingHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
 ): Promise<{ isSessionActive: () => boolean }> {
-  const persistence = createBlockingPersistence(storage)
-  const firewall = createFirewallTracker()
-  const elevatedAtBoot = await isElevated()
-  const windowsEdition = getWindowsEdition()
-  const settings = await storage.read('settings')
-  let currentStrictBlocking = settings?.strictBlocking !== false
-  let processLayerStatus: 'inactive' | 'ok' | 'error' = 'inactive'
-  let liveRuleNotifiedFor: string | null = null
-  const manager = createSessionManager({
-    hosts: { apply: applyNexusBlock, clear: clearNexusBlock, flushDns },
-    processes: {
-      start: (forbidden) => {
-        if (forbidden.length === 0) {
-          processLayerStatus = 'inactive'
-          return { stop: () => undefined }
-        }
+  const client = createServiceClient()
+  let sessionActive = false
 
-        const strategy = pickBlockingStrategy({
-          elevated: elevatedAtBoot,
-          strictBlocking: currentStrictBlocking,
-          edition: windowsEdition,
-        })
-        if (strategy.processLayer !== 'applocker') {
-          processLayerStatus = 'ok'
-          log.warn('[blocking] AppLocker unavailable, falling back to process kill', strategy.reason)
-          const killer = startProcessKiller(forbidden)
-          return {
-            stop: () => {
-              killer.stop()
-              processLayerStatus = 'inactive'
-            },
-          }
-        }
+  // ── Commandes renderer → service ─────────────────────────────────────────
 
-        const appLocker = startAppLockerBlocker(forbidden, strategy.appLockerMode)
-        if (appLocker.applied) {
-          processLayerStatus = 'ok'
-          return {
-            stop: () => {
-              appLocker.stop()
-              processLayerStatus = 'inactive'
-            },
-          }
-        }
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_INITIAL_STATE, () => client.request('GET_STATE'))
 
-        processLayerStatus = 'error'
-        log.warn('[blocking] AppLocker unavailable', appLocker.error)
-        notifyServiceNotStarted('AppLocker', getMainWindow)
-        const killer = startProcessKiller(forbidden)
-        if (forbidden.length === 0) return { stop: () => undefined }
-        processLayerStatus = 'ok'
-        return {
-          stop: () => {
-            killer.stop()
-            processLayerStatus = 'inactive'
-          },
-        }
-      },
-    },
-    firewall: {
-      applyAll: firewall.applyAll,
-      removeAll: firewall.removeAll,
-      removeOrphansExcept: firewall.removeOrphansExcept,
-      applied: firewall.applied,
-    },
-    persistence,
-  })
-
-  manager.on('sessionChanged', (s) => {
-    if (!s) liveRuleNotifiedFor = null
-    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, s)
-  })
-  manager.on('sessionEnded', async (entry, session) => {
-    const durationMin = Math.max(
-      0,
-      Math.round((new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime()) / 60_000),
-    )
-    if (entry.completedNormally) {
-      notifySessionEnd(session.profileSnapshot.name, durationMin, getMainWindow)
-      const stats = await storage.read('stats')
-      await storage.write('stats', {
-        totalFocusMinutes: (stats?.totalFocusMinutes ?? 0) + durationMin,
-        totalSessions: (stats?.totalSessions ?? 0) + 1,
-        longestStreak: Math.max(stats?.longestStreak ?? 0, await computeLongestStreak(persistence)),
-        lastUpdated: new Date().toISOString(),
-      })
-    }
-  })
-
-  const drift = createDriftDetector()
-  drift.on((e) => {
-    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, e)
-  })
-  drift.start(
-    () => manager.getActive(),
-    async (s) => {
-      const names = await firewall.applyAll(s.id, s.profileSnapshot.blockedNetworkApps)
-      await firewall.removeOrphansExcept(names).catch(() => {})
-      s.appliedFirewallRules = names
-      await persistence.writeActive(s)
-    },
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_SAVE_PROFILE, (_e, draft: unknown) =>
+    client.request('SAVE_PROFILE', draft),
   )
 
-  startClockMonitor((event) => {
-    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, {
-      driftMs: event.driftMs,
-    })
-    notifyClockTamper(event.driftMs, getMainWindow)
-  })
-
-  setInterval(async () => {
-    const active = manager.getActive()
-    if (!active || liveRuleNotifiedFor === active.id) return
-
-    const latestSettings = await storage.read('settings')
-    if (latestSettings?.sessionRulesEnabled === false) return
-
-    const state = await persistence.readState()
-    const elapsedMinutes = Math.max(
-      0,
-      Math.ceil((Date.now() - new Date(active.startedAt).getTime()) / 60_000),
-    )
-    const decision = evaluateSessionRules({
-      history: state.history,
-      profileId: active.profileId,
-      requestedMinutes: elapsedMinutes,
-    })
-    if (decision.ok) return
-
-    liveRuleNotifiedFor = active.id
-    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, {
-      reason: decision.reason,
-      restMinutes: decision.restMinutes,
-    })
-    notifyBreakRequired(decision.restMinutes, getMainWindow)
-  }, 60_000)
-
-  await manager.hydrateFromDisk().catch((err) => {
-    log.error('[blocking] hydrate failed', err)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_INITIAL_STATE, async () => {
-    const state = await persistence.readState()
-    return { state, active: manager.getActive() }
-  })
-
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_SAVE_PROFILE, async (_e, draft: unknown) => {
-    const merged = {
-      ...(draft as object),
-      id: (draft as { id?: string }).id ?? randomUUID(),
-      createdAt: (draft as { createdAt?: string }).createdAt ?? new Date().toISOString(),
-    }
-    const profile = BlockingProfileSchema.parse(merged)
-    for (const exeName of profile.blockedProcesses) {
-      if (isSafeListed(exeName)) {
-        throw new Error(`System process refused: ${exeName}`)
-      }
-    }
-    const state = await persistence.readState()
-    const idx = state.profiles.findIndex((p) => p.id === profile.id)
-    if (idx >= 0) state.profiles[idx] = profile
-    else state.profiles.push(profile)
-    await persistence.writeState(state)
-    return profile
-  })
-
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_DELETE_PROFILE, async (_e, id: string) => {
-    const state = await persistence.readState()
-    state.profiles = state.profiles.filter((p) => p.id !== id)
-    await persistence.writeState(state)
-  })
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_DELETE_PROFILE, (_e, id: string) =>
+    client.request('DELETE_PROFILE', { id }),
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.BLOCKING_START_SESSION,
     async (_e, args: { profileId: string; durationMinutes: number }) => {
-      const latestSettings = await storage.read('settings')
-      currentStrictBlocking = latestSettings?.strictBlocking !== false
-      const state = await persistence.readState()
-      const penaltyMinutes = state.nextSessionPenaltyMinutes ?? 0
-      const durationMinutes = Math.min(24 * 60, args.durationMinutes + penaltyMinutes)
-      if (!elevatedAtBoot) {
-        throw new Error('Blocage non opérationnel — droits administrateur requis')
-      }
-      if (latestSettings?.sessionRulesEnabled !== false) {
-        const freeMinutesByDate = await getPreviousFreeMinutesByDate(storage).catch((err) => {
-          log.warn('[blocking] free-time lookup failed for session rules', err)
-          return undefined
-        })
-        const decision = evaluateSessionRules({
-          history: state.history,
-          profileId: args.profileId,
-          requestedMinutes: durationMinutes,
-          freeMinutesByDate,
-        })
-        if (!decision.ok) {
-          notifyBreakRequired(decision.restMinutes, getMainWindow)
-          throw new Error(decision.reason)
-        }
-      }
-      const session = await manager.startSession({ ...args, durationMinutes })
-      if (penaltyMinutes > 0) {
-        const latestState = await persistence.readState()
-        await persistence.writeState({ ...latestState, nextSessionPenaltyMinutes: 0 })
-      }
-      notifySessionStart(session.profileSnapshot.name, durationMinutes, getMainWindow)
+      // strictBlocking / sessionRulesEnabled vivent dans settings (côté UI) ;
+      // le service en a besoin → on enrichit le payload (spec §4.3).
+      const settings = await storage.read('settings')
+      const session = (await client.request('START_SESSION', {
+        profileId: args.profileId,
+        durationMinutes: args.durationMinutes,
+        sessionRulesEnabled: settings?.sessionRulesEnabled !== false,
+        strictBlocking: settings?.strictBlocking !== false,
+      })) as ActiveSession
+      notifySessionStart(
+        session.profileSnapshot.name,
+        session.durationMinutes ?? args.durationMinutes,
+        getMainWindow,
+      )
       return session
     },
   )
 
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_UNLOCK, async () => manager.requestUnlock())
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_UNLOCK, () => client.request('REQUEST_UNLOCK'))
 
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_SUBMIT_JUSTIFICATION, async (_e, text: string) =>
-    manager.submitJustification(text),
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_SUBMIT_JUSTIFICATION, (_e, text: string) =>
+    client.request('SUBMIT_JUSTIFICATION', { text }),
   )
 
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS, async () => {
-    const active = manager.getActive()
-    if (!active) return { hosts: 'inactive', processes: 'inactive', firewall: 'inactive' }
-    let hosts: 'ok' | 'drifted' | 'error' = 'ok'
-    let firewallStatus: 'ok' | 'drifted' | 'error' = 'ok'
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS, () => client.request('GET_LAYER_STATUS'))
 
-    try {
-      const rawHosts = await fsp.readFile(HOSTS_PATH, 'utf8')
-      const parsed = parseHostsFile(rawHosts)
-      const expectedEntryCount = active.profileSnapshot.blockedSites.length * 8
-      if (
-        expectedEntryCount > 0 &&
-        (!parsed.nexusBlock || parsed.nexusBlock.entries.length !== expectedEntryCount)
-      ) {
-        hosts = 'drifted'
-      }
-    } catch {
-      hosts = 'error'
+  // Élévation : concerne l'UI elle-même (encore élevée en Phase 2), pas le
+  // service — pas d'équivalent protocole, traité localement.
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, () => isElevated())
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION, () => requestElevatedRelaunch())
+
+  // ── Événements service → renderer ────────────────────────────────────────
+
+  async function handleSessionEnded(payload: {
+    entry: BlockingHistoryEntry
+    session: ActiveSession
+  }): Promise<void> {
+    // Défensif : SESSION_CHANGED(null) a normalement déjà remis sessionActive
+    // à false, mais on ne dépend pas de l'ordre d'arrivée des événements.
+    sessionActive = false
+    const { entry, session } = payload
+    if (!entry.completedNormally) return
+    const durationMin = Math.max(
+      0,
+      Math.round(
+        (new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime()) / 60_000,
+      ),
+    )
+    notifySessionEnd(session.profileSnapshot.name, durationMin, getMainWindow)
+    // Cycle lecture-écriture de stats non sérialisé entre événements : en
+    // pratique les sessions se terminent une à une, donc sans course.
+    const { state } = (await client.request('GET_STATE')) as {
+      state: { history: BlockingHistoryEntry[] }
     }
+    const stats = await storage.read('stats')
+    await storage.write('stats', {
+      totalFocusMinutes: (stats?.totalFocusMinutes ?? 0) + durationMin,
+      totalSessions: (stats?.totalSessions ?? 0) + 1,
+      longestStreak: Math.max(
+        stats?.longestStreak ?? 0,
+        computeLongestStreak(state.history ?? []),
+      ),
+      lastUpdated: new Date().toISOString(),
+    })
+  }
 
-    try {
-      const appliedNames = active.appliedFirewallRules
-      const existing = new Set(await listRuleNames())
-      if (appliedNames.some((name) => !existing.has(name))) {
-        firewallStatus = 'drifted'
+  async function handleServiceEvent(event: ServiceEvent): Promise<void> {
+    const win = getMainWindow()
+    switch (event.type) {
+      case 'SESSION_CHANGED':
+        // Le service émet SESSION_CHANGED(null) avant SESSION_ENDED en fin de session.
+        sessionActive = event.payload !== null
+        win?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, event.payload)
+        return
+      case 'SESSION_ENDED':
+        await handleSessionEnded(
+          event.payload as { entry: BlockingHistoryEntry; session: ActiveSession },
+        )
+        return
+      case 'LAYER_DRIFT':
+        win?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_LAYER_DRIFT, event.payload)
+        return
+      case 'CLOCK_TAMPER': {
+        const payload = event.payload as { driftMs: number }
+        win?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, payload)
+        notifyClockTamper(payload.driftMs, getMainWindow)
+        return
       }
-    } catch {
-      firewallStatus = 'error'
+      case 'BREAK_REQUIRED': {
+        const payload = event.payload as { reason: string; restMinutes: number }
+        win?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, payload)
+        notifyBreakRequired(payload.restMinutes, getMainWindow)
+        return
+      }
+      default:
+        log.warn('[blocking-relay] événement service inconnu', event.type)
+        return
     }
+  }
 
-    return { hosts, processes: processLayerStatus, firewall: firewallStatus }
+  // `.catch` obligatoire : `onEvent` est fire-and-forget ; une rejection non
+  // capturée déclencherait le `unhandledRejection` global du main (app.exit).
+  client.onEvent((event) => {
+    handleServiceEvent(event).catch((err) => {
+      log.error('[blocking-relay] échec du traitement d un événement service', err)
+    })
   })
 
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, async () => elevatedAtBoot)
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION, async () =>
-    requestElevatedRelaunch(),
-  )
-
-  return { isSessionActive: () => manager.getActive() !== null }
-}
-
-async function computeLongestStreak(persistence: ReturnType<typeof createBlockingPersistence>): Promise<number> {
-  const state = await persistence.readState()
-  const days = [
-    ...new Set(
-      state.history
-        .filter((entry) => entry.completedNormally)
-        .map((entry) => {
-          const date = new Date(entry.endedAt)
-          return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-        }),
-    ),
-  ].sort((a, b) => a - b)
-
-  let longest = 0
-  let current = 0
-  let prev: number | null = null
-  for (const day of days) {
-    current = prev !== null && day - prev === 86_400_000 ? current + 1 : 1
-    longest = Math.max(longest, current)
-    prev = day
-  }
-  return longest
+  return { isSessionActive: () => sessionActive }
 }

@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { StorageKeySchema, type StorageKey } from '@shared/schemas'
-import type { Storage } from '@main/storage'
+import type { Storage } from '@service/storage'
 import log from '@main/logging/setup'
 
 export function registerStorageHandlers(storage: Storage): void {

@@ -1,5 +1,5 @@
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
-import type { Storage } from '@main/storage'
+import type { Storage } from '@service/storage'
 
 type FreeTimeSlot = {
   startMinute: number

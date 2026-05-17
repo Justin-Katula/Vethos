@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks'
-import log from '@main/logging/setup'
+import log from '../engine-log'
 
 export type ClockTamperEvent = {
   driftMs: number

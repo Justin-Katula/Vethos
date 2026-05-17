@@ -1,6 +1,6 @@
 import { promises as fsp } from 'node:fs'
 import * as path from 'node:path'
-import { app } from 'electron'
+import { blockingDataDir } from '../blocking-paths'
 import { SENTINEL_BEGIN, SENTINEL_END } from './sentinels'
 import { expandDomain } from './subdomains'
 import { parseHostsFile } from './parser'
@@ -49,7 +49,7 @@ export async function clearNexusBlock(): Promise<void> {
 }
 
 async function ensureBackup(): Promise<void> {
-  const backupPath = path.join(app.getPath('userData'), 'hosts.nexus.backup')
+  const backupPath = path.join(blockingDataDir(), 'hosts.nexus.backup')
   try {
     await fsp.access(backupPath)
     return
@@ -68,7 +68,7 @@ function ensureTrailingNewline(s: string): string {
 }
 
 async function atomicWriteHosts(content: string): Promise<void> {
-  const stagingPath = path.join(app.getPath('userData'), 'hosts.nexus.staging')
+  const stagingPath = path.join(blockingDataDir(), 'hosts.nexus.staging')
   await fsp.writeFile(stagingPath, content, 'utf8')
   await fsp.copyFile(stagingPath, HOSTS_PATH)
   await fsp.unlink(stagingPath).catch(() => {})

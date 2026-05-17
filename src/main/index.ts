@@ -2,14 +2,14 @@ import log, { setupLogging } from './logging/setup'
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
-import { createStorage } from './storage'
+import { createStorage } from '@service/storage'
 import { registerAllIpcHandlers } from './ipc'
 import { ensureElevatedAtStartup } from './blocking/elevation'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
-import { createServiceClient } from './service-client/client'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
+import { ensureServiceRunning } from './service-launcher'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -99,6 +99,12 @@ app.whenReady().then(async () => {
   const recoveredFromCrash = existsSync(crashMarkerPath())
   writeCrashMarker()
 
+  // P16 Lot 4b : lance le service de blocage (process détaché) s'il ne tourne
+  // pas déjà, après migration des données vers C:\ProgramData\Nexus. Placé
+  // après ensureElevatedAtStartup (la migration écrit dans ProgramData) et
+  // avant registerAllIpcHandlers (dont le relais se connectera au service).
+  await ensureServiceRunning()
+
   const storage = createStorage(app.getPath('userData'))
   await recalculateFreeTimeAtBoot(storage).catch((err) => {
     log.warn('boot free-time recalculation failed', err)
@@ -112,16 +118,6 @@ app.whenReady().then(async () => {
 
   if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
   startUpdater(() => mainWindow, runtime.isSessionActive)
-
-  // Phase 1 P16 : on vérifie seulement que le pont service répond.
-  // Le blocage reste dans le main jusqu'à la Phase 2.
-  const serviceClient = createServiceClient()
-  setTimeout(() => {
-    serviceClient
-      .request('GET_SERVICE_INFO')
-      .then((info) => log.info('[main] service joignable', info))
-      .catch((err) => log.warn('[main] service injoignable', err.message))
-  }, 1500)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
