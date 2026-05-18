@@ -9,7 +9,6 @@ import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
-import { ensureServiceRunning } from './service-launcher'
 import { installService, uninstallService } from './service-install'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
@@ -118,96 +117,93 @@ let mainWindow: BrowserWindow | null = null
 let quitAfterDebounceFlush = false
 
 function startNexusApp(): void {
-app.whenReady().then(async () => {
-  const shouldContinueBoot = await ensureElevatedAtStartup()
-  if (!shouldContinueBoot) return
+  app
+    .whenReady()
+    .then(async () => {
+      const shouldContinueBoot = await ensureElevatedAtStartup()
+      if (!shouldContinueBoot) return
 
-  const recoveredFromCrash = existsSync(crashMarkerPath())
-  writeCrashMarker()
+      const recoveredFromCrash = existsSync(crashMarkerPath())
+      writeCrashMarker()
 
-  // P16 Lot 4b : lance le service de blocage (process détaché) s'il ne tourne
-  // pas déjà, après migration des données vers C:\ProgramData\Nexus. Placé
-  // après ensureElevatedAtStartup (la migration écrit dans ProgramData) et
-  // avant registerAllIpcHandlers (dont le relais se connectera au service).
-  await ensureServiceRunning()
+      const storage = createStorage(app.getPath('userData'))
+      await recalculateFreeTimeAtBoot(storage).catch((err) => {
+        log.warn('boot free-time recalculation failed', err)
+      })
+      const runtime = await registerAllIpcHandlers(storage, () => mainWindow)
 
-  const storage = createStorage(app.getPath('userData'))
-  await recalculateFreeTimeAtBoot(storage).catch((err) => {
-    log.warn('boot free-time recalculation failed', err)
-  })
-  const runtime = await registerAllIpcHandlers(storage, () => mainWindow)
-
-  mainWindow = createMainWindow()
-  mainWindow.on('closed', () => {
-    mainWindow = null
-  })
-
-  if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
-  startUpdater(() => mainWindow, runtime.isSessionActive)
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow()
       mainWindow.on('closed', () => {
         mainWindow = null
       })
-    }
+
+      if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
+      startUpdater(() => mainWindow, runtime.isSessionActive)
+
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          mainWindow = createMainWindow()
+          mainWindow.on('closed', () => {
+            mainWindow = null
+          })
+        }
+      })
+    })
+    .catch((err) => {
+      log.error('app boot failed', err)
+      app.quit()
+    })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
   })
-}).catch((err) => {
-  log.error('app boot failed', err)
-  app.quit()
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  const gotLock = app.requestSingleInstanceLock()
+  if (!gotLock) {
+    app.quit()
+  } else {
+    app.on('second-instance', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        focusWindow(mainWindow)
+      }
+    })
+  }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
-  app.quit()
-} else {
-  app.on('second-instance', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      focusWindow(mainWindow)
+  app.on('before-quit', (event) => {
+    if (quitAfterDebounceFlush) {
+      clearCrashMarker()
+      return
     }
+    const win = mainWindow
+    if (!win || win.isDestroyed()) {
+      clearCrashMarker()
+      return
+    }
+
+    event.preventDefault()
+    win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
+    setTimeout(() => {
+      quitAfterDebounceFlush = true
+      clearCrashMarker()
+      app.quit()
+    }, 650)
   })
-}
 
-app.on('before-quit', (event) => {
-  if (quitAfterDebounceFlush) {
-    clearCrashMarker()
-    return
-  }
-  const win = mainWindow
-  if (!win || win.isDestroyed()) {
-    clearCrashMarker()
-    return
-  }
+  process.on('uncaughtException', (err) => {
+    handleFatalProcessError('uncaught exception', err)
+  })
 
-  event.preventDefault()
-  win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
-  setTimeout(() => {
-    quitAfterDebounceFlush = true
+  process.on('unhandledRejection', (err) => {
+    handleFatalProcessError('unhandled rejection', err)
+  })
+
+  process.on('SIGINT', () => {
     clearCrashMarker()
     app.quit()
-  }, 650)
-})
+  })
 
-process.on('uncaughtException', (err) => {
-  handleFatalProcessError('uncaught exception', err)
-})
-
-process.on('unhandledRejection', (err) => {
-  handleFatalProcessError('unhandled rejection', err)
-})
-
-process.on('SIGINT', () => {
-  clearCrashMarker()
-  app.quit()
-})
-
-process.on('SIGTERM', () => {
-  clearCrashMarker()
-  app.quit()
-})
+  process.on('SIGTERM', () => {
+    clearCrashMarker()
+    app.quit()
+  })
 }

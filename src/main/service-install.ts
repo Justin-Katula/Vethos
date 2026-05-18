@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { Service } from 'node-windows'
+import { serviceDataDir } from '@service/data-dir'
+import { migrateBlockingData } from './blocking/migrate-blocking-data'
 import log from './logging/setup'
 
 /** Nom du service Windows installé pour porter le blocage Nexus. */
@@ -13,6 +15,7 @@ const execFile = promisify(execFileCallback)
 const WRAPPER_ID = SERVICE_NAME.replace(/[^\w]/gi, '').toLowerCase()
 const WRAPPER_EXE = `${WRAPPER_ID}.exe`
 const WAIT_FOR_DAEMON_MS = 10_000
+const SERVICE_STATUS_RUNNING = 4
 
 /**
  * Chemin du bundle du service (`out/service/index.js`). En production le bundle
@@ -82,12 +85,20 @@ async function normalizeServiceXml(): Promise<void> {
   }
 }
 
-async function serviceState(): Promise<string | null> {
+async function serviceState(): Promise<number | null> {
   try {
-    const { stdout } = await execFile('sc.exe', ['query', SERVICE_NAME], {
-      windowsHide: true,
-    })
-    return stdout.match(/STATE\s+:\s+\d+\s+(\w+)/)?.[1] ?? 'UNKNOWN'
+    const { stdout } = await execFile(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `$service = Get-Service -Name '${SERVICE_NAME}' -ErrorAction SilentlyContinue; if ($null -eq $service) { exit 2 }; [int]$service.Status`,
+      ],
+      { windowsHide: true },
+    )
+    return Number(stdout.trim())
   } catch {
     return null
   }
@@ -107,9 +118,9 @@ async function ensureServiceInstalledAndStarted(): Promise<void> {
   }
 
   const state = await serviceState()
-  if (state !== 'RUNNING') {
+  if (state !== SERVICE_STATUS_RUNNING) {
     await runDaemon('start').catch(async (err) => {
-      if ((await serviceState()) !== 'RUNNING') throw err
+      if ((await serviceState()) !== SERVICE_STATUS_RUNNING) throw err
     })
   }
 }
@@ -119,7 +130,9 @@ async function ensureServiceInstalledAndStarted(): Promise<void> {
  * déjà installé, résout sans erreur. À appeler depuis une routine élevée
  * (l'install d'un service Windows exige les droits admin).
  */
-export function installService(): Promise<void> {
+export async function installService(): Promise<void> {
+  await migrateBlockingData(app.getPath('userData'), serviceDataDir())
+
   return new Promise<void>((resolve, reject) => {
     const svc = buildService()
     let settled = false
