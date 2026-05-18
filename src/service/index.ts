@@ -2,6 +2,7 @@ import { createBridgeServer, type BridgeServer } from './bridge/server'
 import type { ServiceInfo } from '@shared/service-protocol'
 import { createStorage } from './storage'
 import { serviceDataDir } from './data-dir'
+import { ensureServiceDataDirSecurity } from './security'
 import { createBlockingAdapters } from './blocking-adapters'
 import { createBlockingHost, createBlockingHandlers } from './blocking-host'
 import log from './logging'
@@ -13,7 +14,11 @@ async function main(): Promise<void> {
   log.info('[service] starting', { pid: process.pid })
 
   // Le service possède ses fichiers de blocage dans C:\ProgramData\Nexus (spec §4.4).
-  const storage = createStorage(serviceDataDir())
+  const dataDir = serviceDataDir()
+  await ensureServiceDataDirSecurity(dataDir).catch((err) => {
+    log.warn('[service] unable to apply data directory ACL', err)
+  })
+  const storage = createStorage(dataDir)
   const host = createBlockingHost(createBlockingAdapters(storage))
 
   const server: BridgeServer = await createBridgeServer({
