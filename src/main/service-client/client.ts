@@ -17,6 +17,7 @@ export type ServiceClient = {
 }
 
 const REQUEST_TIMEOUT_MS = 5000
+const INITIAL_RECONNECT_DELAY_MS = 500
 const MAX_RECONNECT_DELAY_MS = 10_000
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
@@ -30,8 +31,33 @@ export function createServiceClient(opts?: {
   const eventListeners: Array<(e: ServiceEvent) => void> = []
   let socket: net.Socket | null = null
   let connected = false
-  let reconnectDelay = 500
+  let reconnectDelay = INITIAL_RECONNECT_DELAY_MS
+  let reconnectTimer: NodeJS.Timeout | null = null
+  let reportedConnected: boolean | null = null
   let closed = false
+
+  function reportStatus(nextConnected: boolean): void {
+    if (reportedConnected === nextConnected) return
+    reportedConnected = nextConnected
+    opts?.onStatusChange?.(nextConnected)
+  }
+
+  function rejectPending(reason: string): void {
+    for (const p of pending.values()) {
+      clearTimeout(p.timer)
+      p.reject(new Error(reason))
+    }
+    pending.clear()
+  }
+
+  function scheduleReconnect(): void {
+    if (closed || reconnectTimer) return
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      connect()
+    }, reconnectDelay)
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS)
+  }
 
   function connect(): void {
     if (closed) return
@@ -42,8 +68,8 @@ export function createServiceClient(opts?: {
     s.on('connect', () => {
       socket = s
       connected = true
-      reconnectDelay = 500
-      opts?.onStatusChange?.(true)
+      reconnectDelay = INITIAL_RECONNECT_DELAY_MS
+      reportStatus(true)
     })
 
     s.on('data', (chunk: string) => {
@@ -73,12 +99,12 @@ export function createServiceClient(opts?: {
       if (socket === s) {
         socket = null
         connected = false
-        opts?.onStatusChange?.(false)
+        rejectPending('Service disconnected')
+        reportStatus(false)
+      } else if (!connected) {
+        reportStatus(false)
       }
-      if (!closed) {
-        setTimeout(connect, reconnectDelay)
-        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS)
-      }
+      scheduleReconnect()
     })
   }
 
@@ -106,11 +132,11 @@ export function createServiceClient(opts?: {
     isConnected: () => connected,
     close() {
       closed = true
-      for (const p of pending.values()) {
-        clearTimeout(p.timer)
-        p.reject(new Error('Service client closed'))
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
       }
-      pending.clear()
+      rejectPending('Service client closed')
       socket?.destroy()
     },
   }

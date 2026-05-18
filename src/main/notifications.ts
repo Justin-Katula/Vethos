@@ -138,6 +138,17 @@ export function notifyCrashRecovered(getMainWindow: () => BrowserWindow | null):
   )
 }
 
+export function notifyServiceDown(getMainWindow: () => BrowserWindow | null): void {
+  sendNativeNotification(
+    {
+      title: 'Service de blocage indisponible',
+      body: "Nexus ne peut pas démarrer de session tant que le service Windows n'est pas joignable.",
+      payload: { type: 'service-down' },
+    },
+    getMainWindow,
+  )
+}
+
 export function notifyUpdateReady(
   version: string | undefined,
   getMainWindow: () => BrowserWindow | null,

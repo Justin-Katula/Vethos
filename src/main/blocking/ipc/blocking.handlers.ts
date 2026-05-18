@@ -10,6 +10,7 @@ import { computeLongestStreak } from '../streak'
 import {
   notifyBreakRequired,
   notifyClockTamper,
+  notifyServiceDown,
   notifySessionEnd,
   notifySessionStart,
 } from '../../notifications'
@@ -25,8 +26,16 @@ export async function registerBlockingHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
 ): Promise<{ isSessionActive: () => boolean }> {
+  let lastServiceStatus: ServiceStatus | null = null
+
   function emitServiceStatus(status: ServiceStatus): void {
+    if (lastServiceStatus === status) return
+    const previousStatus = lastServiceStatus
+    lastServiceStatus = status
     getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, status)
+    if (status === 'unavailable' && previousStatus !== 'unavailable') {
+      notifyServiceDown(getMainWindow)
+    }
   }
 
   const client = createServiceClient({

@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { createBridgeServer, type BridgeServer } from '@service/bridge/server'
 import { createServiceClient, type ServiceClient } from './client'
 
-const testPipe = (): string => `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+const testPipe = (): string =>
+  `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 let server: BridgeServer | null = null
@@ -18,9 +19,11 @@ describe('createServiceClient', () => {
   it('envoie une requête et résout avec la réponse corrélée', async () => {
     const pipe = testPipe()
     server = await createBridgeServer({ pipePath: pipe, handlers: { PING: async () => 'pong' } })
-    client = createServiceClient({ pipePath: pipe })
+    const statuses: boolean[] = []
+    client = createServiceClient({ pipePath: pipe, onStatusChange: (s) => statuses.push(s) })
     await wait(100)
     expect(client.isConnected()).toBe(true)
+    expect(statuses).toEqual([true])
     await expect(client.request('PING')).resolves.toBe('pong')
   })
 
@@ -28,7 +31,11 @@ describe('createServiceClient', () => {
     const pipe = testPipe()
     server = await createBridgeServer({
       pipePath: pipe,
-      handlers: { BOOM: async () => { throw new Error('nope') } },
+      handlers: {
+        BOOM: async () => {
+          throw new Error('nope')
+        },
+      },
     })
     client = createServiceClient({ pipePath: pipe })
     await wait(100)
@@ -48,9 +55,14 @@ describe('createServiceClient', () => {
   })
 
   it('rejette une requête quand le service est injoignable', async () => {
-    client = createServiceClient({ pipePath: testPipe() })
+    const statuses: boolean[] = []
+    client = createServiceClient({
+      pipePath: testPipe(),
+      onStatusChange: (s) => statuses.push(s),
+    })
     await wait(100)
     expect(client.isConnected()).toBe(false)
+    expect(statuses).toEqual([false])
     await expect(client.request('PING')).rejects.toThrow('not connected')
   })
 })
