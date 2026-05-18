@@ -110,7 +110,7 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
 
     async startSession(profileId, minutes) {
       const s = await nexus.blocking.startSession({ profileId, durationMinutes: minutes })
-      set({ active: s, serviceStatus: 'ok' })
+      set({ active: s })
       void get().refreshLayerStatus()
     },
 
@@ -142,9 +142,9 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
     async repairService() {
       set({ serviceRepairing: true })
       try {
-        const launched = await nexus.blocking.repairService()
-        await get().refreshServiceStatus()
-        return launched
+        // Le statut post-réparation revient par l'événement BLOCKING_EVENT_
+        // SERVICE_STATUS poussé par le main — pas besoin de re-sonder ici.
+        return await nexus.blocking.repairService()
       } finally {
         set({ serviceRepairing: false })
       }

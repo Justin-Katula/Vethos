@@ -33,7 +33,10 @@ export async function registerBlockingHandlers(
     const previousStatus = lastServiceStatus
     lastServiceStatus = status
     getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, status)
-    if (status === 'unavailable' && previousStatus !== 'unavailable') {
+    // On ne notifie que la bascule ok → unavailable : pas au tout premier
+    // statut (previousStatus null), sinon une notif « service indisponible »
+    // surgirait à chaque démarrage tant que le service n'est pas installé.
+    if (status === 'unavailable' && previousStatus === 'ok') {
       notifyServiceDown(getMainWindow)
     }
   }

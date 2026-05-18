@@ -98,7 +98,8 @@ async function serviceState(): Promise<number | null> {
       ],
       { windowsHide: true },
     )
-    return Number(stdout.trim())
+    const state = Number(stdout.trim())
+    return Number.isFinite(state) ? state : null
   } catch {
     return null
   }
