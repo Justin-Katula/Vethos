@@ -12,7 +12,6 @@ const INACTIVE_LAYER_STATUS: LayerStatus = {
 
 type BlockingStore = {
   loaded: boolean
-  elevated: boolean
   serviceStatus: ServiceStatus
   serviceRepairing: boolean
   state: BlockingState
@@ -28,7 +27,6 @@ type BlockingStore = {
   refreshLayerStatus: () => Promise<void>
   refreshServiceStatus: () => Promise<ServiceStatus>
   repairService: () => Promise<boolean>
-  requestElevation: () => Promise<void>
 }
 
 export const useBlockingStore = create<BlockingStore>((set, get) => {
@@ -75,7 +73,6 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
 
   return {
     loaded: false,
-    elevated: false,
     serviceStatus: 'unavailable',
     serviceRepairing: false,
     state: EMPTY_STATE,
@@ -84,11 +81,8 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
 
     async load() {
       subscribeToServiceEvents()
-      const [elevated, serviceStatus] = await Promise.all([
-        nexus.blocking.isElevated(),
-        get().refreshServiceStatus(),
-      ])
-      set({ loaded: true, elevated })
+      const serviceStatus = await get().refreshServiceStatus()
+      set({ loaded: true })
       if (serviceStatus === 'ok' && (await loadServiceState())) {
         void get().refreshLayerStatus()
       }
@@ -154,10 +148,6 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
       } finally {
         set({ serviceRepairing: false })
       }
-    },
-
-    async requestElevation() {
-      await nexus.blocking.requestElevation()
     },
   }
 })

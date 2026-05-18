@@ -23,7 +23,6 @@ win:
     - target: portable
       arch:
         - x64
-  requestedExecutionLevel: requireAdministrator
 
 nsis:
   artifactName: ${productName}-Setup-${version}.${ext}

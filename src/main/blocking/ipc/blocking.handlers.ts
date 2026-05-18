@@ -6,7 +6,6 @@ import type { Storage } from '@service/storage'
 import { createServiceClient } from '../../service-client/client'
 import { getServiceStatus, type ServiceStatus } from '../../service-client/service-status'
 import { requestServiceInstall } from '../../elevated-install'
-import { isElevated, requestElevatedRelaunch } from '../elevation'
 import { computeLongestStreak } from '../streak'
 import {
   notifyBreakRequired,
@@ -85,11 +84,6 @@ export async function registerBlockingHandlers(
     emitServiceStatus(status)
     return launched
   })
-
-  // Élévation : concerne l'UI elle-même (encore élevée en Phase 2), pas le
-  // service — pas d'équivalent protocole, traité localement.
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, () => isElevated())
-  ipcMain.handle(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION, () => requestElevatedRelaunch())
 
   // ── Événements service → renderer ────────────────────────────────────────
 

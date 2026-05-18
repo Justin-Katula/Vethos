@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from '@service/storage'
 import { registerAllIpcHandlers } from './ipc'
-import { ensureElevatedAtStartup } from './blocking/elevation'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
@@ -120,9 +119,6 @@ function startNexusApp(): void {
   app
     .whenReady()
     .then(async () => {
-      const shouldContinueBoot = await ensureElevatedAtStartup()
-      if (!shouldContinueBoot) return
-
       const recoveredFromCrash = existsSync(crashMarkerPath())
       writeCrashMarker()
 

@@ -67,9 +67,6 @@ const api = {
     getServiceStatus: (): Promise<ServiceStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_SERVICE_STATUS),
     repairService: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REPAIR_SERVICE),
-    isElevated: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_IS_ELEVATED),
-    requestElevation: (): Promise<boolean> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION),
     onServiceStatus: (cb: (s: ServiceStatus) => void): (() => void) => {
       const listener = (_: unknown, payload: ServiceStatus) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, listener)

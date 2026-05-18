@@ -18,8 +18,6 @@ export const IPC_CHANNELS = {
   BLOCKING_GET_LAYER_STATUS: 'blocking:getLayerStatus',
   BLOCKING_GET_SERVICE_STATUS: 'blocking:getServiceStatus',
   BLOCKING_REPAIR_SERVICE: 'blocking:repairService',
-  BLOCKING_IS_ELEVATED: 'blocking:isElevated',
-  BLOCKING_REQUEST_ELEVATION: 'blocking:requestElevation',
   // Blocking — events main → renderer
   BLOCKING_EVENT_SERVICE_STATUS: 'blocking:event:serviceStatus',
   BLOCKING_EVENT_SESSION_CHANGED: 'blocking:event:sessionChanged',
