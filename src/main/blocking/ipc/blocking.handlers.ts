@@ -4,6 +4,8 @@ import type { ServiceEvent } from '@shared/service-protocol'
 import type { ActiveSession, BlockingHistoryEntry } from '@shared/schemas'
 import type { Storage } from '@service/storage'
 import { createServiceClient } from '../../service-client/client'
+import { getServiceStatus, type ServiceStatus } from '../../service-client/service-status'
+import { requestServiceInstall } from '../../elevated-install'
 import { isElevated, requestElevatedRelaunch } from '../elevation'
 import { computeLongestStreak } from '../streak'
 import {
@@ -24,7 +26,15 @@ export async function registerBlockingHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
 ): Promise<{ isSessionActive: () => boolean }> {
-  const client = createServiceClient()
+  function emitServiceStatus(status: ServiceStatus): void {
+    getMainWindow()?.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, status)
+  }
+
+  const client = createServiceClient({
+    onStatusChange: (connected) => {
+      emitServiceStatus(connected ? 'ok' : 'unavailable')
+    },
+  })
   let sessionActive = false
 
   // ── Commandes renderer → service ─────────────────────────────────────────
@@ -68,6 +78,14 @@ export async function registerBlockingHandlers(
 
   ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS, () => client.request('GET_LAYER_STATUS'))
 
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_SERVICE_STATUS, () => getServiceStatus())
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_REPAIR_SERVICE, async () => {
+    const launched = await requestServiceInstall()
+    const status = await getServiceStatus()
+    emitServiceStatus(status)
+    return launched
+  })
+
   // Élévation : concerne l'UI elle-même (encore élevée en Phase 2), pas le
   // service — pas d'équivalent protocole, traité localement.
   ipcMain.handle(IPC_CHANNELS.BLOCKING_IS_ELEVATED, () => isElevated())
@@ -100,10 +118,7 @@ export async function registerBlockingHandlers(
     await storage.write('stats', {
       totalFocusMinutes: (stats?.totalFocusMinutes ?? 0) + durationMin,
       totalSessions: (stats?.totalSessions ?? 0) + 1,
-      longestStreak: Math.max(
-        stats?.longestStreak ?? 0,
-        computeLongestStreak(state.history ?? []),
-      ),
+      longestStreak: Math.max(stats?.longestStreak ?? 0, computeLongestStreak(state.history ?? [])),
       lastUpdated: new Date().toISOString(),
     })
   }

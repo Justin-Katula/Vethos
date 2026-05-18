@@ -16,6 +16,7 @@ export type LayerStatus = {
   processes: LayerStatusValue
   firewall: LayerStatusValue
 }
+export type ServiceStatus = 'ok' | 'unavailable'
 
 const api = {
   storage: {
@@ -55,24 +56,29 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SAVE_PROFILE, draft),
     deleteProfile: (id: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_DELETE_PROFILE, id),
-    startSession: (args: {
-      profileId: string
-      durationMinutes: number
-    }): Promise<ActiveSession> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_START_SESSION, args),
+    startSession: (args: { profileId: string; durationMinutes: number }): Promise<ActiveSession> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_START_SESSION, args),
     requestUnlock: (): Promise<ActiveSession['unlockState']> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_UNLOCK),
     submitJustification: (text: string): Promise<{ ok: true } | { ok: false; reason: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SUBMIT_JUSTIFICATION, text),
     getLayerStatus: (): Promise<LayerStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS),
+    getServiceStatus: (): Promise<ServiceStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_SERVICE_STATUS),
+    repairService: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REPAIR_SERVICE),
     isElevated: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_IS_ELEVATED),
     requestElevation: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_ELEVATION),
+    onServiceStatus: (cb: (s: ServiceStatus) => void): (() => void) => {
+      const listener = (_: unknown, payload: ServiceStatus) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_SERVICE_STATUS, listener)
+    },
     onSessionChanged: (cb: (s: ActiveSession | null) => void): (() => void) => {
       const listener = (_: unknown, payload: ActiveSession | null) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, listener)
-      return () =>
-        ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_SESSION_CHANGED, listener)
     },
     onLayerDrift: (cb: (e: { layer: string; restored: boolean }) => void): (() => void) => {
       const listener = (_: unknown, payload: { layer: string; restored: boolean }) => cb(payload)
@@ -82,22 +88,16 @@ const api = {
     onClockTamper: (cb: (e: { driftMs: number }) => void): (() => void) => {
       const listener = (_: unknown, payload: { driftMs: number }) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
-      return () =>
-        ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_CLOCK_TAMPER, listener)
     },
-    onBreakRequired: (
-      cb: (e: { reason: string; restMinutes: number }) => void,
-    ): (() => void) => {
-      const listener = (_: unknown, payload: { reason: string; restMinutes: number }) =>
-        cb(payload)
+    onBreakRequired: (cb: (e: { reason: string; restMinutes: number }) => void): (() => void) => {
+      const listener = (_: unknown, payload: { reason: string; restMinutes: number }) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
-      return () =>
-        ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
     },
   },
   appUsage: {
-    get: (): Promise<DeclaredAppUsageState> =>
-      ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET),
+    get: (): Promise<DeclaredAppUsageState> => ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET),
     onTick: (cb: (state: DeclaredAppUsageState) => void): (() => void) => {
       const listener = (_: unknown, payload: DeclaredAppUsageState) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)

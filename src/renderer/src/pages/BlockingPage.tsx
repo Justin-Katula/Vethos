@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { Plus, AlertTriangle, ShieldCheck, Wrench } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useBlockingStore } from '@/store/blocking.store'
 import { ActiveSessionCard } from '@/components/blocking/ActiveSessionCard'
@@ -16,6 +16,8 @@ export default function BlockingPage() {
   const {
     loaded,
     elevated,
+    serviceStatus,
+    serviceRepairing,
     state,
     active,
     layerStatus,
@@ -25,6 +27,7 @@ export default function BlockingPage() {
     startSession,
     requestUnlock,
     submitJustification,
+    repairService,
     requestElevation,
   } = useBlockingStore()
 
@@ -46,6 +49,13 @@ export default function BlockingPage() {
   }
 
   const handleStart = async (p: BlockingProfile) => {
+    if (serviceStatus !== 'ok') {
+      toast.error({
+        title: 'Service indisponible',
+        description: 'Répare le service de blocage avant de démarrer une session.',
+      })
+      return
+    }
     await startSession(p.id, duration).catch((err) => {
       toast.error({
         title: 'Démarrage impossible',
@@ -57,6 +67,21 @@ export default function BlockingPage() {
   const handleRequestUnlock = async () => {
     await requestUnlock()
     setUnlockOpen(true)
+  }
+
+  const handleRepairService = async () => {
+    const launched = await repairService()
+    if (launched) {
+      toast.success({
+        title: 'Réparation lancée',
+        description: 'Windows peut demander une confirmation administrateur.',
+      })
+    } else {
+      toast.error({
+        title: 'Réparation annulée',
+        description: "Le service n'a pas pu être relancé avec les droits administrateur.",
+      })
+    }
   }
 
   if (!loaded) {
@@ -82,7 +107,9 @@ export default function BlockingPage() {
         <header>
           <h1 className="text-3xl font-semibold tracking-tight">Blocage</h1>
           <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-            {"Crée des sanctuaires d'attention. Décide à froid pour t'épargner les arbitrages à chaud."}
+            {
+              "Crée des sanctuaires d'attention. Décide à froid pour t'épargner les arbitrages à chaud."
+            }
           </p>
         </header>
 
@@ -94,9 +121,13 @@ export default function BlockingPage() {
           >
             <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
             <div>
-              <div className="font-medium text-red-100">Blocage non opérationnel — admin requis</div>
+              <div className="font-medium text-red-100">
+                Blocage non opérationnel — admin requis
+              </div>
               <p className="mt-0.5 text-xs text-red-200/80">
-                {"Les couches de blocage (hosts, processus, firewall) ne peuvent pas être appliquées sans privilèges admin. Relance Nexus avec « Exécuter en tant qu'administrateur »."}
+                {
+                  "Les couches de blocage (hosts, processus, firewall) ne peuvent pas être appliquées sans privilèges admin. Relance Nexus avec « Exécuter en tant qu'administrateur »."
+                }
               </p>
             </div>
             <button
@@ -105,6 +136,33 @@ export default function BlockingPage() {
               className="ml-auto rounded-md border border-red-400/40 px-3 py-1.5 text-xs font-medium text-red-100 transition-colors hover:border-red-300 hover:bg-red-400/10"
             >
               Relancer en admin
+            </button>
+          </motion.div>
+        )}
+
+        {serviceStatus !== 'ok' && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-start gap-3 rounded-lg border border-orange/40 bg-orange/10 px-4 py-3 text-sm text-orange"
+          >
+            <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="font-medium text-orange">Service de blocage indisponible</div>
+              <p className="mt-0.5 text-xs text-orange/80">
+                {
+                  "Les sessions restent verrouillées tant que le service Windows Nexus n'est pas joignable."
+                }
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleRepairService()}
+              disabled={serviceRepairing}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-orange/40 px-3 py-1.5 text-xs font-medium text-orange transition-colors hover:border-orange hover:bg-orange/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Wrench size={12} strokeWidth={2.5} />
+              {serviceRepairing ? 'Réparation...' : 'Réparer'}
             </button>
           </motion.div>
         )}
@@ -181,7 +239,7 @@ export default function BlockingPage() {
                 <ProfileCard
                   key={p.id}
                   profile={p}
-                  disabled={!!active || !elevated}
+                  disabled={!!active || !elevated || serviceStatus !== 'ok'}
                   onStart={handleStart}
                   onEdit={openEditor}
                 />
