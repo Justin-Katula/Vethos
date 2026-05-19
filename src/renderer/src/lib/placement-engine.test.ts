@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
-import { buildItems, enumerateDates } from './placement-engine'
+import { buildItems, enumerateDates, distributeBudget } from './placement-engine'
 
 export function makeTask(over: Partial<Task> & { id: string }): Task {
   return {
@@ -81,5 +81,31 @@ describe('buildItems', () => {
       '2026-05-18',
     )
     expect(items.some((i) => i.kind === 'task')).toBe(false)
+  })
+})
+
+describe('distributeBudget', () => {
+  const item = (refId: string, score: number) => ({
+    kind: 'task' as const,
+    refId,
+    score,
+    deadline: null,
+    linkedTaskId: null,
+  })
+
+  it('répartit proportionnellement au score, arrondi à 5 min', () => {
+    const budgets = distributeBudget([item('t1', 3), item('t2', 1)], 400)
+    expect(budgets.get('task:t1')).toBe(300)
+    expect(budgets.get('task:t2')).toBe(100)
+  })
+
+  it('verse le reliquat d arrondi pour que le total = T', () => {
+    const budgets = distributeBudget([item('a', 1), item('b', 1), item('c', 1)], 80)
+    const total = [...budgets.values()].reduce((s, v) => s + v, 0)
+    expect(total).toBe(80)
+  })
+
+  it('renvoie une map vide si le temps libre total est nul', () => {
+    expect(distributeBudget([item('t1', 3)], 0).size).toBe(0)
   })
 })

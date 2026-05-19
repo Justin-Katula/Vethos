@@ -120,3 +120,37 @@ export function buildItems(
 
   return items.filter((i) => i.score > 0)
 }
+
+// ─── Distribution du budget (spec §4) ───────────────────────────────────────
+
+/**
+ * Répartit `totalFreeMinutes` entre les items : chacun reçoit
+ * `score / Σ scores × T`, arrondi à 5 min. Le reliquat d'arrondi va à l'item au
+ * score le plus élevé. Clé de map = `itemKey`.
+ */
+export function distributeBudget(
+  items: PlacementItem[],
+  totalFreeMinutes: number,
+): Map<string, number> {
+  const budgets = new Map<string, number>()
+  if (totalFreeMinutes <= 0 || items.length === 0) return budgets
+
+  const totalScore = items.reduce((sum, i) => sum + i.score, 0)
+  if (totalScore <= 0) return budgets
+
+  for (const item of items) {
+    const raw = (item.score / totalScore) * totalFreeMinutes
+    budgets.set(itemKey(item), Math.round(raw / 5) * 5)
+  }
+
+  // Reliquat d'arrondi → item au score le plus élevé.
+  const allocated = [...budgets.values()].reduce((s, v) => s + v, 0)
+  const diff = totalFreeMinutes - allocated
+  if (diff !== 0) {
+    const top = items.slice().sort((a, b) => b.score - a.score)[0]!
+    const key = itemKey(top)
+    budgets.set(key, Math.max(0, (budgets.get(key) ?? 0) + diff))
+  }
+
+  return budgets
+}
