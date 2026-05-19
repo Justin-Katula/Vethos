@@ -17,6 +17,8 @@ type SettingsState = {
   defaultUnlockCooldownMinutes: number
   defaultUnlockJustificationWords: number
   firstLaunchDate: string | null
+  freeTimeLevel: number
+  freeTimeLevelChangedAt: string | null
   loaded: boolean
 
   load: () => Promise<void>
@@ -43,6 +45,8 @@ function buildPayload(state: SettingsState): Settings {
     defaultUnlockCooldownMinutes: state.defaultUnlockCooldownMinutes,
     defaultUnlockJustificationWords: state.defaultUnlockJustificationWords,
     firstLaunchDate: state.firstLaunchDate ?? undefined,
+    freeTimeLevel: state.freeTimeLevel,
+    freeTimeLevelChangedAt: state.freeTimeLevelChangedAt ?? undefined,
   }
 }
 
@@ -116,6 +120,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   defaultUnlockCooldownMinutes: 10,
   defaultUnlockJustificationWords: 50,
   firstLaunchDate: null,
+  freeTimeLevel: 5,
+  freeTimeLevelChangedAt: null,
   loaded: false,
 
   async load() {
@@ -134,6 +140,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       defaultUnlockCooldownMinutes: data?.defaultUnlockCooldownMinutes ?? 10,
       defaultUnlockJustificationWords: data?.defaultUnlockJustificationWords ?? 50,
       firstLaunchDate: firstLaunch,
+      freeTimeLevel: data?.freeTimeLevel ?? 5,
+      freeTimeLevelChangedAt: data?.freeTimeLevelChangedAt ?? null,
       loaded: true,
     })
     // Enregistrer la date du premier lancement si pas encore fait
