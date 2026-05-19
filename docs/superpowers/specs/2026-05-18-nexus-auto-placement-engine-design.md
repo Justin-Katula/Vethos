@@ -145,12 +145,12 @@ libres de la fenêtre :
 
 - Le moteur **ne rejoue jamais** un bloc passé : il ne replanifie pas le temps
   non fait.
-- Un bloc dont l'heure est passée est **affiché comme « terminé »** sur le
-  calendrier (état visuel : grisé / coché). C'est un état d'affichage, pas un
-  suivi réel d'accomplissement.
+- Aucun état visuel particulier n'est appliqué aux blocs dont l'heure est
+  passée : ils s'affichent comme les autres blocs du jour. Il n'y a **pas** de
+  suivi « fait / pas fait » ni de marquage « terminé ».
 - L'auto-correction se fait par le recalcul (§9) : une tâche non avancée voit
   son échéance se rapprocher → multiplicateur ↑ → plus de temps au prochain
-  recalcul. Pas de case « fait / pas fait ».
+  recalcul.
 
 ## 7. Verrouillage — aucune pose manuelle
 
@@ -202,19 +202,18 @@ Le calendrier superpose deux couches :
 
 ## 9. Recalcul
 
-Le moteur se relance et réécrit la fenêtre `aujourd'hui + 6 jours` lorsque :
+Le plan étant un état dérivé (§10), il est recalculé automatiquement dès que
+l'une de ses entrées change :
 
-- un **jour change** (passage de minuit, ou première ouverture de l'app un
-  nouveau jour local) ;
-- une **tâche** est créée, modifiée (niveau, échéance, lien objectif), terminée
-  ou supprimée ;
-- un **objectif** est créé, modifié ou supprimé ;
-- le **niveau de temps libre** change ;
-- le **planning** (catégories) change.
+- la **date du jour** (la fenêtre de 7 jours glisse à chaque nouveau jour
+  local) ;
+- une **tâche** créée, modifiée (niveau, échéance, lien objectif), terminée ou
+  supprimée ;
+- un **objectif** créé, modifié ou supprimé ;
+- le **niveau de temps libre** ;
+- le **planning** (catégories).
 
-À chaque recalcul : les blocs de date `< aujourd'hui` sont **gelés** (conservés
-tels quels, affichés « terminés ») ; seuls les blocs de date `≥ aujourd'hui`
-sont régénérés.
+Chaque recalcul produit le plan complet de la fenêtre `aujourd'hui + 6 jours`.
 
 ## 10. Architecture & données
 
@@ -225,32 +224,33 @@ sont régénérés.
   `computePlacement({ tasks, objectives, rules, entries, freeTimeLevel, todayStr }) → PlacedBlock[]`.
 - Déterministe = mêmes entrées ⇒ même plan (aucun `Math.random`, aucun
   `Date.now()` interne ; la date est passée en paramètre). C'est ce qui garantit
-  la stabilité du plan dans la journée.
-- Réutilise `computeFreeTimeSlots` et `getDeadlineMultiplier` de
-  `free-time-calculator.ts`.
-
-### Persistance
-
-La persistance est **nécessaire** : sans elle, les blocs passés disparaissent et
-ne peuvent pas être affichés « terminés » (§6) ; elle servira aussi à la couche
-3 (le service lira le plan).
-
-- Nouvelle clé de stockage `placement` → `nexus_placement.json`.
-- `PlacementStateSchema = { blocks: PlacedBlock[], generatedAt: ISO datetime }`.
-- `PlacedBlockSchema` :
+  la stabilité du plan : tant que les tâches/objectifs/planning ne changent pas,
+  le plan affiché ne bouge pas.
+- Type de sortie `PlacedBlock` :
   ```
   {
-    id: uuid,
+    id: string,
     date: 'YYYY-MM-DD',
     startMinute: 0..1439,
     endMinute: 1..1440,
     kind: 'task' | 'objective' | 'free',
-    refId: uuid | null,        // id de la tâche ou de l'objectif ; null si 'free'
-    linkedTaskId: uuid | null  // si kind='objective' : tâche liée mise en avant
+    refId: string | null,        // id de la tâche/objectif ; null si 'free'
+    linkedTaskId: string | null  // si kind='objective' : tâche liée mise en avant
   }
   ```
-- Au recalcul : conserver les blocs `date < aujourd'hui`, régénérer le reste,
-  réécrire le fichier.
+- Réutilise `computeFreeTimeSlots` et `getDeadlineMultiplier` de
+  `free-time-calculator.ts`.
+
+### Pas de persistance pour cette couche
+
+Le plan est un **état dérivé** : recalculé à la volée (`useMemo`) à partir des
+tâches, objectifs, planning et de la date du jour. Aucun fichier
+`nexus_placement.json`, aucune nouvelle clé de stockage. La fonction pure étant
+déterministe, le plan reste stable sans avoir à le persister.
+
+(La couche 3 — blocage piloté par le bloc actif — devra rendre le plan
+accessible au service Windows ; elle introduira à ce moment-là le transport ou
+la persistance nécessaires, en réutilisant la même fonction `computePlacement`.)
 
 ### Réglages
 
@@ -259,10 +259,9 @@ ne peuvent pas être affichés « terminés » (§6) ; elle servira aussi à la 
 
 ### Renderer
 
-- Nouveau store `placement.store.ts` (ou extension d'un store existant) qui
-  orchestre le recalcul et la persistance.
-- `PlanningPage` / `WeekCalendar` : afficher les blocs de travail (couche 2) en
-  lecture seule, appliquer la fenêtre horaire réveil→coucher.
+- `PlanningPage` / `WeekCalendar` : afficher les blocs de travail en lecture
+  seule, appliquer la fenêtre horaire réveil→coucher. Le plan provient d'un
+  `useMemo` sur `computePlacement`.
 - `MonthView` : recolorer selon la charge réelle (§8.3) au lieu de la charge par
   jour-de-semaine actuelle.
 - `HomePage` : remplacer la double distribution actuelle par les données du
@@ -271,8 +270,8 @@ ne peuvent pas être affichés « terminés » (§6) ; elle servira aussi à la 
 ## 11. Couches suivantes (rappel, hors périmètre)
 
 - **Couche 2** — jeux de distractions par objectif, surcharge par tâche.
-- **Couche 3** — le service lit `nexus_placement.json`, détecte le bloc actif,
-  applique le blocage correspondant.
+- **Couche 3** — le service accède au plan (transport ou persistance à définir
+  dans sa propre spec), détecte le bloc actif, applique le blocage correspondant.
 - **Bugs** — service Windows, scan d'apps, historique navigateur.
 
 ## 12. Risques & questions ouvertes
@@ -284,8 +283,5 @@ ne peuvent pas être affichés « terminés » (§6) ; elle servira aussi à la 
   `distributeTimeToObjectives` et leurs usages dans `HomePage` sont remplacés
   par le moteur unifié. Les fonctions de créneaux (`computeFreeTimeSlots`) et de
   multiplicateur sont conservées.
-- **Sens de « terminé »** : un bloc passé est affiché « terminé » sans preuve
-  d'accomplissement réel. Le suivi réel d'accomplissement (stats) est hors
-  périmètre de cette couche.
 - **Sommeil non contigu** : la fenêtre réveil→coucher suppose un sommeil
   d'un seul tenant. Cas multi-segments à confirmer (repli : journée complète).
