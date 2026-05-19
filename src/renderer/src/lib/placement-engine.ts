@@ -291,3 +291,34 @@ export function computePlacement(input: ComputePlacementInput): PlacedBlock[] {
   const budgets = distributeBudget(items, totalFree)
   return placeBlocks(items, budgets, dates, entries, rules)
 }
+
+// ─── Charge quotidienne — vue Mois (spec §8.3) ──────────────────────────────
+
+export type DailyLoad = {
+  date: string
+  workedMinutes: number
+  /** Temps libre restant = temps libre total du jour − temps travaillé placé. */
+  freeMinutes: number
+}
+
+/**
+ * Pour chaque date, calcule le temps travaillé (somme des blocs tâche/objectif)
+ * et le temps libre restant. Sert à colorer la vue Mois.
+ */
+export function summarizeDailyLoad(
+  blocks: PlacedBlock[],
+  dates: string[],
+  entries: ScheduleEntry[],
+  rules: TimeRule[],
+): DailyLoad[] {
+  return dates.map((date) => {
+    let totalSlot = 0
+    for (const slot of computeFreeTimeSlots(dayOfWeekOf(date), entries, rules)) {
+      if (!slot.isPreparation) totalSlot += slot.durationMinutes
+    }
+    const workedMinutes = blocks
+      .filter((b) => b.date === date && b.kind !== 'free')
+      .reduce((sum, b) => sum + (b.endMinute - b.startMinute), 0)
+    return { date, workedMinutes, freeMinutes: Math.max(0, totalSlot - workedMinutes) }
+  })
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
-import { buildItems, enumerateDates, distributeBudget, placeBlocks, computePlacement } from './placement-engine'
+import { buildItems, enumerateDates, distributeBudget, placeBlocks, computePlacement, summarizeDailyLoad, type PlacedBlock } from './placement-engine'
 
 export function makeTask(over: Partial<Task> & { id: string }): Task {
   return {
@@ -197,5 +197,24 @@ describe('computePlacement', () => {
       tasks: [makeTask({ id: 't1', level: 6, deadline: '2026-12-31', linkedObjectiveId: null })],
     }
     expect(computePlacement(input)).toEqual(computePlacement(input))
+  })
+})
+
+describe('summarizeDailyLoad', () => {
+  it('calcule temps travaillé et temps libre restant par jour', () => {
+    const blocks: PlacedBlock[] = [
+      {
+        id: 'x',
+        date: '2026-05-18',
+        startMinute: 0,
+        endMinute: 120,
+        kind: 'task',
+        refId: 't1',
+        linkedTaskId: null,
+      },
+    ]
+    const load = summarizeDailyLoad(blocks, ['2026-05-18', '2026-05-19'], [], [])
+    expect(load[0]).toEqual({ date: '2026-05-18', workedMinutes: 120, freeMinutes: 1440 - 120 })
+    expect(load[1]).toEqual({ date: '2026-05-19', workedMinutes: 0, freeMinutes: 1440 })
   })
 })
