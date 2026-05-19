@@ -322,3 +322,21 @@ export function summarizeDailyLoad(
     return { date, workedMinutes, freeMinutes: Math.max(0, totalSlot - workedMinutes) }
   })
 }
+
+// ─── Cooldown du niveau de temps libre (spec §2) ────────────────────────────
+
+const FREE_TIME_LEVEL_COOLDOWN_DAYS = 14
+
+/** Vrai si le niveau de temps libre peut être changé (cooldown 2 semaines respecté). */
+export function canChangeFreeTimeLevel(changedAt: string | undefined, now: Date): boolean {
+  if (!changedAt) return true
+  const diffDays = (now.getTime() - new Date(changedAt).getTime()) / 86_400_000
+  return diffDays >= FREE_TIME_LEVEL_COOLDOWN_DAYS
+}
+
+/** Nombre de jours restants avant de pouvoir changer le niveau de temps libre. */
+export function daysUntilFreeTimeLevelChange(changedAt: string | undefined, now: Date): number {
+  if (!changedAt) return 0
+  const diffDays = (now.getTime() - new Date(changedAt).getTime()) / 86_400_000
+  return Math.max(0, Math.ceil(FREE_TIME_LEVEL_COOLDOWN_DAYS - diffDays))
+}

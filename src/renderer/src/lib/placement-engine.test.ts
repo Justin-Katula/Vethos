@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
-import { buildItems, enumerateDates, distributeBudget, placeBlocks, computePlacement, summarizeDailyLoad, type PlacedBlock } from './placement-engine'
+import { buildItems, enumerateDates, distributeBudget, placeBlocks, computePlacement, summarizeDailyLoad, canChangeFreeTimeLevel, daysUntilFreeTimeLevelChange, type PlacedBlock } from './placement-engine'
 
 export function makeTask(over: Partial<Task> & { id: string }): Task {
   return {
@@ -216,5 +216,35 @@ describe('summarizeDailyLoad', () => {
     const load = summarizeDailyLoad(blocks, ['2026-05-18', '2026-05-19'], [], [])
     expect(load[0]).toEqual({ date: '2026-05-18', workedMinutes: 120, freeMinutes: 1440 - 120 })
     expect(load[1]).toEqual({ date: '2026-05-19', workedMinutes: 0, freeMinutes: 1440 })
+  })
+})
+
+describe('canChangeFreeTimeLevel', () => {
+  it('autorise si jamais changé', () => {
+    expect(canChangeFreeTimeLevel(undefined, new Date('2026-05-18T00:00:00.000Z'))).toBe(true)
+  })
+
+  it('refuse avant 14 jours', () => {
+    expect(
+      canChangeFreeTimeLevel('2026-05-10T00:00:00.000Z', new Date('2026-05-18T00:00:00.000Z')),
+    ).toBe(false)
+  })
+
+  it('autorise à partir de 14 jours', () => {
+    expect(
+      canChangeFreeTimeLevel('2026-05-01T00:00:00.000Z', new Date('2026-05-18T00:00:00.000Z')),
+    ).toBe(true)
+  })
+})
+
+describe('daysUntilFreeTimeLevelChange', () => {
+  it('compte les jours restants avant déverrouillage', () => {
+    expect(
+      daysUntilFreeTimeLevelChange('2026-05-10T00:00:00.000Z', new Date('2026-05-18T00:00:00.000Z')),
+    ).toBe(6)
+  })
+
+  it('renvoie 0 si jamais changé', () => {
+    expect(daysUntilFreeTimeLevelChange(undefined, new Date('2026-05-18T00:00:00.000Z'))).toBe(0)
   })
 })
