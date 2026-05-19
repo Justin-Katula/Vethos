@@ -254,3 +254,40 @@ export function placeBlocks(
 
   return blocks
 }
+
+// ─── Fonction publique (spec §3, §10) ───────────────────────────────────────
+
+export type ComputePlacementInput = {
+  tasks: Task[]
+  objectives: Objective[]
+  rules: TimeRule[]
+  entries: ScheduleEntry[]
+  freeTimeLevel: number
+  /** Premier jour planifié + ancre du multiplicateur d'échéance. */
+  todayStr: string
+  /** Dernier jour planifié (todayStr + 6 pour le plan opérationnel ; fin du mois pour l'aperçu). */
+  rangeEndStr: string
+}
+
+/**
+ * Calcule le plan : place tâches et objectifs en blocs datés de `todayStr` à
+ * `rangeEndStr`. Pure et déterministe — mêmes entrées ⇒ même sortie.
+ */
+export function computePlacement(input: ComputePlacementInput): PlacedBlock[] {
+  const { tasks, objectives, rules, entries, freeTimeLevel, todayStr, rangeEndStr } = input
+  const dates = enumerateDates(todayStr, rangeEndStr)
+  if (dates.length === 0) return []
+
+  const items = buildItems(tasks, objectives, freeTimeLevel, todayStr)
+
+  // Temps libre total de la plage (créneaux hors préparation).
+  let totalFree = 0
+  for (const date of dates) {
+    for (const slot of computeFreeTimeSlots(dayOfWeekOf(date), entries, rules)) {
+      if (!slot.isPreparation) totalFree += slot.durationMinutes
+    }
+  }
+
+  const budgets = distributeBudget(items, totalFree)
+  return placeBlocks(items, budgets, dates, entries, rules)
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
-import { buildItems, enumerateDates, distributeBudget, placeBlocks } from './placement-engine'
+import { buildItems, enumerateDates, distributeBudget, placeBlocks, computePlacement } from './placement-engine'
 
 export function makeTask(over: Partial<Task> & { id: string }): Task {
   return {
@@ -164,5 +164,38 @@ describe('placeBlocks', () => {
       [],
     )
     expect(blocks).toEqual([])
+  })
+})
+
+describe('computePlacement', () => {
+  const base = {
+    objectives: [],
+    rules: [],
+    entries: [],
+    freeTimeLevel: 5,
+    todayStr: '2026-05-18',
+    rangeEndStr: '2026-05-24',
+  }
+
+  it('produit des blocs datés dans la plage', () => {
+    const blocks = computePlacement({
+      ...base,
+      tasks: [makeTask({ id: 't1', level: 6, deadline: '2026-12-31', linkedObjectiveId: null })],
+    })
+    expect(blocks.length).toBeGreaterThan(0)
+    expect(blocks.every((b) => b.date >= '2026-05-18' && b.date <= '2026-05-24')).toBe(true)
+    expect(blocks.every((b) => b.kind === 'task')).toBe(true)
+  })
+
+  it('renvoie [] sans tâche ni objectif (seul le temps libre concourt)', () => {
+    expect(computePlacement({ ...base, tasks: [] })).toEqual([])
+  })
+
+  it('est déterministe : mêmes entrées ⇒ même plan', () => {
+    const input = {
+      ...base,
+      tasks: [makeTask({ id: 't1', level: 6, deadline: '2026-12-31', linkedObjectiveId: null })],
+    }
+    expect(computePlacement(input)).toEqual(computePlacement(input))
   })
 })
