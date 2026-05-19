@@ -101,17 +101,20 @@ garantit qu'une part du temps reste vraiment libre (repos) plutôt qu'avalée à
 
 ## 3. Fenêtre de planification
 
-- Le moteur planifie une **fenêtre glissante de 7 jours** : aujourd'hui + les 6
-  jours suivants.
-- La fenêtre est **recalculée chaque jour** (cf. §9).
-- Une tâche dont l'échéance dépasse la fenêtre est tout de même prise en compte
+- Le moteur place les blocs sur une **plage de dates** paramétrable
+  (`aujourd'hui → date_fin`). Deux plages sont utilisées :
+  - **Plan opérationnel** — fenêtre glissante de **7 jours** (aujourd'hui + 6) ;
+    alimente la vue Semaine et l'Accueil.
+  - **Aperçu mensuel** — du jour courant à la fin du mois affiché ; alimente la
+    vue Mois (§8.3).
+- Une tâche dont l'échéance dépasse la plage est tout de même prise en compte
   (multiplicateur `1.0`) ; elle reçoit peu de temps, puis de plus en plus à
-  mesure que l'échéance entre dans la fenêtre.
+  mesure que l'échéance approche.
 
 ## 4. Distribution du budget
 
-1. Calculer le **temps libre total** `T` de la fenêtre = somme des créneaux
-   libres des 7 jours (réutilise `computeFreeTimeSlots`, hors créneaux de
+1. Calculer le **temps libre total** `T` de la plage = somme des créneaux libres
+   de tous ses jours (réutilise `computeFreeTimeSlots`, hors créneaux de
    préparation).
 2. Calculer le score de chaque item (§1).
 3. Chaque item reçoit `budget = score_item / Σ scores × T`, **arrondi à 5 min**.
@@ -131,7 +134,8 @@ libres de la fenêtre :
    premier.
 3. **Étalement.** Les blocs d'un même item sont répartis sur plusieurs jours
    plutôt qu'entassés ; les jours plus proches sont légèrement préférés pour les
-   items les plus urgents.
+   items les plus urgents. Les blocs d'une tâche ne sont **jamais placés après
+   son échéance**.
 4. **Règles de session** (déjà existantes) respectées : jamais plus de 4 h du
    même item d'affilée, ni plus de 6 h de travail cumulé d'affilée.
 5. **Créneaux trop courts** (< 30 min) ou de **préparation** : non utilisés pour
@@ -143,14 +147,16 @@ libres de la fenêtre :
 
 ## 6. Blocs passés
 
-- Le moteur **ne rejoue jamais** un bloc passé : il ne replanifie pas le temps
-  non fait.
-- Aucun état visuel particulier n'est appliqué aux blocs dont l'heure est
-  passée : ils s'affichent comme les autres blocs du jour. Il n'y a **pas** de
-  suivi « fait / pas fait » ni de marquage « terminé ».
+- Un bloc passé **n'a aucune incidence sur les calculs** (score, distribution,
+  placement) : le moteur ne rejoue jamais le temps non fait.
+- Un bloc d'**aujourd'hui** dont l'heure de fin est dépassée est affiché comme
+  **« terminé »** (état visuel : grisé / coché).
+- Un bloc d'un **jour révolu disparaît entièrement** : le moteur ne planifie
+  qu'à partir du jour courant, donc un jour passé n'a plus aucun bloc. Exemple :
+  un bloc du lundi 23 n'apparaît plus le mardi 24.
 - L'auto-correction se fait par le recalcul (§9) : une tâche non avancée voit
   son échéance se rapprocher → multiplicateur ↑ → plus de temps au prochain
-  recalcul.
+  recalcul. Pas de suivi « fait / pas fait ».
 
 ## 7. Verrouillage — aucune pose manuelle
 
@@ -181,39 +187,47 @@ Le calendrier superpose deux couches :
 ### 8.2 Fenêtre horaire visible (réveil → coucher)
 
 - Le calendrier n'affiche **que les heures d'éveil**.
-- La première heure affichée (en haut) = l'**heure de réveil** ; la dernière (en
-  bas) = l'**heure de coucher**. Le sommeil n'est pas affiché.
-- Exemple : sommeil 23h → 7h ⇒ le calendrier va de **7h** à **23h**.
-- Source : l'heure de réveil/coucher est dérivée de la catégorie « sommeil » du
+- L'axe horaire est gradué avec les **heures réelles de l'horloge**. La première
+  graduation (en haut) est l'heure de réveil ; la dernière (en bas) est l'heure
+  de coucher.
+- Exemples : réveil à 7h → l'axe commence à `7h`, puis `8h`, `9h`… ; réveil à 8h
+  → l'axe commence à `8h`. Même logique pour la dernière heure. **Aucune
+  numérotation relative** (pas de « 1h, 2h… »).
+- Le sommeil n'est jamais affiché.
+- Source : heure de réveil/coucher dérivée de la catégorie « sommeil » du
   planning, ou à défaut de `sleepStart` / `sleepEnd` des réglages.
 - **Repli** : si aucun sommeil n'est défini, afficher la journée complète
   (00h–24h).
 
 ### 8.3 Vue Mois — carte de charge
 
-- Chaque jour du mois est coloré selon sa **charge**.
-- **Charge d'un jour** = le **temps libre restant** ce jour-là — le temps non
-  occupé par des blocs de tâches/objectifs. Beaucoup de temps libre restant →
-  jour peu chargé ; peu de temps libre restant → jour très chargé.
-- Échelle **relative** sur les jours affichés : le jour avec le plus de temps
-  libre restant → **vert** ; le jour avec le moins → **rouge** ; dégradé continu
-  entre les deux (vert → lime → jaune → orange → rouge).
-- Au-delà de la fenêtre de 7 jours (jours non planifiés), la cellule est neutre.
+- À l'ouverture de la vue Mois, le moteur calcule le placement sur **tout le
+  mois** (du jour courant à la fin du mois) — pas seulement les 7 jours du plan
+  opérationnel. Calcul fait **à la demande**, quand la vue Mois est affichée.
+- Chaque jour est coloré selon sa **charge** = le **temps libre restant** ce
+  jour-là (temps non occupé par des blocs de tâches/objectifs). Beaucoup de
+  temps libre restant → jour peu chargé ; peu → jour très chargé.
+- Échelle **relative** sur les jours calculés : le jour avec le plus de temps
+  libre restant → **vert** ; le moins → **rouge** ; dégradé continu entre les
+  deux (vert → lime → jaune → orange → rouge).
+- Les jours déjà passés ne portent pas de charge (cohérent avec §6) : cellule
+  neutre.
 
 ## 9. Recalcul
 
 Le plan étant un état dérivé (§10), il est recalculé automatiquement dès que
 l'une de ses entrées change :
 
-- la **date du jour** (la fenêtre de 7 jours glisse à chaque nouveau jour
-  local) ;
+- la **date du jour** (la fenêtre glisse à chaque nouveau jour local) ;
 - une **tâche** créée, modifiée (niveau, échéance, lien objectif), terminée ou
   supprimée ;
 - un **objectif** créé, modifié ou supprimé ;
 - le **niveau de temps libre** ;
 - le **planning** (catégories).
 
-Chaque recalcul produit le plan complet de la fenêtre `aujourd'hui + 6 jours`.
+Le recalcul vaut pour les **deux plages** (§3) : le plan opérationnel de 7 jours
+(toujours), et l'aperçu mensuel **lorsque la vue Mois est affichée** (calculé à
+la demande, recalculé tant qu'elle reste ouverte).
 
 ## 10. Architecture & données
 
@@ -221,7 +235,10 @@ Chaque recalcul produit le plan complet de la fenêtre `aujourd'hui + 6 jours`.
 
 - Nouveau module `src/renderer/src/lib/placement-engine.ts`.
 - Fonction **pure et déterministe** :
-  `computePlacement({ tasks, objectives, rules, entries, freeTimeLevel, todayStr }) → PlacedBlock[]`.
+  `computePlacement({ tasks, objectives, rules, entries, freeTimeLevel, todayStr, rangeEndStr }) → PlacedBlock[]`.
+  `todayStr` fixe le multiplicateur d'échéance et le premier jour planifié ;
+  `rangeEndStr` est le dernier jour planifié (`todayStr + 6` pour le plan
+  opérationnel, fin du mois pour l'aperçu mensuel).
 - Déterministe = mêmes entrées ⇒ même plan (aucun `Math.random`, aucun
   `Date.now()` interne ; la date est passée en paramètre). C'est ce qui garantit
   la stabilité du plan : tant que les tâches/objectifs/planning ne changent pas,
@@ -283,5 +300,9 @@ la persistance nécessaires, en réutilisant la même fonction `computePlacement
   `distributeTimeToObjectives` et leurs usages dans `HomePage` sont remplacés
   par le moteur unifié. Les fonctions de créneaux (`computeFreeTimeSlots`) et de
   multiplicateur sont conservées.
+- **Plan 7 jours vs aperçu mensuel** : les deux plages (§3) produisent une
+  distribution différente, donc la charge d'un jour dans la vue Mois peut
+  différer légèrement du plan de la vue Semaine. Assumé : le Mois est un aperçu,
+  la Semaine est le plan opérationnel.
 - **Sommeil non contigu** : la fenêtre réveil→coucher suppose un sommeil
   d'un seul tenant. Cas multi-segments à confirmer (repli : journée complète).
