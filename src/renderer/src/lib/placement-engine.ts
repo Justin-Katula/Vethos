@@ -99,6 +99,9 @@ export function buildItems(
 
   // Objectifs : score = (niveau_objectif + Σ scores des tâches liées) / 1,5.
   for (const objective of objectives) {
+    // Objectif de niveau 0 = désactivé : on le saute. Ses tâches liées — qui ne
+    // sont jamais des items autonomes (cf. boucle ci-dessus) — ne reçoivent donc
+    // aucun temps tant que l'objectif est à 0. Comportement voulu (spec §1).
     if (objective.level <= 0) continue
     const linked = activeTasks.filter((t) => t.linkedObjectiveId === objective.id)
     const sumLinked = linked.reduce(
@@ -143,7 +146,9 @@ export function distributeBudget(
     budgets.set(itemKey(item), Math.round(raw / 5) * 5)
   }
 
-  // Reliquat d'arrondi → item au score le plus élevé.
+  // Reliquat d'arrondi → item au score le plus élevé. Si `totalFreeMinutes`
+  // n'est pas un multiple de 5, ce budget peut ne pas l'être ; placeBlocks
+  // ré-arrondit chaque bloc à 5 min et le reliquat impair reste non placé.
   const allocated = [...budgets.values()].reduce((s, v) => s + v, 0)
   const diff = totalFreeMinutes - allocated
   if (diff !== 0) {

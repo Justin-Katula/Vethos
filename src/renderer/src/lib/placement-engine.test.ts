@@ -248,3 +248,32 @@ describe('daysUntilFreeTimeLevelChange', () => {
     expect(daysUntilFreeTimeLevelChange(undefined, new Date('2026-05-18T00:00:00.000Z'))).toBe(0)
   })
 })
+
+describe('placeBlocks — plafond par jour', () => {
+  it('ne place pas plus de 240 min du même item sur un seul jour', () => {
+    const blocks = placeBlocks(
+      [{ kind: 'task' as const, refId: 't1', score: 1, deadline: null, linkedTaskId: null }],
+      new Map([['task:t1', 1000]]),
+      ['2026-05-18'],
+      [],
+      [],
+    )
+    const total = blocks.reduce((s, b) => s + (b.endMinute - b.startMinute), 0)
+    expect(total).toBe(240)
+  })
+})
+
+describe('distributeBudget — total non multiple de 5', () => {
+  it('le total distribué égale exactement totalFreeMinutes', () => {
+    const item = (refId: string) => ({
+      kind: 'task' as const,
+      refId,
+      score: 1,
+      deadline: null,
+      linkedTaskId: null,
+    })
+    const budgets = distributeBudget([item('a'), item('b'), item('c')], 83)
+    const total = [...budgets.values()].reduce((s, v) => s + v, 0)
+    expect(total).toBe(83)
+  })
+})
