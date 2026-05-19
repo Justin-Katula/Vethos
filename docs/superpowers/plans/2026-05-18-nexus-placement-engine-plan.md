@@ -36,10 +36,12 @@ Dans `src/shared/schemas.ts`, dans `SettingsSchema`, juste après la ligne `firs
 
 ```ts
   /** Niveau du temps libre (4–7) : concourt avec les tâches/objectifs pour le temps. */
-  freeTimeLevel: z.number().int().min(4).max(7).default(5),
+  freeTimeLevel: z.number().int().min(4).max(7).optional(),
   /** Date du dernier changement du niveau de temps libre (cooldown 2 semaines). */
   freeTimeLevelChangedAt: z.string().datetime().optional(),
 ```
+
+> Le champ est `.optional()` — comme **tous** les autres réglages de `SettingsSchema` (`username`, `sleepStart`…). La valeur par défaut (5) est fournie par le store (Task 2), pas par le schéma. Un `.default(5)` rendrait le champ *requis* dans le type inféré et casserait les fixtures de `storage.test.ts` ; `.optional()` l'évite.
 
 - [ ] **Step 2 : Vérifier le typecheck**
 
@@ -49,7 +51,7 @@ Expected: PASS (node + web), aucune erreur.
 - [ ] **Step 3 : Vérifier les tests**
 
 Run: `npm run test`
-Expected: PASS — 169 tests (le `.default(5)` rend le champ rétro-compatible : les fichiers `settings` existants sans le champ restent valides).
+Expected: PASS — 169 tests (le champ `.optional()` est rétro-compatible : les fichiers `settings` existants sans le champ restent valides, et aucun défaut n'est injecté à la lecture).
 
 - [ ] **Step 4 : Commit**
 
