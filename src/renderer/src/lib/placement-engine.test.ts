@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
-import { buildItems, enumerateDates, distributeBudget } from './placement-engine'
+import { buildItems, enumerateDates, distributeBudget, placeBlocks } from './placement-engine'
 
 export function makeTask(over: Partial<Task> & { id: string }): Task {
   return {
@@ -107,5 +107,62 @@ describe('distributeBudget', () => {
 
   it('renvoie une map vide si le temps libre total est nul', () => {
     expect(distributeBudget([item('t1', 3)], 0).size).toBe(0)
+  })
+})
+
+describe('placeBlocks', () => {
+  const taskItem = (refId: string, deadline: string | null) => ({
+    kind: 'task' as const,
+    refId,
+    score: 1,
+    deadline,
+    linkedTaskId: null,
+  })
+
+  it('place les blocs dans les créneaux libres, planning vide = journée libre', () => {
+    const blocks = placeBlocks(
+      [taskItem('t1', null)],
+      new Map([['task:t1', 120]]),
+      ['2026-05-18'],
+      [],
+      [],
+    )
+    const total = blocks.reduce((s, b) => s + (b.endMinute - b.startMinute), 0)
+    expect(total).toBe(120)
+    expect(blocks.every((b) => b.date === '2026-05-18' && b.kind === 'task')).toBe(true)
+  })
+
+  it('ne place jamais une tâche après son échéance', () => {
+    const blocks = placeBlocks(
+      [taskItem('t1', '2026-05-18')],
+      new Map([['task:t1', 120]]),
+      ['2026-05-18', '2026-05-19', '2026-05-20'],
+      [],
+      [],
+    )
+    expect(blocks.length).toBeGreaterThan(0)
+    expect(blocks.every((b) => b.date <= '2026-05-18')).toBe(true)
+  })
+
+  it('étale les blocs d un item sur plusieurs jours', () => {
+    const blocks = placeBlocks(
+      [taskItem('t1', null)],
+      new Map([['task:t1', 600]]),
+      ['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22'],
+      [],
+      [],
+    )
+    expect(new Set(blocks.map((b) => b.date)).size).toBeGreaterThan(1)
+  })
+
+  it('ne place pas l item temps libre (il est ce qui reste)', () => {
+    const blocks = placeBlocks(
+      [{ kind: 'free', refId: null, score: 5, deadline: null, linkedTaskId: null }],
+      new Map([['free', 300]]),
+      ['2026-05-18'],
+      [],
+      [],
+    )
+    expect(blocks).toEqual([])
   })
 })

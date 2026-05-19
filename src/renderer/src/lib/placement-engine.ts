@@ -154,3 +154,103 @@ export function distributeBudget(
 
   return budgets
 }
+
+// ─── Placement des blocs (spec §5) ──────────────────────────────────────────
+
+const MIN_BLOCK = 30 // durée minimale d'un bloc (min)
+const MAX_BLOCK = 120 // durée maximale d'un bloc (min)
+const MAX_PER_ITEM_PER_DAY = 240 // plafond « 4 h même item / jour »
+const MAX_WORK_PER_DAY = 360 // plafond « 6 h de travail / jour »
+
+type WorkSlot = { cursor: number; endMinute: number }
+
+/**
+ * Place les budgets (tâches + objectifs) en blocs concrets. Le temps libre
+ * n'est pas placé : ce sont les créneaux qui restent vides. Par item, le budget
+ * est étalé sur ses jours éligibles ; les tâches ne dépassent jamais leur
+ * échéance ; les plafonds par jour sont respectés.
+ */
+export function placeBlocks(
+  items: PlacementItem[],
+  budgets: Map<string, number>,
+  dates: string[],
+  entries: ScheduleEntry[],
+  rules: TimeRule[],
+): PlacedBlock[] {
+  const placeable = items
+    .filter((i) => i.kind !== 'free')
+    .sort((a, b) => b.score - a.score)
+
+  // Créneaux de travail libres par date (créneaux non-préparation ≥ MIN_BLOCK).
+  const slotsByDate = new Map<string, WorkSlot[]>()
+  for (const date of dates) {
+    slotsByDate.set(
+      date,
+      computeFreeTimeSlots(dayOfWeekOf(date), entries, rules)
+        .filter((s) => !s.isPreparation && s.durationMinutes >= MIN_BLOCK)
+        .map((s) => ({ cursor: s.startMinute, endMinute: s.endMinute })),
+    )
+  }
+
+  const perDayItem = new Map<string, number>() // clé `${date}|${itemKey}`
+  const perDayTotal = new Map<string, number>() // clé `date`
+  const blocks: PlacedBlock[] = []
+
+  for (const item of placeable) {
+    const key = itemKey(item)
+    let budget = budgets.get(key) ?? 0
+    const eligible = dates.filter(
+      (d) => item.kind !== 'task' || item.deadline === null || d <= item.deadline,
+    )
+    if (eligible.length === 0) continue
+
+    let guard = 0
+    while (budget >= MIN_BLOCK && guard < 1000) {
+      guard += 1
+      // Cible par jour : étale le budget restant sur les jours éligibles.
+      const perPass = Math.min(
+        MAX_BLOCK,
+        Math.max(MIN_BLOCK, Math.floor(budget / eligible.length / 5) * 5),
+      )
+      let placedThisPass = false
+      for (const date of eligible) {
+        if (budget < MIN_BLOCK) break
+        const dayItem = perDayItem.get(`${date}|${key}`) ?? 0
+        const dayTotal = perDayTotal.get(date) ?? 0
+        if (dayItem >= MAX_PER_ITEM_PER_DAY || dayTotal >= MAX_WORK_PER_DAY) continue
+        const slot = (slotsByDate.get(date) ?? []).find(
+          (s) => s.endMinute - s.cursor >= MIN_BLOCK,
+        )
+        if (!slot) continue
+        const size =
+          Math.floor(
+            Math.min(
+              perPass,
+              budget,
+              slot.endMinute - slot.cursor,
+              MAX_PER_ITEM_PER_DAY - dayItem,
+              MAX_WORK_PER_DAY - dayTotal,
+            ) / 5,
+          ) * 5
+        if (size < MIN_BLOCK) continue
+        blocks.push({
+          id: `${date}:${slot.cursor}:${item.kind}:${item.refId ?? ''}`,
+          date,
+          startMinute: slot.cursor,
+          endMinute: slot.cursor + size,
+          kind: item.kind,
+          refId: item.refId,
+          linkedTaskId: item.linkedTaskId,
+        })
+        slot.cursor += size
+        budget -= size
+        perDayItem.set(`${date}|${key}`, dayItem + size)
+        perDayTotal.set(date, dayTotal + size)
+        placedThisPass = true
+      }
+      if (!placedThisPass) break
+    }
+  }
+
+  return blocks
+}
