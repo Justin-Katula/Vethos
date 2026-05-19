@@ -39,9 +39,9 @@ Mais l'app **n'a jamais placé** ces minutes sur le calendrier : elle dit
 
 ## Périmètre
 
-**Dans le périmètre :** le moteur d'auto-placement, sa persistance, son
-affichage sur le calendrier (semaine + mois), la fenêtre horaire visible, le
-niveau de temps libre.
+**Dans le périmètre :** le moteur d'auto-placement, son affichage sur le
+calendrier (semaine + mois), la fenêtre horaire visible, le niveau de temps
+libre.
 
 **Hors périmètre (specs ultérieures) :** les jeux de distractions (couche 2),
 le déclenchement du blocage (couche 3), les bugs du service Windows.
