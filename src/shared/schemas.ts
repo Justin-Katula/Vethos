@@ -47,6 +47,10 @@ export const SettingsSchema = z.object({
   defaultUnlockJustificationWords: z.number().int().min(50).max(500).optional(),
   /** Date du premier lancement (pour la première semaine). */
   firstLaunchDate: z.string().datetime().optional(),
+  /** Niveau du temps libre (4–7) : concourt avec les tâches/objectifs pour le temps. */
+  freeTimeLevel: z.number().int().min(4).max(7).optional(),
+  /** Date du dernier changement du niveau de temps libre (cooldown 2 semaines). */
+  freeTimeLevelChangedAt: z.string().datetime().optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
