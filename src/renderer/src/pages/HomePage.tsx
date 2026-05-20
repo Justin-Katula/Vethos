@@ -12,24 +12,11 @@ import { useTasksStore } from '@/store/tasks.store'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
-import {
-  computeDailyFreeTime,
-  distributeTimeToObjectives,
-  formatAllocatedTime,
-  type ObjectiveTimeDistribution,
-  type TimeDistribution,
-} from '@/lib/free-time-calculator'
-import { cn } from '@/lib/cn'
+import { formatAllocatedTime, computeFreeTimeSlots } from '@/lib/free-time-calculator'
+import { usePlacement, localDateKey } from '@/lib/use-placement'
 import { checkPaletteCollisions } from '@/lib/color-similarity'
 
 const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-
-function localDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 export default function HomePage() {
   const { loaded, rules, entries, load } = useScheduleStore()
@@ -74,15 +61,45 @@ export default function HomePage() {
     ? objectives.find((objective) => objective.linkedRuleIds.includes(currentRule.id))
     : undefined
 
-  // ─── CORE: Time distribution calculation ───
-  const dailyResult = useMemo(
-    () => computeDailyFreeTime(dow, entries, rules, tasks, todayStr),
-    [dow, entries, rules, tasks, todayStr],
+  // ─── CORE: Time distribution via le moteur unifié ───
+  const rangeEnd = useMemo(() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6)
+    return localDateKey(d)
+  }, [now])
+  const { blocks } = usePlacement(now, rangeEnd)
+
+  const todayMinutesByTask = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const b of blocks) {
+      if (b.date !== todayStr || b.kind !== 'task' || !b.refId) continue
+      m.set(b.refId, (m.get(b.refId) ?? 0) + (b.endMinute - b.startMinute))
+    }
+    return m
+  }, [blocks, todayStr])
+  const todayMinutesByObjective = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const b of blocks) {
+      if (b.date !== todayStr || b.kind !== 'objective' || !b.refId) continue
+      m.set(b.refId, (m.get(b.refId) ?? 0) + (b.endMinute - b.startMinute))
+    }
+    return m
+  }, [blocks, todayStr])
+
+  const totalTodayWorkMinutes = useMemo(
+    () =>
+      blocks
+        .filter((b) => b.date === todayStr && b.kind !== 'free')
+        .reduce((s, b) => s + (b.endMinute - b.startMinute), 0),
+    [blocks, todayStr],
   )
-  const objectiveDistributions = useMemo(
-    () => distributeTimeToObjectives(objectives, dailyResult.totalFreeMinutes, todayStr),
-    [objectives, dailyResult.totalFreeMinutes, todayStr],
-  )
+
+  // Pour la persistance de stats : temps libre brut d'aujourd'hui (somme des
+  // créneaux non-préparation), indépendant du nouveau moteur.
+  const todayDow = (now.getDay() + 6) % 7
+  const todayFreeMinutes = useMemo(() => {
+    const slots = computeFreeTimeSlots(todayDow, entries, rules)
+    return slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
+  }, [todayDow, entries, rules])
   const colorCollisions = useMemo(() => {
     const colors = todayEntries
       .map((entry) => ruleById.get(entry.ruleId))
@@ -94,8 +111,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!loaded || !tasksLoaded) return
-    void setCalculatedFreeTime(dailyResult.totalFreeMinutes, todayStr)
-  }, [loaded, tasksLoaded, dailyResult.totalFreeMinutes, todayStr, setCalculatedFreeTime])
+    void setCalculatedFreeTime(todayFreeMinutes, todayStr)
+  }, [loaded, tasksLoaded, todayFreeMinutes, todayStr, setCalculatedFreeTime])
 
   // Average level
   const avgLevel =
@@ -229,31 +246,69 @@ export default function HomePage() {
               </div>
             )}
 
-            {objectiveDistributions.length > 0 && (
+            {todayMinutesByObjective.size > 0 && (
               <div className="mt-8">
                 <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
                   <Target size={14} />
-                  Répartition par objectif
+                  Répartition par objectif (aujourd&apos;hui)
                 </h2>
                 <div className="flex flex-col gap-2">
-                  {objectiveDistributions.map((dist) => (
-                    <ObjectiveDistributionCard key={dist.objectiveId} dist={dist} />
-                  ))}
+                  {[...todayMinutesByObjective.entries()].map(([objectiveId, minutes]) => {
+                    const obj = objectives.find((o) => o.id === objectiveId)
+                    if (!obj) return null
+                    return (
+                      <div
+                        key={objectiveId}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className="h-9 w-1.5 shrink-0 rounded-2xl" style={{ backgroundColor: obj.color }} />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-text-primary">{obj.name}</div>
+                            <div className="mt-0.5 text-[10px] text-text-muted">Niveau {obj.level.toFixed(1)}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold tabular-nums text-text-primary">
+                            {formatAllocatedTime(minutes)}
+                          </div>
+                          <div className="text-[10px] text-text-muted">alloué</div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {/* ─── DISTRIBUTION DU TEMPS — LE CŒUR ─── */}
-            {dailyResult.distributions.length > 0 && (
+            {todayMinutesByTask.size > 0 && (
               <div className="mt-8">
                 <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
                   <Target size={14} />
                   Ce que tu dois faire aujourd&apos;hui
                 </h2>
                 <div className="flex flex-col gap-2">
-                  {dailyResult.distributions.map((dist) => (
-                    <DistributionCard key={dist.taskId} dist={dist} />
-                  ))}
+                  {[...todayMinutesByTask.entries()].map(([taskId, minutes]) => {
+                    const task = tasks.find((t) => t.id === taskId)
+                    if (!task) return null
+                    return (
+                      <div
+                        key={taskId}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-text-primary">{task.title}</div>
+                          <div className="mt-0.5 text-[10px] text-text-muted">Niveau {task.level} · échéance {task.deadline}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold tabular-nums text-text-primary">
+                            {formatAllocatedTime(minutes)}
+                          </div>
+                          <div className="text-[10px] text-text-muted">à travailler</div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -271,14 +326,15 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-yellow" />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                  Temps libre aujourd&apos;hui
+                  Temps de travail aujourd&apos;hui
                 </h3>
               </div>
               <div className="mt-3 text-3xl font-bold tabular-nums text-text-primary">
-                {formatAllocatedTime(dailyResult.totalFreeMinutes)}
+                {formatAllocatedTime(totalTodayWorkMinutes)}
               </div>
               <div className="mt-1 text-xs text-text-muted">
-                Réparti entre {dailyResult.distributions.length} tâche{dailyResult.distributions.length !== 1 ? 's' : ''}
+                Réparti entre {todayMinutesByTask.size + todayMinutesByObjective.size} item
+                {todayMinutesByTask.size + todayMinutesByObjective.size !== 1 ? 's' : ''}
               </div>
             </div>
 
@@ -358,8 +414,8 @@ export default function HomePage() {
                 />
                 <StatCard
                   icon={<Clock size={14} className="text-yellow" />}
-                  label="Temps libre"
-                  value={formatAllocatedTime(dailyResult.totalFreeMinutes)}
+                  label="Temps de travail"
+                  value={formatAllocatedTime(totalTodayWorkMinutes)}
                 />
                 <StatCard
                   icon={<Target size={14} className="text-cyan" />}
@@ -380,90 +436,7 @@ export default function HomePage() {
   )
 }
 
-// ─── Distribution card ──────────────────────────────────────────────────────
 
-function DistributionCard({ dist }: { dist: TimeDistribution }) {
-  const urgencyColor =
-    dist.deadlineDays <= 1
-      ? 'text-red-400 bg-red-500/10 border-red-500/30'
-      : dist.deadlineDays <= 3
-      ? 'text-orange bg-orange/10 border-orange/30'
-      : 'text-text-secondary bg-bg-card border-border-subtle'
-
-  const deadlineLabel =
-    dist.deadlineDays <= 0
-      ? 'En retard !'
-      : dist.deadlineDays === 1
-      ? 'Demain'
-      : `${dist.deadlineDays} jours`
-
-  return (
-    <motion.div
-      whileHover={{ x: 2 }}
-      className={cn(
-        'flex items-center justify-between gap-4 rounded-xl border p-4 transition-colors',
-        urgencyColor,
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-text-primary">{dist.taskTitle}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-          <span>Niveau {dist.level}</span>
-          <span>·</span>
-          <span>{deadlineLabel}</span>
-          <span>·</span>
-          <span>Score: {dist.scoreReel.toFixed(1)}</span>
-        </div>
-      </div>
-      <div className="text-right">
-        <div className="text-lg font-bold tabular-nums text-text-primary">
-          {formatAllocatedTime(dist.allocatedMinutes)}
-        </div>
-        <div className="text-[10px] text-text-muted">à travailler</div>
-      </div>
-    </motion.div>
-  )
-}
-
-function ObjectiveDistributionCard({ dist }: { dist: ObjectiveTimeDistribution }) {
-  const deadlineLabel =
-    dist.deadlineDays === null
-      ? 'Sans deadline'
-      : dist.deadlineDays <= 0
-      ? 'Aujourd’hui'
-      : dist.deadlineDays === 1
-      ? 'Demain'
-      : `${dist.deadlineDays} jours`
-
-  return (
-    <motion.div
-      whileHover={{ x: 2 }}
-      className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4 transition-colors hover:border-border-strong"
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="h-9 w-1.5 shrink-0 rounded-2xl" style={{ backgroundColor: dist.color }} />
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-text-primary">
-            {dist.objectiveName}
-          </div>
-          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-text-muted">
-            <span>Niveau {dist.level.toFixed(1)}</span>
-            <span>·</span>
-            <span>{deadlineLabel}</span>
-            <span>·</span>
-            <span>Score: {dist.scoreReel.toFixed(1)}</span>
-          </div>
-        </div>
-      </div>
-      <div className="text-right">
-        <div className="text-lg font-bold tabular-nums text-text-primary">
-          {formatAllocatedTime(dist.allocatedMinutes)}
-        </div>
-        <div className="text-[10px] text-text-muted">alloué</div>
-      </div>
-    </motion.div>
-  )
-}
 
 // ─── Helper components ──────────────────────────────────────────────────────
 
