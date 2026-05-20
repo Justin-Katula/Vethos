@@ -13,7 +13,7 @@
  *   - Si trajet retour → sommeil : max 30 min de transition
  */
 
-import type { Objective, ScheduleEntry, TimeRule, Task } from '@shared/schemas'
+import type { ScheduleEntry, TimeRule, Task } from '@shared/schemas'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,30 +26,7 @@ export type FreeTimeSlot = {
   isPreparation: boolean
 }
 
-export type TimeDistribution = {
-  taskId: string
-  taskTitle: string
-  scoreReel: number
-  allocatedMinutes: number
-  deadlineDays: number
-  level: number
-}
 
-export type ObjectiveTimeDistribution = {
-  objectiveId: string
-  objectiveName: string
-  color: string
-  scoreReel: number
-  allocatedMinutes: number
-  deadlineDays: number | null
-  level: number
-}
-
-export type DailyFreeTimeResult = {
-  totalFreeMinutes: number
-  slots: FreeTimeSlot[]
-  distributions: TimeDistribution[]
-}
 
 // ─── Calcul des créneaux libres ─────────────────────────────────────────────
 
@@ -223,123 +200,7 @@ export function computeDayFreeMinutes(
   return slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
 }
 
-// ─── Distribution du temps libre ────────────────────────────────────────────
 
-/**
- * Distribue le temps libre entre les tâches actives selon la formule :
- *   part = (niveau × multiplicateur_deadline) / somme_scores × temps_libre_total
- * Arrondi au multiple de 5 minutes.
- *
- * Écrêtage intelligent : le score réel (niveau × multiplicateur) prime sur le niveau brut.
- */
-export function distributeTimeToTasks(
-  tasks: Task[],
-  totalFreeMinutes: number,
-  todayStr: string,
-): TimeDistribution[] {
-  if (totalFreeMinutes <= 0) return []
-
-  const activeTasks = tasks.filter((task) => task.status === 'active' && task.level > 0)
-  if (activeTasks.length === 0) return []
-
-  const scored = activeTasks.map((task) => ({
-    task,
-    scoreReel: task.level * getDeadlineMultiplier(task.deadline, todayStr),
-  }))
-  const totalScore = scored.reduce((sum, item) => sum + item.scoreReel, 0)
-  if (totalScore === 0) return []
-
-  const distributions = scored.map(({ task, scoreReel }) => {
-    const rawMinutes = (scoreReel / totalScore) * totalFreeMinutes
-    return {
-      taskId: task.id,
-      taskTitle: task.title,
-      scoreReel,
-      allocatedMinutes: Math.round(rawMinutes / 5) * 5,
-      deadlineDays: daysBetweenLocalDates(todayStr, task.deadline),
-      level: task.level,
-    }
-  })
-
-  const allocatedTotal = distributions.reduce((sum, item) => sum + item.allocatedMinutes, 0)
-  const diff = totalFreeMinutes - allocatedTotal
-  if (diff !== 0) {
-    const top = scored.slice().sort((a, b) => b.scoreReel - a.scoreReel)[0]
-    const target = top ? distributions.find((item) => item.taskId === top.task.id) : undefined
-    if (target) target.allocatedMinutes = Math.max(0, target.allocatedMinutes + diff)
-  }
-
-  return distributions
-}
-
-export function distributeTimeToObjectives(
-  objectives: Objective[],
-  totalFreeMinutes: number,
-  todayStr: string,
-): ObjectiveTimeDistribution[] {
-  const activeObjectives = objectives.filter((objective) => objective.level > 0)
-  if (activeObjectives.length === 0 || totalFreeMinutes <= 0) return []
-
-  const scored = activeObjectives.map((objective) => {
-    const deadlineDays = objective.deadline
-      ? daysBetweenLocalDates(todayStr, objective.deadline)
-      : null
-    const multiplier = objective.deadline ? getDeadlineMultiplier(objective.deadline, todayStr) : 1
-    const scoreReel = objective.level * multiplier
-    return { objective, scoreReel, deadlineDays }
-  })
-
-  const totalScore = scored.reduce((sum, item) => sum + item.scoreReel, 0)
-  if (totalScore === 0) return []
-
-  scored.sort((a, b) => b.scoreReel - a.scoreReel)
-
-  const distributions = scored.map(({ objective, scoreReel, deadlineDays }) => {
-    const rawMinutes = (scoreReel / totalScore) * totalFreeMinutes
-    return {
-      objectiveId: objective.id,
-      objectiveName: objective.name,
-      color: objective.color,
-      scoreReel,
-      allocatedMinutes: Math.round(rawMinutes / 5) * 5,
-      deadlineDays,
-      level: objective.level,
-    }
-  })
-
-  const allocatedTotal = distributions.reduce((sum, item) => sum + item.allocatedMinutes, 0)
-  const diff = totalFreeMinutes - allocatedTotal
-  if (diff !== 0) {
-    distributions[0] = {
-      ...distributions[0]!,
-      allocatedMinutes: Math.max(0, distributions[0]!.allocatedMinutes + diff),
-    }
-  }
-
-  return distributions
-}
-
-/**
- * Calcule le résultat complet pour aujourd'hui :
- *   - Temps libre total
- *   - Créneaux libres
- *   - Distribution entre les tâches
- */
-export function computeDailyFreeTime(
-  dayOfWeek: number,
-  entries: ScheduleEntry[],
-  rules: TimeRule[],
-  tasks: Task[],
-  todayStr: string,
-): DailyFreeTimeResult {
-  const slots = computeFreeTimeSlots(dayOfWeek, entries, rules)
-  const totalFreeMinutes = slots
-    .filter((s) => !s.isPreparation)
-    .reduce((sum, s) => sum + s.durationMinutes, 0)
-  const distributions = distributeTimeToTasks(tasks, totalFreeMinutes, todayStr)
-
-  return { totalFreeMinutes, slots, distributions }
-}
 
 // ─── Niveaux : dégradation et cooldown ──────────────────────────────────────
 

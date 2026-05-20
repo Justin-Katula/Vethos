@@ -3,7 +3,6 @@ import {
   applyAutomaticDegradation,
   clampManualLevelChange,
   computeDayFreeMinutes,
-  distributeTimeToTasks,
   formatAllocatedTime,
   getDeadlineMultiplier,
   getMinimumLevel,
@@ -64,19 +63,7 @@ describe('free-time-calculator', () => {
     expect(getDeadlineMultiplier('2026-05-01', today)).toBe(1.0)
   })
 
-  it('distributes free time correctly and rounds to 5 mins', () => {
-    const results = distributeTimeToTasks(
-      [task('1', '2026-05-15', 5), task('2', '2026-05-08', 4), task('3', '2026-05-07', 3)],
-      60,
-      '2026-05-06',
-    )
 
-    expect(results).toEqual([
-      expect.objectContaining({ taskId: '1', scoreReel: 5, allocatedMinutes: 15 }),
-      expect.objectContaining({ taskId: '2', scoreReel: 6.4, allocatedMinutes: 25 }),
-      expect.objectContaining({ taskId: '3', scoreReel: 6, allocatedMinutes: 20 }),
-    ])
-  })
 
   it('handles minimum levels', () => {
     expect(getMinimumLevel(10)).toBe(3)
@@ -128,30 +115,14 @@ describe('free-time-calculator', () => {
     expect(computeDayFreeMinutes(0, entries, [custom, free])).toBe(1440)
   })
 
-  it('ignores level 0 tasks in the distribution', () => {
-    const out = distributeTimeToTasks(
-      [task('active', '2026-05-20', 5), task('zero', '2026-05-14', 0)],
-      120,
-      '2026-05-13',
-    )
 
-    expect(out).toEqual([expect.objectContaining({ taskId: 'active', allocatedMinutes: 120 })])
-  })
 
   it('formats allocated time without clock notation', () => {
     expect(formatAllocatedTime(45)).toBe('45min')
     expect(formatAllocatedTime(150)).toBe('2h30')
   })
 
-  it('keeps rounded allocations reconciled to the full daily free time', () => {
-    const out = distributeTimeToTasks(
-      [task('a', '2026-05-22', 5), task('b', '2026-05-15', 4), task('c', '2026-05-14', 3)],
-      60,
-      '2026-05-13',
-    )
 
-    expect(out.reduce((sum, item) => sum + item.allocatedMinutes, 0)).toBe(60)
-  })
 })
 
 describe('reconcileLevelZeroTasks', () => {

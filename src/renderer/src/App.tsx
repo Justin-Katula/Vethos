@@ -15,7 +15,7 @@ import { useDeclaredAppsStore } from './store/declared-apps.store'
 import { useTasksStore } from './store/tasks.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
-import { computeDailyFreeTime } from './lib/free-time-calculator'
+import { computeFreeTimeSlots } from './lib/free-time-calculator'
 import { jsDateToDayOfWeek } from './lib/schedule-selectors'
 import HomePage from './pages/HomePage'
 import ObjectivesPage from './pages/ObjectivesPage'
@@ -50,7 +50,6 @@ export default function App(): JSX.Element {
   const reconcileWithHistory = useLevelsStore((s) => s.reconcileWithHistory)
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
   const loadTasks = useTasksStore((s) => s.load)
-  const tasks = useTasksStore((s) => s.tasks)
   const reconcileLevelZero = useTasksStore((s) => s.reconcileLevelZero)
   const tasksLoaded = useTasksStore((s) => s.loaded)
   const toast = useToast()
@@ -82,14 +81,10 @@ export default function App(): JSX.Element {
     const today = new Date()
     const todayStr = localDateKey(today)
     if (lastCalculatedDate === todayStr) return
-    const result = computeDailyFreeTime(
-      jsDateToDayOfWeek(today),
-      scheduleEntries,
-      scheduleRules,
-      tasks,
-      todayStr,
-    )
-    void setCalculatedFreeTime(result.totalFreeMinutes, todayStr)
+    const todayDow = jsDateToDayOfWeek(today)
+    const slots = computeFreeTimeSlots(todayDow, scheduleEntries, scheduleRules)
+    const freeMinutes = slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
+    void setCalculatedFreeTime(freeMinutes, todayStr)
   }, [
     scheduleLoaded,
     levelsLoaded,
@@ -97,7 +92,6 @@ export default function App(): JSX.Element {
     lastCalculatedDate,
     scheduleEntries,
     scheduleRules,
-    tasks,
     setCalculatedFreeTime,
   ])
 
