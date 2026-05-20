@@ -174,6 +174,11 @@ export default function PlanningPage() {
               rules={rules}
               entries={entries}
               viewport={{ startMinute: 0, endMinute: 1440 }}
+              weekDates={['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22', '2026-05-23', '2026-05-24']}
+              workBlocks={[]}
+              now={new Date()}
+              taskById={new Map()}
+              objectiveById={new Map()}
               onCreateEntry={handleCreateEntry}
               onUpdateEntry={handleUpdateEntry}
               onChangeRule={handleChangeRule}

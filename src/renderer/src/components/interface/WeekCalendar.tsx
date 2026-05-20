@@ -14,11 +14,19 @@ import {
   visibleHoursOfViewport,
   type CalendarViewport,
 } from '@/lib/calendar-viewport'
+import type { PlacedBlock } from '@/lib/placement-engine'
+import type { Task, Objective } from '@shared/schemas'
+import { localDateKey } from '@/lib/use-placement'
 
 type Props = {
   rules: TimeRule[]
   entries: ScheduleEntry[]
   viewport: CalendarViewport
+  weekDates: string[]
+  workBlocks: PlacedBlock[]
+  now: Date
+  taskById: Map<string, Task>
+  objectiveById: Map<string, Objective>
   onCreateEntry: (draft: {
     ruleId: string
     dayOfWeek: number
@@ -62,6 +70,11 @@ export function WeekCalendar({
   rules,
   entries,
   viewport,
+  weekDates,
+  workBlocks,
+  now,
+  taskById,
+  objectiveById,
   onCreateEntry,
   onUpdateEntry,
   onChangeRule,
@@ -334,6 +347,79 @@ export function WeekCalendar({
     )
   }
 
+  // Couleur neutre pour les tâches autonomes (sans objectif).
+  const STANDALONE_TASK_COLOR = '#64748b' // slate-500
+
+  const renderWorkBlock = (block: PlacedBlock, dayOfWeek: number) => {
+    const clippedStart = Math.max(block.startMinute, viewport.startMinute)
+    const clippedEnd = Math.min(block.endMinute, viewport.endMinute)
+    if (clippedEnd <= clippedStart) return null
+
+    const top = HEADER_HEIGHT + minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const height =
+      minuteToYPx(viewport, clippedEnd, HOUR_HEIGHT) -
+      minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+
+    // Couleur, libellé principal, et tâche en sous-titre.
+    let color = STANDALONE_TASK_COLOR
+    let title = '…'
+    let subtitle: string | null = null
+
+    if (block.kind === 'task' && block.refId) {
+      const task = taskById.get(block.refId)
+      if (task) title = task.title
+    } else if (block.kind === 'objective' && block.refId) {
+      const obj = objectiveById.get(block.refId)
+      if (obj) {
+        title = obj.name
+        color = obj.color
+      }
+      if (block.linkedTaskId) {
+        const linked = taskById.get(block.linkedTaskId)
+        if (linked) subtitle = linked.title
+      }
+    }
+
+    // « Terminé » : bloc d'aujourd'hui dont l'heure de fin est passée.
+    const todayStr = localDateKey(now)
+    const nowMinute = now.getHours() * 60 + now.getMinutes()
+    const isToday = block.date === todayStr
+    const isFinished = isToday && block.endMinute <= nowMinute
+
+    void dayOfWeek
+
+    return (
+      <div
+        key={block.id}
+        className={cn(
+          'pointer-events-none absolute left-1 right-1 overflow-hidden rounded-md ring-1 ring-white/10',
+          isFinished && 'opacity-40',
+        )}
+        style={{
+          top,
+          height,
+          backgroundColor: color,
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
+        <div className="relative flex h-full flex-col p-1.5 text-white drop-shadow-sm">
+          <div className="flex items-center gap-1 text-[11px] font-semibold leading-tight">
+            <span className="truncate">{title}</span>
+            {isFinished && <span className="ml-auto text-[9px] uppercase opacity-80">Terminé</span>}
+          </div>
+          {height > 28 && subtitle && (
+            <div className="truncate text-[10px] leading-tight opacity-80">{subtitle}</div>
+          )}
+          {height > 50 && (
+            <div className="text-[10px] leading-tight opacity-70">
+              {minuteToClockLabel(block.startMinute)} — {minuteToClockLabel(block.endMinute)}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       ref={containerRef}
@@ -403,7 +489,11 @@ export function WeekCalendar({
                 style={{ top: minuteToYPx(viewport, h * 60 + 30, HOUR_HEIGHT) }}
               />
             ))}
-            {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
+             {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
+            {/* Blocs de travail (lecture seule, par-dessus la grille) */}
+            {workBlocks
+              .filter((b) => b.date === weekDates[dayOfWeek])
+              .map((b) => renderWorkBlock(b, dayOfWeek))}
             {drag?.type === 'create' && drag.dayOfWeek === dayOfWeek && (
               <div
                 className="pointer-events-none absolute inset-0"
