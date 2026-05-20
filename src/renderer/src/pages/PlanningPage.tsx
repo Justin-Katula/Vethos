@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Calendar, Grid3X3 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
@@ -11,6 +11,11 @@ import { useBlockingStore } from '@/store/blocking.store'
 import { useToast } from '@/lib/use-toast'
 import { cn } from '@/lib/cn'
 import type { TimeRule } from '@shared/schemas'
+import { usePlacement, localDateKey } from '@/lib/use-placement'
+import { viewportFromSettings } from '@/lib/calendar-viewport'
+import { useSettingsStore } from '@/store/settings.store'
+import { useLevelsStore } from '@/store/levels.store'
+import { useTasksStore } from '@/store/tasks.store'
 
 export default function PlanningPage() {
   const {
@@ -32,10 +37,51 @@ export default function PlanningPage() {
   const [editingRule, setEditingRule] = useState<TimeRule | null>(null)
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
 
+  const sleepStart = useSettingsStore((s) => s.sleepStart)
+  const sleepEnd = useSettingsStore((s) => s.sleepEnd)
+  const tasks = useTasksStore((s) => s.tasks)
+  const objectives = useLevelsStore((s) => s.objectives)
+  const loadTasks = useTasksStore((s) => s.load)
+  const loadLevels = useLevelsStore((s) => s.load)
+  const tasksLoaded = useTasksStore((s) => s.loaded)
+  const levelsLoaded = useLevelsStore((s) => s.loaded)
+
   useEffect(() => {
     void load()
     if (!blockingLoaded) void loadBlocking()
-  }, [load, loadBlocking, blockingLoaded])
+    if (!tasksLoaded) void loadTasks()
+    if (!levelsLoaded) void loadLevels()
+  }, [load, loadBlocking, loadTasks, loadLevels, blockingLoaded, tasksLoaded, levelsLoaded])
+
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const weekDates = useMemo(() => {
+    const dow = (now.getDay() + 6) % 7
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i)
+      return localDateKey(d)
+    })
+  }, [now])
+
+  const viewport = useMemo(() => viewportFromSettings(sleepStart, sleepEnd), [sleepStart, sleepEnd])
+
+  // Plan opérationnel : aujourd'hui → aujourd'hui + 6.
+  const todayStr = localDateKey(now)
+  const rangeEnd = useMemo(() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6)
+    return localDateKey(d)
+  }, [now])
+
+  const { blocks: workBlocks } = usePlacement(now, rangeEnd)
+
+  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
+  const objectiveById = useMemo(() => new Map(objectives.map((o) => [o.id, o])), [objectives])
+  void todayStr
 
   const openEditor = (rule: TimeRule | null) => {
     setEditingRule(rule)
@@ -173,12 +219,12 @@ export default function PlanningPage() {
             <WeekCalendar
               rules={rules}
               entries={entries}
-              viewport={{ startMinute: 0, endMinute: 1440 }}
-              weekDates={['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22', '2026-05-23', '2026-05-24']}
-              workBlocks={[]}
-              now={new Date()}
-              taskById={new Map()}
-              objectiveById={new Map()}
+              viewport={viewport}
+              weekDates={weekDates}
+              workBlocks={workBlocks}
+              now={now}
+              taskById={taskById}
+              objectiveById={objectiveById}
               onCreateEntry={handleCreateEntry}
               onUpdateEntry={handleUpdateEntry}
               onChangeRule={handleChangeRule}
@@ -186,7 +232,7 @@ export default function PlanningPage() {
               onCreateRule={() => openEditor(null)}
             />
           ) : (
-            <MonthView rules={rules} entries={entries} />
+            <MonthView now={now} />
           )}
         </section>
       </div>
@@ -206,13 +252,10 @@ export default function PlanningPage() {
 // ─── Vue mois ───────────────────────────────────────────────────────────────
 
 function MonthView({
-  rules: _rules,
-  entries,
+  now,
 }: {
-  rules: import('@shared/schemas').TimeRule[]
-  entries: import('@shared/schemas').ScheduleEntry[]
+  now: Date
 }) {
-  const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
   const firstDay = new Date(year, month, 1)
@@ -227,22 +270,6 @@ function MonthView({
     'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
   ]
-
-  // Calculer la charge par jour de la semaine
-  const loadByDow = new Map<number, number>()
-  for (let dow = 0; dow < 7; dow++) {
-    const dayEntries = entries.filter((e) => e.dayOfWeek === dow)
-    const totalMinutes = dayEntries.reduce((sum, e) => sum + (e.endMinute - e.startMinute), 0)
-    loadByDow.set(dow, totalMinutes)
-  }
-
-  const getLoadColor = (dow: number): string => {
-    const minutes = loadByDow.get(dow) ?? 0
-    if (minutes < 240) return 'bg-emerald-500/30 text-emerald-300' // < 4h → vert
-    if (minutes < 480) return 'bg-yellow/30 text-yellow' // 4-8h → jaune
-    if (minutes < 720) return 'bg-orange/30 text-orange' // 8-12h → orange
-    return 'bg-red-500/30 text-red-400' // 12h+ → rouge feu
-  }
 
   const cells: (number | null)[] = []
   for (let i = 0; i < firstDayOfWeek; i++) cells.push(null)
@@ -265,15 +292,13 @@ function MonthView({
           if (day === null) {
             return <div key={i} className="h-12" />
           }
-          const dow = i % 7
           const isToday = day === now.getDate()
           return (
             <motion.div
               key={i}
               whileHover={{ scale: 1.05 }}
               className={cn(
-                'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors cursor-pointer',
-                getLoadColor(dow),
+                'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors cursor-pointer bg-emerald-500/30 text-emerald-300',
                 isToday && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-card',
               )}
             >
