@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2 } from 'lucide-react'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
@@ -7,10 +7,18 @@ import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import { cn } from '@/lib/cn'
 import { EntryQuickPicker } from './EntryQuickPicker'
+import {
+  minuteToYPx,
+  yPxToMinute,
+  viewportHeightPx,
+  visibleHoursOfViewport,
+  type CalendarViewport,
+} from '@/lib/calendar-viewport'
 
 type Props = {
   rules: TimeRule[]
   entries: ScheduleEntry[]
+  viewport: CalendarViewport
   onCreateEntry: (draft: {
     ruleId: string
     dayOfWeek: number
@@ -28,7 +36,6 @@ type Props = {
 
 const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const HOUR_HEIGHT = 40 // px par heure
-const TOTAL_HEIGHT = 24 * HOUR_HEIGHT
 const HEADER_HEIGHT = 36
 const GUTTER_WIDTH = 48 // colonne des heures à gauche
 
@@ -54,6 +61,7 @@ type PickerState = {
 export function WeekCalendar({
   rules,
   entries,
+  viewport,
   onCreateEntry,
   onUpdateEntry,
   onChangeRule,
@@ -65,15 +73,18 @@ export function WeekCalendar({
   const [picker, setPicker] = useState<PickerState | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
 
+  const totalHeight = viewportHeightPx(viewport, HOUR_HEIGHT)
+  const visibleHours = useMemo(() => visibleHoursOfViewport(viewport), [viewport])
+
   const ruleById = useMemo(() => new Map(rules.map((r) => [r.id, r])), [rules])
 
-  const minuteFromY = (clientY: number): number => {
+  const minuteFromY = useCallback((clientY: number): number => {
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return 0
+    if (!rect) return viewport.startMinute
     const y = clientY - rect.top - HEADER_HEIGHT
-    const m = Math.round((y / TOTAL_HEIGHT) * 1440)
-    return Math.max(0, Math.min(1440, m))
-  }
+    const m = Math.round(yPxToMinute(viewport, y, HOUR_HEIGHT))
+    return Math.max(viewport.startMinute, Math.min(viewport.endMinute, m))
+  }, [viewport])
 
   const onCellMouseDown = (e: React.MouseEvent, dayOfWeek: number) => {
     if (e.button !== 0) return
@@ -173,7 +184,7 @@ export function WeekCalendar({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [drag, entries, onUpdateEntry])
+  }, [drag, entries, onUpdateEntry, minuteFromY])
 
   const handlePickRule = async (ruleId: string) => {
     if (!picker) return
@@ -199,8 +210,12 @@ export function WeekCalendar({
     const eff = beingDragged
       ? { startMinute: drag.startMinute, endMinute: drag.endMinute }
       : { startMinute: entry.startMinute, endMinute: entry.endMinute }
-    const liveTop = HEADER_HEIGHT + (eff.startMinute / 1440) * TOTAL_HEIGHT
-    const liveHeight = ((eff.endMinute - eff.startMinute) / 1440) * TOTAL_HEIGHT
+    // Clip aux bornes de la fenêtre visible.
+    const clippedStart = Math.max(eff.startMinute, viewport.startMinute)
+    const clippedEnd = Math.min(eff.endMinute, viewport.endMinute)
+    if (clippedEnd <= clippedStart) return null
+    const liveTop = HEADER_HEIGHT + minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const liveHeight = minuteToYPx(viewport, clippedEnd, HOUR_HEIGHT) - minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
 
     return (
       <div
@@ -300,8 +315,10 @@ export function WeekCalendar({
       startMinute: drag.startMinute,
       endMinute: drag.endMinute,
     })
-    const top = HEADER_HEIGHT + (drag.startMinute / 1440) * TOTAL_HEIGHT
-    const height = ((drag.endMinute - drag.startMinute) / 1440) * TOTAL_HEIGHT
+    const top = HEADER_HEIGHT + minuteToYPx(viewport, drag.startMinute, HOUR_HEIGHT)
+    const height =
+      minuteToYPx(viewport, drag.endMinute, HOUR_HEIGHT) -
+      minuteToYPx(viewport, drag.startMinute, HOUR_HEIGHT)
     return (
       <div
         className={cn(
@@ -321,7 +338,7 @@ export function WeekCalendar({
     <div
       ref={containerRef}
       className="relative overflow-hidden rounded-lg border border-border-subtle bg-bg-card"
-      style={{ height: TOTAL_HEIGHT + HEADER_HEIGHT }}
+      style={{ height: totalHeight + HEADER_HEIGHT }}
     >
       {/* Header jours */}
       <div
@@ -342,15 +359,15 @@ export function WeekCalendar({
       {/* Gutter heures */}
       <div
         className="absolute left-0 top-0 z-0 border-r border-border-subtle"
-        style={{ width: GUTTER_WIDTH, top: HEADER_HEIGHT, height: TOTAL_HEIGHT }}
+        style={{ width: GUTTER_WIDTH, top: HEADER_HEIGHT, height: totalHeight }}
       >
-        {Array.from({ length: 24 }, (_, h) => (
+        {visibleHours.map((h) => (
           <div
             key={h}
             className="absolute left-0 right-1 text-right text-[10px] font-mono text-text-muted"
-            style={{ top: (h / 24) * TOTAL_HEIGHT - 6 }}
+            style={{ top: minuteToYPx(viewport, h * 60, HOUR_HEIGHT) - 6 }}
           >
-            {h === 0 ? '' : `${String(h).padStart(2, '0')}h`}
+            {`${String(h).padStart(2, '0')}h`}
           </div>
         ))}
       </div>
@@ -361,7 +378,7 @@ export function WeekCalendar({
         style={{
           left: GUTTER_WIDTH,
           top: HEADER_HEIGHT,
-          height: TOTAL_HEIGHT,
+          height: totalHeight,
         }}
       >
         {DAYS_FR.map((_, dayOfWeek) => (
@@ -371,19 +388,19 @@ export function WeekCalendar({
             onMouseDown={(e) => onCellMouseDown(e, dayOfWeek)}
           >
             {/* lignes horaires */}
-            {Array.from({ length: 24 }, (_, h) => (
+            {visibleHours.map((h) => (
               <div
-                key={h}
+                key={`hr-${h}`}
                 className="absolute inset-x-0 border-t border-border-subtle/40"
-                style={{ top: (h / 24) * TOTAL_HEIGHT }}
+                style={{ top: minuteToYPx(viewport, h * 60, HOUR_HEIGHT) }}
               />
             ))}
             {/* lignes demi-heure */}
-            {Array.from({ length: 24 }, (_, h) => (
+            {visibleHours.map((h) => (
               <div
                 key={`half-${h}`}
                 className="absolute inset-x-0 border-t border-border-subtle/15"
-                style={{ top: ((h + 0.5) / 24) * TOTAL_HEIGHT }}
+                style={{ top: minuteToYPx(viewport, h * 60 + 30, HOUR_HEIGHT) }}
               />
             ))}
             {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
@@ -392,7 +409,7 @@ export function WeekCalendar({
                 className="pointer-events-none absolute inset-0"
                 style={{ top: -HEADER_HEIGHT }}
               >
-                <div style={{ position: 'relative', height: TOTAL_HEIGHT + HEADER_HEIGHT }}>
+                <div style={{ position: 'relative', height: totalHeight + HEADER_HEIGHT }}>
                   {renderGhost()}
                 </div>
               </div>

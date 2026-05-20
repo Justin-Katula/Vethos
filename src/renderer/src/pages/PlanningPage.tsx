@@ -173,6 +173,7 @@ export default function PlanningPage() {
             <WeekCalendar
               rules={rules}
               entries={entries}
+              viewport={{ startMinute: 0, endMinute: 1440 }}
               onCreateEntry={handleCreateEntry}
               onUpdateEntry={handleUpdateEntry}
               onChangeRule={handleChangeRule}
