@@ -49,6 +49,8 @@ RegistryItem {
   usageCount      // visites (site) ou minutes d'usage cumulé (app)
   lastSeenAt      // ISO datetime
   classified      // true ssi l'utilisateur a répondu au moins une fois
+  demoted         // true ssi l'item a été démontré « utile » → « distraction »
+                  // (one-way, jamais réversible — cf. D11)
   usefulFor: {
     objectives: ObjectiveId[]
     standaloneTasks: TaskId[]
@@ -108,10 +110,13 @@ RegistryItem {
   BlockingPage.
 
 ### D8 — Comportement pendant un bloc
-- Pendant un bloc d'**objectif O** : items du registre où `!classified` OU
-  (`classified && O ∉ usefulFor.objectives`) → **bloqués**.
-- Pendant un bloc de **tâche autonome T** : items où `!classified` OU
-  (`classified && T ∉ usefulFor.standaloneTasks`) → **bloqués**.
+- Pendant un bloc d'**objectif O** : items du registre où `demoted` OU
+  `!classified` OU (`classified && O ∉ usefulFor.objectives`) → **bloqués**.
+- Pendant un bloc de **tâche autonome T** : items où `demoted` OU
+  `!classified` OU (`classified && T ∉ usefulFor.standaloneTasks`) → **bloqués**.
+- Les IDs de tâches dans `usefulFor.standaloneTasks` qui pointent vers des
+  tâches en `history` (échéance passée) sont **ignorés** par le resolver —
+  ce qui implémente naturellement l'expiration des classifications par tâche.
 - Le service applique le payload résolu via le mécanisme `START_SESSION`
   existant (P16) — pas de changement service pour cette couche.
 
@@ -134,6 +139,47 @@ depuis cette page (le blocage est piloté par le calendrier → couche 3).
 Dans `SettingsPage`, nouveau réglage :
 - **Mode de classification** : *immédiat* (défaut) / *batch 3 h* / *batch 1 j* /
   *batch 1 sem*. Stocké dans `SettingsSchema.classificationMode`.
+
+### D11 — Règles d'anti-sabotage (verrouillage)
+
+L'utilisateur a explicitement demandé un modèle très strict d'anti-sabotage,
+cohérent avec le calendrier verrouillé de la Partie B (§7) et le cooldown
+2 jours du niveau des objectifs/tâches (Partie A).
+
+**Sur les classifications de sites/apps :**
+- Aucune modification une fois définie. Une association `(site, objectif)` ou
+  `(site, tâche)` ne peut **jamais** être supprimée individuellement par
+  l'utilisateur.
+- **Seule exception autorisée** : la **dégradation one-way** d'« utile » vers
+  « distraction ». Concrètement : l'utilisateur peut basculer `demoted = true`
+  sur un item ; cela le bloque partout, en court-circuitant tout
+  `usefulFor`. Cette bascule est **irréversible** — `demoted` ne peut jamais
+  redevenir `false`.
+- **Avertissement avant création** : avant qu'une classification soit
+  enregistrée (popup ou édition manuelle dans la BlockingPage), l'app affiche
+  un message clair « Une fois validé, tu ne pourras plus revenir en arrière.
+  Es-tu sûr ? ». Confirmation requise.
+
+**Sur les tâches :**
+- Une fois créée, une tâche **ne peut pas être supprimée** ni marquée
+  « terminée » manuellement tant que son échéance n'est pas atteinte.
+- **Seule modification autorisée** : le niveau (avec cooldown 2 jours, règle
+  Partie A existante).
+- À l'échéance, la tâche bascule automatiquement en `status: 'history'`
+  (mécanisme existant). À ce moment seulement, ses associations de
+  classification se « libèrent » (résolveur les ignore — cf. D8).
+
+**Sur les objectifs :**
+- Pas de deadline obligatoire (déjà optionnelle). Les associations restent
+  actives tant que l'objectif n'est pas supprimé.
+- La suppression manuelle d'un objectif suit la même logique stricte que les
+  tâches (à clarifier en design d'objectifs ; non couvert par cette spec).
+
+**Sur les sessions en cours :**
+- Une session déclenchée par un bloc va jusqu'à sa fin prévue, quoi qu'il
+  arrive. Aucun mécanisme d'interruption.
+- Pour accéder à un site bloqué pendant une session, le seul recours est
+  l'`unlockPolicy` de l'objectif/tâche (cooldown ou justification).
 
 ## Périmètre
 
@@ -196,11 +242,23 @@ Dans `SettingsPage`, nouveau réglage :
   donnée et l'app n'a rien à classifier. L'UI fonctionne (saisie manuelle
   possible) mais le bénéfice principal est perdu.
 - **Mode immédiat intrusif** : un popup pendant qu'on tape sur un nouveau
-  site coupe le flow. Atténué par la possibilité de passer en batch. À tester
-  en vrai usage.
-- **Coût des prompts** : si l'utilisateur visite 50 nouveaux sites en une
-  journée, 50 popups (mode immédiat) → friction réelle. Le mode batch est
-  l'échappatoire.
-- **Classification cumulative** : l'utilisateur peut faire évoluer la liste
-  des objectifs/tâches utiles pour un site donné. À chaque édition, recalculer
-  la liste de blocage des sessions futures (resolver pur, pas d'état caché).
+  site coupe le flow. Atténué par la possibilité de passer en batch.
+- **Scalabilité du registre — connue, différée** : un utilisateur visite
+  facilement 50–200 domaines uniques par semaine. Avec les règles
+  anti-sabotage de D11 (no modifications), le registre grandit
+  monotoniquement. Pour un utilisateur prudent qui ne classifie que ce qui
+  compte vraiment, c'est gérable ; pour un utilisateur curieux, ça devient
+  une charge cognitive importante.
+  - **Mitigation prévue** : intégration future d'IA (planifiée par
+    l'utilisateur) pour pré-classer automatiquement les nouveaux sites.
+    L'utilisateur valide ou ajuste, mais le travail brut est automatisé.
+  - **Pour v1** : assumer la limitation. Encourager la classification
+    parcimonieuse via le mode batch et la possibilité de laisser indéfiniment
+    des items en « non classifiés » (= bloqués par défaut, sans engagement).
+- **Anti-sabotage strict** : l'utilisateur a fait des choix très contraints
+  (D11). Le warning avant chaque action est critique — l'expérience UX dépend
+  fortement de ce dialogue (clair, non ambigu, jamais sauté par défaut).
+- **Tâches expirées dans `usefulFor`** : les associations vers des tâches
+  archivées (en `history`) sont ignorées par le resolver mais persistent en
+  données. À long terme, le registre peut accumuler des références mortes ;
+  garbage collection optionnelle (hors v1).
