@@ -16,6 +16,7 @@ import { viewportFromSettings } from '@/lib/calendar-viewport'
 import { useSettingsStore } from '@/store/settings.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { useTasksStore } from '@/store/tasks.store'
+import { loadColor } from '@/lib/load-heatmap'
 
 export default function PlanningPage() {
   const {
@@ -251,18 +252,30 @@ export default function PlanningPage() {
 
 // ─── Vue mois ───────────────────────────────────────────────────────────────
 
-function MonthView({
-  now,
-}: {
-  now: Date
-}) {
+function MonthView({ now }: { now: Date }) {
   const year = now.getFullYear()
   const month = now.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
   const daysInMonth = lastDay.getDate()
 
-  // Décalage pour commencer un lundi (0=lundi dans notre système)
+  // Calcul à la demande : tout le mois à partir d'aujourd'hui.
+  const rangeEndStr = localDateKey(lastDay)
+  const { dailyLoad } = usePlacement(now, rangeEndStr)
+
+  const todayStr = localDateKey(now)
+  const todayDayOfMonth = now.getMonth() === month ? now.getDate() : -1
+  const loadByDate = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const l of dailyLoad) m.set(l.date, l.freeMinutes)
+    return m
+  }, [dailyLoad])
+
+  // Échelle relative sur les jours rendus avec une charge calculée.
+  const futureLoads = dailyLoad.filter((l) => l.date >= todayStr).map((l) => l.freeMinutes)
+  const minFree = futureLoads.length ? Math.min(...futureLoads) : 0
+  const maxFree = futureLoads.length ? Math.max(...futureLoads) : 0
+
   const firstDayOfWeek = (firstDay.getDay() + 6) % 7
 
   const DAYS_HEADER = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
@@ -275,6 +288,11 @@ function MonthView({
   for (let i = 0; i < firstDayOfWeek; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
+
+  function dateStrFor(day: number): string {
+    const d = new Date(year, month, day)
+    return localDateKey(d)
+  }
 
   return (
     <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
@@ -292,15 +310,23 @@ function MonthView({
           if (day === null) {
             return <div key={i} className="h-12" />
           }
-          const isToday = day === now.getDate()
+          const isToday = day === todayDayOfMonth
+          const dStr = dateStrFor(day)
+          const isPast = dStr < todayStr
+          const freeMinutes = loadByDate.get(dStr)
+          const colored = !isPast && freeMinutes !== undefined && futureLoads.length > 0
+          const bgColor = colored ? loadColor(freeMinutes!, minFree, maxFree) + '4D' : undefined
+          const textColor = colored ? loadColor(freeMinutes!, minFree, maxFree) : undefined
           return (
             <motion.div
               key={i}
               whileHover={{ scale: 1.05 }}
               className={cn(
-                'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors cursor-pointer bg-emerald-500/30 text-emerald-300',
+                'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors',
+                !colored && 'text-text-muted',
                 isToday && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-card',
               )}
+              style={colored ? { backgroundColor: bgColor, color: textColor } : undefined}
             >
               {day}
             </motion.div>
@@ -310,16 +336,16 @@ function MonthView({
 
       <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl bg-emerald-500/50" /> Peu chargé
+          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#22c55e80' }} /> Peu chargé
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl bg-yellow/50" /> Moyen
+          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#eab30880' }} /> Moyen
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl bg-orange/50" /> Chargé
+          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#f9731680' }} /> Chargé
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl bg-red-500/50" /> Très chargé
+          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#ef444480' }} /> Très chargé
         </span>
       </div>
     </div>
