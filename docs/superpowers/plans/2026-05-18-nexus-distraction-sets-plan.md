@@ -1,102 +1,305 @@
-# Couche 2 — Jeux de distractions : plan d'implémentation
+# Couche 2 — Registre + classifications : plan d'implémentation
 
 > Reference spec : `docs/superpowers/specs/2026-05-18-nexus-distraction-sets-design.md`
-> Préreq : Partie B (UI calendrier) mergée.
+> Préreq : Partie B (UI calendrier) mergée. Le scan d'apps et l'historique
+> navigateur (bugs 2 et 3) peuvent être corrigés en parallèle ou après ; sans
+> eux le registre reste alimentable à la main.
 
-**Goal :** Mettre les distractions sur les objectifs et tâches, retirer
-l'éditeur de profils autonomes, fournir le resolver pur.
-
-**Architecture :** Schéma + champs optionnels sur Objective/Task ; resolver pur
-testé unitairement ; composant `DistractionSetForm` ré-utilisable extrait du
-`ProfileEditor` ; éditeurs d'objectif et de tâche gagnent une section ;
-BlockingPage passe en passif.
-
-**Tech Stack :** TypeScript, React 18, Zod, Vitest.
+**Goal :** Implémenter le registre central (sites + apps avec classification),
+le resolver pur, l'UI de classification dans la BlockingPage, l'unlockPolicy
+sur Objective/Task, et le réglage `classificationMode`. Respecter les règles
+d'anti-sabotage de D11 (pas de modifications, demote one-way).
 
 **Branche suggérée :** `nexus-distraction-sets` depuis `master`.
 
 ---
 
-## Files
+## Fichiers
 
-**Create :**
-- `src/renderer/src/lib/distraction-resolver.ts`
-- `src/renderer/src/lib/distraction-resolver.test.ts`
-- `src/renderer/src/components/blocking/DistractionSetForm.tsx`
+**Créer :**
+- `src/renderer/src/lib/blocking-resolver.ts` (+ `.test.ts`)
+- `src/renderer/src/store/registry.store.ts`
+- `src/renderer/src/components/blocking/DistractionWarning.tsx` (dialog)
+- `src/renderer/src/components/blocking/ClassificationDialog.tsx`
+- `src/renderer/src/components/blocking/UnclassifiedList.tsx`
+- `src/renderer/src/components/blocking/RegistryList.tsx`
+- `src/renderer/src/components/blocking/UnlockPolicyForm.tsx`
 
-**Modify :**
+**Modifier :**
 - `src/shared/schemas.ts`
-- `src/renderer/src/components/blocking/ProfileEditor.tsx`
-- L'éditeur d'objectif (à localiser via grep : `ObjectiveEditor`, `saveObjective`)
-- L'éditeur de tâche (à localiser de même)
-- `src/renderer/src/pages/BlockingPage.tsx`
+- `src/renderer/src/pages/BlockingPage.tsx` (refonte)
+- `src/renderer/src/pages/SettingsPage.tsx` (ajout classificationMode)
+- L'éditeur d'objectif (à localiser via grep `ObjectiveEditor|saveObjective`)
+- L'éditeur de tâche (à localiser via grep)
+- `src/main/tracking/app-discovery.ts` (câblage au registre, après bug 2 fixé)
+- `src/main/tracking/site-tracker.ts` (câblage au registre, après bug 3 fixé)
 
 Aucun `git add -A`.
 
 ---
 
-## Task 1 : Schéma — `DistractionSet` + champs sur Objective/Task
+## Task 1 : Schéma — RegistryItem + UnlockPolicy + champs additifs
 
-**Step 1 — Modifier `src/shared/schemas.ts`.** Juste après `BlockingProfileSchema`,
-ajouter :
+**Step 1 — Extraire `UnlockPolicySchema` du `BlockingProfileSchema`.** Dans
+`src/shared/schemas.ts`, juste avant `BlockingProfileSchema`, ajouter :
 
 ```ts
-export const DistractionSetSchema = z.object({
-  blockedSites: z.array(z.string().regex(DOMAIN_REGEX)),
-  blockedProcesses: z.array(z.string().regex(EXE_NAME_REGEX)),
-  blockedNetworkApps: z.array(z.string()),
-  unlockPolicy: z.discriminatedUnion('type', [
-    z.object({ type: z.literal('none') }),
-    z.object({ type: z.literal('cooldown'), minutes: z.number().int().min(1).max(60) }),
-    z.object({ type: z.literal('justification'), minWords: z.number().int().min(50).max(500) }),
-    z.object({
-      type: z.literal('cooldown_and_justification'),
-      minutes: z.number().int().min(1).max(60),
-      minWords: z.number().int().min(50).max(500),
-    }),
-  ]),
+export const UnlockPolicySchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('none') }),
+  z.object({ type: z.literal('cooldown'), minutes: z.number().int().min(1).max(60) }),
+  z.object({ type: z.literal('justification'), minWords: z.number().int().min(50).max(500) }),
+  z.object({
+    type: z.literal('cooldown_and_justification'),
+    minutes: z.number().int().min(1).max(60),
+    minWords: z.number().int().min(50).max(500),
+  }),
+])
+export type UnlockPolicy = z.infer<typeof UnlockPolicySchema>
+```
+
+Et dans `BlockingProfileSchema`, remplacer la définition inline d'`unlockPolicy`
+par `unlockPolicy: UnlockPolicySchema` (équivalent, mais factorisé).
+
+**Step 2 — Ajouter `RegistryItemSchema` et `RegistryStateSchema`.** Après
+`BlockingProfileSchema` :
+
+```ts
+export const RegistryItemSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(['site', 'app']),
+  /** Domaine ('youtube.com') ou nom de processus ('discord.exe'). */
+  identifier: z.string().min(1),
+  /** Label lisible affiché à l'utilisateur. */
+  displayName: z.string().min(1),
+  /** Visites (site) ou minutes d'usage cumulé (app). */
+  usageCount: z.number().int().min(0).default(0),
+  lastSeenAt: z.string().datetime(),
+  /** True ssi l'utilisateur a répondu au moins une fois. */
+  classified: z.boolean().default(false),
+  /** True ssi démontré utile → distraction. Irréversible (D11). */
+  demoted: z.boolean().default(false),
+  usefulFor: z
+    .object({
+      objectives: z.array(z.string().uuid()).default([]),
+      standaloneTasks: z.array(z.string().uuid()).default([]),
+    })
+    .default({ objectives: [], standaloneTasks: [] }),
+  createdAt: z.string().datetime(),
 })
-export type DistractionSet = z.infer<typeof DistractionSetSchema>
+export type RegistryItem = z.infer<typeof RegistryItemSchema>
+
+export const RegistryStateSchema = z.object({
+  items: z.array(RegistryItemSchema).max(10_000),
+})
+export type RegistryState = z.infer<typeof RegistryStateSchema>
 ```
 
-Dans `ObjectiveSchema`, juste avant la ligne `createdAt:`, ajouter :
+**Step 3 — Ajouter `unlockPolicy` à Objective et Task.**
+
+Dans `ObjectiveSchema`, juste avant `createdAt`, ajouter :
 ```ts
-  distractions: DistractionSetSchema.optional(),
+  unlockPolicy: UnlockPolicySchema.optional(),
 ```
 
-Dans `TaskSchema`, juste avant la ligne `createdAt:`, ajouter :
+Dans `TaskSchema`, juste avant `createdAt`, ajouter :
 ```ts
-  distractionsOverride: DistractionSetSchema.optional(),
+  unlockPolicy: UnlockPolicySchema.optional(),
 ```
 
-**Step 2 — Verify.** `npm run typecheck && npm run lint && npm run test` → PASS.
+**Step 4 — Ajouter `classificationMode` à `SettingsSchema`.**
 
-**Step 3 — Commit.**
+Juste avant `freeTimeLevel`, ajouter :
+```ts
+  /** Quand l'app demande de classifier (D7). */
+  classificationMode: z.enum(['immediate', 'batch_3h', 'batch_1d', 'batch_1w']).optional(),
+```
+
+**Step 5 — Ajouter la storage key `'registry'`.**
+
+Dans `STORAGE_KEYS`, ajouter `'registry'`. Dans `STORAGE_SCHEMAS`, ajouter :
+```ts
+  registry: RegistryStateSchema,
+```
+
+**Step 6 — Vérifier les portes.**
+`npm run typecheck && npm run lint && npm run test` — Expected : PASS.
+
+**Step 7 — Commit.**
 ```bash
 git add src/shared/schemas.ts
-git commit -m "feat(distractions): schéma DistractionSet sur Objective et Task"
+git commit -m "feat(distractions): schéma RegistryItem, UnlockPolicy, classificationMode"
 ```
 
 ---
 
-## Task 2 : Resolver pur `resolveDistractions` (TDD)
+## Task 2 : Store du registre + actions anti-sabotage
 
-**Step 1 — Test qui échoue.** Créer `src/renderer/src/lib/distraction-resolver.test.ts` :
+**Step 1 — Créer `src/renderer/src/store/registry.store.ts`.**
+
+```ts
+import { create } from 'zustand'
+import { nexus } from '@/lib/ipc'
+import type { RegistryItem, RegistryState } from '@shared/schemas'
+import { assertStorageWrite } from '@/lib/storage-write'
+
+type AddItemInput = Omit<RegistryItem, 'id' | 'createdAt' | 'classified' | 'demoted' | 'usefulFor' | 'usageCount'> & {
+  usageCount?: number
+}
+
+type ClassifyInput = {
+  itemId: string
+  usefulFor: { objectives: string[]; standaloneTasks: string[] }
+}
+
+type State = {
+  items: RegistryItem[]
+  loaded: boolean
+  load: () => Promise<void>
+  /** Ajoute un item nouvellement détecté (classified=false). */
+  observeItem: (input: AddItemInput) => Promise<RegistryItem>
+  /** Incrémente l'usageCount + met à jour lastSeenAt. */
+  incrementUsage: (itemId: string) => Promise<void>
+  /** Classifie un item (irréversible, D11). Refuse si déjà classifié. */
+  classifyItem: (input: ClassifyInput) => Promise<void>
+  /** Ajoute des associations supplémentaires (additif uniquement). */
+  addUsefulFor: (input: ClassifyInput) => Promise<void>
+  /** Démote one-way (D11). Refuse si déjà demoted. */
+  demoteItem: (itemId: string) => Promise<void>
+}
+
+async function persist(items: RegistryItem[]): Promise<void> {
+  const result = await nexus.storage.write<RegistryState>('registry', { items })
+  assertStorageWrite(result, 'registry')
+}
+
+export const useRegistryStore = create<State>((set, get) => ({
+  items: [],
+  loaded: false,
+
+  async load() {
+    const data = await nexus.storage.read<RegistryState>('registry')
+    set({ items: data?.items ?? [], loaded: true })
+  },
+
+  async observeItem(input) {
+    const existing = get().items.find(
+      (i) => i.kind === input.kind && i.identifier === input.identifier,
+    )
+    if (existing) return existing
+    const now = new Date().toISOString()
+    const item: RegistryItem = {
+      id: crypto.randomUUID(),
+      kind: input.kind,
+      identifier: input.identifier,
+      displayName: input.displayName,
+      usageCount: input.usageCount ?? 0,
+      lastSeenAt: now,
+      classified: false,
+      demoted: false,
+      usefulFor: { objectives: [], standaloneTasks: [] },
+      createdAt: now,
+    }
+    const items = [...get().items, item]
+    set({ items })
+    await persist(items)
+    return item
+  },
+
+  async incrementUsage(itemId) {
+    const items = get().items.map((i) =>
+      i.id === itemId ? { ...i, usageCount: i.usageCount + 1, lastSeenAt: new Date().toISOString() } : i,
+    )
+    set({ items })
+    await persist(items)
+  },
+
+  async classifyItem({ itemId, usefulFor }) {
+    const item = get().items.find((i) => i.id === itemId)
+    if (!item) throw new Error('Registry item introuvable')
+    if (item.classified) throw new Error('Item déjà classifié — anti-sabotage (D11)')
+    const items = get().items.map((i) =>
+      i.id === itemId ? { ...i, classified: true, usefulFor } : i,
+    )
+    set({ items })
+    await persist(items)
+  },
+
+  async addUsefulFor({ itemId, usefulFor }) {
+    const item = get().items.find((i) => i.id === itemId)
+    if (!item) throw new Error('Registry item introuvable')
+    if (item.demoted) throw new Error('Item démontré — pas d ajout possible (D11)')
+    const merged = {
+      objectives: Array.from(new Set([...item.usefulFor.objectives, ...usefulFor.objectives])),
+      standaloneTasks: Array.from(new Set([...item.usefulFor.standaloneTasks, ...usefulFor.standaloneTasks])),
+    }
+    const items = get().items.map((i) =>
+      i.id === itemId ? { ...i, classified: true, usefulFor: merged } : i,
+    )
+    set({ items })
+    await persist(items)
+  },
+
+  async demoteItem(itemId) {
+    const item = get().items.find((i) => i.id === itemId)
+    if (!item) throw new Error('Registry item introuvable')
+    if (item.demoted) throw new Error('Item déjà démontré — irréversible (D11)')
+    const items = get().items.map((i) =>
+      i.id === itemId ? { ...i, classified: true, demoted: true } : i,
+    )
+    set({ items })
+    await persist(items)
+  },
+}))
+```
+
+**Step 2 — Vérifier les portes.** PASS.
+
+**Step 3 — Commit.**
+```bash
+git add src/renderer/src/store/registry.store.ts
+git commit -m "feat(distractions): store du registre + actions anti-sabotage"
+```
+
+---
+
+## Task 3 : Resolver pur `resolveBlockingForBlock` (TDD)
+
+**Step 1 — Créer le test.** `src/renderer/src/lib/blocking-resolver.test.ts` :
 
 ```ts
 import { describe, it, expect } from 'vitest'
-import type { Task, Objective } from '@shared/schemas'
+import type { Objective, Task, RegistryItem } from '@shared/schemas'
 import type { PlacedBlock } from '@/lib/placement-engine'
-import { resolveDistractions } from './distraction-resolver'
+import { resolveBlockingForBlock } from './blocking-resolver'
 
-const sampleSet = {
-  blockedSites: ['example.com'],
-  blockedProcesses: [],
-  blockedNetworkApps: [],
-  unlockPolicy: { type: 'none' as const },
+function item(over: Partial<RegistryItem> & { id: string; identifier: string }): RegistryItem {
+  return {
+    id: over.id,
+    kind: over.kind ?? 'site',
+    identifier: over.identifier,
+    displayName: over.displayName ?? over.identifier,
+    usageCount: 0,
+    lastSeenAt: '2026-01-01T00:00:00.000Z',
+    classified: over.classified ?? false,
+    demoted: over.demoted ?? false,
+    usefulFor: over.usefulFor ?? { objectives: [], standaloneTasks: [] },
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }
 }
 
-function makeTask(over: Partial<Task> & { id: string }): Task {
+function obj(over: Partial<Objective> & { id: string }): Objective {
+  return {
+    id: over.id,
+    name: over.name ?? 'O',
+    color: '#000000',
+    linkedRuleIds: [],
+    level: 5,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    unlockPolicy: over.unlockPolicy,
+  }
+}
+
+function task(over: Partial<Task> & { id: string }): Task {
   return {
     id: over.id,
     title: over.title ?? 'T',
@@ -105,333 +308,525 @@ function makeTask(over: Partial<Task> & { id: string }): Task {
     level: 5,
     degradationPool: 0,
     totalDegradation: 0,
-    status: 'active',
+    status: over.status ?? 'active',
     createdAt: '2026-01-01T00:00:00.000Z',
-    distractionsOverride: over.distractionsOverride,
+    unlockPolicy: over.unlockPolicy,
   }
 }
-function makeObjective(over: Partial<Objective> & { id: string }): Objective {
-  return {
-    id: over.id,
-    name: over.name ?? 'O',
-    color: '#000000',
-    linkedRuleIds: [],
-    level: 5,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    distractions: over.distractions,
-  }
-}
+
 function block(over: Partial<PlacedBlock> & { id: string }): PlacedBlock {
   return {
     id: over.id,
-    date: over.date ?? '2026-05-18',
+    date: '2026-05-18',
     startMinute: 0,
     endMinute: 60,
-    kind: over.kind ?? 'task',
+    kind: over.kind ?? 'objective',
     refId: over.refId ?? null,
     linkedTaskId: over.linkedTaskId ?? null,
   }
 }
 
-describe('resolveDistractions', () => {
+describe('resolveBlockingForBlock', () => {
   it('renvoie null pour un bloc temps libre', () => {
-    expect(resolveDistractions(block({ id: 'b', kind: 'free' }), [], [])).toBeNull()
+    expect(resolveBlockingForBlock(block({ id: 'b', kind: 'free' }), [], [], [])).toBeNull()
   })
 
-  it('renvoie l override d une tâche autonome', () => {
-    const t = makeTask({ id: 't1', linkedObjectiveId: null, distractionsOverride: sampleSet })
-    expect(resolveDistractions(block({ id: 'b', kind: 'task', refId: 't1' }), [t], [])).toEqual(sampleSet)
+  it('bloque les items non classifiés pendant un bloc objectif', () => {
+    const items = [item({ id: 'i1', identifier: 'unknown.com', classified: false })]
+    const o = obj({ id: 'o1' })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), items, [o], [])
+    expect(res?.blockedSites).toEqual(['unknown.com'])
   })
 
-  it('renvoie null pour une tâche autonome sans override', () => {
-    const t = makeTask({ id: 't1', linkedObjectiveId: null })
-    expect(resolveDistractions(block({ id: 'b', kind: 'task', refId: 't1' }), [t], [])).toBeNull()
+  it('autorise un item utile pour l objectif en cours', () => {
+    const items = [item({ id: 'i1', identifier: 'docs.com', classified: true, usefulFor: { objectives: ['o1'], standaloneTasks: [] } })]
+    const o = obj({ id: 'o1' })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), items, [o], [])
+    expect(res?.blockedSites).toEqual([])
   })
 
-  it('renvoie les distractions de l objectif d un bloc objective', () => {
-    const o = makeObjective({ id: 'o1', distractions: sampleSet })
-    expect(resolveDistractions(block({ id: 'b', kind: 'objective', refId: 'o1' }), [], [o])).toEqual(sampleSet)
+  it('bloque un item utile pour un AUTRE objectif', () => {
+    const items = [item({ id: 'i1', identifier: 'docs.com', classified: true, usefulFor: { objectives: ['o2'], standaloneTasks: [] } })]
+    const o1 = obj({ id: 'o1' })
+    const o2 = obj({ id: 'o2' })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), items, [o1, o2], [])
+    expect(res?.blockedSites).toEqual(['docs.com'])
   })
 
-  it('un override de tâche liée écrase les distractions de son objectif', () => {
-    const o = makeObjective({ id: 'o1', distractions: { ...sampleSet, blockedSites: ['obj.com'] } })
-    const t = makeTask({
-      id: 't1',
-      linkedObjectiveId: 'o1',
-      distractionsOverride: { ...sampleSet, blockedSites: ['task.com'] },
-    })
-    const res = resolveDistractions(
-      block({ id: 'b', kind: 'objective', refId: 'o1', linkedTaskId: 't1' }),
-      [t],
-      [o],
-    )
-    expect(res?.blockedSites).toEqual(['task.com'])
+  it('bloque un item démontré même s il est dans usefulFor', () => {
+    const items = [item({ id: 'i1', identifier: 'demoted.com', classified: true, demoted: true, usefulFor: { objectives: ['o1'], standaloneTasks: [] } })]
+    const o = obj({ id: 'o1' })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), items, [o], [])
+    expect(res?.blockedSites).toEqual(['demoted.com'])
+  })
+
+  it('utilise l unlockPolicy de l objectif', () => {
+    const o = obj({ id: 'o1', unlockPolicy: { type: 'cooldown', minutes: 10 } })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), [], [o], [])
+    expect(res?.unlockPolicy).toEqual({ type: 'cooldown', minutes: 10 })
+  })
+
+  it('ignore une standaloneTask archivée dans usefulFor', () => {
+    const t = task({ id: 't1', linkedObjectiveId: null, status: 'history' })
+    const items = [item({ id: 'i1', identifier: 'docs.com', classified: true, usefulFor: { objectives: [], standaloneTasks: ['t1'] } })]
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'task', refId: 't1' }), items, [], [t])
+    expect(res?.blockedSites).toEqual(['docs.com'])
+  })
+
+  it('renvoie default unlock {type: none} si l objectif n a pas de unlockPolicy', () => {
+    const o = obj({ id: 'o1' })
+    const res = resolveBlockingForBlock(block({ id: 'b', kind: 'objective', refId: 'o1' }), [], [o], [])
+    expect(res?.unlockPolicy).toEqual({ type: 'none' })
   })
 })
 ```
 
 **Step 2 — Run, expect FAIL** (module introuvable).
 
-**Step 3 — Implémenter.** Créer `src/renderer/src/lib/distraction-resolver.ts` :
+**Step 3 — Créer `src/renderer/src/lib/blocking-resolver.ts`.**
 
 ```ts
-import type { Objective, Task, DistractionSet } from '@shared/schemas'
+import type { Objective, RegistryItem, Task, UnlockPolicy } from '@shared/schemas'
 import type { PlacedBlock } from './placement-engine'
 
+export type SessionPayload = {
+  blockedSites: string[]
+  blockedProcesses: string[]
+  blockedNetworkApps: string[]
+  unlockPolicy: UnlockPolicy
+  /** Label à utiliser dans les notifications (« Maths commence »). */
+  label: string
+}
+
+const DEFAULT_UNLOCK: UnlockPolicy = { type: 'none' }
+
 /**
- * Résout les distractions à appliquer à un bloc placé.
- *  - 'free'      → null (pas de blocage).
- *  - 'task'      → l'override de la tâche s'il existe, sinon null.
- *                  (Note : le moteur ne place pas de bloc 'task' pour une
- *                  tâche liée — celles-ci sont absorbées dans l'objectif.)
- *  - 'objective' → l'override de la `linkedTaskId` si présente et défini,
- *                  sinon les distractions de l'objectif, sinon null.
+ * Résout le payload de session pour un bloc planifié, à partir du registre,
+ * des objectifs et des tâches. Renvoie null pour un bloc 'free'.
+ *
+ * Règles (spec D8) :
+ *  - item demoted → bloqué.
+ *  - item !classified → bloqué.
+ *  - bloc 'objective' O : item bloqué ssi O ∉ usefulFor.objectives.
+ *  - bloc 'task' T (autonome) : item bloqué ssi T ∉ usefulFor.standaloneTasks
+ *    OU T n'est plus active (status === 'history').
  */
-export function resolveDistractions(
+export function resolveBlockingForBlock(
   block: PlacedBlock,
-  tasks: Task[],
+  registry: RegistryItem[],
   objectives: Objective[],
-): DistractionSet | null {
-  if (block.kind === 'free') return null
-  if (block.kind === 'task') {
-    if (!block.refId) return null
-    const task = tasks.find((t) => t.id === block.refId)
-    return task?.distractionsOverride ?? null
+  tasks: Task[],
+): SessionPayload | null {
+  if (block.kind === 'free' || !block.refId) return null
+
+  const activeStandaloneTaskIds = new Set(
+    tasks.filter((t) => t.status === 'active' && t.linkedObjectiveId === null).map((t) => t.id),
+  )
+
+  const isUsefulForThisBlock = (item: RegistryItem): boolean => {
+    if (!item.classified) return false
+    if (item.demoted) return false
+    if (block.kind === 'objective') {
+      return item.usefulFor.objectives.includes(block.refId!)
+    }
+    // block.kind === 'task'
+    return (
+      item.usefulFor.standaloneTasks.includes(block.refId!) &&
+      activeStandaloneTaskIds.has(block.refId!)
+    )
   }
-  // kind === 'objective'
-  if (!block.refId) return null
-  if (block.linkedTaskId) {
-    const linked = tasks.find((t) => t.id === block.linkedTaskId)
-    if (linked?.distractionsOverride) return linked.distractionsOverride
+
+  const blocked = registry.filter((item) => !isUsefulForThisBlock(item))
+  const blockedSites = blocked.filter((i) => i.kind === 'site').map((i) => i.identifier)
+  const blockedProcesses = blocked.filter((i) => i.kind === 'app').map((i) => i.identifier)
+
+  let unlockPolicy: UnlockPolicy = DEFAULT_UNLOCK
+  let label = 'Bloc'
+  if (block.kind === 'objective') {
+    const o = objectives.find((x) => x.id === block.refId)
+    if (o) {
+      unlockPolicy = o.unlockPolicy ?? DEFAULT_UNLOCK
+      label = o.name
+    }
+  } else {
+    const t = tasks.find((x) => x.id === block.refId)
+    if (t) {
+      unlockPolicy = t.unlockPolicy ?? DEFAULT_UNLOCK
+      label = t.title
+    }
   }
-  const obj = objectives.find((o) => o.id === block.refId)
-  return obj?.distractions ?? null
+
+  return {
+    blockedSites,
+    blockedProcesses,
+    blockedNetworkApps: [], // v1.1 : mapper exeName → exePath dans le registre.
+    unlockPolicy,
+    label,
+  }
 }
 ```
 
-**Step 4 — Run, expect PASS** (5 tests).
+**Step 4 — Run, expect PASS** (8 tests).
 
 **Step 5 — Commit.**
 ```bash
-git add src/renderer/src/lib/distraction-resolver.ts src/renderer/src/lib/distraction-resolver.test.ts
-git commit -m "feat(distractions): resolver pur des distractions d'un bloc"
+git add src/renderer/src/lib/blocking-resolver.ts src/renderer/src/lib/blocking-resolver.test.ts
+git commit -m "feat(distractions): resolver pur du payload de session"
 ```
 
 ---
 
-## Task 3 : Extraire `DistractionSetForm` de `ProfileEditor`
+## Task 4 : Composant `DistractionWarning` (dialog de confirmation D11)
 
-**Step 1 — Lire `src/renderer/src/components/blocking/ProfileEditor.tsx`** pour
-repérer la portion du JSX qui édite les champs `blockedSites`,
-`blockedProcesses`, `blockedNetworkApps`, `unlockPolicy`.
-
-**Step 2 — Créer `src/renderer/src/components/blocking/DistractionSetForm.tsx`** :
+**Step 1 — Créer `src/renderer/src/components/blocking/DistractionWarning.tsx`.**
 
 ```tsx
-import { useState } from 'react'
-import type { DistractionSet } from '@shared/schemas'
+import { motion, AnimatePresence } from 'framer-motion'
+import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/cn'
 
 type Props = {
-  value: DistractionSet | undefined
-  onChange: (next: DistractionSet | undefined) => void
+  open: boolean
+  title: string
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
 }
 
-const EMPTY: DistractionSet = {
-  blockedSites: [],
-  blockedProcesses: [],
-  blockedNetworkApps: [],
-  unlockPolicy: { type: 'none' },
-}
-
-export function DistractionSetForm({ value, onChange }: Props) {
-  if (!value) {
-    return (
-      <button
-        type="button"
-        onClick={() => onChange(EMPTY)}
-        className="rounded-md border border-border-subtle bg-bg-card px-3 py-1.5 text-xs text-text-secondary hover:border-border-strong"
-      >
-        Ajouter des distractions
-      </button>
-    )
-  }
-
-  // Reprendre ici les sections JSX du ProfileEditor pour :
-  //   - blockedSites (champ + bouton add ; suggestion auto si scan ok)
-  //   - blockedProcesses (champ + scan d'apps si dispo)
-  //   - blockedNetworkApps (sélecteur fichier)
-  //   - unlockPolicy (radio + champs conditionnels)
-  // En remplaçant chaque setter de Profile par `onChange({ ...value, <field>: <newVal> })`.
-  // Bouton « Retirer » → onChange(undefined).
-  // ⚠️ Codex : copie exactement le markup/styles existants ; ne réinvente pas.
-
+/**
+ * Dialog de confirmation avant une action irréversible (classification, demote).
+ * Anti-sabotage : l'utilisateur doit lire le warning avant de valider (D11).
+ */
+export function DistractionWarning({ open, title, message, onConfirm, onCancel }: Props) {
   return (
-    <div className="space-y-4">
-      {/* TODO Codex : insérer ici le markup adapté de ProfileEditor */}
-      <button
-        type="button"
-        onClick={() => onChange(undefined)}
-        className="text-[10px] text-red-400 hover:underline"
-      >
-        Retirer les distractions
-      </button>
-    </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={onCancel}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="max-w-md rounded-xl border border-border-strong bg-bg-elevated p-6 shadow-elevated"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-orange/10 text-orange">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
+                <p className="mt-2 text-xs text-text-secondary">{message}</p>
+                <p className="mt-3 text-[10px] uppercase tracking-wider text-orange">
+                  Cette action est irréversible.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-md border border-border-subtle px-3 py-1.5 text-xs text-text-secondary hover:border-border-strong"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className={cn(
+                  'rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white',
+                  'hover:bg-accent-hover',
+                )}
+              >
+                Confirmer
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 ```
 
-**Note Codex :** ce TODO n'est pas un placeholder du plan — c'est une
-instruction explicite pour toi : **transcris le markup existant** des 4
-sections du `ProfileEditor` ici, en l'adaptant aux props `value` / `onChange`.
-Pas de réinvention.
+**Step 2 — Verify gates.** PASS.
 
-**Step 3 — Adapter `ProfileEditor.tsx`** pour utiliser `<DistractionSetForm>`
-en interne (le profile garde son `id` / `name` autour, mais le formulaire
-interne devient le composant extrait).
-
-**Step 4 — Verify.** typecheck + lint + tests verts. Aucun changement visible
-côté BlockingPage à ce stade.
-
-**Step 5 — Commit.**
+**Step 3 — Commit.**
 ```bash
-git add src/renderer/src/components/blocking/DistractionSetForm.tsx src/renderer/src/components/blocking/ProfileEditor.tsx
-git commit -m "refactor(distractions): extraire DistractionSetForm de ProfileEditor"
+git add src/renderer/src/components/blocking/DistractionWarning.tsx
+git commit -m "feat(distractions): dialog DistractionWarning (anti-sabotage D11)"
 ```
 
 ---
 
-## Task 4 : Section Distractions dans l'éditeur d'objectif
+## Task 5 : `ClassificationDialog` (popup immédiat)
 
-**Step 1 — Localiser l'éditeur.** Lance :
-```bash
-grep -rn "ObjectiveEditor\|EditObjective\|saveObjective" src/renderer/src/
-```
-Si plusieurs candidats : choisir le composant qui rend les champs d'objectif
-(nom, couleur, deadline, level).
+**Step 1 — Créer `src/renderer/src/components/blocking/ClassificationDialog.tsx`.**
 
-**Step 2 — Importer le composant.**
-```ts
-import { DistractionSetForm } from '@/components/blocking/DistractionSetForm'
-import type { DistractionSet } from '@shared/schemas'
-```
+Le composant affiche :
+- Le nom du site/app à classifier.
+- Multi-select objectifs (chips cochables).
+- Multi-select tâches autonomes (chips cochables).
+- Bouton « C'est une distraction » (= classifié, usefulFor vide).
+- Bouton « Plus tard » (= ne classifie pas, reste en non-classifiés).
+- Au clic « Confirmer », montre d'abord un `<DistractionWarning>`, puis appelle
+  `useRegistryStore.classifyItem(...)`.
 
-**Step 3 — Ajouter la section.** Sous les champs existants de l'objectif :
+Squelette (Codex : étoffe avec le markup Tailwind cohérent avec le reste de
+l'app, et utilise les patterns existants des autres dialogs de BlockingPage) :
 
 ```tsx
-<section className="space-y-2">
-  <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-    Distractions
-  </h3>
-  <p className="text-[10px] text-text-muted">
-    Sites et applications à bloquer pendant les créneaux de cet objectif.
-  </p>
-  <DistractionSetForm
-    value={draft.distractions}
-    onChange={(distractions) => setDraft({ ...draft, distractions })}
-  />
-</section>
+import { useState } from 'react'
+import { useRegistryStore } from '@/store/registry.store'
+import { useLevelsStore } from '@/store/levels.store'
+import { useTasksStore } from '@/store/tasks.store'
+import { DistractionWarning } from './DistractionWarning'
+import type { RegistryItem } from '@shared/schemas'
+
+type Props = {
+  item: RegistryItem
+  onClose: () => void
+}
+
+export function ClassificationDialog({ item, onClose }: Props) {
+  const objectives = useLevelsStore((s) => s.objectives)
+  const tasks = useTasksStore((s) => s.tasks).filter((t) => t.status === 'active' && t.linkedObjectiveId === null)
+  const classifyItem = useRegistryStore((s) => s.classifyItem)
+
+  const [selObjs, setSelObjs] = useState<string[]>([])
+  const [selTasks, setSelTasks] = useState<string[]>([])
+  const [pendingAction, setPendingAction] = useState<'classify' | 'distraction' | null>(null)
+
+  const handleConfirmClassify = async () => {
+    await classifyItem({ itemId: item.id, usefulFor: { objectives: selObjs, standaloneTasks: selTasks } })
+    onClose()
+  }
+  const handleConfirmDistraction = async () => {
+    await classifyItem({ itemId: item.id, usefulFor: { objectives: [], standaloneTasks: [] } })
+    onClose()
+  }
+
+  // … markup : nom, multi-select chips, 3 boutons : « Utile (n sélectionnés) »
+  // déclenche pendingAction='classify' ; « Distraction » déclenche
+  // pendingAction='distraction' ; « Plus tard » → onClose() sans changer
+  // l'item. Confirmation via <DistractionWarning> avant chaque action.
+
+  return (
+    <>
+      {/* dialog principal — markup à finaliser par Codex */}
+      <DistractionWarning
+        open={pendingAction === 'classify'}
+        title={`Marquer ${item.displayName} comme utile ?`}
+        message={`Tu vas marquer ${item.displayName} comme utile pour ${selObjs.length + selTasks.length} item(s). Une fois validé, tu ne pourras plus retirer ces associations — la seule modification possible sera de démontrer l'item en « distraction » plus tard.`}
+        onConfirm={handleConfirmClassify}
+        onCancel={() => setPendingAction(null)}
+      />
+      <DistractionWarning
+        open={pendingAction === 'distraction'}
+        title={`Marquer ${item.displayName} comme distraction ?`}
+        message={`Tu vas marquer ${item.displayName} comme une distraction. Il sera bloqué pendant TOUT bloc de travail et tu ne pourras plus jamais le marquer utile.`}
+        onConfirm={handleConfirmDistraction}
+        onCancel={() => setPendingAction(null)}
+      />
+    </>
+  )
+}
 ```
 
-(`draft` = le state local de l'éditeur. Adapter au nommage réel.)
+**Step 2 — Verify gates.**
 
-**Step 4 — Verify.** typecheck + lint + tests verts. Smoke test manuel
-recommandé.
-
-**Step 5 — Commit.**
+**Step 3 — Commit.**
 ```bash
-git add <chemin de l éditeur d objectif>
-git commit -m "feat(distractions): section Distractions dans l'éditeur d'objectif"
+git add src/renderer/src/components/blocking/ClassificationDialog.tsx
+git commit -m "feat(distractions): ClassificationDialog (popup immédiat)"
 ```
 
 ---
 
-## Task 5 : Toggle « Surcharger les distractions » dans l'éditeur de tâche
+## Task 6 : `RegistryList` + `UnclassifiedList`
 
-**Step 1 — Localiser l'éditeur de tâche.**
+**Step 1 — Créer `src/renderer/src/components/blocking/RegistryList.tsx`.**
+
+Composant paramétré par `kind: 'site' | 'app'` qui rend une liste triée par
+`usageCount` desc. Pour chaque item, affiche :
+- Nom + identifier.
+- Usage (« 12 visites », « 4 h d'usage »).
+- Statut courant : « Utile pour : Maths, Programmation » / « Distraction » /
+  « Non classifié ».
+- Bouton « Modifier » qui ouvre `ClassificationDialog` (n'autorise QUE l'ajout
+  d'associations supplémentaires — pas la suppression, anti-sabotage D11).
+- Bouton « Démontrer en distraction » (one-way) avec warning, si l'item est
+  classifié useful et pas déjà demoted.
+
+**Step 2 — Créer `src/renderer/src/components/blocking/UnclassifiedList.tsx`.**
+
+Filtre les items où `!classified`. Affiche chaque item avec un bouton
+« Classifier » qui ouvre le `ClassificationDialog`.
+
+Le badge dans la sidebar (« n nouveaux ») est dérivé d'un sélecteur du store :
+`useRegistryStore((s) => s.items.filter((i) => !i.classified).length)`. À
+afficher dans `Sidebar.tsx` à côté du lien « Blocage ».
+
+**Step 3 — Verify gates.**
+
+**Step 4 — Commit.**
 ```bash
-grep -rn "TaskEditor\|EditTask\|saveTask" src/renderer/src/
+git add src/renderer/src/components/blocking/RegistryList.tsx src/renderer/src/components/blocking/UnclassifiedList.tsx src/renderer/src/components/Sidebar.tsx
+git commit -m "feat(distractions): RegistryList + UnclassifiedList + badge sidebar"
 ```
 
-**Step 2 — Importer le composant.**
-```ts
-import { DistractionSetForm } from '@/components/blocking/DistractionSetForm'
-```
+---
 
-**Step 3 — Ajouter la section.**
+## Task 7 : Refonte `BlockingPage`
+
+**Step 1 — Refondre `src/renderer/src/pages/BlockingPage.tsx`.**
+
+Layout final (Codex : suivre les styles existants de la page) :
 
 ```tsx
-<section className="space-y-2">
-  <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-    Distractions spécifiques
-  </h3>
-  <p className="text-[10px] text-text-muted">
-    {draft.linkedObjectiveId
-      ? 'Surcharge celles de l objectif lié pour cette tâche seulement.'
-      : 'Liste de sites/apps à bloquer quand cette tâche est planifiée.'}
-  </p>
-  <DistractionSetForm
-    value={draft.distractionsOverride}
-    onChange={(distractionsOverride) => setDraft({ ...draft, distractionsOverride })}
-  />
-</section>
+<PageTransition>
+  <div className="flex h-full flex-col gap-6 overflow-y-auto px-12 pb-16 pt-16">
+    <header>
+      <h1 className="text-3xl font-semibold tracking-tight">Blocage</h1>
+      <p className="mt-2 text-sm text-text-secondary">
+        Centre d'automatisation : Nexus suit tes apps et sites visités, tu les classes, le calendrier déclenche le blocage automatiquement.
+      </p>
+    </header>
+
+    {/* Bannière statut service — existante */}
+    <ServiceStatusBanner />
+
+    {/* Session active — existante */}
+    <ActiveSessionPanel />
+
+    {/* Non classifiés */}
+    <UnclassifiedList />
+
+    {/* Apps installées (triées par usage) */}
+    <section>
+      <h2 className="...">Apps installées</h2>
+      <RegistryList kind="app" />
+    </section>
+
+    {/* Sites suivis */}
+    <section>
+      <h2 className="...">Sites suivis</h2>
+      <RegistryList kind="site" />
+    </section>
+
+    {/* Historique des sessions — existant */}
+    <HistoryPanel />
+  </div>
+</PageTransition>
 ```
 
-**Step 4 — Verify.** typecheck + lint + tests verts.
-
-**Step 5 — Commit.**
-```bash
-git add <chemin de l éditeur de tâche>
-git commit -m "feat(distractions): override des distractions par tâche"
-```
-
----
-
-## Task 6 : `BlockingPage` passe en passif
-
-**Step 1 — Modifier `src/renderer/src/pages/BlockingPage.tsx`.** Retirer :
+Retirer entièrement :
 - Le bouton « Nouveau profile ».
 - La liste des profils.
-- L'ouverture / mount de `ProfileEditor`.
+- Toute ouverture/mount de `ProfileEditor`.
 
-Garder :
-- La bannière de statut du service (existante, P16).
-- L'affichage de la session active (s'il y en a une).
-- L'historique des sessions.
-
-Si la page devient quasi vide, ajouter un court paragraphe explicatif :
-« Le blocage suit ton calendrier vivant — il s'active automatiquement
-quand un bloc commence. Configure les distractions par objectif et par tâche
-dans leurs éditeurs respectifs. »
-
-**Step 2 — Verify.** typecheck + lint + tests verts. Si l'import de
-`ProfileEditor` devient inutilisé, le retirer.
+**Step 2 — Verify gates.** Si des imports deviennent inutilisés, les retirer.
 
 **Step 3 — Commit.**
 ```bash
 git add src/renderer/src/pages/BlockingPage.tsx
-git commit -m "feat(distractions): BlockingPage devient passive"
+git commit -m "feat(distractions): refonte BlockingPage en hub d'automatisation"
 ```
 
 ---
 
-## Couverture spec → tâches
+## Task 8 : `UnlockPolicyForm` + intégration éditeurs
 
-- D1 (où vivent les distractions) → Task 1.
-- D2 (forme `DistractionSet`) → Task 1.
-- D3 (`BlockingProfile` reste pour le service) → aucune action requise (la
-  couche 3 compilera à la volée).
-- D4 (resolver) → Task 2.
-- D5 (UI) → Tasks 3, 4, 5, 6.
-- D6 (migration) → aucune (rien à migrer).
+**Step 1 — Créer `src/renderer/src/components/blocking/UnlockPolicyForm.tsx`.**
+
+Composant qui édite une `UnlockPolicy` :
+- Radio entre `none` / `cooldown` / `justification` / `cooldown_and_justification`.
+- Champ minutes (1–60) si cooldown / both.
+- Champ minWords (50–500) si justification / both.
+
+**Step 2 — Localiser et modifier l'éditeur d'objectif.**
+
+```bash
+grep -rn "ObjectiveEditor\|saveObjective" src/renderer/src/
+```
+
+Ajouter une section utilisant `<UnlockPolicyForm value={draft.unlockPolicy} onChange={(unlockPolicy) => setDraft({...draft, unlockPolicy})} />`.
+
+**Step 3 — Pareil pour l'éditeur de tâche** (uniquement les tâches autonomes :
+masquer la section si `draft.linkedObjectiveId !== null`, message explicatif :
+« Cette tâche hérite de la politique de son objectif »).
+
+**Step 4 — Verify gates.**
+
+**Step 5 — Commit.**
+```bash
+git add src/renderer/src/components/blocking/UnlockPolicyForm.tsx <éditeurs>
+git commit -m "feat(distractions): UnlockPolicyForm + intégration éditeurs"
+```
+
+---
+
+## Task 9 : `classificationMode` dans SettingsPage
+
+**Step 1 — Étendre `settings.store.ts`.** Ajouter `classificationMode: 'immediate' | 'batch_3h' | 'batch_1d' | 'batch_1w'` à `SettingsState` + initial state `'immediate'` + buildPayload + load.
+
+**Step 2 — Modifier `SettingsPage.tsx`.** Ajouter une section « Mode de classification » avec 4 boutons radio (immediate par défaut). Sur changement → `updateSettings({ classificationMode: ... })`.
+
+**Step 3 — Verify gates + commit.**
+```bash
+git add src/renderer/src/store/settings.store.ts src/renderer/src/pages/SettingsPage.tsx
+git commit -m "feat(distractions): réglage classificationMode"
+```
+
+---
+
+## Task 10 : Câbler la détection automatique au registre
+
+**Préreq :** Bugs 2 et 3 corrigés (sinon les trackers ne renvoient rien).
+
+**Step 1 — Site tracker** : dans `src/main/tracking/site-tracker.ts`, à chaque
+détection d'un nouveau domaine, invoquer l'IPC qui appelle
+`useRegistryStore.observeItem({ kind: 'site', identifier: domain, displayName: domain })`
+puis `incrementUsage(...)` à chaque revisit.
+
+(Côté renderer : exposer une méthode `nexus.tracking.observeSite(domain)` qui
+réémet vers le store ; ou alors le tracker écrit directement dans le storage
+`'registry'` côté main, et le store recharge.)
+
+**Step 2 — App tracker** : dans `app-usage-tracker.ts`, pareil pour les apps.
+
+**Step 3 — Décision sur le mode immédiat** : si `classificationMode === 'immediate'`
+et qu'un nouvel item est ajouté au registre, ouvrir automatiquement
+`ClassificationDialog` côté renderer (déclencher via un event store ou un
+listener du registre). Sinon (mode batch), l'item reste dans la
+`UnclassifiedList`.
+
+**Step 4 — Verify gates + smoke test manuel.**
+
+**Step 5 — Commit.**
+```bash
+git add src/main/tracking/<files>
+git commit -m "feat(distractions): câble les trackers au registre"
+```
 
 ---
 
 ## À surveiller
 
-- Si l'éditeur d'objectif ou de tâche est gros et tangled, **ne pas
-  restructurer** au-delà du strict nécessaire. Ajouter la section, c'est tout.
-- Si le scan d'apps reste cassé (bug 2), l'UX d'ajout d'apps reste manuelle —
-  fonctionnelle mais inconfortable.
-- Si la couche 2 livrée révèle un modèle qui ne convient pas à l'utilisateur,
-  c'est le prix de la spec non brainstormée. Le code reste localisé (3
-  fichiers principaux + un composant) → refactor à coût modéré.
+- Les éditeurs d'objectif/tâche n'ont pas leurs chemins exacts dans cette
+  spec (codebase pas exhaustivement exploré côté Couche 2). Codex doit
+  grep et adapter.
+- Le câblage du popup immédiat (Task 10 Step 3) demande un mécanisme
+  event-driven entre le registre et l'UI. Possibilités : Zustand subscribe,
+  EventBus, ou simple polling sur les changements du store. Choix
+  d'implémentation laissé à Codex.
+- Le mapping `exeName` → `exePath` (pour blockedNetworkApps) est laissé v1.1.
+  Pour l'instant `blockedNetworkApps: []` dans le resolver.
+- Smoke test final : sans le service P16 fonctionnel (bug 1), tu peux quand
+  même tester la classification, le registre, l'UI. La session de blocage
+  réelle attendra Couche 3.
