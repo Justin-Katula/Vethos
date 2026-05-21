@@ -243,6 +243,7 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                         key={`${app.exePath}-${app.exeName}`}
                         className="flex items-center gap-3 border-b border-border-subtle px-3 py-2 last:border-b-0"
                       >
+                        <AppIcon app={app} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-xs font-medium text-text-primary">
                             {app.name}
@@ -452,6 +453,25 @@ function splitLines(s: string): string[] {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
+}
+
+function AppIcon({ app }: { app: DiscoveredApp }) {
+  if (app.iconDataUrl) {
+    return (
+      <img
+        src={app.iconDataUrl}
+        alt=""
+        className="h-8 w-8 flex-shrink-0 rounded-md object-contain"
+        draggable={false}
+      />
+    )
+  }
+
+  return (
+    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border-subtle bg-bg-card text-xs font-semibold text-text-muted">
+      {app.name.trim().charAt(0).toUpperCase() || '?'}
+    </div>
+  )
 }
 
 const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z]{2,})+$/

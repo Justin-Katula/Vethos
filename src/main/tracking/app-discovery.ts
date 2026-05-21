@@ -7,6 +7,7 @@
  */
 
 import { execFile as execFileCallback } from 'node:child_process'
+import { app as electronApp } from 'electron'
 import { promisify } from 'node:util'
 import * as path from 'node:path'
 import log from '@main/logging/setup'
@@ -18,6 +19,7 @@ export type DiscoveredApp = {
   exeName: string
   exePath: string
   publisher: string
+  iconDataUrl?: string
 }
 
 type ShortcutRecord = {
@@ -71,9 +73,42 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
     log.warn('[app-discovery] registry scan failed', err)
   }
 
-  const apps = mergeCandidates(candidates)
+  const apps = await attachAppIcons(mergeCandidates(candidates))
   log.info(`[app-discovery] count=${apps.length}`)
   return apps
+}
+
+const iconCache = new Map<string, string | null>()
+
+async function attachAppIcons(apps: DiscoveredApp[]): Promise<DiscoveredApp[]> {
+  if (process.platform !== 'win32') return apps
+
+  return Promise.all(
+    apps.map(async (app) => {
+      const iconDataUrl = await getIconDataUrl(app.exePath)
+      return iconDataUrl ? { ...app, iconDataUrl } : app
+    }),
+  )
+}
+
+async function getIconDataUrl(exePath: string): Promise<string | null> {
+  const key = exePath.toLowerCase()
+  if (iconCache.has(key)) return iconCache.get(key) ?? null
+
+  try {
+    if (!electronApp.isReady()) {
+      iconCache.set(key, null)
+      return null
+    }
+    const image = await electronApp.getFileIcon(exePath, { size: 'normal' })
+    const dataUrl = image.isEmpty() ? null : image.toDataURL()
+    iconCache.set(key, dataUrl)
+    return dataUrl
+  } catch (err) {
+    iconCache.set(key, null)
+    log.warn('[app-discovery] icon read failed', { exePath, err })
+    return null
+  }
 }
 
 async function readStartMenuShortcuts(): Promise<ShortcutRecord[]> {

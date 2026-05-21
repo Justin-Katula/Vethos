@@ -31,7 +31,13 @@ const api = {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     openLogs: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS),
     discoverInstalledApps: (): Promise<
-      Array<{ name: string; exeName: string; exePath: string; publisher: string }>
+      Array<{
+        name: string
+        exeName: string
+        exePath: string
+        publisher: string
+        iconDataUrl?: string
+      }>
     > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),
     onFlushDebounces: (cb: () => void): (() => void) => {
       const listener = () => cb()
