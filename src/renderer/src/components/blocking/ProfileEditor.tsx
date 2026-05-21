@@ -89,9 +89,9 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
         ...(initial?.id ? { id: initial.id } : {}),
         ...(initial?.createdAt ? { createdAt: initial.createdAt } : {}),
         name: name.trim(),
-        blockedSites: splitLines(sites),
-        blockedProcesses: splitLines(procs),
-        blockedNetworkApps: splitLines(apps),
+        blockedSites: splitDomains(sites),
+        blockedProcesses: splitExeNames(procs),
+        blockedNetworkApps: splitExePaths(apps),
         unlockPolicy: policy,
       })
       onClose()
@@ -120,7 +120,7 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
     setError(null)
     try {
       const apps = await nexus.app.discoverInstalledApps()
-      setDiscoveredApps(apps.slice(0, 20))
+      setDiscoveredApps(apps)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -198,8 +198,8 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
               </Field>
 
               <Field
-                label="Apps bloquées (par nom)"
-                hint="Un nom .exe par ligne. Ex : notepad.exe"
+                label="Apps bloquées (processus)"
+                hint="Un nom .exe par ligne. Utilise le scanner pour éviter les noms invalides."
               >
                 <textarea
                   value={procs}
@@ -256,7 +256,7 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                           onClick={() => appendLine(setProcs, app.exeName)}
                           className="rounded-md border border-border-subtle px-2 py-1 text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
                         >
-                          Lancement
+                          Processus
                         </button>
                         <button
                           type="button"
@@ -452,4 +452,46 @@ function splitLines(s: string): string[] {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
+}
+
+const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z]{2,})+$/
+const EXE_NAME_REGEX = /^[A-Za-z0-9_.\- ]+\.exe$/i
+
+function splitDomains(s: string): string[] {
+  return splitLines(s).map(normalizeDomain).filter(Boolean)
+}
+
+function normalizeDomain(raw: string): string {
+  const candidate = raw
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .replace(/^\/\//, '')
+    .split(/[/?#]/)[0]
+    ?.replace(/:\d+$/, '')
+    .replace(/^www\./i, '')
+    .toLowerCase()
+    .trim()
+
+  if (!candidate || !DOMAIN_REGEX.test(candidate)) {
+    throw new Error(`Site invalide : "${raw}". Exemple attendu : youtube.com`)
+  }
+  return candidate
+}
+
+function splitExeNames(s: string): string[] {
+  return splitLines(s).map((line) => {
+    if (!EXE_NAME_REGEX.test(line)) {
+      throw new Error(`App invalide : "${line}". Utilise un nom de processus comme chrome.exe.`)
+    }
+    return line
+  })
+}
+
+function splitExePaths(s: string): string[] {
+  return splitLines(s).map((line) => {
+    if (!/\.exe$/i.test(line.trim())) {
+      throw new Error(`Chemin réseau invalide : "${line}". Choisis "Réseau" dans le scanner.`)
+    }
+    return line
+  })
 }
