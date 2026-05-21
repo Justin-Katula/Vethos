@@ -6,11 +6,12 @@
  * choisir quoi bloquer sans taper les noms à la main.
  */
 
-import { exec } from 'node:child_process'
+import { execFile as execFileCallback } from 'node:child_process'
 import { promisify } from 'node:util'
 import * as path from 'node:path'
+import log from '@main/logging/setup'
 
-const execAsync = promisify(exec)
+const execFile = promisify(execFileCallback)
 
 export type DiscoveredApp = {
   name: string
@@ -26,9 +27,11 @@ export type DiscoveredApp = {
 export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
   const apps: DiscoveredApp[] = []
   const seen = new Set<string>()
+  log.info('[app-discovery] start')
 
   // PowerShell script pour lister les apps installées
   const script = `
+    $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $paths = @(
       'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
       'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
@@ -39,16 +42,17 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
         Where-Object { $_.DisplayName -and ($_.InstallLocation -or $_.DisplayIcon) } |
         Select-Object DisplayName, InstallLocation, DisplayIcon, Publisher
     }
-    $apps | ConvertTo-Json -Depth 1
+    @($apps) | ConvertTo-Json -Depth 2
   `
 
   try {
-    const { stdout } = await execAsync(
-      `powershell -NoProfile -NonInteractive -Command "${script.replace(/"/g, '\\"')}"`,
+    const { stdout } = await execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
       { windowsHide: true, maxBuffer: 10 * 1024 * 1024, timeout: 15000 },
     )
 
-    const parsed = JSON.parse(stdout || '[]')
+    const parsed = JSON.parse(stdout.trim().replace(/^\uFEFF/, '') || '[]')
     const items = Array.isArray(parsed) ? parsed : [parsed]
 
     for (const item of items) {
@@ -63,8 +67,8 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
 
       // Essayer DisplayIcon (souvent le chemin de l'exe)
       if (item.DisplayIcon) {
-        const iconPath = String(item.DisplayIcon).split(',')[0]?.trim() ?? ''
-        if (iconPath.toLowerCase().endsWith('.exe')) {
+        const iconPath = extractExePathFromDisplayIcon(String(item.DisplayIcon))
+        if (iconPath) {
           exePath = iconPath
           exeName = path.basename(iconPath)
         }
@@ -89,17 +93,25 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
         })
       }
     }
-  } catch {
-    // PowerShell non disponible ou erreur — on retourne une liste vide
+  } catch (err) {
+    log.warn('[app-discovery] PowerShell scan failed', err)
   }
 
   // Ajouter aussi les apps UWP courantes
   try {
-    const { stdout } = await execAsync(
-      'powershell -NoProfile -NonInteractive -Command "Get-AppxPackage | Select-Object Name, PackageFamilyName | ConvertTo-Json"',
+    const { stdout } = await execFile(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        '$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-AppxPackage | Select-Object Name, PackageFamilyName | ConvertTo-Json',
+      ],
       { windowsHide: true, maxBuffer: 5 * 1024 * 1024, timeout: 10000 },
     )
-    const uwpApps = JSON.parse(stdout || '[]')
+    const uwpApps = JSON.parse(stdout.trim().replace(/^\uFEFF/, '') || '[]')
     const items = Array.isArray(uwpApps) ? uwpApps : [uwpApps]
     for (const item of items) {
       if (!item?.Name) continue
@@ -111,12 +123,19 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
       seen.add(name.toLowerCase())
       // Les apps UWP n'ont pas un .exe simple, on les skip pour l'instant
     }
-  } catch {
-    // Ignore
+  } catch (err) {
+    log.warn('[app-discovery] UWP scan failed', err)
   }
 
   // Trier par nom
   apps.sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  log.info(`[app-discovery] count=${apps.length}`)
 
   return apps
+}
+
+function extractExePathFromDisplayIcon(displayIcon: string): string {
+  const trimmed = displayIcon.trim()
+  const match = /"([^"]+\.exe)"|([a-z]:\\[^,"]+?\.exe)(?:,|$)/i.exec(trimmed)
+  return (match?.[1] ?? match?.[2] ?? '').trim()
 }
