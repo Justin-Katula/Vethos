@@ -62,20 +62,27 @@ export function createBridgeServer(opts: {
 
   return new Promise<BridgeServer>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(pipePath, () => {
-      server.removeListener('error', reject)
-      resolve({
-        broadcast(event) {
-          const line = encodeMessage({ kind: 'event', ...event })
-          for (const s of sockets) if (!s.destroyed) s.write(line)
-        },
-        close() {
-          return new Promise<void>((res) => {
-            for (const s of sockets) s.destroy()
-            server.close(() => res())
-          })
-        },
-      })
-    })
+    server.listen(
+      {
+        path: pipePath,
+        readableAll: true,
+        writableAll: true,
+      },
+      () => {
+        server.removeListener('error', reject)
+        resolve({
+          broadcast(event) {
+            const line = encodeMessage({ kind: 'event', ...event })
+            for (const s of sockets) if (!s.destroyed) s.write(line)
+          },
+          close() {
+            return new Promise<void>((res) => {
+              for (const s of sockets) s.destroy()
+              server.close(() => res())
+            })
+          },
+        })
+      },
+    )
   })
 }

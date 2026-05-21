@@ -1,6 +1,6 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { promises as fs } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, normalize } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { Service } from 'node-windows'
@@ -14,6 +14,7 @@ export const SERVICE_NAME = 'NexusBlockingService'
 const execFile = promisify(execFileCallback)
 const WRAPPER_ID = SERVICE_NAME.replace(/[^\w]/gi, '').toLowerCase()
 const WRAPPER_EXE = `${WRAPPER_ID}.exe`
+const WINDOWS_SERVICE_NAME = WRAPPER_EXE
 const WAIT_FOR_DAEMON_MS = 10_000
 const SERVICE_STATUS_RUNNING = 4
 
@@ -79,37 +80,84 @@ async function waitForPath(path: string): Promise<void> {
 async function normalizeServiceXml(): Promise<void> {
   const xmlPath = daemonXmlPath()
   const xml = await fs.readFile(xmlPath, 'utf8')
-  const normalized = xml.replace(`<id>${WRAPPER_EXE}</id>`, `<id>${SERVICE_NAME}</id>`)
+  const normalized = xml
+    .replace(/<id>.*?<\/id>/, `<id>${WINDOWS_SERVICE_NAME}</id>`)
+    .replace(/<name>.*?<\/name>/, `<name>${SERVICE_NAME}</name>`)
   if (normalized !== xml) {
     await fs.writeFile(xmlPath, normalized, 'utf8')
   }
 }
 
-async function serviceState(): Promise<number | null> {
+async function serviceState(serviceName = WINDOWS_SERVICE_NAME): Promise<number | null> {
   try {
-    const { stdout } = await execFile(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        `$service = Get-Service -Name '${SERVICE_NAME}' -ErrorAction SilentlyContinue; if ($null -eq $service) { exit 2 }; [int]$service.Status`,
-      ],
-      { windowsHide: true },
-    )
-    const state = Number(stdout.trim())
+    const { stdout } = await execFile('sc.exe', ['query', serviceName], { windowsHide: true })
+    const match = /STATE\s*:\s*(\d+)/.exec(stdout)
+    const state = Number(match?.[1])
     return Number.isFinite(state) ? state : null
   } catch {
     return null
   }
 }
 
+async function installedServiceBinaryPath(serviceName = WINDOWS_SERVICE_NAME): Promise<string | null> {
+  try {
+    const { stdout } = await execFile('sc.exe', ['qc', serviceName], { windowsHide: true })
+    const line = stdout
+      .split(/\r?\n/)
+      .find((entry) => entry.trimStart().startsWith('BINARY_PATH_NAME'))
+    const raw = line?.split(':').slice(1).join(':').trim()
+    if (!raw) return null
+    const quoted = /^"([^"]+)"/.exec(raw)
+    return quoted?.[1] ?? raw.split(/\s+/)[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+function samePath(a: string, b: string): boolean {
+  return normalize(a).toLowerCase() === normalize(b).toLowerCase()
+}
+
+async function waitForServiceDeleted(serviceName = WINDOWS_SERVICE_NAME): Promise<void> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < WAIT_FOR_DAEMON_MS) {
+    if ((await serviceState(serviceName)) === null) return
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  throw new Error(`Service ${serviceName} encore présent après suppression`)
+}
+
+async function uninstallServiceViaSc(serviceName = WINDOWS_SERVICE_NAME): Promise<void> {
+  await execFile('sc.exe', ['stop', serviceName], { windowsHide: true }).catch(() => undefined)
+  await execFile('sc.exe', ['delete', serviceName], { windowsHide: true })
+  await waitForServiceDeleted(serviceName)
+}
+
+async function uninstallStaleServiceIfNeeded(): Promise<void> {
+  if ((await serviceState(SERVICE_NAME)) !== null) {
+    log.info('[service-install] ancien nom de service détecté, suppression', {
+      serviceName: SERVICE_NAME,
+    })
+    await uninstallServiceViaSc(SERVICE_NAME)
+  }
+
+  if ((await serviceState()) === null) return
+  const installedPath = await installedServiceBinaryPath()
+  const expectedPath = daemonExecutablePath()
+  if (installedPath && samePath(installedPath, expectedPath)) return
+
+  log.info('[service-install] service existant obsolète, remplacement', {
+    installedPath,
+    expectedPath,
+  })
+  await uninstallServiceViaSc()
+}
+
 async function runDaemon(command: 'install' | 'start' | 'stop' | 'uninstall'): Promise<void> {
   await execFile(daemonExecutablePath(), [command], { windowsHide: true })
 }
 
-async function ensureServiceInstalledAndStarted(): Promise<void> {
+async function ensureServiceInstalledAndStarted(options: { restartIfRunning?: boolean } = {}): Promise<void> {
   await waitForPath(daemonExecutablePath())
   await waitForPath(daemonXmlPath())
   await normalizeServiceXml()
@@ -118,7 +166,11 @@ async function ensureServiceInstalledAndStarted(): Promise<void> {
     await runDaemon('install')
   }
 
-  const state = await serviceState()
+  let state = await serviceState()
+  if (state === SERVICE_STATUS_RUNNING && options.restartIfRunning) {
+    await runDaemon('stop').catch(() => undefined)
+    state = await serviceState()
+  }
   if (state !== SERVICE_STATUS_RUNNING) {
     await runDaemon('start').catch(async (err) => {
       if ((await serviceState()) !== SERVICE_STATUS_RUNNING) throw err
@@ -133,6 +185,7 @@ async function ensureServiceInstalledAndStarted(): Promise<void> {
  */
 export async function installService(): Promise<void> {
   await migrateBlockingData(app.getPath('userData'), serviceDataDir())
+  await uninstallStaleServiceIfNeeded()
 
   return new Promise<void>((resolve, reject) => {
     const svc = buildService()
@@ -140,7 +193,7 @@ export async function installService(): Promise<void> {
     const finishInstall = (source: 'install' | 'alreadyinstalled'): void => {
       if (settled) return
       settled = true
-      ensureServiceInstalledAndStarted()
+      ensureServiceInstalledAndStarted({ restartIfRunning: source === 'alreadyinstalled' })
         .then(() => {
           log.info('[service-install] service installé et démarré', { source })
           resolve()

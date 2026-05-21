@@ -1,4 +1,5 @@
 import { exec as sudoExec } from 'sudo-prompt'
+import { app } from 'electron'
 import log from './logging/setup'
 
 function quoteArg(value: string): string {
@@ -7,7 +8,8 @@ function quoteArg(value: string): string {
 
 function relaunchElevated(flag: '--install-service' | '--uninstall-service'): Promise<boolean> {
   return new Promise((resolve) => {
-    sudoExec(`${quoteArg(process.execPath)} ${flag}`, { name: 'Nexus' }, (err) => {
+    const appArg = process.defaultApp ? ` ${quoteArg(app.getAppPath())}` : ''
+    sudoExec(`${quoteArg(process.execPath)}${appArg} ${flag}`, { name: 'Nexus' }, (err) => {
       if (err) {
         log.error('[elevated-install] échec de la relance élevée', err)
         resolve(false)

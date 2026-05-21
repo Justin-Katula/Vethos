@@ -6,7 +6,7 @@ import { PIPE_PATH } from '@shared/service-protocol'
 export type ServiceStatus = 'ok' | 'unavailable'
 
 const execFile = promisify(execFileCallback)
-const SERVICE_NAME = 'NexusBlockingService'
+const SERVICE_NAMES = ['nexusblockingservice.exe', 'NexusBlockingService']
 const SERVICE_STATUS_RUNNING = 4
 const PROBE_TIMEOUT_MS = 1000
 
@@ -29,22 +29,13 @@ function probeServicePipe(pipePath: string): Promise<boolean> {
   })
 }
 
-async function getWindowsServiceState(): Promise<number | null> {
+async function getWindowsServiceState(serviceName: string): Promise<number | null> {
   if (process.platform !== 'win32') return null
 
   try {
-    const { stdout } = await execFile(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        `$service = Get-Service -Name '${SERVICE_NAME}' -ErrorAction SilentlyContinue; if ($null -eq $service) { exit 2 }; [int]$service.Status`,
-      ],
-      { windowsHide: true },
-    )
-    const state = Number(stdout.trim())
+    const { stdout } = await execFile('sc.exe', ['query', serviceName], { windowsHide: true })
+    const match = /STATE\s*:\s*(\d+)/.exec(stdout)
+    const state = Number(match?.[1])
     return Number.isFinite(state) ? state : null
   } catch {
     return null
@@ -52,12 +43,13 @@ async function getWindowsServiceState(): Promise<number | null> {
 }
 
 export async function getServiceStatus(pipePath = PIPE_PATH): Promise<ServiceStatus> {
-  const [pipeAvailable, serviceState] = await Promise.all([
+  const [pipeAvailable, serviceStates] = await Promise.all([
     probeServicePipe(pipePath),
-    getWindowsServiceState(),
+    Promise.all(SERVICE_NAMES.map((name) => getWindowsServiceState(name))),
   ])
 
   if (!pipeAvailable) return 'unavailable'
-  if (serviceState !== null && serviceState !== SERVICE_STATUS_RUNNING) return 'unavailable'
+  const knownStates = serviceStates.filter((state): state is number => state !== null)
+  if (knownStates.length > 0 && !knownStates.includes(SERVICE_STATUS_RUNNING)) return 'unavailable'
   return 'ok'
 }
