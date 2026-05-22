@@ -6,6 +6,8 @@ import { OnboardingOverlay } from './components/onboarding/OnboardingOverlay'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ToastViewport } from './components/ui/Toast'
 import { ProgressPulse } from './components/levels/ProgressPulse'
+import { NexusLogo } from './components/NexusLogo'
+import { useAuthStore } from './store/auth.store'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
 import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
@@ -23,6 +25,7 @@ import PlanningPage from './pages/PlanningPage'
 import BlockingPage from './pages/BlockingPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
+import AuthPage from './pages/AuthPage'
 
 function localDateKey(date: Date): string {
   const year = date.getFullYear()
@@ -32,6 +35,9 @@ function localDateKey(date: Date): string {
 }
 
 export default function App(): JSX.Element {
+  const authLoaded = useAuthStore((s) => s.loaded)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const loadAuth = useAuthStore((s) => s.load)
   const loaded = useSettingsStore((s) => s.loaded)
   const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const loadSettings = useSettingsStore((s) => s.load)
@@ -56,13 +62,14 @@ export default function App(): JSX.Element {
 
   // Boot — charge tous les stores au montage
   useEffect(() => {
+    void loadAuth()
     void loadSettings()
     void loadSchedule()
     void loadBlocking()
     void loadLevels()
     void loadDeclaredApps()
     void loadTasks()
-  }, [loadSettings, loadSchedule, loadBlocking, loadLevels, loadDeclaredApps, loadTasks])
+  }, [loadAuth, loadSettings, loadSchedule, loadBlocking, loadLevels, loadDeclaredApps, loadTasks])
 
   // V2 P9 — Réconciliation niveau-0 au boot (une fois tasks chargées)
   useEffect(() => {
@@ -142,6 +149,31 @@ export default function App(): JSX.Element {
   }, [toast])
 
   const showOnboarding = loaded && onboardingCompleted !== true
+
+  if (!authLoaded) {
+    return (
+      <ErrorBoundary>
+        <div className="flex h-screen w-screen items-center justify-center bg-bg-base text-text-primary">
+          <div className="flex flex-col items-center gap-4">
+            <NexusLogo size={32} />
+            <div className="h-1 w-28 overflow-hidden rounded-full bg-border-subtle">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-accent" />
+            </div>
+          </div>
+        </div>
+        <ToastViewport />
+      </ErrorBoundary>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <ErrorBoundary>
+        <AuthPage />
+        <ToastViewport />
+      </ErrorBoundary>
+    )
+  }
 
   return (
     <ErrorBoundary>

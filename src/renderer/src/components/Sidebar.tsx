@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Target, Calendar, Shield, Settings, type LucideIcon } from 'lucide-react'
+import { Home, Target, Calendar, Shield, Settings, LogOut, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NexusLogo } from '@/components/NexusLogo'
 import { nexus } from '@/lib/ipc'
+import { useAuthStore } from '@/store/auth.store'
 
 type NavItem = {
   to: string
@@ -24,6 +25,8 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const { pathname } = useLocation()
   const [version, setVersion] = useState<string | null>(null)
+  const account = useAuthStore((s) => s.account)
+  const signOut = useAuthStore((s) => s.signOut)
 
   useEffect(() => {
     void nexus.app.getVersion().then(setVersion).catch(() => setVersion(null))
@@ -85,8 +88,29 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto px-3 text-xs text-text-muted">
-        {version ? `v${version}` : 'Nexus'}
+      <div
+        className="mt-auto space-y-3 px-3"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        {account && (
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium text-text-primary">{account.name}</div>
+            <div className="truncate text-xs text-text-muted">{account.email}</div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className={cn(
+            'inline-flex w-full items-center gap-2 rounded-md border px-3 py-2',
+            'border-border-subtle text-xs font-medium text-text-secondary transition-colors',
+            'hover:border-border-strong hover:text-text-primary',
+          )}
+        >
+          <LogOut size={14} />
+          Déconnexion
+        </button>
+        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Nexus'}</div>
       </div>
     </aside>
   )

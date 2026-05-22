@@ -18,6 +18,7 @@ export const STORAGE_KEYS = [
   'declared_app_usage',
   'tasks',
   'discovered_sites',
+  'auth',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -53,6 +54,31 @@ export const SettingsSchema = z.object({
   freeTimeLevelChangedAt: z.string().datetime().optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
+
+// ─── Auth locale ──────────────────────────────────────────────────────────
+
+export const AuthAccountSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  email: z.string().email().max(254),
+  passwordHash: z.string().min(1),
+  passwordSalt: z.string().min(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+})
+export type AuthAccount = z.infer<typeof AuthAccountSchema>
+
+export const AuthSessionSchema = z.object({
+  accountId: z.string().uuid(),
+  signedInAt: z.string().datetime(),
+})
+export type AuthSession = z.infer<typeof AuthSessionSchema>
+
+export const AuthStateSchema = z.object({
+  account: AuthAccountSchema.nullable(),
+  session: AuthSessionSchema.nullable(),
+})
+export type AuthState = z.infer<typeof AuthStateSchema>
 
 // ─── Blocking (sous-projet 2) ──────────────────────────────────────────────
 
@@ -299,4 +325,5 @@ export const STORAGE_SCHEMAS = {
   declared_app_usage: DeclaredAppUsageStateSchema,
   tasks: TasksStateSchema,
   discovered_sites: DiscoveredSitesStateSchema,
+  auth: AuthStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>
