@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Téléchargez Vethos, l'application desktop de focus pour planifier votre temps et bloquer les distractions."
+    />
+    <title>Vethos - Téléchargement</title>
+    <link rel="canonical" href="https://justin-katula.github.io/Vethos/" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="background" aria-hidden="true">
+      <span class="falling-layer falling-layer-a"></span>
+      <span class="falling-layer falling-layer-b"></span>
+      <span class="mesh-layer"></span>
+    </div>
+
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Accueil Vethos">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="vethosLogoGradient" x1="16" y1="8" x2="48" y2="56" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#cbd5e1" />
+              <stop offset="100%" stop-color="#64748b" />
+            </linearGradient>
+            <mask id="vethosLogoMask">
+              <rect x="0" y="0" width="64" height="64" fill="white" />
+              <rect x="0" y="17.5" width="64" height="3" fill="black" />
+              <rect x="0" y="24.5" width="64" height="2" fill="black" />
+              <rect x="0" y="29.5" width="64" height="2" fill="black" />
+              <rect x="0" y="34" width="64" height="1.8" fill="black" />
+              <rect x="0" y="38" width="64" height="1.6" fill="black" />
+              <rect x="0" y="41.5" width="64" height="1.4" fill="black" />
+              <rect x="0" y="44.5" width="64" height="1.2" fill="black" />
+              <rect x="0" y="47" width="64" height="1" fill="black" />
+              <rect x="0" y="49" width="64" height="0.8" fill="black" />
+            </mask>
+          </defs>
+          <circle cx="32" cy="32" r="22.5" stroke="url(#vethosLogoGradient)" stroke-width="11" mask="url(#vethosLogoMask)" fill="none" />
+          <path d="M21.5 20.5 L32 46 L42.5 20.5 H37.5 L32 34.2 L26.5 20.5 Z" fill="url(#vethosLogoGradient)" />
+        </svg>
+        <span>Vethos</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Navigation principale">
+        <a href="#features">Fonctions</a>
+        <a href="#install">Installer</a>
+        <a class="nav-download" href="https://github.com/Justin-Katula/Vethos/releases/download/v0.12.2/Vethos-Setup-0.12.2.exe">Télécharger</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+          <p class="eyebrow">Version 0.12.2 · Windows 10/11</p>
+          <h1 id="hero-title">Vethos</h1>
+          <p class="hero-copy">
+            Une app desktop de focus pour structurer ta journée, protéger tes sessions de travail et garder tes priorités visibles.
+          </p>
+          <div class="hero-actions" aria-label="Actions de telechargement">
+            <a class="button button-primary" href="https://github.com/Justin-Katula/Vethos/releases/download/v0.12.2/Vethos-Setup-0.12.2.exe">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v2.5A1.5 1.5 0 0 0 6.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+              </svg>
+              Télécharger Vethos
+            </a>
+            <a class="button button-secondary" href="#install">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7h10v10H7zM3 12h4m10 0h4M12 3v4m0 10v4" />
+              </svg>
+              Voir l'installation
+            </a>
+          </div>
+          <p class="download-note">Installeur Windows · Vethos-Setup-0.12.2.exe</p>
+        </div>
+
+        <div class="app-preview" aria-label="Aperçu visuel de l'application Vethos">
+          <div class="preview-sidebar">
+            <div class="preview-brand">
+              <span class="preview-logo"></span>
+              <span>Vethos</span>
+            </div>
+            <span class="side-item active">Aujourd'hui</span>
+            <span class="side-item">Objectifs</span>
+            <span class="side-item">Planning</span>
+            <span class="side-item">Blocage</span>
+          </div>
+          <div class="preview-main">
+            <div class="preview-top">
+              <div>
+                <span class="micro-label">Mercredi · 3 juin</span>
+                <strong>Aujourd'hui</strong>
+              </div>
+              <span class="status-pill">Focus prêt</span>
+            </div>
+            <div class="preview-grid">
+              <div class="time-ring" aria-hidden="true">
+                <span></span>
+              </div>
+              <div class="preview-stack">
+                <article class="mini-panel">
+                  <span class="panel-bar"></span>
+                  <strong>Session profonde</strong>
+                  <p>09:00 - 11:00 · blocage actif</p>
+                </article>
+                <article class="mini-panel">
+                  <span class="panel-bar muted"></span>
+                  <strong>Projet prioritaire</strong>
+                  <p>2h allouées aujourd'hui</p>
+                </article>
+                <article class="mini-panel">
+                  <span class="panel-bar warm"></span>
+                  <strong>Pause obligatoire</strong>
+                  <p>Récupération après effort long</p>
+                </article>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section" aria-labelledby="features-title">
+        <div class="section-heading">
+          <p class="eyebrow">Ce que l'app installe</p>
+          <h2 id="features-title">Un poste de travail plus strict, sans bruit visuel.</h2>
+        </div>
+
+        <div class="info-grid">
+          <article class="info-panel">
+            <span class="icon-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3 5 6v5c0 4.5 2.8 8.5 7 10 4.2-1.5 7-5.5 7-10V6z" />
+              </svg>
+            </span>
+            <h3>Blocage des distractions</h3>
+            <p>Crée des profils pour bloquer sites, apps et tentatives de contournement pendant tes sessions.</p>
+          </article>
+
+          <article class="info-panel">
+            <span class="icon-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16M7 3v4m10-4v4M5 10h14v11H5z" />
+              </svg>
+            </span>
+            <h3>Planning vivant</h3>
+            <p>Visualise ta journée, tes blocs de travail, tes pauses et la place restante dans un calendrier clair.</p>
+          </article>
+
+          <article class="info-panel">
+            <span class="icon-box">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-14v5l3 2" />
+              </svg>
+            </span>
+            <h3>Objectifs et tâches</h3>
+            <p>Relie tes tâches aux objectifs importants et laisse Vethos réserver des blocs de travail cohérents.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="section install-section" aria-labelledby="install-title">
+        <div class="section-heading compact">
+          <p class="eyebrow">Installation</p>
+          <h2 id="install-title">Télécharge, lance, commence.</h2>
+        </div>
+
+        <div class="install-layout">
+          <div class="release-card">
+            <span class="release-label">Dernière version</span>
+            <strong>Vethos 0.12.2</strong>
+            <p>Installeur Windows prêt pour une installation locale dans ton profil utilisateur.</p>
+            <a class="button button-primary full-width" href="https://github.com/Justin-Katula/Vethos/releases/download/v0.12.2/Vethos-Setup-0.12.2.exe">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v2.5A1.5 1.5 0 0 0 6.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+              </svg>
+              Télécharger l'installeur
+            </a>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <span>1</span>
+              <div>
+              <strong>Ouvre l'exécutable</strong>
+              <p>Lance <code>Vethos-Setup-0.12.2.exe</code> depuis ton dossier de téléchargements.</p>
+              </div>
+            </li>
+            <li>
+              <span>2</span>
+              <div>
+              <strong>Choisis le dossier</strong>
+              <p>L'assistant installe Vethos dans <code>AppData\Local\Programs\Vethos</code>.</p>
+              </div>
+            </li>
+            <li>
+              <span>3</span>
+              <div>
+                <strong>Démarre Vethos</strong>
+                <p>Un raccourci bureau et un raccourci menu Démarrer sont créés automatiquement.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
