@@ -62,7 +62,7 @@ describe('runtime-coordinator-diagnostics', () => {
     },
     explanation: { title: 'T', summary: 'S', reasons: [], warnings: [] },
     confidence: 1,
-    metadata: { modelVersion: 1, createdAt: '', updatedAt: '', source: 'shadow_runtime_coordinator' },
+    metadata: { modelVersion: 1, createdAt: '', updatedAt: '', source: 'runtime_coordinator' },
   }
 
   it('should return healthy for a valid plan', () => {

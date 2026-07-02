@@ -21,7 +21,15 @@ describe('runManualReviewDiagnostics', () => {
   it('detects dangerous decision flags', () => {
     const badDraft = { 
       ...baseDraft, 
-      decisions: [{ id: 'd1', kind: 'approve_preview_in_principle', targetType: 'preview', decision: 'accepted_in_principle', createdAt: '', source: 'manual_review_ui', canApplyDecision: true as any }] 
+      decisions: [{
+        id: 'd1',
+        kind: 'approve_preview_in_principle' as const,
+        targetType: 'preview' as const,
+        decision: 'accepted_in_principle' as const,
+        createdAt: '',
+        source: 'manual_review_ui' as const,
+        canApplyDecision: true
+      }] 
     }
     const diag = runManualReviewDiagnostics({ draft: badDraft, previewPlan: {} })
     expect(diag.status).toBe('critical')

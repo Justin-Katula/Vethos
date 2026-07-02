@@ -336,15 +336,12 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
         else failures.push({ layer, message: `${layer}: ${status}` })
       }
       recordLayer('hosts', profile.blockedSites.length > 0, hostsStatus)
-      recordLayer(
-        'process_watcher',
-        profile.mode === 'allowlist' || profile.blockedProcesses.length > 0,
-        processStatus,
-      )
+      const hasProcessWatcher = profile.mode === 'allowlist' || profile.blockedProcesses.length > 0
+      recordLayer('process_watcher', hasProcessWatcher, processStatus)
+      recordLayer('overlay', hasProcessWatcher, processStatus)
+      recordLayer('media_control', hasProcessWatcher, processStatus)
       recordLayer('firewall', profile.blockedNetworkApps.length > 0, firewallStatus)
-      if (active.protectionResult?.appliedLayers.includes('service_recovery')) {
-        appliedLayers.push('service_recovery')
-      }
+      recordLayer('service_recovery', true, 'ok')
       await manager.updateProtectionAudit(appliedLayers, failures)
       return { hosts: hostsStatus, processes: processStatus, firewall: firewallStatus }
     },

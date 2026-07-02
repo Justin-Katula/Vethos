@@ -23,10 +23,10 @@ describe('execution-preview-plan-builder', () => {
 
     // Verify purely shadow
     expect(plan.id).toBe('pid1')
-    expect(plan.metadata.source).toBe('shadow_execution_preview')
+    expect(plan.metadata.source).toBe('execution_preview')
     expect(plan.readiness.canApplyLater).toBe(false)
     expect(plan.status).toBe('ready_for_preview')
-    expect(plan.mode).toBe('shadow_only')
+    expect(plan.mode).toBe('debug_preview')
     expect(plan.pipelineTrace.steps.length).toBeGreaterThan(0)
     expect(plan.diagnostics?.status).toBe('healthy')
   })

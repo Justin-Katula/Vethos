@@ -1,5 +1,5 @@
 export const ExecutionPreviewFlags = {
-  executionPreviewV2ShadowEnabled: true,
+  executionPreviewV2Enabled: true,
   executionPreviewInputAdapterEnabled: true,
   executionPreviewDependencyResolverEnabled: true,
   executionPreviewPipelineTraceEnabled: true,

@@ -1,5 +1,5 @@
 export type PlacementPlanV2Flags = {
-  placementPlanV2ShadowEnabled: true
+  placementPlanV2Enabled: true
   placementInputAdapterEnabled: true
   placementWindowSelectorEnabled: true
   taskFitEngineEnabled: true
@@ -20,7 +20,7 @@ export type PlacementPlanV2Flags = {
 }
 
 export const DEFAULT_PLACEMENT_PLAN_V2_FLAGS: PlacementPlanV2Flags = {
-  placementPlanV2ShadowEnabled: true,
+  placementPlanV2Enabled: true,
   placementInputAdapterEnabled: true,
   placementWindowSelectorEnabled: true,
   taskFitEngineEnabled: true,

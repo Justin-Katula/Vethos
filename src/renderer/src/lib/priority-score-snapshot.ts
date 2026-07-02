@@ -10,6 +10,7 @@ import { compareOldAndNewPriorityScore } from './priority-score-comparison'
 import { rankPriorityItemsV2 } from './priority-ranking-engine-v2'
 import { runPriorityScoreDiagnostics } from './priority-diagnostics'
 import { scoreTaskPriorityV2 } from './task-priority-scorer-v2'
+import { useSettingsStore } from '../store/settings.store'
 
 export type BuildPriorityScoreSnapshotInput = {
   taskModelsV2: TaskModelV2[]
@@ -76,14 +77,14 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
     comparisons,
     diagnostics,
     metadata: {
-      shadowOnly: true,
+      shadowOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
       createdAt: now.toISOString(),
       modelVersion: PRIORITY_SCORE_V2_MODEL_VERSION,
       debug: {
-        priorityV2ControlsRealUi: false,
-        priorityV2ControlsRealSorting: false,
-        priorityV2ControlsRealPlanning: false,
-        priorityV2ControlsRealBlocking: false,
+        priorityV2ControlsRealUi: useSettingsStore.getState?.()?.engineV2Priority === true,
+        priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,
+        priorityV2ControlsRealPlanning: useSettingsStore.getState?.()?.engineV2Placement === true,
+        priorityV2ControlsRealBlocking: useSettingsStore.getState?.()?.engineV2Blocking === true,
       },
     },
   }

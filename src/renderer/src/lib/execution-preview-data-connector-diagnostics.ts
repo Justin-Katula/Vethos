@@ -93,7 +93,7 @@ export function runExecutionPreviewDataConnectorDiagnostics(
       hasCritical = true
     }
 
-    if (providerState.previewPlan?.readiness.canApplyLater === true) {
+    if (providerState.previewPlan?.readiness?.canApplyLater === true) {
       issues.push({
         id: 'can_apply_later_true',
         severity: 'critical',

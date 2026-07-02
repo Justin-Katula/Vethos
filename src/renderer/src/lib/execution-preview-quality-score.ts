@@ -65,7 +65,7 @@ export function calculateExecutionPreviewQualityScore(
   }
 
   // 4. Calibration & Safety
-  if (calibration.status === 'unsafe' || providerState?.status === 'unsafe' || previewPlan?.safety.status === 'unsafe') {
+  if (calibration.status === 'unsafe' || providerState?.status === 'unsafe' || previewPlan?.safety?.status === 'unsafe') {
     safety = 0
     reasons.push('Safety is unsafe.')
   } else if (calibration.status === 'needs_major_adjustment') {
@@ -74,7 +74,7 @@ export function calculateExecutionPreviewQualityScore(
   }
 
   // 5. Hard rules for safety
-  if (previewPlan?.readiness.canApplyLater === true) {
+  if (previewPlan?.readiness?.canApplyLater === true) {
     safety = 0
     reasons.push('canApplyLater is true (forbidden).')
   }

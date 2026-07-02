@@ -20,7 +20,7 @@ export function explainExecutionPreviewPlan(plan: Omit<ExecutionPreviewPlanV2, '
     nextRecommendedAction = 'ask_manual_review'
   } else {
     // Healthy preview
-    if (plan.days.some((day) => day.summary.rescueMinutes > 0)) {
+    if (plan.days?.some((day) => day.summary.rescueMinutes > 0)) {
       summary = 'Vethos can display a preview. This schedule includes rescue modes due to time constraints.'
     } else {
       summary = 'Vethos can display a preview of the upcoming sessions and protection rules.'

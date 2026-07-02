@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { runExecutionPreviewMappingAudit } from './execution-preview-mapping-audit'
+import { ExecutionPreviewPlanV2 } from '@shared/execution-preview-model'
 
 describe('execution-preview-mapping-audit', () => {
   it('detects unmapped tasks', () => {
@@ -14,11 +15,78 @@ describe('execution-preview-mapping-audit', () => {
       },
       previewPlan: {
         id: '1',
-        days: [{ date: '2026-06-26', blocks: [] }],
-        safety: { status: 'safe', warnings: [], errors: [], confidence: 100 },
-        totals: { totalProposedMinutes: 0 },
-        canApplyLater: false
-      }
+        userId: 'user-1',
+        dateRange: { startDate: '2026-06-26', endDate: '2026-06-26' },
+        mode: 'shadow_only',
+        status: 'ready_for_preview',
+        dependencies: [],
+        days: [{
+          date: '2026-06-26',
+          status: 'healthy',
+          blocks: [],
+          unplacedCount: 0,
+          summary: {
+            proposedWorkMinutes: 0,
+            deepWorkMinutes: 0,
+            rescueMinutes: 0,
+            reviewMinutes: 0,
+            protectedRecoveryMinutes: 0,
+            blockedOrUnsafeCount: 0,
+          },
+          reasons: [],
+          warnings: [],
+          confidence: 100,
+        }],
+        sessionPlanIds: [],
+        runtimeCoordinatorPlanIds: [],
+        readiness: {
+          canDisplayPreview: true,
+          canApplyLater: false,
+          readiness: 'partial_preview_only',
+          blockers: [],
+          warnings: [],
+          requiredActions: [],
+          confidence: 100,
+        },
+        safety: {
+          status: 'safe',
+          realActionDetected: false,
+          forbiddenDependencyDetected: false,
+          unsafeRuntimePlans: [],
+          warnings: [],
+          reasons: [],
+          confidence: 100,
+        },
+        pipelineTrace: {
+          steps: [],
+          failedStepIds: [],
+          warningStepIds: [],
+          confidence: 100,
+        },
+        explanation: {
+          title: '',
+          summary: '',
+          keyDecisions: [],
+          warnings: [],
+          nextRecommendedAction: 'show_debug_preview',
+          confidence: 100,
+        },
+        summary: {
+          totalPreviewBlocks: 0,
+          totalProposedMinutes: 0,
+          totalWarnings: 0,
+          totalBlocked: 0,
+          totalManualReview: 0,
+          totalUnsafe: 0,
+        },
+        confidence: 100,
+        metadata: {
+          modelVersion: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          source: 'execution_preview',
+        },
+      } as unknown as ExecutionPreviewPlanV2
     })
     
     expect(audit.tasks.mappedCount).toBe(0)

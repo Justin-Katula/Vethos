@@ -1,16 +1,16 @@
 export const sessionFlags = {
-  // Shadow flags
-  sessionPlanV2ShadowEnabled: true,
+  // Active/Enabled flags
+  sessionPlanV2Enabled: true,
   sessionInputAdapterEnabled: true,
   sessionContractBuilderEnabled: true,
   sessionPreflightEnabled: true,
   sessionTimingEngineEnabled: true,
-  sessionProtectionPlanShadowEnabled: true,
-  sessionLifecycleShadowEnabled: true,
-  sessionInterruptionPolicyShadowEnabled: true,
+  sessionProtectionPlanEnabled: true,
+  sessionLifecycleEnabled: true,
+  sessionInterruptionPolicyEnabled: true,
   sessionClosurePlanEnabled: true,
-  sessionIntegrityShadowEnabled: true,
-  sessionOutcomeShadowEnabled: true,
+  sessionIntegrityEnabled: true,
+  sessionOutcomeEnabled: true,
   sessionExplanationsEnabled: true,
   sessionDiagnosticsEnabled: true,
 

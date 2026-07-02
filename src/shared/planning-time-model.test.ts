@@ -5,8 +5,8 @@ import { PLANNING_CONTEXT_V2_MODEL_VERSION, type FreeTimeWindow, type PlanningBl
 describe('planning-time-model contracts', () => {
   it('garde le modèle planning en shadow avec les contrôles dangereux désactivés', () => {
     expect(PLANNING_CONTEXT_V2_MODEL_VERSION).toBe(2)
-    expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextV2ShadowEnabled).toBe(true)
-    expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.scheduleNormalizerShadowEnabled).toBe(true)
+    expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextV2Enabled).toBe(true)
+    expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.scheduleNormalizerEnabled).toBe(true)
     expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextControlsDisplay).toBe(false)
     expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextControlsPlanning).toBe(false)
     expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextControlsSessions).toBe(false)

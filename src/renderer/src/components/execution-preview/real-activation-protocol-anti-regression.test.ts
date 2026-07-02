@@ -88,6 +88,9 @@ describe('real-activation-protocol-anti-regression', () => {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
+        if (line === undefined) {
+          continue
+        }
         // Allow imports of models/flags of real-activation itself
         if (line.includes('real-activation-protocol') || line.includes('real-activation-view-model') || line.includes('real-activation-ui-guards')) {
           continue

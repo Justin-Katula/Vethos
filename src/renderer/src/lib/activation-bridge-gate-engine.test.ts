@@ -18,7 +18,13 @@ describe('activation-bridge-gate-engine', () => {
 
   it('is blocked by review when not approved', () => {
     const review = { ...manualReviewFixture(), status: 'in_review' as const, previewDecision: 'undecided' as const }
-    const result = runActivationBridgeGate({ contractDraft: contractFixture(), manualReviewDraft: review })
+    const contract = buildExecutionContractDraft({
+      previewPlan: executionPreviewFixture(),
+      qaReport: executionQaFixture(),
+      manualReviewDraft: review,
+      manualReviewGateResult: manualReviewGateFixture(review)
+    })
+    const result = runActivationBridgeGate({ contractDraft: contract, manualReviewDraft: review })
     expect(result.status).toBe('blocked_by_review')
   })
 

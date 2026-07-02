@@ -21,7 +21,7 @@ describe('minimal-execution-boundary-builder', () => {
       id: '1', kind: 'session_manager', name: 'M', realFunctions: [{ name: 'f', candidateForFuturePoint: true, requiredPreconditions: [], dangerLevel: 'high' }]
     }] as any
     const res = buildMinimalExecutionBoundary({ moduleAudit: audit, contractDraft: {} })
-    expect(res.futureBoundaryCandidates[0].canExecuteNow).toBe(false)
+    expect(res.futureBoundaryCandidates[0]!.canExecuteNow).toBe(false)
   })
 
   it('earliest future point >= 17', () => {
@@ -29,6 +29,6 @@ describe('minimal-execution-boundary-builder', () => {
       id: '1', kind: 'session_manager', name: 'M', realFunctions: [{ name: 'f', candidateForFuturePoint: true, requiredPreconditions: [], dangerLevel: 'high' }]
     }] as any
     const res = buildMinimalExecutionBoundary({ moduleAudit: audit, contractDraft: {} })
-    expect(res.futureBoundaryCandidates[0].futurePointEarliest).toBeGreaterThanOrEqual(17)
+    expect(res.futureBoundaryCandidates[0]!.futurePointEarliest).toBeGreaterThanOrEqual(17)
   })
 })

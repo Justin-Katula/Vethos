@@ -65,7 +65,7 @@ describe('SessionManager', () => {
     expect(session.protectionResult).toEqual(
       expect.objectContaining({
         applied: true,
-        appliedLayers: ['hosts', 'process_watcher', 'firewall'],
+        appliedLayers: ['hosts', 'process_watcher', 'overlay', 'media_control', 'firewall', 'service_recovery'],
         failedLayers: [],
       }),
     )
@@ -235,6 +235,8 @@ describe('SessionManager', () => {
     expect(m.getActive()?.protectionResult?.appliedLayers).toEqual([
       'hosts',
       'process_watcher',
+      'overlay',
+      'media_control',
       'firewall',
       'service_recovery',
     ])

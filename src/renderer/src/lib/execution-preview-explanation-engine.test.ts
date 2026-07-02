@@ -18,7 +18,7 @@ describe('execution-preview-explanation-engine', () => {
   it('explains a rescue preview', () => {
     const expl = explainExecutionPreviewPlan({
       ...basePlan,
-      summary: { ...basePlan.summary, rescueMinutes: 30 }
+      days: [{ summary: { rescueMinutes: 30 } }] as any
     })
     expect(expl.nextRecommendedAction).toBe('show_ui_preview')
     expect(expl.summary).toContain('rescue modes')

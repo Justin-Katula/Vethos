@@ -29,7 +29,7 @@ export function runExecutionPreviewConsistencyChecks(
 
   // 2. canApplyLater / canApplyPreview detection
   const executionEnabled = settings?.engineV2Execution === true
-  if (previewPlan?.readiness.canApplyLater === true && !executionEnabled) {
+  if (previewPlan?.readiness?.canApplyLater === true && !executionEnabled) {
     checks.push({
       id: 'cc-2',
       category: 'readiness',
@@ -97,7 +97,7 @@ export function runExecutionPreviewConsistencyChecks(
     }
     
     // Safety check
-    if (previewPlan.safety.status === 'unsafe' || previewPlan.safety.status === 'critical') {
+    if (previewPlan.safety?.status === 'unsafe' || previewPlan.safety?.status === 'critical') {
        if (providerState?.status === 'ready') {
          checks.push({
            id: 'cc-6',
@@ -111,7 +111,7 @@ export function runExecutionPreviewConsistencyChecks(
        }
     }
     
-    if (previewPlan.summary.totalProposedMinutes < 0) {
+    if (previewPlan.summary?.totalProposedMinutes < 0) {
        checks.push({
          id: 'cc-7',
          category: 'planning',

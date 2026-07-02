@@ -1,10 +1,10 @@
 export type PriorityScoreV2Flags = {
-  priorityScoreV2ShadowEnabled: true
-  priorityDimensionsShadowEnabled: true
-  taskPriorityV2ShadowEnabled: true
-  objectivePriorityV2ShadowEnabled: true
-  deadlineFeasibilityShadowEnabled: true
-  priorityRankingShadowEnabled: true
+  priorityScoreV2Enabled: true
+  priorityDimensionsEnabled: true
+  taskPriorityV2Enabled: true
+  objectivePriorityV2Enabled: true
+  deadlineFeasibilityEnabled: true
+  priorityRankingEnabled: true
   priorityRecommendationsEnabled: true
   priorityExplanationsEnabled: true
   priorityOldScoreComparisonEnabled: true
@@ -16,12 +16,12 @@ export type PriorityScoreV2Flags = {
 }
 
 export const DEFAULT_PRIORITY_SCORE_V2_FLAGS: PriorityScoreV2Flags = {
-  priorityScoreV2ShadowEnabled: true,
-  priorityDimensionsShadowEnabled: true,
-  taskPriorityV2ShadowEnabled: true,
-  objectivePriorityV2ShadowEnabled: true,
-  deadlineFeasibilityShadowEnabled: true,
-  priorityRankingShadowEnabled: true,
+  priorityScoreV2Enabled: true,
+  priorityDimensionsEnabled: true,
+  taskPriorityV2Enabled: true,
+  objectivePriorityV2Enabled: true,
+  deadlineFeasibilityEnabled: true,
+  priorityRankingEnabled: true,
   priorityRecommendationsEnabled: true,
   priorityExplanationsEnabled: true,
   priorityOldScoreComparisonEnabled: true,

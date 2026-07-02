@@ -24,7 +24,7 @@ describe('runtime-closure-bridge-planner', () => {
 
   it('should plan for manual review when closure type is manual', () => {
     const mockSessionPlan = {
-      closure: { required: true, type: 'manual' },
+      closure: { required: true, closurePromptType: 'manual_review' },
       contract: { completionPolicy: 'manual' },
     } as unknown as SessionPlanV2
 

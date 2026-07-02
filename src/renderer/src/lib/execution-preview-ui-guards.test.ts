@@ -40,6 +40,7 @@ describe('execution-preview-ui-guards', () => {
     }
     const result = guardExecutionPreviewActions(vm)
     expect(result.safe).toBe(false)
-    expect(result.issues[0].id).toBe('dangerous_action_enabled_disabled_apply')
+    expect(result.issues).toBeDefined()
+    expect(result.issues![0]!.id).toBe('dangerous_action_enabled_disabled_apply')
   })
 })

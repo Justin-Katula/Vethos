@@ -1,4 +1,4 @@
-export const runtimeCoordinatorV2ShadowEnabled = true
+export const runtimeCoordinatorV2Enabled = true
 export const blockingProfileDraftAdapterEnabled = true
 export const runtimeSignalBridgePlannerEnabled = true
 export const runtimeClosureBridgePlannerEnabled = true

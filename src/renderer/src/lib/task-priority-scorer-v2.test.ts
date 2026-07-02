@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
 import { buildObjectiveModelV2 } from './objective-model-builder'

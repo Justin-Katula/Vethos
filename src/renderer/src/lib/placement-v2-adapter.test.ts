@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { mapProposedPlacementBlocksToPlacedBlocks, buildV1DiagnosticsFromV2 } from './placement-v2-adapter'
 import type { ProposedPlacementBlock, PlacementPlanV2 } from '../../../shared/placement-model'

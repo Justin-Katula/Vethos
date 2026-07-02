@@ -5,6 +5,7 @@ import type { UserCognitiveModel, UserModel } from '@shared/user-model'
 import { buildPriorityScoreDimensions, type PriorityPlanningContext } from './priority-dimension-builder'
 import { explainPriorityScore } from './priority-explanation-engine'
 import { buildPriorityRecommendation } from './priority-recommendation-engine'
+import { useSettingsStore } from '../store/settings.store'
 
 export type ScoreObjectivePriorityV2Input = {
   objectiveModelV2: ObjectiveModelV2
@@ -146,13 +147,13 @@ export function scoreObjectivePriorityV2(input: ScoreObjectivePriorityV2Input): 
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       source: 'objective_model_v2',
-      shadowOnly: true,
+      shadowOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
       debug: {
         oldScore: input.oldScore,
         linkedTaskScoreCount: input.linkedTaskScores?.length ?? 0,
-        priorityV2ControlsRealSorting: false,
-        priorityV2ControlsRealPlanning: false,
-        priorityV2ControlsRealBlocking: false,
+        priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,
+        priorityV2ControlsRealPlanning: useSettingsStore.getState?.()?.engineV2Placement === true,
+        priorityV2ControlsRealBlocking: useSettingsStore.getState?.()?.engineV2Blocking === true,
       },
     },
   }

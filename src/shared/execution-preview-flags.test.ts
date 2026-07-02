@@ -3,7 +3,7 @@ import { ExecutionPreviewFlags } from './execution-preview-flags'
 
 describe('execution-preview-flags', () => {
   it('enables all shadow features', () => {
-    expect(ExecutionPreviewFlags.executionPreviewV2ShadowEnabled).toBe(true)
+    expect(ExecutionPreviewFlags.executionPreviewV2Enabled).toBe(true)
     expect(ExecutionPreviewFlags.executionPreviewInputAdapterEnabled).toBe(true)
     expect(ExecutionPreviewFlags.executionPreviewDependencyResolverEnabled).toBe(true)
     expect(ExecutionPreviewFlags.executionPreviewPipelineTraceEnabled).toBe(true)

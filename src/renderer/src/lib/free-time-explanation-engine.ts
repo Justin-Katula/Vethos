@@ -1,6 +1,6 @@
 import type { DayAvailabilitySnapshot, FreeTimeExplanation, FreeTimeWindow, PlanningContextV2 } from '@shared/planning-time-model'
 
-export function explainFreeTimeWindow(window: FreeTimeWindow): FreeTimeExplanation {
+export function explainFreeTimeWindow(window: FreeTimeWindow, shadowOnly = false): FreeTimeExplanation {
   const title =
     window.windowType === 'tiny'
       ? 'Créneau trop court.'
@@ -25,11 +25,11 @@ export function explainFreeTimeWindow(window: FreeTimeWindow): FreeTimeExplanati
     reasons: window.reasons.slice(0, 5),
     warnings,
     confidence: window.confidence,
-    debug: { shadowOnly: true, windowType: window.windowType },
+    debug: { shadowOnly, windowType: window.windowType },
   }
 }
 
-export function explainDayAvailability(daySnapshot: DayAvailabilitySnapshot): FreeTimeExplanation {
+export function explainDayAvailability(daySnapshot: DayAvailabilitySnapshot, shadowOnly = false): FreeTimeExplanation {
   const warnings: string[] = []
   if (daySnapshot.status === 'fragmented') warnings.push('Journée fragmentée : peu de vrais blocs longs.')
   if (daySnapshot.status === 'no_usable_time') warnings.push('Aucun temps réellement utilisable.')
@@ -52,11 +52,11 @@ export function explainDayAvailability(daySnapshot: DayAvailabilitySnapshot): Fr
     reasons: daySnapshot.reasons.slice(0, 5),
     warnings,
     confidence: daySnapshot.timeline.length > 0 ? 78 : 35,
-    debug: { shadowOnly: true, status: daySnapshot.status },
+    debug: { shadowOnly, status: daySnapshot.status },
   }
 }
 
-export function explainPlanningContext(planningContext: PlanningContextV2): FreeTimeExplanation {
+export function explainPlanningContext(planningContext: PlanningContextV2, shadowOnly = false): FreeTimeExplanation {
   const warnings: string[] = []
   if (planningContext.weeklySummary.noUsableTimeDays > 0) {
     warnings.push(`${planningContext.weeklySummary.noUsableTimeDays} jour(s) sans vrai temps utilisable.`)
@@ -66,7 +66,7 @@ export function explainPlanningContext(planningContext: PlanningContextV2): Free
   }
 
   return {
-    title: 'Contexte de planning calculé en shadow.',
+    title: shadowOnly ? 'Contexte de planning calculé en shadow.' : 'Contexte de planning calculé.',
     summary: `${planningContext.weeklySummary.usableFreeMinutes} min utilisables sur ${planningContext.weeklySummary.rawFreeMinutes} min libres brutes.`,
     reasons: [
       'Vethos distingue temps vide, préparation, récupération, petits trous et deep work.',
@@ -74,6 +74,6 @@ export function explainPlanningContext(planningContext: PlanningContextV2): Free
     ],
     warnings,
     confidence: planningContext.confidence,
-    debug: { shadowOnly: true, days: planningContext.days.length },
+    debug: { shadowOnly, days: planningContext.days.length },
   }
 }

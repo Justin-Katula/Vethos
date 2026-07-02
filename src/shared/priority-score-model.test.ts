@@ -4,8 +4,8 @@ import type { PriorityScoreDimensions } from './priority-score-model'
 
 describe('priority-score-model contracts', () => {
   it('garde les flags dangereux désactivés par défaut', () => {
-    expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityScoreV2ShadowEnabled).toBe(true)
-    expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityDimensionsShadowEnabled).toBe(true)
+    expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityScoreV2Enabled).toBe(true)
+    expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityDimensionsEnabled).toBe(true)
     expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityControlsDisplay).toBe(false)
     expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityControlsSorting).toBe(false)
     expect(DEFAULT_PRIORITY_SCORE_V2_FLAGS.priorityControlsPlanning).toBe(false)

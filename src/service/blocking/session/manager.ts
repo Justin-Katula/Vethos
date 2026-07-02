@@ -100,10 +100,14 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     const profile = session.profileSnapshot
     const layers: ProtectionLayer[] = []
     if (profile.blockedSites.length > 0) layers.push('hosts')
-    if (profile.mode === 'allowlist' || profile.blockedProcesses.length > 0) {
+    const hasProcessWatcher = profile.mode === 'allowlist' || profile.blockedProcesses.length > 0
+    if (hasProcessWatcher) {
       layers.push('process_watcher')
+      layers.push('overlay')
+      layers.push('media_control')
     }
     if (profile.blockedNetworkApps.length > 0) layers.push('firewall')
+    layers.push('service_recovery')
     return layers
   }
 

@@ -1,8 +1,10 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import type { Objective, Task } from '@shared/schemas'
 import { buildObjectiveModelV2 } from './objective-model-builder'
 import { buildPriorityScoreSnapshot } from './priority-score-snapshot'
 import { buildTaskModelV2 } from './task-model-builder'
+import { useSettingsStore } from '../store/settings.store'
 
 const NOW = new Date('2026-06-25T12:00:00.000Z')
 const OBJECTIVE_ID = '22222222-2222-4222-8222-222222222222'
@@ -45,6 +47,8 @@ describe('priority-score-snapshot', () => {
     const t = task()
     const objectiveModel = buildObjectiveModelV2({ objective: obj, linkedTasks: [t], now: NOW })
     const taskModel = buildTaskModelV2({ task: t, objective: obj, objectiveModel, now: NOW })
+
+    useSettingsStore.setState({ engineV2Priority: false })
 
     const snapshot = buildPriorityScoreSnapshot({
       taskModelsV2: [taskModel],

@@ -29,14 +29,22 @@ export function buildTaskProtectionProfile(args: BuildTaskProtectionProfileInput
   if (args.userModel?.declaredProfile.protectionStyle === 'calm') level -= 8
   
   const recommendedProtectionLevel = clampScore(level)
-  const mode =
+  const allowedApps = args.appSiteContext.usefulApps
+  const allowedSites = args.appSiteContext.usefulSites
+  const allowlistHasUsefulResource = allowedApps.length > 0 || allowedSites.length > 0
+  const requestedMode =
     blocking?.mode ??
     (recommendedProtectionLevel >= 70 || args.risk.riskLevel === 'high' || args.risk.riskLevel === 'critical'
       ? 'allowlist'
       : 'blocklist')
       
+  const mode = requestedMode === 'allowlist' && !allowlistHasUsefulResource ? 'blocklist' : requestedMode
+      
   const reasons = []
   if (mode === 'allowlist') reasons.push('Une allowlist devient préférable pour les tâches risquées ou importantes.')
+  if (requestedMode === 'allowlist' && mode === 'blocklist') {
+    reasons.push('Allowlist refusée : aucun outil utile connu. Repli sûr vers le blocage ciblé.')
+  }
   if (args.appSiteContext.usefulApps.length > 0 || args.appSiteContext.usefulSites.length > 0) {
     reasons.push('Le modèle connaît déjà des outils utiles pour cette tâche.')
   }

@@ -20,7 +20,7 @@ describe('execution-preview-data-connector-diagnostics', () => {
 
   it('detects canApplyLater = true as a critical security violation', () => {
     const diag = runExecutionPreviewDataConnectorDiagnostics({
-      providerState: { previewPlan: { canApplyLater: true }, errors: [], status: 'ready', warnings: [] } as any
+      providerState: { previewPlan: { readiness: { canApplyLater: true } }, errors: [], status: 'ready', warnings: [] } as any
     })
     expect(diag.issues.some(i => i.id === 'can_apply_later_true')).toBe(true)
     expect(diag.status).toBe('critical')

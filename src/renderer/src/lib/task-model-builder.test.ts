@@ -184,6 +184,7 @@ describe('task-model-builder orchestrator', () => {
             updatedAt: NOW.toISOString(),
           },
         ],
+        updatedAt: NOW.toISOString(),
       },
       {
         identifier: 'feed.example',
@@ -199,6 +200,7 @@ describe('task-model-builder orchestrator', () => {
             updatedAt: NOW.toISOString(),
           },
         ],
+        updatedAt: NOW.toISOString(),
       },
     ]
 

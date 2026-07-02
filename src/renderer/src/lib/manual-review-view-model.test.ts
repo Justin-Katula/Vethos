@@ -25,7 +25,7 @@ describe('buildManualReviewViewModel', () => {
 
     const vm = buildManualReviewViewModel({ draft, previewPlan: { days: [{ blocks: [{ id: 'b1' }] }] } })
     expect(vm.blockRows.length).toBe(1)
-    expect(vm.blockRows[0].decisionLabel).toBe('Accepté')
-    expect(vm.blockRows[0].decisionSeverity).toBe('good')
+    expect(vm.blockRows[0]!.decisionLabel).toBe('Accepté')
+    expect(vm.blockRows[0]!.decisionSeverity).toBe('good')
   })
 })
