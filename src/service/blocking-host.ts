@@ -335,14 +335,23 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
         if (status === 'ok') appliedLayers.push(layer)
         else failures.push({ layer, message: `${layer}: ${status}` })
       }
-      recordLayer('hosts', profile.blockedSites.length > 0, hostsStatus)
-      const hasProcessWatcher = profile.mode === 'allowlist' || profile.blockedProcesses.length > 0
-      recordLayer('process_watcher', hasProcessWatcher, processStatus)
-      recordLayer('overlay', hasProcessWatcher, processStatus)
-      recordLayer('media_control', hasProcessWatcher, processStatus)
-      recordLayer('firewall', profile.blockedNetworkApps.length > 0, firewallStatus)
-      recordLayer('service_recovery', true, 'ok')
-      await manager.updateProtectionAudit(appliedLayers, failures)
+       recordLayer('hosts', profile.blockedSites.length > 0, hostsStatus)
+       const hasProcessWatcher = profile.mode === 'allowlist' || profile.blockedProcesses.length > 0
+       recordLayer('process_watcher', hasProcessWatcher, processStatus)
+       
+       // NOTE: The background service running as SYSTEM in Session 0 cannot directly query
+       // the rendering state of the Electron overlay window (Session 1) or Spotify's focus state.
+       // These layers inherit the status of the process watcher, which is the layer responsible
+       // for matching distracted windows and triggering the overlay/mute actions.
+       recordLayer('overlay', hasProcessWatcher, processStatus)
+       recordLayer('media_control', hasProcessWatcher, processStatus)
+       
+       recordLayer('firewall', profile.blockedNetworkApps.length > 0, firewallStatus)
+       
+       // NOTE: service_recovery is assumed 'ok' because the background service is running
+       // and hydration logic has executed successfully.
+       recordLayer('service_recovery', true, 'ok')
+       await manager.updateProtectionAudit(appliedLayers, failures)
       return { hosts: hostsStatus, processes: processStatus, firewall: firewallStatus }
     },
 
