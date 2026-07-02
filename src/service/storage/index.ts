@@ -15,11 +15,12 @@ type ValueFor<K extends StorageKey> = z.infer<SchemaFor<K>>
  * En test : un tmpdir.
  */
 export function createStorage(baseDir: string) {
-  const fileFor = (key: StorageKey) => join(baseDir, `nexus_${key}.json`)
+  const fileFor = (key: StorageKey, userId?: string) =>
+    join(baseDir, userId === undefined ? `vethos_${key}.json` : `vethos_${userId}_${key}.json`)
 
   return {
-    async read<K extends StorageKey>(key: K): Promise<ValueFor<K> | null> {
-      const filePath = fileFor(key)
+    async read<K extends StorageKey>(key: K, userId?: string): Promise<ValueFor<K> | null> {
+      const filePath = fileFor(key, userId)
       let raw: unknown | null
       try {
         raw = await atomicRead<unknown>(filePath)
@@ -43,20 +44,24 @@ export function createStorage(baseDir: string) {
       return parsed.data as ValueFor<K>
     },
 
-    async write<K extends StorageKey>(key: K, data: ValueFor<K>): Promise<void> {
+    async write<K extends StorageKey>(key: K, data: ValueFor<K>, userId?: string): Promise<void> {
       const schema = STORAGE_SCHEMAS[key]
       // Throw si invalide — protège contre des bugs dans le main process.
       schema.parse(data)
-      await atomicWrite(fileFor(key), data)
+      await atomicWrite(fileFor(key, userId), data)
     },
 
-    async exists(key: StorageKey): Promise<boolean> {
+    async exists(key: StorageKey, userId?: string): Promise<boolean> {
       try {
-        await fs.access(fileFor(key))
+        await fs.access(fileFor(key, userId))
         return true
       } catch {
         return false
       }
+    },
+
+    async remove(key: StorageKey, userId?: string): Promise<void> {
+      await fs.unlink(fileFor(key, userId)).catch(() => undefined)
     },
   }
 }

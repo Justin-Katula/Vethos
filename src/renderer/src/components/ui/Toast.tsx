@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, Info, AlertCircle, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useToastStore, type Toast as ToastType } from '@/store/toast.store'
+import { Button } from '@/components/ui/Button'
 
 const AUTO_DISMISS_MS = 4000
 
@@ -60,14 +61,16 @@ function ToastItem({ toast }: { toast: ToastType }): JSX.Element {
           <div className="mt-0.5 text-xs text-text-secondary">{toast.description}</div>
         )}
       </div>
-      <button
+      <Button
         type="button"
         onClick={() => dismiss(toast.id)}
-        className="shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 shrink-0 rounded-md p-0 shadow-none hover:-translate-y-0"
         aria-label="Fermer"
       >
         <X size={14} />
-      </button>
+      </Button>
     </motion.div>
   )
 }

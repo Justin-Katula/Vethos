@@ -5,6 +5,7 @@ import {
   type BlockingHostDeps,
   type BlockingHostEvent,
 } from './blocking-host'
+import { SLEEP_LOCKDOWN_PROCESS_MARKER } from '@shared/blocking'
 import type { BlockingProfile, BlockingState } from '@shared/schemas'
 import net from 'node:net'
 import { createBridgeServer, type BridgeServer } from './bridge/server'
@@ -13,10 +14,22 @@ import { encodeMessage, createMessageDecoder, type ServiceMessage } from '@share
 const PROFILE: BlockingProfile = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'Focus',
+  mode: 'blocklist',
   blockedSites: ['example.com'],
   blockedProcesses: ['notepad.exe'],
   blockedNetworkApps: [],
   unlockPolicy: { type: 'none' },
+  createdAt: '2026-05-04T09:00:00.000Z',
+}
+
+const SLEEP_PROFILE: BlockingProfile = {
+  id: '33333333-3333-4333-8333-333333333333',
+  name: 'Mode sommeil - verrouillage complet',
+  mode: 'blocklist',
+  blockedSites: ['youtube.com'],
+  blockedProcesses: [SLEEP_LOCKDOWN_PROCESS_MARKER],
+  blockedNetworkApps: [],
+  unlockPolicy: { type: 'cooldown_and_justification', minutes: 60, minWords: 500 },
   createdAt: '2026-05-04T09:00:00.000Z',
 }
 
@@ -27,6 +40,8 @@ function makeState(overrides?: Partial<BlockingState>): BlockingState {
 function makeDeps(overrides?: Partial<BlockingHostDeps>): BlockingHostDeps {
   return {
     persistence: {
+      setUserId: vi.fn(),
+      getUserId: vi.fn().mockReturnValue(undefined),
       readState: vi.fn().mockResolvedValue(makeState()),
       writeState: vi.fn().mockResolvedValue(undefined),
       readActive: vi.fn().mockResolvedValue(null),
@@ -127,6 +142,149 @@ describe('createBlockingHost', () => {
     expect(deps.firewall.applyAll).toHaveBeenCalled()
   })
 
+  it('refuse une reprise annoncée active si la surveillance process ne tourne pas', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    const session = await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    vi.mocked(deps.persistence.readActive).mockResolvedValue(session)
+    vi.mocked(deps.processes.status).mockReturnValue('inactive')
+
+    await expect(host.resync()).rejects.toThrow(/surveillance réelle/iu)
+  })
+
+  it('réapplique une session et confirme sa reprise quand la surveillance tourne', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    const session = await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    vi.mocked(deps.persistence.readActive).mockResolvedValue(session)
+    vi.mocked(deps.processes.status).mockReturnValue('ok')
+
+    const recovered = await host.resync()
+
+    expect(recovered.active?.id).toBe(session.id)
+    expect(deps.processes.start).toHaveBeenCalledTimes(2)
+  })
+
+  it('rattache au bon utilisateur une session reprise avant le chargement de Clerk', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    const session = await host.startSession({
+      userId: 'user_123',
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    vi.mocked(deps.persistence.readActive).mockResolvedValue(session)
+    vi.mocked(deps.persistence.getUserId).mockReturnValue(undefined)
+
+    await host.hydrate()
+
+    expect(deps.persistence.setUserId).toHaveBeenCalledWith('user_123')
+  })
+
+  it('startSession avec resolvedProfile applique le profil résolu', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    const resolvedProfile: BlockingProfile = {
+      id: PROFILE.id,
+      name: 'Resolved Profile',
+      mode: 'allowlist',
+      blockedSites: ['resolved-site.com'],
+      blockedProcesses: ['resolved-proc.exe'],
+      blockedNetworkApps: ['C:\\resolved.exe'],
+      unlockPolicy: { type: 'none' },
+      createdAt: PROFILE.createdAt,
+    }
+    const session = await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: false,
+      resolvedProfile,
+    })
+    expect(session.profileSnapshot.name).toBe('Resolved Profile')
+    expect(session.profileSnapshot.mode).toBe('allowlist')
+    expect(deps.hosts.apply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domains: ['resolved-site.com'],
+      }),
+    )
+    expect(deps.processes.start).toHaveBeenCalledWith(
+      ['resolved-proc.exe'],
+      expect.any(Function),
+      { mode: 'allowlist', allowedExeNames: ['resolved-proc.exe'] },
+    )
+    expect(deps.firewall.applyAll).toHaveBeenCalledWith(expect.any(String), ['C:\\resolved.exe'])
+  })
+
+  it('startSession sommeil remplace une session active par le verrouillage complet', async () => {
+    const deps = makeDeps()
+    deps.persistence.readState = vi
+      .fn()
+      .mockResolvedValue(makeState({ profiles: [PROFILE, SLEEP_PROFILE] }))
+    const host = createBlockingHost(deps)
+
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    const sleepSession = await host.startSession({
+      profileId: SLEEP_PROFILE.id,
+      durationMinutes: 420,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+
+    expect(sleepSession.profileId).toBe(SLEEP_PROFILE.id)
+    expect(deps.processes.start).toHaveBeenLastCalledWith(
+      [SLEEP_LOCKDOWN_PROCESS_MARKER],
+      expect.any(Function),
+      { mode: 'blocklist', allowedExeNames: undefined },
+    )
+  })
+
+  it('émet BLOCKED_ATTEMPT quand la couche process détecte une app bloquée', async () => {
+    const deps = makeDeps()
+    deps.processes.start = vi.fn((_forbidden, onBlocked) => {
+      onBlocked?.({ processName: 'notepad.exe', pid: 1234, blockAll: false })
+      return { stop: vi.fn() }
+    })
+    const host = createBlockingHost(deps)
+    const events: BlockingHostEvent[] = []
+    host.on((e) => events.push(e))
+
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'BLOCKED_ATTEMPT',
+        payload: expect.objectContaining({
+          processName: 'notepad.exe',
+          pid: 1234,
+          mode: 'work',
+        }),
+      }),
+    )
+  })
+
   it("startSession échoue si le service n'est pas élevé", async () => {
     const host = createBlockingHost(makeDeps({ elevated: false }))
     await expect(
@@ -167,9 +325,9 @@ describe('createBlockingHost', () => {
 
   it('startSession applique la pénalité en attente puis la remet à zéro', async () => {
     const deps = makeDeps()
-    deps.persistence.readState = vi.fn().mockResolvedValue(
-      makeState({ nextSessionPenaltyMinutes: 30 }),
-    )
+    deps.persistence.readState = vi
+      .fn()
+      .mockResolvedValue(makeState({ nextSessionPenaltyMinutes: 30 }))
     const host = createBlockingHost(deps)
     const session = await host.startSession({
       profileId: PROFILE.id,
@@ -195,7 +353,7 @@ describe('createBlockingHost', () => {
   it('getLayerStatus signale la dérive hosts et le statut process', async () => {
     const deps = makeDeps()
     deps.processes.status = vi.fn().mockReturnValue('ok')
-    deps.layerProbe.readHostsFile = vi.fn().mockResolvedValue('') // bloc Nexus absent
+    deps.layerProbe.readHostsFile = vi.fn().mockResolvedValue('') // bloc Vethos absent
     const host = createBlockingHost(deps)
     await host.startSession({
       profileId: PROFILE.id,
@@ -325,6 +483,24 @@ describe('createBlockingHost', () => {
     })
   })
 
+  it("nettoie les règles firewall quand l'utilisateur se déconnecte", async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    await host.disconnectUser()
+
+    expect(deps.firewall.removeAll).toHaveBeenCalled()
+    expect(deps.persistence.clearActive).toHaveBeenCalled()
+    expect(deps.persistence.setUserId).toHaveBeenLastCalledWith(undefined)
+    expect((await host.getState()).active).toBeNull()
+  })
+
   it('hydrate délègue à hydrateFromDisk et nettoie les orphelins', async () => {
     const deps = makeDeps()
     const host = createBlockingHost(deps)
@@ -370,7 +546,7 @@ describe('createBlockingHandlers (pont nommé)', () => {
   })
 
   const testPipe = (): string =>
-    `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+    `\\\\.\\pipe\\vethos-test-${process.pid}-${Math.random().toString(36).slice(2)}`
 
   function collect(socket: net.Socket): { next: () => Promise<ServiceMessage> } {
     const decode = createMessageDecoder()
@@ -460,6 +636,31 @@ describe('createBlockingHandlers (pont nommé)', () => {
       expect.objectContaining({ kind: 'event', type: 'SESSION_CHANGED' }),
     )
     client.destroy()
+    host.stop()
+  })
+
+  it('SET_USER_CONTEXT sans userId déconnecte et nettoie le firewall', async () => {
+    const deps = makeDeps()
+    const host = createBlockingHost(deps)
+    const handlers = createBlockingHandlers(host)
+    const setUserContext = handlers.SET_USER_CONTEXT
+    if (!setUserContext) throw new Error('SET_USER_CONTEXT handler missing')
+
+    await host.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      sessionRulesEnabled: false,
+      strictBlocking: true,
+    })
+    await setUserContext({
+      kind: 'request',
+      id: 'ctx1',
+      type: 'SET_USER_CONTEXT',
+      payload: {},
+    })
+
+    expect(deps.firewall.removeAll).toHaveBeenCalled()
+    expect(deps.persistence.clearActive).toHaveBeenCalled()
     host.stop()
   })
 })

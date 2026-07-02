@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, Check } from 'lucide-react'
-import type { Objective, TimeRule } from '@shared/schemas'
+import {
+  DEFAULT_OBJECTIVE_LEVEL,
+  OBJECTIVE_DAILY_MINUTES_BY_LEVEL,
+  OBJECTIVE_LEVEL_MAX,
+  OBJECTIVE_LEVEL_MIN,
+  clampObjectiveLevel,
+  type Objective,
+  type TimeRule,
+  type WorkBlockingConfig,
+  type UnlockPolicy,
+} from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { PALETTE, ICON_OPTIONS } from '@/lib/rule-palette'
 import { useShortcut } from '@/lib/use-shortcut'
 import { areColorsSimilar } from '@/lib/color-similarity'
+import { WorkBlockingFields } from '@/components/blocking/WorkBlockingFields'
+import { Button } from '@/components/ui/Button'
+import { UnlockPolicyForm } from '@/components/blocking/UnlockPolicyForm'
 
 type SaveDraft = {
   id?: string
@@ -15,7 +28,8 @@ type SaveDraft = {
   icon?: string
   linkedRuleIds?: string[]
   level: number
-  deadline?: string
+  blocking?: WorkBlockingConfig
+  unlockPolicy?: UnlockPolicy
 }
 
 type Props = {
@@ -29,6 +43,8 @@ type Props = {
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
+
+
 
 export function ObjectiveEditor({
   open,
@@ -44,8 +60,9 @@ export function ObjectiveEditor({
   const [color, setColor] = useState(PALETTE[0]!)
   const [icon, setIcon] = useState<string | undefined>(undefined)
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>([])
-  const [level, setLevel] = useState(5)
-  const [deadline, setDeadline] = useState('')
+  const [level, setLevel] = useState(DEFAULT_OBJECTIVE_LEVEL)
+  const [blocking, setBlocking] = useState<WorkBlockingConfig | undefined>(undefined)
+  const [unlockPolicy, setUnlockPolicy] = useState<UnlockPolicy | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -60,16 +77,18 @@ export function ObjectiveEditor({
       setColor(initial.color)
       setIcon(initial.icon)
       setLinkedRuleIds(initial.linkedRuleIds)
-      setLevel(initial.level)
-      setDeadline(initial.deadline ?? '')
+      setLevel(clampObjectiveLevel(initial.level))
+      setBlocking(initial.blocking)
+      setUnlockPolicy(initial.unlockPolicy)
     } else {
       setName('')
       setDescription('')
       setColor(PALETTE[0]!)
       setIcon(undefined)
       setLinkedRuleIds([])
-      setLevel(5)
-      setDeadline('')
+      setLevel(DEFAULT_OBJECTIVE_LEVEL)
+      setBlocking(undefined)
+      setUnlockPolicy(undefined)
     }
     setError(null)
     setConfirmDelete(false)
@@ -77,6 +96,7 @@ export function ObjectiveEditor({
 
   const colorValid = HEX_RE.test(color)
   const canSave = !busy && name.trim().length > 0 && colorValid
+  const dailyMinutes = OBJECTIVE_DAILY_MINUTES_BY_LEVEL[level] ?? 0
   const closeColorWarning = existingObjectives.some((objective) =>
     objective.id !== initial?.id && areColorsSimilar(objective.color, color),
   )
@@ -98,9 +118,12 @@ export function ObjectiveEditor({
         icon,
         linkedRuleIds,
         level,
-        deadline: deadline || undefined,
+        blocking,
+        unlockPolicy,
       }
-      if (initial?.id) draft.id = initial.id
+      if (initial) {
+        draft.id = initial.id
+      }
       await onSave(draft)
       onClose()
     } catch (err) {
@@ -155,13 +178,14 @@ export function ObjectiveEditor({
                   {initial ? 'Modifier l’objectif' : 'Nouvel objectif'}
                 </h2>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={onClose}
-                className="rounded-md p-1.5 text-text-muted hover:bg-bg-card hover:text-text-primary"
               >
                 <X size={18} />
-              </button>
+              </Button>
             </header>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -186,19 +210,35 @@ export function ObjectiveEditor({
                 />
               </Field>
 
+              <WorkBlockingFields
+                value={blocking}
+                onChange={setBlocking}
+                subjectLabel="objectif"
+              />
+
+              <div className="mb-5">
+                <UnlockPolicyForm
+                  value={unlockPolicy}
+                  onChange={setUnlockPolicy}
+                />
+              </div>
+
               <Field label="Couleur">
                 <div className="grid grid-cols-6 gap-2">
                   {PALETTE.map((c) => {
                     const selected = color.toLowerCase() === c.toLowerCase()
                     return (
-                      <button
+                      <Button
                         key={c}
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setColor(c)}
                         className={cn(
-                          'group relative h-10 w-full rounded-md ring-offset-2 ring-offset-bg-elevated transition-all',
+                          'relative h-10 w-full rounded-md p-0 ring-offset-2 ring-offset-bg-elevated',
                           selected ? 'ring-2 ring-text-primary' : 'hover:scale-105',
                         )}
+                        contentClassName="absolute inset-0"
                         style={{ backgroundColor: c }}
                         aria-label={`Couleur ${c}`}
                       >
@@ -209,7 +249,7 @@ export function ObjectiveEditor({
                             className="absolute inset-0 m-auto text-white drop-shadow"
                           />
                         )}
-                      </button>
+                      </Button>
                     )
                   })}
                 </div>
@@ -225,20 +265,22 @@ export function ObjectiveEditor({
                   {ICON_OPTIONS.map(({ name: n, Icon }) => {
                     const selected = icon === n
                     return (
-                      <button
+                      <Button
                         key={n}
                         type="button"
+                        variant={selected ? 'solid' : 'default'}
+                        size="sm"
                         onClick={() => setIcon(selected ? undefined : n)}
                         className={cn(
-                          'flex h-10 w-full items-center justify-center rounded-md border transition-colors',
+                          'h-10 w-full rounded-md p-0',
                           selected
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-border-subtle bg-bg-base text-text-muted hover:border-border-strong hover:text-text-primary',
+                            ? 'border-accent/60 bg-accent/15 text-accent hover:bg-accent/20'
+                            : 'bg-bg-base text-text-muted',
                         )}
                         aria-label={`Icône ${n}`}
                       >
                         <Icon size={16} />
-                      </button>
+                      </Button>
                     )
                   })}
                 </div>
@@ -257,68 +299,61 @@ export function ObjectiveEditor({
                     {rules.map((r) => {
                       const selected = linkedRuleIds.includes(r.id)
                       return (
-                        <button
+                        <Button
                           key={r.id}
                           type="button"
+                          variant={selected ? 'solid' : 'default'}
+                          size="sm"
                           onClick={() => toggleRule(r.id)}
                           className={cn(
-                            'inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1 text-xs font-medium transition-colors',
+                            'rounded-2xl px-3 py-1',
                             selected
                               ? 'border-transparent text-white'
-                              : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
+                              : 'bg-bg-base text-text-secondary',
                           )}
                           style={
                             selected
                               ? { backgroundColor: r.color }
                               : undefined
                           }
-                        >
-                          <span
-                            className="h-2 w-2 rounded-2xl"
+                          >
+                            <span
+                              className="h-2 w-2 rounded-2xl"
                             style={{
                               backgroundColor: selected ? 'white' : r.color,
                             }}
-                          />
-                          {r.name}
-                        </button>
+                            />
+                            {r.name}
+                        </Button>
                       )
                     })}
                   </div>
                 )}
               </Field>
 
-              <Field label="Deadline" hint="Optionnel — les tâches gardent la priorité pour le calcul quotidien">
-                <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-              
-              <Field label="Intensité (Niveau)" hint="Le niveau recommandé est 5. Plus le niveau est haut, plus cet objectif consommera de temps libre.">
+              <Field label="Intensité (niveau)" hint="Le niveau définit le maximum quotidien réservé à cet objectif quand la journée le permet.">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                      <span className="text-2xl font-bold text-text-primary">{level}</span>
-                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}>
-                        {level === 5 ? 'Recommandé' : 'Manuel'}
+                     <span className="rounded bg-bg-base px-2 py-0.5 text-[10px] font-bold uppercase text-text-muted">
+                        {dailyMinutes} min/jour
                      </span>
                   </div>
                   <input
                     type="range"
-                    min="3"
-                    max="7"
+                    min={OBJECTIVE_LEVEL_MIN}
+                    max={OBJECTIVE_LEVEL_MAX}
                     step="1"
                     value={level}
-                    onChange={(e) => setLevel(parseInt(e.target.value))}
+                    onChange={(e) => setLevel(clampObjectiveLevel(parseInt(e.target.value)))}
                     className="w-full accent-accent h-1.5 rounded-2xl bg-bg-base appearance-none cursor-pointer"
                   />
                   <div className="flex justify-between text-[10px] text-text-muted font-mono">
-                    <span>3</span>
-                    <span>4</span>
-                    <span className="text-accent font-bold">5</span>
-                    <span>6</span>
-                    <span>7</span>
+                    {[3, 4, 5, 6, 7].map((n) => (
+                      <span key={n} className={n === level ? 'font-bold text-accent' : undefined}>
+                        {n}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </Field>
@@ -332,12 +367,12 @@ export function ObjectiveEditor({
 
             <footer className="flex items-center justify-between gap-2 border-t border-border-subtle px-6 py-4">
               {initial && onDelete ? (
-                <button
+                <Button
                   type="button"
+                  variant="danger"
                   onClick={handleDelete}
                   disabled={busy}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors',
                     confirmDelete
                       ? 'bg-red-500 text-white hover:bg-red-600'
                       : 'text-red-400 hover:bg-red-500/10',
@@ -345,31 +380,26 @@ export function ObjectiveEditor({
                 >
                   <Trash2 size={14} />
                   {confirmDelete ? 'Confirmer' : 'Supprimer'}
-                </button>
+                </Button>
               ) : (
                 <div />
               )}
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={onClose}
-                  className="rounded-md px-4 py-2 text-sm text-text-secondary hover:bg-bg-card"
                 >
                   Annuler
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="solid"
                   onClick={handleSave}
                   disabled={!canSave}
-                  className={cn(
-                    'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                    canSave
-                      ? 'bg-accent text-white hover:bg-accent-hover'
-                      : 'cursor-not-allowed bg-bg-card text-text-muted',
-                  )}
                 >
                   {busy ? 'Sauvegarde...' : 'Sauvegarder'}
-                </button>
+                </Button>
               </div>
             </footer>
           </motion.aside>

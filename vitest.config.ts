@@ -7,9 +7,14 @@ export default defineConfig({
     include: [
       'src/main/**/*.test.ts',
       'src/renderer/**/*.test.ts',
+      'src/renderer/**/*.test.tsx',
       'src/shared/**/*.test.ts',
       'src/service/**/*.test.ts',
     ],
+    environmentMatchGlobs: [
+      ['src/renderer/**/*.test.tsx', 'jsdom'],
+    ],
+    setupFiles: ['vitest.setup.ts'],
   },
   resolve: {
     alias: {

@@ -3,18 +3,17 @@ import { promises as fs } from 'node:fs'
 import { dirname, join, normalize } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
-import { Service } from 'node-windows'
 import { serviceDataDir } from '@service/data-dir'
 import { migrateBlockingData } from './blocking/migrate-blocking-data'
 import log from './logging/setup'
 
-/** Nom du service Windows installé pour porter le blocage Nexus. */
-export const SERVICE_NAME = 'NexusBlockingService'
+/** Nom du service Windows installé pour porter le blocage Vethos. */
+export const SERVICE_NAME = 'VethosBlockingService'
 
 const execFile = promisify(execFileCallback)
-const WRAPPER_ID = SERVICE_NAME.replace(/[^\w]/gi, '').toLowerCase()
-const WRAPPER_EXE = `${WRAPPER_ID}.exe`
-const WINDOWS_SERVICE_NAME = WRAPPER_EXE
+const WRAPPER_ID = SERVICE_NAME.replace(/[^\w]/gi, '').toLowerCase() // "vethosblockingservice"
+const WRAPPER_EXE = `${WRAPPER_ID}.exe` // "vethosblockingservice.exe"
+const WINDOWS_SERVICE_NAME = SERVICE_NAME // "VethosBlockingService"
 const WAIT_FOR_DAEMON_MS = 10_000
 const SERVICE_STATUS_RUNNING = 4
 
@@ -30,21 +29,13 @@ function serviceScriptPath(): string {
 }
 
 /**
- * Construit l'objet `Service` node-windows. HYPOTHÈSE DU SPIKE : node-windows fait
- * tourner le service via un exécutable Node ; comme la routine d'install s'exécute
- * sous `Nexus.exe` (binaire Electron), et avec `ELECTRON_RUN_AS_NODE=1` dans
- * l'environnement du service, le binaire Electron exécute le bundle en mode Node.
+ * Chemin de l'exécutable WinSW d'origine dans le dossier des ressources.
  */
-function buildService(): Service {
-  return new Service({
-    name: SERVICE_NAME,
-    description: 'Service de blocage en arrière-plan de Nexus (sous-projet P16).',
-    script: serviceScriptPath(),
-    env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
-    wait: 2,
-    grow: 0.5,
-    maxRestarts: 10,
-  })
+function winswExecutablePath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'WinSW-x64.exe')
+  }
+  return join(app.getAppPath(), 'resources', 'WinSW-x64.exe')
 }
 
 function daemonDir(): string {
@@ -68,24 +59,42 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function waitForPath(path: string): Promise<void> {
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < WAIT_FOR_DAEMON_MS) {
-    if (await pathExists(path)) return
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
-  throw new Error(`Fichier daemon introuvable après génération node-windows: ${path}`)
-}
+/**
+ * Génère dynamiquement le fichier XML requis par WinSW 3.x et copie le binaire.
+ */
+async function prepareDaemonFiles(): Promise<void> {
+  const dir = daemonDir()
+  await fs.mkdir(dir, { recursive: true })
 
-async function normalizeServiceXml(): Promise<void> {
-  const xmlPath = daemonXmlPath()
-  const xml = await fs.readFile(xmlPath, 'utf8')
-  const normalized = xml
-    .replace(/<id>.*?<\/id>/, `<id>${WINDOWS_SERVICE_NAME}</id>`)
-    .replace(/<name>.*?<\/name>/, `<name>${SERVICE_NAME}</name>`)
-  if (normalized !== xml) {
-    await fs.writeFile(xmlPath, normalized, 'utf8')
+  const sourceExe = winswExecutablePath()
+  const targetExe = daemonExecutablePath()
+  const targetXml = daemonXmlPath()
+
+  log.info('[service-install] preparing daemon files', { sourceExe, targetExe, targetXml })
+
+  // Copie de WinSW executable
+  // Le wrapper WinSW peut être verrouillé par le service actuellement lancé.
+  // Il est générique et n'a pas besoin d'être recopié à chaque mise à jour.
+  if (!(await pathExists(targetExe))) {
+    await fs.copyFile(sourceExe, targetExe)
   }
+
+  // Écriture du fichier de configuration XML requis par WinSW 3.x
+  const xmlContent = `<service>
+  <id>${SERVICE_NAME}</id>
+  <name>Vethos Blocking Service</name>
+  <description>Moteur de blocage anti-distraction pour l'application Vethos.</description>
+  <startmode>Automatic</startmode>
+  <executable>${process.execPath}</executable>
+  <arguments>${serviceScriptPath()}</arguments>
+  <env name="ELECTRON_RUN_AS_NODE" value="1"/>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>`
+
+  await fs.writeFile(targetXml, xmlContent, 'utf8')
 }
 
 async function serviceState(serviceName = WINDOWS_SERVICE_NAME): Promise<number | null> {
@@ -134,23 +143,24 @@ async function uninstallServiceViaSc(serviceName = WINDOWS_SERVICE_NAME): Promis
 }
 
 async function uninstallStaleServiceIfNeeded(): Promise<void> {
-  if ((await serviceState(SERVICE_NAME)) !== null) {
-    log.info('[service-install] ancien nom de service détecté, suppression', {
-      serviceName: SERVICE_NAME,
-    })
-    await uninstallServiceViaSc(SERVICE_NAME)
+  // Nettoyer l'ancienne installation node-windows qui utilisait "vethosblockingservice.exe" comme ID de service
+  const oldServiceName = 'vethosblockingservice.exe'
+  if ((await serviceState(oldServiceName)) !== null) {
+    log.info(`[service-install] ancienne installation node-windows détectée, suppression de ${oldServiceName}`)
+    await uninstallServiceViaSc(oldServiceName)
   }
 
-  if ((await serviceState()) === null) return
-  const installedPath = await installedServiceBinaryPath()
+  // Nettoyer l'ancienne installation si elle pointe vers un autre chemin d'exécutable
+  if ((await serviceState(SERVICE_NAME)) === null) return
+  const installedPath = await installedServiceBinaryPath(SERVICE_NAME)
   const expectedPath = daemonExecutablePath()
   if (installedPath && samePath(installedPath, expectedPath)) return
 
-  log.info('[service-install] service existant obsolète, remplacement', {
+  log.info('[service-install] service VethosBlockingService existant obsolète, remplacement', {
     installedPath,
     expectedPath,
   })
-  await uninstallServiceViaSc()
+  await uninstallServiceViaSc(SERVICE_NAME)
 }
 
 async function runDaemon(command: 'install' | 'start' | 'stop' | 'uninstall'): Promise<void> {
@@ -158,10 +168,6 @@ async function runDaemon(command: 'install' | 'start' | 'stop' | 'uninstall'): P
 }
 
 async function ensureServiceInstalledAndStarted(options: { restartIfRunning?: boolean } = {}): Promise<void> {
-  await waitForPath(daemonExecutablePath())
-  await waitForPath(daemonXmlPath())
-  await normalizeServiceXml()
-
   if ((await serviceState()) === null) {
     await runDaemon('install')
   }
@@ -179,7 +185,7 @@ async function ensureServiceInstalledAndStarted(options: { restartIfRunning?: bo
 }
 
 /**
- * Installe `NexusBlockingService` et le démarre. Idempotent : si le service est
+ * Installe `VethosBlockingService` et le démarre. Idempotent : si le service est
  * déjà installé, résout sans erreur. À appeler depuis une routine élevée
  * (l'install d'un service Windows exige les droits admin).
  */
@@ -187,32 +193,18 @@ export async function installService(): Promise<void> {
   await migrateBlockingData(app.getPath('userData'), serviceDataDir())
   await uninstallStaleServiceIfNeeded()
 
-  return new Promise<void>((resolve, reject) => {
-    const svc = buildService()
-    let settled = false
-    const finishInstall = (source: 'install' | 'alreadyinstalled'): void => {
-      if (settled) return
-      settled = true
-      ensureServiceInstalledAndStarted({ restartIfRunning: source === 'alreadyinstalled' })
-        .then(() => {
-          log.info('[service-install] service installé et démarré', { source })
-          resolve()
-        })
-        .catch(reject)
-    }
-    svc.on('install', () => finishInstall('install'))
-    svc.on('alreadyinstalled', () => finishInstall('alreadyinstalled'))
-    svc.on('invalidinstallation', () => {
-      reject(new Error('Installation du service invalide'))
-    })
-    svc.on('error', (err) => {
-      if (!settled) reject(err)
-    })
-    svc.install()
-  })
+  // 1. Copier le binaire WinSW et générer dynamiquement le XML
+  await prepareDaemonFiles()
+
+  // 2. Installer et démarrer
+  const isInstalled = (await serviceState()) !== null
+  const source = isInstalled ? 'alreadyinstalled' : 'install'
+
+  await ensureServiceInstalledAndStarted({ restartIfRunning: isInstalled })
+  log.info('[service-install] service installé et démarré', { source })
 }
 
-/** Désinstalle `NexusBlockingService`. Idempotent côté node-windows. */
+/** Désinstalle `VethosBlockingService`. Idempotent. */
 export async function uninstallService(): Promise<void> {
   const wrapperExists = await pathExists(daemonExecutablePath())
   if ((await serviceState()) !== null) {

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { Show, UserButton, useUser } from '@clerk/react'
 import { motion } from 'framer-motion'
-import { Home, Target, Calendar, Shield, Settings, LogOut, type LucideIcon } from 'lucide-react'
+import { Home, Calendar, Shield, Settings, LayoutGrid, BarChart3, ListTodo, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { NexusLogo } from '@/components/NexusLogo'
-import { nexus } from '@/lib/ipc'
-import { useAuthStore } from '@/store/auth.store'
+import { VethosLogo } from '@/components/VethosLogo'
+import { vethos } from '@/lib/ipc'
+
+import { useRegistryStore } from '@/store/registry.store'
 
 type NavItem = {
   to: string
@@ -15,21 +17,26 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', Icon: Home },
-  { to: '/tasks', label: 'Mes tâches', Icon: Target },
-  { to: '/objectives', label: 'Mes objectifs', Icon: Target },
+  { to: '/todo', label: 'À faire', Icon: ListTodo },
   { to: '/planning', label: 'Mon planning', Icon: Calendar },
-  { to: '/blocking', label: 'Blocage', Icon: Shield },
+  { to: '/blocking', label: 'Coach', Icon: Shield },
+  { to: '/apps', label: 'Apps', Icon: LayoutGrid },
+  { to: '/statistics', label: 'Statistiques', Icon: BarChart3 },
   { to: '/settings', label: 'Paramètres', Icon: Settings },
 ]
 
 export function Sidebar() {
   const { pathname } = useLocation()
   const [version, setVersion] = useState<string | null>(null)
-  const account = useAuthStore((s) => s.account)
-  const signOut = useAuthStore((s) => s.signOut)
+  const { user } = useUser()
+  const displayName =
+    user?.fullName ?? user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Compte Vethos'
+  const email = user?.primaryEmailAddress?.emailAddress ?? ''
+
+  const unclassifiedCount = useRegistryStore((s) => s.items.filter((i) => !i.classified).length)
 
   useEffect(() => {
-    void nexus.app.getVersion().then(setVersion).catch(() => setVersion(null))
+    void vethos.app.getVersion().then(setVersion).catch(() => setVersion(null))
   }, [])
 
   return (
@@ -42,12 +49,12 @@ export function Sidebar() {
       style={
         {
           WebkitAppRegion: 'drag',
-          boxShadow: '1px 0 8px rgba(59, 163, 255, 0.15)',
+          boxShadow: '1px 0 10px rgba(216, 216, 216, 0.08)',
         } as React.CSSProperties
       }
     >
       <div className="px-3 pb-6">
-        <NexusLogo size={26} />
+        <VethosLogo size={42} />
         <p className="mt-1 text-xs text-text-muted">Focus, par design.</p>
       </div>
 
@@ -64,7 +71,7 @@ export function Sidebar() {
               end={to === '/'}
               className={cn(
                 'group relative flex items-center gap-3 rounded-md px-3 py-2.5',
-                'text-sm font-medium transition-all duration-200 ease-out hover:shadow-[0_0_8px_rgba(59,163,255,0.3)]',
+                'text-sm font-medium transition-all duration-200 ease-out hover:shadow-[0_0_8px_rgba(216,216,216,0.16)]',
                 isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary',
               )}
             >
@@ -79,9 +86,16 @@ export function Sidebar() {
                   transition={{ type: 'tween', duration: 0.25 }}
                 />
               )}
-              <span className="relative z-10 flex items-center gap-3">
-                <Icon size={18} strokeWidth={1.75} />
-                {label}
+              <span className="relative z-10 flex w-full items-center justify-between">
+                <span className="flex items-center gap-3">
+                  <Icon size={18} strokeWidth={1.75} />
+                  {label}
+                </span>
+                {label === 'Apps' && unclassifiedCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-yellow px-1.5 text-[10px] font-bold text-black shadow-sm">
+                    {unclassifiedCount}
+                  </span>
+                )}
               </span>
             </NavLink>
           )
@@ -92,25 +106,16 @@ export function Sidebar() {
         className="mt-auto space-y-3 px-3"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {account && (
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-text-primary">{account.name}</div>
-            <div className="truncate text-xs text-text-muted">{account.email}</div>
+        <Show when="signed-in">
+          <div className="flex min-w-0 items-center gap-3 rounded-md border border-border-subtle bg-bg-card px-3 py-2">
+            <UserButton />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-text-primary">{displayName}</div>
+              {email && <div className="truncate text-xs text-text-muted">{email}</div>}
+            </div>
           </div>
-        )}
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className={cn(
-            'inline-flex w-full items-center gap-2 rounded-md border px-3 py-2',
-            'border-border-subtle text-xs font-medium text-text-secondary transition-colors',
-            'hover:border-border-strong hover:text-text-primary',
-          )}
-        >
-          <LogOut size={14} />
-          Déconnexion
-        </button>
-        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Nexus'}</div>
+        </Show>
+        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Vethos'}</div>
       </div>
     </aside>
   )

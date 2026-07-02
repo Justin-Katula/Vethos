@@ -8,7 +8,7 @@ describe('atomic storage', () => {
   let dir: string
 
   beforeEach(async () => {
-    dir = await fs.mkdtemp(join(tmpdir(), 'nexus-test-'))
+    dir = await fs.mkdtemp(join(tmpdir(), 'vethos-test-'))
   })
 
   afterEach(async () => {

@@ -10,7 +10,7 @@ describe('migrateBlockingData', () => {
   let toDir: string
 
   beforeEach(async () => {
-    base = await fsp.mkdtemp(join(tmpdir(), 'nexus-migrate-'))
+    base = await fsp.mkdtemp(join(tmpdir(), 'vethos-migrate-'))
     fromDir = join(base, 'from')
     toDir = join(base, 'to')
     await fsp.mkdir(fromDir, { recursive: true })
@@ -20,17 +20,17 @@ describe('migrateBlockingData', () => {
   })
 
   it('copie un fichier de blocage absent de la cible', async () => {
-    await fsp.writeFile(join(fromDir, 'nexus_blocking.json'), '{"profiles":[]}', 'utf8')
+    await fsp.writeFile(join(fromDir, 'vethos_blocking.json'), '{"profiles":[]}', 'utf8')
     await migrateBlockingData(fromDir, toDir)
-    expect(await fsp.readFile(join(toDir, 'nexus_blocking.json'), 'utf8')).toBe('{"profiles":[]}')
+    expect(await fsp.readFile(join(toDir, 'vethos_blocking.json'), 'utf8')).toBe('{"profiles":[]}')
   })
 
   it("n'écrase pas un fichier déjà présent dans la cible", async () => {
-    await fsp.writeFile(join(fromDir, 'nexus_blocking.json'), 'NOUVEAU', 'utf8')
+    await fsp.writeFile(join(fromDir, 'vethos_blocking.json'), 'NOUVEAU', 'utf8')
     await fsp.mkdir(toDir, { recursive: true })
-    await fsp.writeFile(join(toDir, 'nexus_blocking.json'), 'EXISTANT', 'utf8')
+    await fsp.writeFile(join(toDir, 'vethos_blocking.json'), 'EXISTANT', 'utf8')
     await migrateBlockingData(fromDir, toDir)
-    expect(await fsp.readFile(join(toDir, 'nexus_blocking.json'), 'utf8')).toBe('EXISTANT')
+    expect(await fsp.readFile(join(toDir, 'vethos_blocking.json'), 'utf8')).toBe('EXISTANT')
   })
 
   it('ignore un fichier absent de la source sans erreur', async () => {
@@ -39,28 +39,28 @@ describe('migrateBlockingData', () => {
   })
 
   it("crée le répertoire cible s'il n'existe pas", async () => {
-    await fsp.writeFile(join(fromDir, 'hosts.nexus.backup'), 'backup', 'utf8')
+    await fsp.writeFile(join(fromDir, 'hosts.vethos.backup'), 'backup', 'utf8')
     await migrateBlockingData(fromDir, toDir)
-    expect(await fsp.readFile(join(toDir, 'hosts.nexus.backup'), 'utf8')).toBe('backup')
+    expect(await fsp.readFile(join(toDir, 'hosts.vethos.backup'), 'utf8')).toBe('backup')
   })
 
   it('migre les 4 fichiers de blocage connus, pas le staging', async () => {
     for (const name of [
-      'nexus_blocking.json',
-      'nexus_blocking_history.json',
-      'nexus_blocking_active.json',
-      'hosts.nexus.backup',
-      'hosts.nexus.staging',
+      'vethos_blocking.json',
+      'vethos_blocking_history.json',
+      'vethos_blocking_active.json',
+      'hosts.vethos.backup',
+      'hosts.vethos.staging',
     ]) {
       await fsp.writeFile(join(fromDir, name), name, 'utf8')
     }
     await migrateBlockingData(fromDir, toDir)
     expect((await fsp.readdir(toDir)).sort()).toEqual(
       [
-        'hosts.nexus.backup',
-        'nexus_blocking.json',
-        'nexus_blocking_active.json',
-        'nexus_blocking_history.json',
+        'hosts.vethos.backup',
+        'vethos_blocking.json',
+        'vethos_blocking_active.json',
+        'vethos_blocking_history.json',
       ].sort(),
     )
   })

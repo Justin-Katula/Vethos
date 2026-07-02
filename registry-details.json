@@ -1,0 +1,807 @@
+[
+    {
+        "DisplayName":  "AMD Software",
+        "InstallLocation":  "C:\\Program Files\\AMD\\CIM\\BIN64",
+        "DisplayIcon":  "C:\\Program Files\\AMD\\CIM\\Bin64\\AMDSoftwareConsumer.ico",
+        "Publisher":  "Advanced Micro Devices, Inc.",
+        "UninstallString":  "\"C:\\Program Files\\AMD\\CIM\\BIN64\\AMDSoftwareInstaller.exe\" /EXPRESS_UNINSTALL /IGNORE_UPGRADE /ON_REBOOT_MESSAGE:NO"
+    },
+    {
+        "DisplayName":  "Armoury Crate Service",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files\\ASUS\\Armoury Crate Service\\ArmouryCrate.Service.exe",
+        "Publisher":  "ASUSTeK COMPUTER INC.",
+        "UninstallString":  "\"C:\\Program Files\\ASUS\\Armoury Crate Service\\ArmouryCrate.Uninstaller.exe\""
+    },
+    {
+        "DisplayName":  "Denuvo Anti-Cheat",
+        "InstallLocation":  "C:\\Program Files\\Denuvo Anti-Cheat",
+        "DisplayIcon":  "C:\\Program Files\\Denuvo Anti-Cheat\\denuvo-anti-cheat-update-service.exe",
+        "Publisher":  "Denuvo GmbH",
+        "UninstallString":  "C:\\Program Files\\Denuvo Anti-Cheat\\denuvo-anti-cheat-update-service.exe uninstall"
+    },
+    {
+        "DisplayName":  "Docker Desktop",
+        "InstallLocation":  "C:\\Program Files\\Docker\\Docker",
+        "DisplayIcon":  "C:\\Program Files\\Docker\\Docker\\Docker Desktop Installer.exe",
+        "Publisher":  "Docker Inc.",
+        "UninstallString":  "\"C:\\Program Files\\Docker\\Docker\\Docker Desktop Installer.exe\" \"uninstall\""
+    },
+    {
+        "DisplayName":  "Git",
+        "InstallLocation":  "C:\\Program Files\\Git\\",
+        "DisplayIcon":  "C:\\Program Files\\Git\\mingw64\\share\\git\\git-for-windows.ico",
+        "Publisher":  "The Git Development Community",
+        "UninstallString":  "\"C:\\Program Files\\Git\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "PC Remote Receiver 7.8.1",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files\\PC Remote Receiver\\PCRemoteReceiver.exe",
+        "Publisher":  "Monect (Suzhou) Co., Ltd.",
+        "UninstallString":  "C:\\Program Files\\PC Remote Receiver\\uninst.exe"
+    },
+    {
+        "DisplayName":  "PyCharm 2026.1",
+        "InstallLocation":  "C:\\Program Files\\JetBrains\\PyCharm 2025.3.3",
+        "DisplayIcon":  "C:\\Program Files\\JetBrains\\PyCharm 2025.3.3\\bin\\pycharm64.exe",
+        "Publisher":  "JetBrains s.r.o.",
+        "UninstallString":  "\"C:\\Program Files\\JetBrains\\PyCharm 2025.3.3\\bin\\Uninstall.exe\""
+    },
+    {
+        "DisplayName":  "Red Dead Redemption 2",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Red Dead Redemption 2",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\5bf6edd7efb1110b457da905e7ac696c6c619ed1.ico",
+        "Publisher":  "Rockstar Games",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1174180"
+    },
+    {
+        "DisplayName":  "Detroit: Become Human",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Detroit Become Human",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\04f01ce9d6ae17dd26e3762a927cc19032787369.ico",
+        "Publisher":  "Quantic Dream",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1222140"
+    },
+    {
+        "DisplayName":  "Cyberpunk 2077 Bonus Content",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\music\\Cyberpunk 2077 Bonus Content",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\32cbb235c6869e3d1c8f9346d012d7f69a073abf.ico",
+        "Publisher":  "CD PROJEKT RED",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1495710"
+    },
+    {
+        "DisplayName":  "Planet of Lana",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Planet of Lana",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\b95db26a2659af0dc728fb1800fa762afcf0fe5e.ico",
+        "Publisher":  "Wishfully",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1608230"
+    },
+    {
+        "DisplayName":  "HITMAN World of Assassination",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\b31beeb897979d62d6233753f5aa60a7865becb8.ico",
+        "Publisher":  "IO Interactive A/S",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1659040"
+    },
+    {
+        "DisplayName":  "eFootball™",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\eFootball",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\f8d66e73fb5666bd7290e6756a32ac866e3544db.ico",
+        "Publisher":  "KONAMI",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1665460"
+    },
+    {
+        "DisplayName":  "Call of Duty®",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Call of Duty HQ",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\62d857e14896e4f7010ebedc8842b1e48898a18c.ico",
+        "Publisher":  "Treyarch",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/1938090"
+    },
+    {
+        "DisplayName":  "Sky: Children of the Light",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Sky Children of the Light",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\a89208d099aaa194da5cad8e81dfcc2bb83da029.ico",
+        "Publisher":  "thatgamecompany",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/2325290"
+    },
+    {
+        "DisplayName":  "Path of Exile",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Path of Exile",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\ccabb5a034c0e3ed54f9ce0e5def91302a492850.ico",
+        "Publisher":  "Grinding Gear Games",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/238960"
+    },
+    {
+        "DisplayName":  "Battlefield™ 6",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Battlefield 6",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\36868dea6365c7656fdc49d6f31bb1f7a01251c7.ico",
+        "Publisher":  "Battlefield Studios",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/2807960"
+    },
+    {
+        "DisplayName":  "Graveyard Keeper",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Graveyard Keeper",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\251422cde52b40d623afae747b3e8a01f19e10dd.ico",
+        "Publisher":  "Lazy Bear Games",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/599140"
+    },
+    {
+        "DisplayName":  "Car Mechanic Simulator 2018",
+        "InstallLocation":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Car Mechanic Simulator 2018",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\steam\\games\\6454b2c114a9f347e30d2d25f0d90cdfac5f3b3a.ico",
+        "Publisher":  "Red Dot Games",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" steam://uninstall/645630"
+    },
+    {
+        "DisplayName":  "Microsoft GameInput",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /I{14EDF950-06B9-415F-862C-1D5DEC321AE6}"
+    },
+    {
+        "DisplayName":  "PowerShell 7-x64",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /X{18AF003E-70BD-4CD0-874C-D53E4D0B9708}"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2010  x64 Redistributable - 10.0.40219",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /X{1D8E6291-B0D5-35EC-8441-6616F567A0F7}"
+    },
+    {
+        "DisplayName":  "ROG Live Service",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "ASUSTek COMPUTER INC.",
+        "UninstallString":  "MsiExec.exe /I{2D87BFB6-C184-4A59-9BBE-3E20CE797631}"
+    },
+    {
+        "DisplayName":  "Blender",
+        "InstallLocation":  "C:\\Program Files\\Blender Foundation\\Blender 5.0\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Blender Foundation",
+        "UninstallString":  "MsiExec.exe /X{42953594-7E2A-46C1-83C0-F536CDE28D69}"
+    },
+    {
+        "DisplayName":  "HidHide",
+        "InstallLocation":  "C:\\Program Files\\Nefarius Software Solutions\\HidHide\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Nefarius Software Solutions e.U.",
+        "UninstallString":  "MsiExec.exe /X{48DD38C8-443E-4474-A249-AB32389E08F6}"
+    },
+    {
+        "DisplayName":  "ROGFontInstaller",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "ASUS",
+        "UninstallString":  "MsiExec.exe /I{605108C1-153E-43D8-8A67-7CE326B00ECA}"
+    },
+    {
+        "DisplayName":  "Cold Turkey Blocker",
+        "InstallLocation":  "C:\\Program Files\\Cold Turkey\\",
+        "DisplayIcon":  "C:\\Program Files\\Cold Turkey\\Cold Turkey Blocker.exe",
+        "Publisher":  "Cold Turkey Software, Inc.",
+        "UninstallString":  "\"C:\\Program Files\\Cold Turkey\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "Microsoft Visual Studio Installer",
+        "InstallLocation":  "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\"",
+        "DisplayIcon":  "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe\"",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe\" /uninstall"
+    },
+    {
+        "DisplayName":  "Node.js",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Node.js Foundation",
+        "UninstallString":  "MsiExec.exe /I{943F6D8C-08E2-4F54-8E3D-623E82DC6BF0}"
+    },
+    {
+        "DisplayName":  "ViGEm Bus Driver",
+        "InstallLocation":  "C:\\Program Files\\Nefarius Software Solutions\\ViGEm Bus Driver\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Nefarius Software Solutions e.U.",
+        "UninstallString":  "MsiExec.exe /X{966606F3-2745-49E9-BF15-5C3EAA4E9077}"
+    },
+    {
+        "DisplayName":  "ASUS DriverHub",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files\\ASUS\\AsusDriverHubInstaller\\ASUS-DriverHub-Installer.exe",
+        "Publisher":  "ASUS",
+        "UninstallString":  "\"C:\\Program Files\\ASUS\\AsusDriverHubInstaller\\ASUS-DriverHub-Installer.exe\" /u"
+    },
+    {
+        "DisplayName":  "Epic Games Launcher",
+        "InstallLocation":  "C:\\Users\\obedi\\Epic games\\Epic Games\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Epic Games, Inc.",
+        "UninstallString":  "MsiExec.exe /X{B0DDAB3F-A2A6-46A9-8C1E-75B303CD1E26}"
+    },
+    {
+        "DisplayName":  "Virtual Assistant",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "ASUS",
+        "UninstallString":  "MsiExec.exe /I{B9B6590E-885B-4856-B123-A6CB814ADB1B}"
+    },
+    {
+        "DisplayName":  "AURA lighting effect add-on x64",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "ASUSTek COMPUTER INC.",
+        "UninstallString":  "MsiExec.exe /I{C5A4A164-4428-4931-B728-96EEF0FA3C44}"
+    },
+    {
+        "DisplayName":  "AMD Install Manager",
+        "InstallLocation":  "C:\\Program Files\\AMD\\AMDInstallManager\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Advanced Micro Devices, Inc.",
+        "UninstallString":  "MsiExec.exe /X{E7AAA003-D847-40C9-BF3E-0DB659A950C7}"
+    },
+    {
+        "DisplayName":  "Visual Studio Community 2026",
+        "InstallLocation":  "C:\\Program Files\\Microsoft Visual Studio\\18\\Community",
+        "DisplayIcon":  "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\devenv.exe",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe\" uninstall --installPath \"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\""
+    },
+    {
+        "DisplayName":  "MSI Afterburner 4.6.6",
+        "InstallLocation":  null,
+        "DisplayIcon":  "\"C:\\Program Files (x86)\\MSI Afterburner\\uninstall.exe\"",
+        "Publisher":  "MSI Co., LTD",
+        "UninstallString":  "\"C:\\Program Files (x86)\\MSI Afterburner\\uninstall.exe\""
+    },
+    {
+        "DisplayName":  "AMD Chipset Software",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files (x86)\\AMD\\Chipset_Software\\QT_Dependencies\\Setup.exe",
+        "Publisher":  "Advanced Micro Devices, Inc.",
+        "UninstallString":  "\"C:\\Program Files (x86)\\AMD\\Chipset_Software\\QT_Dependencies\\Setup.exe\" /U {5f4cd92f-734e-4d46-80be-d91262a0c1e3}"
+    },
+    {
+        "DisplayName":  "Cocos Dashboard 1.0.14.2515",
+        "InstallLocation":  "C:\\CocosDashboard\\",
+        "DisplayIcon":  "C:\\WINDOWS\\Installer\\{5B686938-99D9-4ED6-94E2-59E5CC7C3D94}\\atom.exe",
+        "Publisher":  "Xiamen Yaji Software Co., Ltd.",
+        "UninstallString":  "C:\\ProgramData\\Caphyon\\Advanced Installer\\{5B686938-99D9-4ED6-94E2-59E5CC7C3D94}\\CocosDashboard_setup.exe /x {5B686938-99D9-4ED6-94E2-59E5CC7C3D94}"
+    },
+    {
+        "DisplayName":  "Display Driver Uninstaller",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files (x86)\\Display Driver Uninstaller\\Display Driver Uninstaller.exe",
+        "Publisher":  "Wagnardsoft",
+        "UninstallString":  "C:\\Program Files (x86)\\Display Driver Uninstaller\\uninst.exe"
+    },
+    {
+        "DisplayName":  "DS4Windows version 3.3.3",
+        "InstallLocation":  "C:\\Controller\\DS4Windows\\",
+        "DisplayIcon":  null,
+        "Publisher":  "Ryochan7",
+        "UninstallString":  "\"C:\\Controller\\DS4Windows\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "Visual Studio Build Tools 2026 (2)",
+        "InstallLocation":  "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\Common7\\IDE\\devenv.ico",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe\" uninstall --installPath \"C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\""
+    },
+    {
+        "DisplayName":  "Google Chrome",
+        "InstallLocation":  "C:\\Program Files\\Google\\Chrome\\Application",
+        "DisplayIcon":  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe,0",
+        "Publisher":  "Google LLC",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\149.0.7827.53\\Installer\\setup.exe\" --uninstall --channel=stable --system-level --verbose-logging"
+    },
+    {
+        "DisplayName":  "IncrediBuild 10.31.2 (build 16403)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "\"C:\\Program Files (x86)\\IncrediBuild\\Install.exe\"",
+        "Publisher":  "Incredibuild",
+        "UninstallString":  "\"C:\\Program Files (x86)\\IncrediBuild\\Install.exe\" /uninstall"
+    },
+    {
+        "DisplayName":  "Copilot",
+        "InstallLocation":  "C:\\Program Files (x86)\\Microsoft\\Copilot\\Application",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Microsoft\\Copilot\\Application\\148.0.3967.70\\mscopilot.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Microsoft\\Copilot\\Application\\148.0.3967.70\\Installer\\copilot_setup.exe\" --uninstall --mscopilot --channel=stable --system-level --verbose-logging"
+    },
+    {
+        "DisplayName":  "Microsoft Edge",
+        "InstallLocation":  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\148.0.3967.96\\msedge.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\148.0.3967.96\\Installer\\setup.exe\" --uninstall --msedge --channel=stable --system-level --verbose-logging"
+    },
+    {
+        "DisplayName":  "OBS Studio",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe",
+        "Publisher":  "OBS Project",
+        "UninstallString":  "\"C:\\Program Files\\obs-studio\\uninstall.exe\""
+    },
+    {
+        "DisplayName":  "Comet",
+        "InstallLocation":  "C:\\Program Files\\Perplexity\\Comet\\Application",
+        "DisplayIcon":  "C:\\Program Files\\Perplexity\\Comet\\Application\\comet.exe,0",
+        "Publisher":  "The Comet Authors",
+        "UninstallString":  "\"C:\\Program Files\\Perplexity\\Comet\\Application\\148.0.7778.1018\\Installer\\setup.exe\" --uninstall --system-level"
+    },
+    {
+        "DisplayName":  "Rockstar Games Launcher",
+        "InstallLocation":  "C:\\Program Files\\Rockstar Games\\Launcher",
+        "DisplayIcon":  "\"C:\\Program Files\\Rockstar Games\\Launcher\\Launcher.exe\"",
+        "Publisher":  "Rockstar Games",
+        "UninstallString":  "\"C:\\Program Files\\Rockstar Games\\Launcher\\uninstall.exe\" -enableFullMode -uninstall=launcher"
+    },
+    {
+        "DisplayName":  "Rockstar Games SDK",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files\\Rockstar Games\\Social Club\\uninstallRGSCRedistributable.exe",
+        "Publisher":  "Rockstar Games",
+        "UninstallString":  "C:\\Program Files\\Rockstar Games\\Social Club\\uninstallRGSCRedistributable.exe"
+    },
+    {
+        "DisplayName":  "RivaTuner Statistics Server 7.3.7",
+        "InstallLocation":  null,
+        "DisplayIcon":  "\"C:\\Program Files (x86)\\RivaTuner Statistics Server\\uninstall.exe\"",
+        "Publisher":  "Unwinder",
+        "UninstallString":  "\"C:\\Program Files (x86)\\RivaTuner Statistics Server\\uninstall.exe\""
+    },
+    {
+        "DisplayName":  "Steam",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files (x86)\\Steam\\uninstall.exe",
+        "Publisher":  "Valve Corporation",
+        "UninstallString":  "C:\\Program Files (x86)\\Steam\\uninstall.exe"
+    },
+    {
+        "DisplayName":  "Ubisoft Connect",
+        "InstallLocation":  "C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\UbisoftConnect.exe",
+        "Publisher":  "Ubisoft",
+        "UninstallString":  "C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\Uninstall.exe"
+    },
+    {
+        "DisplayName":  "GameSDK Service",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{021d69c3-d686-4a94-8fb5-fd1ee782fb14}\\GameSDK.exe,0",
+        "Publisher":  "ASUSTek COMPUTER INC.",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{021d69c3-d686-4a94-8fb5-fd1ee782fb14}\\GameSDK.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2013 Redistributable (x64) - 12.0.40664",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{042d26ef-3dbe-4c25-95d3-4c1b11b235a7}\\vcredist_x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{042d26ef-3dbe-4c25-95d3-4c1b11b235a7}\\vcredist_x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "vs_CoreEditorFonts",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /I{1851460E-0E63-4117-B5BA-25A2F045801B}"
+    },
+    {
+        "DisplayName":  "AURA lighting effect add-on",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "ASUSTek COMPUTER INC.",
+        "UninstallString":  "MsiExec.exe /I{1E2EA04B-FCA7-457E-B6F4-F33E1858E859}"
+    },
+    {
+        "DisplayName":  "Windows Software Development Kit - Windows 10.0.26100.8249",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{204d0387-6d9a-48cf-bb7d-93d49ec0141c}\\winsdksetup.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{204d0387-6d9a-48cf-bb7d-93d49ec0141c}\\winsdksetup.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "ROG FAN XPERT 4",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files (x86)\\InstallShield Installation Information\\{2dfe216d-3481-4684-ad4d-2566bd7cfe4f}\\Setup.exe,0",
+        "Publisher":  "ASUSTek Computer Inc.",
+        "UninstallString":  "C:\\Program Files (x86)\\InstallShield Installation Information\\{2dfe216d-3481-4684-ad4d-2566bd7cfe4f}\\Setup.exe -uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Windows Desktop Runtime - 8.0.27 (x64)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{2e63a120-0290-4d41-b713-28bf4b7f0631}\\windowsdesktop-runtime-8.0.27-win-x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{2e63a120-0290-4d41-b713-28bf4b7f0631}\\windowsdesktop-runtime-8.0.27-win-x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "ASUS Framework Service",
+        "InstallLocation":  "C:\\Program Files (x86)\\ASUS\\ArmouryDevice",
+        "DisplayIcon":  "C:\\Program Files (x86)\\ASUS\\ArmouryDevice\\asus_framework.exe,0",
+        "Publisher":  "ASUSTeK Computer Inc.",
+        "UninstallString":  "\"C:\\Program Files (x86)\\InstallShield Installation Information\\{339A6383-7862-46DA-8A9D-E84180EF9424}\\FrameworkServiceSetup.exe\" /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2012 Redistributable (x86) - 11.0.61030",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{33d1fd90-4274-48a1-9bc1-97e33d9c2d6f}\\vcredist_x86.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{33d1fd90-4274-48a1-9bc1-97e33d9c2d6f}\\vcredist_x86.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Futuremark SystemInfo",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Futuremark",
+        "UninstallString":  "MsiExec.exe /X{5C03B390-A762-4C43-B0A3-43166E612476}"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2015-2022 Redistributable (x86) - 14.51.36231",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{73fd1972-7030-4d2d-9ede-dd38a78c1d52}\\VC_redist.x86.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{73fd1972-7030-4d2d-9ede-dd38a78c1d52}\\VC_redist.x86.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft .NET Runtime - 8.0.27 (x64)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{785c0558-c01e-44e3-8799-90ea5ea70ae6}\\dotnet-runtime-8.0.27-win-x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{785c0558-c01e-44e3-8799-90ea5ea70ae6}\\dotnet-runtime-8.0.27-win-x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Epic Online Services",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Epic Games, Inc.",
+        "UninstallString":  "MsiExec.exe /X{786992A0-5C37-4552-B402-69D172EC2474}"
+    },
+    {
+        "DisplayName":  "Realtek Ethernet Controller Driver",
+        "InstallLocation":  "C:\\Program Files (x86)\\Realtek\\NICDRV_8169",
+        "DisplayIcon":  "\"C:\\Program Files (x86)\\Realtek\\NICDRV_8169\\ICON\\remove.ico\"",
+        "Publisher":  "Realtek",
+        "UninstallString":  "\"C:\\Program Files (x86)\\InstallShield Installation Information\\{8833FFB6-5B0C-4764-81AA-06DFEED9A476}\\setup.exe\" -runfromtemp -removeonly"
+    },
+    {
+        "DisplayName":  "ASUS Motherboard",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Program Files (x86)\\InstallShield Installation Information\\{93795eb8-bd86-4d4d-ab27-ff80f9467b37}\\Setup.exe,0",
+        "Publisher":  "ASUSTek Computer Inc.",
+        "UninstallString":  "C:\\Program Files (x86)\\InstallShield Installation Information\\{93795eb8-bd86-4d4d-ab27-ff80f9467b37}\\Setup.exe -uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2013 Redistributable (x86) - 12.0.40664",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{9dff3540-fc85-4ed5-ac84-9e3c7fd8bece}\\vcredist_x86.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{9dff3540-fc85-4ed5-ac84-9e3c7fd8bece}\\vcredist_x86.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Windows SDK AddOn",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /I{AFEDE556-1D76-4165-A1E8-34FF80126836}"
+    },
+    {
+        "DisplayName":  "Windows Software Development Kit - Windows 10.0.22621.5040",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{b72d4013-dd88-405a-9f9d-e88c278dcefe}\\winsdksetup.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{b72d4013-dd88-405a-9f9d-e88c278dcefe}\\winsdksetup.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Windows Desktop Runtime - 9.0.16 (x64)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{b842def2-5667-4a78-8bfa-9b1df75dfa5e}\\windowsdesktop-runtime-9.0.16-win-x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{b842def2-5667-4a78-8bfa-9b1df75dfa5e}\\windowsdesktop-runtime-9.0.16-win-x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.51.36231",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{c157798c-9519-4e56-98d9-f696f78f4a61}\\VC_redist.x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{c157798c-9519-4e56-98d9-f696f78f4a61}\\VC_redist.x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "AURA Service",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{c74e7336-6fc2-472d-b921-ba6f5e58bd59}\\AuraServiceSetup.exe,0",
+        "Publisher":  "ASUSTeK COMPUTER INC.",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{c74e7336-6fc2-472d-b921-ba6f5e58bd59}\\AuraServiceSetup.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2012 Redistributable (x64) - 11.0.61030",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{ca67548a-5ebe-413a-b50c-4b9ceb6d66c6}\\vcredist_x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{ca67548a-5ebe-413a-b50c-4b9ceb6d66c6}\\vcredist_x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Python Launcher",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Python Software Foundation",
+        "UninstallString":  "MsiExec.exe /X{CF2C2B82-E540-4ACE-B007-DF0C216EFC40}"
+    },
+    {
+        "DisplayName":  "Microsoft .NET Runtime - 8.0.21 (x64)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\ProgramData\\Package Cache\\{cf83f56a-4c10-4d97-9594-0764dfeb96e3}\\dotnet-runtime-8.0.21-win-x64.exe,0",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\ProgramData\\Package Cache\\{cf83f56a-4c10-4d97-9594-0764dfeb96e3}\\dotnet-runtime-8.0.21-win-x64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Microsoft Visual C++ 2010  x86 Redistributable - 10.0.40219",
+        "InstallLocation":  "",
+        "DisplayIcon":  null,
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "MsiExec.exe /X{F0C3E5D1-1ADE-321E-8167-68EF0DE699A5}"
+    },
+    {
+        "DisplayName":  "Realtek Audio Driver",
+        "InstallLocation":  "C:\\Program Files (x86)\\Realtek\\Audio\\Drivers",
+        "DisplayIcon":  "C:\\Program Files (x86)\\Realtek\\Audio\\Drivers\\Display.ico",
+        "Publisher":  "Realtek Semiconductor Corp.",
+        "UninstallString":  "\"C:\\Program Files (x86)\\InstallShield Installation Information\\{F132AF7F-7BCA-4EDE-8A7C-958108FE7DBC}\\setup.exe\" -runfromtemp  -removeonly"
+    },
+    {
+        "DisplayName":  "Kinguin",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 3\\Web Applications\\_crx_lbadgcficfnlinhamnpnnlnfkcikeclp\\Kinguin.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 3\" --uninstall-app-id=lbadgcficfnlinhamnpnnlnfkcikeclp"
+    },
+    {
+        "DisplayName":  "Antigravity 2.0.10",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\antigravity\\Antigravity.exe,0",
+        "Publisher":  "Google",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\antigravity\\Uninstall Antigravity.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "Stitch",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_kpkpmmpeainfoiplppkjdnclpakaldhf\\Stitch.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=kpkpmmpeainfoiplppkjdnclpakaldhf"
+    },
+    {
+        "DisplayName":  "Indeed",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_adpjaaaeigfaoojincdkfpeoehipphdd\\Indeed.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=adpjaaaeigfaoojincdkfpeoehipphdd"
+    },
+    {
+        "DisplayName":  "Poseidon Scans",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 3\\Web Applications\\_crx_ngkffkfhnagcompodgfjncjaelommebg\\Poseidon Scans.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 3\" --uninstall-app-id=ngkffkfhnagcompodgfjncjaelommebg"
+    },
+    {
+        "DisplayName":  "Docs",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_mpnpojknpmmopombnjdcgaaiekajbnjb\\Docs.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=mpnpojknpmmopombnjdcgaaiekajbnjb"
+    },
+    {
+        "DisplayName":  "21st - Infrastructure and UI building blocks for the agentic internet",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_giojadecoaaelfgddlioinfdbldenjfm\\21st - Infrastructure and UI building blocks for the agentic internet.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=giojadecoaaelfgddlioinfdbldenjfm"
+    },
+    {
+        "DisplayName":  "Canva",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Canva\\Canva.exe,0",
+        "Publisher":  "Canva Pty Ltd",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Canva\\Uninstall Canva.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "DeepSeek",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 2\\Web Applications\\_crx_iolmpcamkamihhfmgiaeeglpeggchmdp\\DeepSeek.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 2\" --uninstall-app-id=iolmpcamkamihhfmgiaeeglpeggchmdp"
+    },
+    {
+        "DisplayName":  "Scan Manga",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 3\\Web Applications\\_crx_mblgnplofkbajidggijjkjhlgdbjjidf\\Scan Manga.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 3\" --uninstall-app-id=mblgnplofkbajidggijjkjhlgdbjjidf"
+    },
+    {
+        "DisplayName":  "Kimi",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_bcgafhnakejpjppmkepolmdhfhabkpkn\\Kimi.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=bcgafhnakejpjppmkepolmdhfhabkpkn"
+    },
+    {
+        "DisplayName":  "Open WebUI",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 2\\Web Applications\\_crx_hbblfifohofgngfbjbiimbbcimepbdcb\\Open WebUI.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 2\" --uninstall-app-id=hbblfifohofgngfbjbiimbbcimepbdcb"
+    },
+    {
+        "DisplayName":  "Gemini",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 2\\Web Applications\\_crx_caidcmannjgahlnbpmidmiecjcoiiigg\\Gemini.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 2\" --uninstall-app-id=caidcmannjgahlnbpmidmiecjcoiiigg"
+    },
+    {
+        "DisplayName":  "WaveWatch",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 3\\Web Applications\\_crx_bmdllnhidbbndlfnodilkhlcmgangobb\\WaveWatch.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 3\" --uninstall-app-id=bmdllnhidbbndlfnodilkhlcmgangobb"
+    },
+    {
+        "DisplayName":  "Obsidian",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Obsidian\\Obsidian.exe,0",
+        "Publisher":  "Obsidian",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Obsidian\\Uninstall Obsidian.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "Perplexity 1.3.0",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Perplexity\\Perplexity.exe,0",
+        "Publisher":  "Perplexity",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Perplexity\\Uninstall Perplexity.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "RipGrep MSVC",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe",
+        "DisplayIcon":  null,
+        "Publisher":  "BurntSushi",
+        "UninstallString":  "winget uninstall --product-code BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe"
+    },
+    {
+        "DisplayName":  "DeepSeek",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 2\\Web Applications\\_crx_obodlahpolhdfoaohcfenfnabipjmedh\\DeepSeek.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 2\" --uninstall-app-id=obodlahpolhdfoaohcfenfnabipjmedh"
+    },
+    {
+        "DisplayName":  "Cineby",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 3\\Web Applications\\_crx_ipdgdibkpdocgehahkipbilbickokdof\\Cineby.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=\"Profile 3\" --uninstall-app-id=ipdgdibkpdocgehahkipbilbickokdof"
+    },
+    {
+        "DisplayName":  "LM Studio 0.4.6+1",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\LM Studio\\LM Studio.exe,0",
+        "Publisher":  "LM Studio",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\LM Studio\\Uninstall LM Studio.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "AnythingLLM 1.11.1",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\AnythingLLM\\AnythingLLM.exe,0",
+        "Publisher":  "Mintplex Labs Inc",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\AnythingLLM\\Uninstall AnythingLLM.exe\" /currentuser"
+    },
+    {
+        "DisplayName":  "Gemini",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_gdfaincndogidkdcdkhapmbffkckdkhn\\Gemini.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=gdfaincndogidkdcdkhapmbffkckdkhn"
+    },
+    {
+        "DisplayName":  "Discord",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Discord",
+        "DisplayIcon":  null,
+        "Publisher":  "Discord Inc.",
+        "UninstallString":  "C:\\Users\\obedi\\AppData\\Local\\Discord\\Update.exe --uninstall"
+    },
+    {
+        "DisplayName":  "Google One",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_eakaohfifianijfhiinjjoeamoopjmcc\\Google One.ico",
+        "Publisher":  "Google\\Chrome",
+        "UninstallString":  "\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --profile-directory=Default --uninstall-app-id=eakaohfifianijfhiinjjoeamoopjmcc"
+    },
+    {
+        "DisplayName":  "GitHub Desktop",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\GitHubDesktop",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\GitHubDesktop\\app.ico",
+        "Publisher":  "GitHub, Inc.",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\GitHubDesktop\\Update.exe\" --uninstall"
+    },
+    {
+        "DisplayName":  "itch",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\itch",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\itch\\app.ico",
+        "Publisher":  "itch corp.",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\itch\\itch-setup.exe\" --appname itch --uninstall"
+    },
+    {
+        "DisplayName":  "Vethos",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Vethos",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Vethos\\Vethos.exe",
+        "Publisher":  "Vethos",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Vethos\\Uninstall Vethos.exe\""
+    },
+    {
+        "DisplayName":  "Microsoft OneDrive",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Microsoft\\OneDrive\\26.084.0504.0007\\OneDriveSetup.exe,-101",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Microsoft\\OneDrive\\26.084.0504.0007\\OneDriveSetup.exe\"  /uninstall "
+    },
+    {
+        "DisplayName":  "Python 3.14.2",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Python\\pythoncore-3.14-64",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+        "Publisher":  "Python Software Foundation",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.PythonManager_3847v3x7pw1km\\pymanager.exe\" uninstall --yes --by-id \"pythoncore-3.14-64\""
+    },
+    {
+        "DisplayName":  "Spotify",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Roaming\\Spotify",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Roaming\\Spotify\\Spotify.exe",
+        "Publisher":  "Spotify AB",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Roaming\\Spotify\\uninstall.exe\""
+    },
+    {
+        "DisplayName":  "Python 3.14.4 (64-bit)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{21bd423a-1cbb-41b4-b464-5e7c059ec5a4}\\python-3.14.4-amd64.exe,0",
+        "Publisher":  "Python Software Foundation",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{21bd423a-1cbb-41b4-b464-5e7c059ec5a4}\\python-3.14.4-amd64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Ollama version 0.30.0",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Ollama\\",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Ollama\\unins000.exe",
+        "Publisher":  "Ollama",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Ollama\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "Microsoft Visual Studio Code (User)",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Microsoft VS Code\\",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+        "Publisher":  "Microsoft Corporation",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Microsoft VS Code\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "Python 3.12.9 (64-bit)",
+        "InstallLocation":  null,
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{95f11c27-5079-4ec7-b5b0-fda34467b15e}\\python-3.12.9-amd64.exe,0",
+        "Publisher":  "Python Software Foundation",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{95f11c27-5079-4ec7-b5b0-fda34467b15e}\\python-3.12.9-amd64.exe\"  /uninstall"
+    },
+    {
+        "DisplayName":  "Antigravity (User)",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Antigravity\\",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe",
+        "Publisher":  "Google",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\Antigravity\\unins000.exe\""
+    },
+    {
+        "DisplayName":  "Cursor (User)",
+        "InstallLocation":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\cursor\\",
+        "DisplayIcon":  "C:\\Users\\obedi\\AppData\\Local\\Programs\\cursor\\Cursor.exe",
+        "Publisher":  "Anysphere",
+        "UninstallString":  "\"C:\\Users\\obedi\\AppData\\Local\\Programs\\cursor\\unins000.exe\""
+    }
+]

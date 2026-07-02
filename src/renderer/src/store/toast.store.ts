@@ -13,6 +13,7 @@ export type Toast = {
 
 type ToastStore = {
   toasts: Toast[]
+  reset: () => void
   push: (t: Omit<Toast, 'id' | 'createdAt'>) => string
   dismiss: (id: string) => void
   dismissAll: () => void
@@ -22,6 +23,9 @@ const MAX_TOASTS = 4
 
 export const useToastStore = create<ToastStore>((set, get) => ({
   toasts: [],
+  reset() {
+    set({ toasts: [] })
+  },
   push(input) {
     const id =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto

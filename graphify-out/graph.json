@@ -238,31 +238,31 @@
       "id": "src_main_blocking_hosts_writer_ts"
     },
     {
-      "label": "renderNexusBlock()",
+      "label": "renderVethosBlock()",
       "file_type": "code",
       "source_file": "src/main/blocking/hosts/writer.ts",
       "source_location": "L10",
       "community": 1,
-      "norm_label": "rendernexusblock()",
-      "id": "hosts_writer_rendernexusblock"
+      "norm_label": "rendervethosblock()",
+      "id": "hosts_writer_rendervethosblock"
     },
     {
-      "label": "applyNexusBlock()",
+      "label": "applyVethosBlock()",
       "file_type": "code",
       "source_file": "src/main/blocking/hosts/writer.ts",
       "source_location": "L31",
       "community": 1,
-      "norm_label": "applynexusblock()",
-      "id": "hosts_writer_applynexusblock"
+      "norm_label": "applyvethosblock()",
+      "id": "hosts_writer_applyvethosblock"
     },
     {
-      "label": "clearNexusBlock()",
+      "label": "clearVethosBlock()",
       "file_type": "code",
       "source_file": "src/main/blocking/hosts/writer.ts",
       "source_location": "L45",
       "community": 1,
-      "norm_label": "clearnexusblock()",
-      "id": "hosts_writer_clearnexusblock"
+      "norm_label": "clearvethosblock()",
+      "id": "hosts_writer_clearvethosblock"
     },
     {
       "label": "ensureBackup()",
@@ -760,22 +760,22 @@
       "id": "components_layout_layout"
     },
     {
-      "label": "NexusLogo.tsx",
+      "label": "VethosLogo.tsx",
       "file_type": "code",
-      "source_file": "src/renderer/src/components/NexusLogo.tsx",
+      "source_file": "src/renderer/src/components/VethosLogo.tsx",
       "source_location": "L1",
       "community": 20,
-      "norm_label": "nexuslogo.tsx",
-      "id": "src_renderer_src_components_nexuslogo_tsx"
+      "norm_label": "vethoslogo.tsx",
+      "id": "src_renderer_src_components_vethoslogo_tsx"
     },
     {
-      "label": "NexusLogo()",
+      "label": "VethosLogo()",
       "file_type": "code",
-      "source_file": "src/renderer/src/components/NexusLogo.tsx",
+      "source_file": "src/renderer/src/components/VethosLogo.tsx",
       "source_location": "L10",
       "community": 20,
-      "norm_label": "nexuslogo()",
-      "id": "components_nexuslogo_nexuslogo"
+      "norm_label": "vethoslogo()",
+      "id": "components_vethoslogo_vethoslogo"
     },
     {
       "label": "PagePlaceholder()",
@@ -2385,7 +2385,7 @@
       "source_location": "L38",
       "weight": 1.0,
       "source": "hosts_parser_parsehostsfile",
-      "target": "hosts_writer_applynexusblock"
+      "target": "hosts_writer_applyvethosblock"
     },
     {
       "relation": "calls",
@@ -2396,7 +2396,7 @@
       "source_location": "L47",
       "weight": 1.0,
       "source": "hosts_parser_parsehostsfile",
-      "target": "hosts_writer_clearnexusblock"
+      "target": "hosts_writer_clearvethosblock"
     },
     {
       "relation": "contains",
@@ -2428,7 +2428,7 @@
       "source_location": "L18",
       "weight": 1.0,
       "source": "hosts_subdomains_expanddomain",
-      "target": "hosts_writer_rendernexusblock"
+      "target": "hosts_writer_rendervethosblock"
     },
     {
       "relation": "imports",
@@ -2439,7 +2439,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_main_blocking_hosts_writer_test_ts",
-      "target": "hosts_writer_rendernexusblock"
+      "target": "hosts_writer_rendervethosblock"
     },
     {
       "relation": "contains",
@@ -2449,7 +2449,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_main_blocking_hosts_writer_ts",
-      "target": "hosts_writer_rendernexusblock"
+      "target": "hosts_writer_rendervethosblock"
     },
     {
       "relation": "contains",
@@ -2459,7 +2459,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_main_blocking_hosts_writer_ts",
-      "target": "hosts_writer_applynexusblock"
+      "target": "hosts_writer_applyvethosblock"
     },
     {
       "relation": "contains",
@@ -2469,7 +2469,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_main_blocking_hosts_writer_ts",
-      "target": "hosts_writer_clearnexusblock"
+      "target": "hosts_writer_clearvethosblock"
     },
     {
       "relation": "contains",
@@ -2509,8 +2509,8 @@
       "source_location": "L39",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_rendernexusblock",
-      "target": "hosts_writer_applynexusblock"
+      "source": "hosts_writer_rendervethosblock",
+      "target": "hosts_writer_applyvethosblock"
     },
     {
       "relation": "calls",
@@ -2520,7 +2520,7 @@
       "source_location": "L36",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_applynexusblock",
+      "source": "hosts_writer_applyvethosblock",
       "target": "hosts_writer_ensurebackup"
     },
     {
@@ -2531,7 +2531,7 @@
       "source_location": "L40",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_applynexusblock",
+      "source": "hosts_writer_applyvethosblock",
       "target": "hosts_writer_ensuretrailingnewline"
     },
     {
@@ -2542,7 +2542,7 @@
       "source_location": "L41",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_applynexusblock",
+      "source": "hosts_writer_applyvethosblock",
       "target": "hosts_writer_atomicwritehosts"
     },
     {
@@ -2553,7 +2553,7 @@
       "source_location": "L10",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_applynexusblock",
+      "source": "hosts_writer_applyvethosblock",
       "target": "src_main_blocking_ipc_blocking_handlers_ts"
     },
     {
@@ -2564,7 +2564,7 @@
       "source_location": "L2",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_applynexusblock",
+      "source": "hosts_writer_applyvethosblock",
       "target": "src_main_blocking_session_drift_detector_ts"
     },
     {
@@ -2575,7 +2575,7 @@
       "source_location": "L48",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_clearnexusblock",
+      "source": "hosts_writer_clearvethosblock",
       "target": "hosts_writer_atomicwritehosts"
     },
     {
@@ -2586,7 +2586,7 @@
       "source_location": "L10",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "hosts_writer_clearnexusblock",
+      "source": "hosts_writer_clearvethosblock",
       "target": "src_main_blocking_ipc_blocking_handlers_ts"
     },
     {
@@ -3291,12 +3291,12 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "src/renderer/src/components/NexusLogo.tsx",
+      "source_file": "src/renderer/src/components/VethosLogo.tsx",
       "source_location": "L10",
       "weight": 1.0,
       "confidence_score": 1.0,
-      "source": "src_renderer_src_components_nexuslogo_tsx",
-      "target": "components_nexuslogo_nexuslogo"
+      "source": "src_renderer_src_components_vethoslogo_tsx",
+      "target": "components_vethoslogo_vethoslogo"
     },
     {
       "relation": "imports",

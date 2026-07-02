@@ -27,6 +27,11 @@ export type AppLockerHandle = {
   error?: string
 }
 
+export type AppLockerCleanupResult = {
+  removed: boolean
+  error?: string
+}
+
 function xmlEscape(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -41,7 +46,7 @@ function normalizeExe(exeName: string): string {
 }
 
 function allowRule(name: string, sid: string, path: string): string {
-  return `    <FilePathRule Id="${randomUUID()}" Name="${xmlEscape(name)}" Description="Nexus default allow" UserOrGroupSid="${sid}" Action="Allow">
+  return `    <FilePathRule Id="${randomUUID()}" Name="${xmlEscape(name)}" Description="Vethos default allow" UserOrGroupSid="${sid}" Action="Allow">
       <Conditions>
         <FilePathCondition Path="${xmlEscape(path)}" />
       </Conditions>
@@ -50,7 +55,7 @@ function allowRule(name: string, sid: string, path: string): string {
 
 function denyRule(exeName: string): string {
   const normalized = normalizeExe(exeName)
-  return `    <FilePathRule Id="${randomUUID()}" Name="Nexus block ${xmlEscape(normalized)}" Description="Nexus session app block" UserOrGroupSid="${EVERYONE_SID}" Action="Deny">
+  return `    <FilePathRule Id="${randomUUID()}" Name="Vethos block ${xmlEscape(normalized)}" Description="Vethos session app block" UserOrGroupSid="${EVERYONE_SID}" Action="Deny">
       <Conditions>
         <FilePathCondition Path="*\\${xmlEscape(normalized)}" />
       </Conditions>
@@ -60,10 +65,10 @@ function denyRule(exeName: string): string {
 export function buildAppLockerPolicyXml(exeNames: string[], mode: AppLockerMode): string {
   const uniqueExeNames = [...new Set(exeNames.map(normalizeExe).filter(Boolean))]
   const rules = [
-    allowRule('Nexus allow Windows', EVERYONE_SID, '%WINDIR%\\*'),
-    allowRule('Nexus allow Program Files', EVERYONE_SID, '%PROGRAMFILES%\\*'),
-    allowRule('Nexus allow Program Files x86', EVERYONE_SID, '%PROGRAMFILES(X86)%\\*'),
-    allowRule('Nexus allow administrators', ADMINS_SID, '*'),
+    allowRule('Vethos allow Windows', EVERYONE_SID, '%WINDIR%\\*'),
+    allowRule('Vethos allow Program Files', EVERYONE_SID, '%PROGRAMFILES%\\*'),
+    allowRule('Vethos allow Program Files x86', EVERYONE_SID, '%PROGRAMFILES(X86)%\\*'),
+    allowRule('Vethos allow administrators', ADMINS_SID, '*'),
     ...uniqueExeNames.map(denyRule),
   ].join('\n')
 
@@ -94,6 +99,55 @@ function readPowerShell(command: string): string {
     ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
     { stdio: 'pipe', windowsHide: true, encoding: 'utf8' },
   )
+}
+
+/**
+ * Supprime uniquement les règles créées par les anciennes versions de
+ * Nexus/Vethos. Sans ce nettoyage, AppLocker continue d'afficher son propre
+ * message même après le passage au rappel visuel géré par Vethos.
+ */
+export function clearManagedAppLockerRules(): AppLockerCleanupResult {
+  if (process.platform !== 'win32') return { removed: false }
+
+  const dir = join(tmpdir(), `vethos-applocker-cleanup-${randomUUID()}`)
+  const policyPath = join(dir, 'cleaned.xml')
+  const escapedPath = policyPath.replace(/'/g, "''")
+
+  try {
+    mkdirSync(dir, { recursive: true })
+    const output = readPowerShell(`
+$ErrorActionPreference = 'Stop'
+[xml]$policy = Get-AppLockerPolicy -Local -Xml
+$managed = @($policy.SelectNodes('//*[@Name]') | Where-Object {
+  $ruleName = $_.GetAttribute('Name')
+  $ruleName -like 'Vethos block *' -or
+  $ruleName -like 'Vethos allow *' -or
+  $ruleName -like 'Nexus block *' -or
+  $ruleName -like 'Nexus allow *'
+})
+if ($managed.Count -eq 0) {
+  Write-Output 'UNCHANGED'
+  exit 0
+}
+foreach ($rule in $managed) {
+  [void]$rule.ParentNode.RemoveChild($rule)
+}
+foreach ($collection in @($policy.AppLockerPolicy.RuleCollection)) {
+  $remainingRules = @($collection.ChildNodes | Where-Object { $_.NodeType -eq 'Element' })
+  if ($remainingRules.Count -eq 0) {
+    $collection.SetAttribute('EnforcementMode', 'NotConfigured')
+  }
+}
+$policy.Save('${escapedPath}')
+Set-AppLockerPolicy -XmlPolicy '${escapedPath}'
+Write-Output 'REMOVED'
+`)
+    return { removed: output.includes('REMOVED') }
+  } catch (err) {
+    return { removed: false, error: (err as Error).message }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 export function getWindowsEdition(): WindowsEdition {
@@ -166,9 +220,9 @@ export function startAppLockerBlocker(
     return { applied: false, stop: () => undefined }
   }
 
-  const dir = join(tmpdir(), `nexus-applocker-${randomUUID()}`)
+  const dir = join(tmpdir(), `vethos-applocker-${randomUUID()}`)
   const backupPath = join(dir, 'before.xml')
-  const policyPath = join(dir, 'nexus.xml')
+  const policyPath = join(dir, 'vethos.xml')
 
   try {
     mkdirSync(dir, { recursive: true })

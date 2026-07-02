@@ -45,7 +45,7 @@ async function runIcacls(args: string[]): Promise<void> {
 export async function ensureServiceDataDirSecurity(dataDir: string): Promise<void> {
   await fs.mkdir(dataDir, { recursive: true })
 
-  if (process.platform !== 'win32') return
+  if (process.platform !== 'win32' || process.env.VETHOS_DEV === 'true') return
 
   const sentinel = join(dataDir, ACL_SENTINEL)
   if (await fileExists(sentinel)) return

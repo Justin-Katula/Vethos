@@ -3,7 +3,11 @@ import { motion } from 'framer-motion'
 import { User } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 
-export function UsernameStep(): JSX.Element {
+type UsernameStepProps = {
+  registerCommit?: (commit: () => Promise<boolean>) => void
+}
+
+export function UsernameStep({ registerCommit }: UsernameStepProps): JSX.Element {
   const stored = useSettingsStore((s) => s.username)
   const save = useSettingsStore((s) => s.save)
   const [name, setName] = useState(stored)
@@ -16,6 +20,14 @@ export function UsernameStep(): JSX.Element {
     }, 400)
     return () => clearTimeout(t)
   }, [name, stored, save])
+
+  useEffect(() => {
+    registerCommit?.(async () => {
+      const clean = name.trim()
+      if (clean !== stored) await save(clean)
+      return true
+    })
+  }, [name, registerCommit, save, stored])
 
   const trimmed = name.trim()
 

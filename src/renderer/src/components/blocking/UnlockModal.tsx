@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Lock } from 'lucide-react'
 import type { ActiveSession } from '@shared/schemas'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   open: boolean
@@ -85,7 +86,7 @@ export function UnlockModal({ open, session, onClose, onSubmit }: Props) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-2xl overflow-hidden rounded-xl border border-border-subtle bg-bg-elevated shadow-elevated"
+            className="info-panel w-full max-w-2xl rounded-xl bg-bg-elevated shadow-elevated"
           >
             <div className="border-b border-border-subtle px-8 py-5">
               <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -167,26 +168,21 @@ export function UnlockModal({ open, session, onClose, onSubmit }: Props) {
             )}
 
             <footer className="flex items-center justify-end gap-2 border-t border-border-subtle px-8 py-4">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onClose}
-                className="rounded-md px-4 py-2 text-sm text-text-secondary hover:bg-bg-card"
               >
                 Continuer la session
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="solid"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className={cn(
-                  'rounded-md px-5 py-2 text-sm font-medium transition-colors',
-                  canSubmit
-                    ? 'bg-accent text-white hover:bg-accent-hover'
-                    : 'cursor-not-allowed bg-bg-card text-text-muted',
-                )}
               >
-                {busy ? 'Validation...' : 'Confirmer l’arrêt'}
-              </button>
+                {busy ? 'Validation...' : 'Confirmer l\'arrêt'}
+              </Button>
             </footer>
           </motion.div>
         </motion.div>

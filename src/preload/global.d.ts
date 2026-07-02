@@ -1,8 +1,8 @@
-import type { NexusApi } from './index'
+import type { VethosApi } from './index'
 
 declare global {
   interface Window {
-    nexus: NexusApi
+    vethos: VethosApi
   }
 }
 

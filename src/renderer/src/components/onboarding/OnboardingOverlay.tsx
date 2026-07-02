@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 import {
   ONBOARDING_STEPS,
   useOnboardingStore,
@@ -12,6 +13,7 @@ import { UsernameStep } from './UsernameStep'
 import { ScheduleStep } from './ScheduleStep'
 import { ObjectiveStep } from './ObjectiveStep'
 import { DonePage } from './DonePage'
+import { useToast } from '@/lib/use-toast'
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
   welcome: 'Bienvenue',
@@ -31,6 +33,8 @@ export function OnboardingOverlay(): JSX.Element {
   const prev = useOnboardingStore((s) => s.prev)
   const skip = useOnboardingStore((s) => s.skip)
   const finish = useOnboardingStore((s) => s.finish)
+  const toast = useToast()
+  const stepCommitRef = useRef<(() => Promise<boolean>) | null>(null)
 
   // Données capturées pendant l'onboarding et utilisées entre étapes
   const [captured, setCaptured] = useState<{
@@ -47,7 +51,30 @@ export function OnboardingOverlay(): JSX.Element {
   const progress =
     step === 'done' ? 1 : (currentIdx + 1) / VISIBLE_STEPS.length
 
+  useEffect(() => {
+    stepCommitRef.current = null
+  }, [step])
+
+  const registerStepCommit = useCallback((commit: () => Promise<boolean>) => {
+    stepCommitRef.current = commit
+  }, [])
+
+  const commitCurrentStep = async (): Promise<boolean> => {
+    const commit = stepCommitRef.current
+    if (!commit) return true
+    try {
+      return await commit()
+    } catch (err) {
+      toast.error({
+        title: 'Sauvegarde impossible',
+        description: err instanceof Error ? err.message : String(err),
+      })
+      return false
+    }
+  }
+
   const handleNext = async (): Promise<void> => {
+    if (!(await commitCurrentStep())) return
     if (isLastVisible) {
       await finish()
     } else {
@@ -87,14 +114,15 @@ export function OnboardingOverlay(): JSX.Element {
               {Math.round(progress * 100)}%
             </span>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => void skip()}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-card hover:text-text-primary"
           >
             <X size={14} />
             Passer
-          </button>
+          </Button>
         </header>
       )}
 
@@ -109,9 +137,10 @@ export function OnboardingOverlay(): JSX.Element {
             className="flex w-full max-w-3xl flex-col"
           >
             {step === 'welcome' && <WelcomeStep onContinue={next} />}
-            {step === 'username' && <UsernameStep />}
+            {step === 'username' && <UsernameStep registerCommit={registerStepCommit} />}
             {step === 'schedule' && (
               <ScheduleStep
+                registerCommit={registerStepCommit}
                 onTemplateApplied={(ruleIds) =>
                   setCaptured((c) => ({ ...c, templateRuleIds: ruleIds }))
                 }
@@ -119,6 +148,7 @@ export function OnboardingOverlay(): JSX.Element {
             )}
             {step === 'objective' && (
               <ObjectiveStep
+                registerCommit={registerStepCommit}
                 preselectedRuleIds={captured.templateRuleIds}
                 onObjectiveCreated={(id, color) =>
                   setCaptured((c) => ({ ...c, objectiveId: id, objectiveColor: color }))
@@ -132,30 +162,25 @@ export function OnboardingOverlay(): JSX.Element {
 
       {!isDone && (
         <footer className="flex items-center justify-between border-t border-border-subtle px-10 py-5">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={prev}
             disabled={isFirstVisible}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
-              isFirstVisible
-                ? 'cursor-not-allowed text-text-muted opacity-40'
-                : 'text-text-secondary hover:bg-bg-card hover:text-text-primary',
-            )}
           >
             <ArrowLeft size={16} />
             Précédent
-          </button>
+          </Button>
 
           <span className="text-xs text-text-muted">
             Étape {currentIdx + 1} sur {VISIBLE_STEPS.length} ·{' '}
             <span className="text-text-secondary">{STEP_LABELS[step]}</span>
           </span>
 
-          <button
+          <Button
             type="button"
+            variant="solid"
             onClick={() => void handleNext()}
-            className="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
           >
             {isLastVisible ? (
               <>
@@ -168,7 +193,7 @@ export function OnboardingOverlay(): JSX.Element {
                 <ArrowRight size={16} />
               </>
             )}
-          </button>
+          </Button>
         </footer>
       )}
     </motion.div>

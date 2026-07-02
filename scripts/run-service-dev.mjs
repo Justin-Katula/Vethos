@@ -12,6 +12,6 @@ if (build.status !== 0) process.exit(build.status ?? 1)
 const electronExe = createRequire(import.meta.url)('electron')
 const child = spawn(electronExe, [join('out', 'service', 'index.js')], {
   stdio: 'inherit',
-  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', VETHOS_DEV: 'true' },
 })
 child.on('exit', (code) => process.exit(code ?? 0))

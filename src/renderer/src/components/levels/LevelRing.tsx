@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Star } from 'lucide-react'
 
 type Props = {
-  /** Niveau 1..10 */
+  /** Niveau entier affiché. */
   level: number
   /** Progression 0..1 vers le niveau suivant */
   progress: number
@@ -16,7 +16,7 @@ type Props = {
 
 /**
  * Anneau circulaire SVG : track gris + arc coloré + chiffre central.
- * Étoile dorée si niveau 10 atteint.
+ * Étoile dorée si le niveau max est atteint.
  */
 export function LevelRing({
   level,
@@ -28,7 +28,7 @@ export function LevelRing({
   const stroke = Math.max(4, Math.round(size * 0.08))
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
-  const clamped = Math.max(0, Math.min(1, progress))
+  const clamped = isMax ? 1 : Math.max(0, Math.min(1, progress))
   const dashOffset = c * (1 - clamped)
 
   const cx = size / 2

@@ -10,7 +10,7 @@ type Props = {
 export function HistoryList({ items, profiles }: Props) {
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border-subtle p-8 text-center text-sm text-text-muted">
+      <div className="info-panel rounded-lg border-dashed p-8 text-center text-sm text-text-muted">
         {"Aucune session pour l'instant. Démarre ta première session ci-dessus."}
       </div>
     )
@@ -25,7 +25,7 @@ export function HistoryList({ items, profiles }: Props) {
         Complétées : <span className="font-mono text-text-secondary">{completed}</span> /{' '}
         <span className="font-mono text-text-secondary">{items.length}</span>
       </div>
-      <ul className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-bg-card">
+      <ul className="info-panel divide-y divide-border-subtle rounded-lg">
         {items.map((it) => {
           const profile = profileById.get(it.profileId)
           const durationMs = Date.parse(it.endedAt) - Date.parse(it.startedAt)

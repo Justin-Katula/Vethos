@@ -32,12 +32,12 @@
       "hosts_flush_dns_flushdns",
       "hosts_parser_parsehostsfile",
       "hosts_subdomains_expanddomain",
-      "hosts_writer_applynexusblock",
+      "hosts_writer_applyvethosblock",
       "hosts_writer_atomicwritehosts",
-      "hosts_writer_clearnexusblock",
+      "hosts_writer_clearvethosblock",
       "hosts_writer_ensurebackup",
       "hosts_writer_ensuretrailingnewline",
-      "hosts_writer_rendernexusblock",
+      "hosts_writer_rendervethosblock",
       "ipc_blocking_handlers_registerblockinghandlers",
       "session_drift_detector_createdriftdetector",
       "session_persistence_createblockingpersistence",
@@ -236,8 +236,8 @@
       "pages_planningpage_planningpage"
     ],
     "20": [
-      "components_nexuslogo_nexuslogo",
-      "src_renderer_src_components_nexuslogo_tsx"
+      "components_vethoslogo_vethoslogo",
+      "src_renderer_src_components_vethoslogo_tsx"
     ],
     "21": [
       "blocking_historylist_formatduration",
@@ -376,8 +376,8 @@
       "degree": 12
     },
     {
-      "id": "hosts_writer_applynexusblock",
-      "label": "applyNexusBlock()",
+      "id": "hosts_writer_applyvethosblock",
+      "label": "applyVethosBlock()",
       "degree": 8
     },
     {

@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Calendar, Moon, Briefcase, GraduationCap, Clock, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useSettingsStore } from '@/store/settings.store'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
 
 type Props = {
   onTemplateApplied: (ruleIds: string[]) => void
+  registerCommit?: (commit: () => Promise<boolean>) => void
 }
 
 const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -26,37 +27,44 @@ type CommitmentDraft = {
 const DEFAULT_SCHOOL: DaySchedule = { start: '08:00', end: '16:00', enabled: true }
 const DEFAULT_WORK: DaySchedule = { start: '09:00', end: '17:00', enabled: true }
 const DEFAULT_SCHOOL_WEEK: DaySchedule[] = [
-  { ...DEFAULT_SCHOOL }, { ...DEFAULT_SCHOOL }, { ...DEFAULT_SCHOOL },
-  { ...DEFAULT_SCHOOL }, { ...DEFAULT_SCHOOL },
+  { ...DEFAULT_SCHOOL },
+  { ...DEFAULT_SCHOOL },
+  { ...DEFAULT_SCHOOL },
+  { ...DEFAULT_SCHOOL },
+  { ...DEFAULT_SCHOOL },
   { start: '08:00', end: '16:00', enabled: false },
   { start: '08:00', end: '16:00', enabled: false },
 ]
 const DEFAULT_WORK_WEEK: DaySchedule[] = [
-  { ...DEFAULT_WORK }, { ...DEFAULT_WORK }, { ...DEFAULT_WORK },
-  { ...DEFAULT_WORK }, { ...DEFAULT_WORK },
+  { ...DEFAULT_WORK },
+  { ...DEFAULT_WORK },
+  { ...DEFAULT_WORK },
+  { ...DEFAULT_WORK },
+  { ...DEFAULT_WORK },
   { start: '09:00', end: '17:00', enabled: false },
   { start: '09:00', end: '17:00', enabled: false },
 ]
 
-// Couleurs fixes par catégorie (prompt)
+// Couleurs fixes par catégorie, alignées avec le fond noir/gris.
 const COLORS = {
-  sleep: '#1E3A5F',     // Bleu foncé
-  school: '#FFFFFF',    // Blanc
-  work: '#3BA3FF',      // Bleu clair
-  free: '#FFD54F',      // Jaune
-  health: '#FF8A00',    // Orange
+  sleep: '#111113',
+  school: '#E2E2E2',
+  work: '#A8A8AC',
+  free: '#C4C4C4',
+  health: '#8E8E93',
 }
 
-const COMMITMENT_COLORS = ['#10B981', '#FF8A00', '#A855F7', '#06B6D4']
+const COMMITMENT_COLORS = ['#D8D8D8', '#B8B8B8', '#8E8E93', '#5A5A5F']
 
 function timeToMinute(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return (h ?? 0) * 60 + (m ?? 0)
 }
 
-export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
+export function ScheduleStep({ onTemplateApplied, registerCommit }: Props): JSX.Element {
   const replaceAll = useScheduleStore((s) => s.replaceAll)
   const loaded = useScheduleStore((s) => s.loaded)
+  const scheduleUserId = useScheduleStore((s) => s.userId)
   const load = useScheduleStore((s) => s.load)
   const updateSettings = useSettingsStore((s) => s.updateSettings)
 
@@ -69,8 +77,9 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
   const [applied, setApplied] = useState(false)
 
   useEffect(() => {
-    if (!loaded) void load()
-  }, [loaded, load])
+    if (!scheduleUserId) return
+    if (!loaded) void load(scheduleUserId)
+  }, [loaded, load, scheduleUserId])
 
   const showSchool = profileType === 'student' || profileType === 'both'
   const showWork = profileType === 'worker' || profileType === 'both'
@@ -125,7 +134,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
       const sleepS = timeToMinute(sleepStart)
       const sleepE = timeToMinute(sleepEnd)
       if (sleepS > sleepE) {
-        usedMinutes += (1440 - sleepS) + sleepE
+        usedMinutes += 1440 - sleepS + sleepE
       } else {
         usedMinutes += sleepE - sleepS
       }
@@ -151,7 +160,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
 
   const totalWeekFree = freeTimeByDay.reduce((s, m) => s + m, 0)
 
-  const handleApply = async () => {
+  const handleApply = useCallback(async (): Promise<boolean> => {
     const rules: TimeRule[] = []
     const entries: ScheduleEntry[] = []
     const now = new Date().toISOString()
@@ -298,9 +307,30 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
       sleepStart,
       sleepEnd,
     })
-    onTemplateApplied(rules.filter((r) => r.categoryType === 'custom').map((r) => r.id))
+    onTemplateApplied(
+      rules
+        .filter((r) => r.categoryType === 'work' || r.categoryType === 'school')
+        .map((r) => r.id),
+    )
     setApplied(true)
-  }
+    return true
+  }, [
+    commitments,
+    onTemplateApplied,
+    profileType,
+    replaceAll,
+    schoolDays,
+    showSchool,
+    showWork,
+    sleepEnd,
+    sleepStart,
+    updateSettings,
+    workDays,
+  ])
+
+  useEffect(() => {
+    registerCommit?.(handleApply)
+  }, [handleApply, registerCommit])
 
   return (
     <div className="flex flex-col gap-6">
@@ -310,7 +340,9 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         </div>
         <h1 className="text-3xl font-bold tracking-tight">Ton emploi du temps</h1>
         <p className="max-w-xl text-sm text-text-secondary">
-          {"Dis-moi tes horaires fixes. Nexus calculera automatiquement ton temps libre et te dira quoi en faire."}
+          {
+            'Dis-moi tes horaires fixes. Vethos calculera automatiquement ton temps libre et te dira quoi en faire.'
+          }
         </p>
       </header>
 
@@ -320,32 +352,34 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
           Ton profil
         </label>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {([
+          {[
             { id: 'student' as const, label: 'Étudiant', icon: GraduationCap },
             { id: 'worker' as const, label: 'Travailleur', icon: Briefcase },
             { id: 'both' as const, label: 'Les deux', icon: Clock },
             { id: 'other' as const, label: 'Autre', icon: Calendar },
-          ]).map(({ id, label, icon: Icon }) => (
-            <button
+          ].map(({ id, label, icon: Icon }) => (
+            <Button
               key={id}
               type="button"
+              variant={profileType === id ? 'solid' : 'default'}
               onClick={() => setProfileType(id)}
               className={cn(
-                'flex flex-col items-center gap-2 rounded-xl border p-4 text-sm font-medium transition-colors',
+                'rounded-xl p-4 text-sm',
                 profileType === id
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border-subtle bg-bg-elevated text-text-secondary hover:border-border-strong',
+                  ? 'border-accent/60 bg-accent/15 text-accent hover:bg-accent/20'
+                  : 'bg-bg-elevated text-text-secondary',
               )}
+              contentClassName="flex-col gap-2"
             >
               <Icon size={20} />
               {label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {/* Sommeil */}
-      <div className="rounded-xl border border-border-subtle bg-bg-elevated p-4">
+      <div className="info-panel rounded-xl bg-bg-elevated p-4">
         <div className="mb-3 flex items-center gap-2">
           <Moon size={16} className="text-text-muted" />
           <span className="text-xs font-medium uppercase tracking-widest text-text-muted">
@@ -397,7 +431,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         />
       )}
 
-      <div className="rounded-xl border border-border-subtle bg-bg-elevated p-4">
+      <div className="info-panel rounded-xl bg-bg-elevated p-4">
         <div className="mb-3 flex items-center gap-2">
           <Calendar size={16} className="text-text-muted" />
           <span className="text-xs font-medium uppercase tracking-widest text-text-muted">
@@ -446,25 +480,22 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
                 onChange={(e) => updateCommitment(commitment.id, { end: e.target.value })}
                 className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-xs text-text-primary outline-none focus:border-accent"
               />
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={() => removeCommitment(commitment.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-300"
                 aria-label="Retirer cet engagement"
               >
                 <Trash2 size={14} />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={addCommitment}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-bg-base px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-        >
+        <Button type="button" variant="default" size="sm" onClick={addCommitment} className="mt-3">
           <Plus size={13} />
           Ajouter un engagement
-        </button>
+        </Button>
       </div>
 
       {/* Aperçu temps libre */}
@@ -477,31 +508,31 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
             <div key={i} className="text-center">
               <div className="text-[10px] text-text-muted">{d}</div>
               <div className="mt-1 text-sm font-bold text-text-primary">
-                {Math.floor(freeTimeByDay[i]! / 60)}h{String(freeTimeByDay[i]! % 60).padStart(2, '0')}
+                {Math.floor(freeTimeByDay[i]! / 60)}h
+                {String(freeTimeByDay[i]! % 60).padStart(2, '0')}
               </div>
             </div>
           ))}
         </div>
         <div className="mt-3 border-t border-accent/20 pt-3 text-center text-sm text-text-secondary">
-          Total semaine : <strong className="text-accent">{Math.floor(totalWeekFree / 60)}h{String(totalWeekFree % 60).padStart(2, '0')}</strong> de temps libre
+          Total semaine :{' '}
+          <strong className="text-accent">
+            {Math.floor(totalWeekFree / 60)}h{String(totalWeekFree % 60).padStart(2, '0')}
+          </strong>{' '}
+          de temps libre
         </div>
       </div>
 
       {/* Bouton appliquer */}
       <div className="flex justify-end">
-        <motion.button
+        <Button
           type="button"
+          variant="solid"
           onClick={() => void handleApply()}
-          whileHover={{ y: -1 }}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
-            applied
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : 'bg-accent text-white hover:bg-accent-hover',
-          )}
+          className={applied ? 'bg-emerald-500/15 text-emerald-300' : undefined}
         >
           {applied ? '✓ Emploi du temps enregistré' : 'Appliquer'}
-        </motion.button>
+        </Button>
       </div>
     </div>
   )
@@ -521,7 +552,7 @@ function DayGrid({
   onUpdate: (i: number, p: Partial<DaySchedule>) => void
 }) {
   return (
-    <div className="rounded-xl border border-border-subtle bg-bg-elevated p-4">
+    <div className="info-panel rounded-xl bg-bg-elevated p-4">
       <div className="mb-3 flex items-center gap-2">
         {icon}
         <span className="text-xs font-medium uppercase tracking-widest text-text-muted">
@@ -532,18 +563,20 @@ function DayGrid({
       <div className="space-y-2">
         {DAYS_FR.map((day, i) => (
           <div key={i} className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
+              variant={days[i]?.enabled ? 'solid' : 'default'}
+              size="sm"
               onClick={() => onUpdate(i, { enabled: !days[i]?.enabled })}
               className={cn(
-                'w-20 shrink-0 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors',
+                'w-20 shrink-0 rounded-md px-2 py-1.5',
                 days[i]?.enabled
-                  ? 'border-accent/40 bg-accent/10 text-accent'
-                  : 'border-border-subtle bg-bg-base text-text-muted',
+                  ? 'border-accent/50 bg-accent/15 text-accent hover:bg-accent/20'
+                  : 'bg-bg-base text-text-muted',
               )}
             >
               {day}
-            </button>
+            </Button>
             {days[i]?.enabled ? (
               <div className="flex items-center gap-2">
                 <input

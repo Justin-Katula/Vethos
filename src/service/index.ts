@@ -1,5 +1,5 @@
 import { createBridgeServer, type BridgeServer } from './bridge/server'
-import type { ServiceInfo } from '@shared/service-protocol'
+import { BLOCKING_SERVICE_VERSION, type ServiceInfo } from '@shared/service-protocol'
 import { createStorage } from './storage'
 import { serviceDataDir } from './data-dir'
 import { ensureServiceDataDirSecurity } from './security'
@@ -7,13 +7,12 @@ import { createBlockingAdapters } from './blocking-adapters'
 import { createBlockingHost, createBlockingHandlers } from './blocking-host'
 import log from './logging'
 
-const SERVICE_VERSION = '0.12.0'
 const startedAt = Date.now()
 
 async function main(): Promise<void> {
   log.info('[service] starting', { pid: process.pid })
 
-  // Le service possède ses fichiers de blocage dans C:\ProgramData\Nexus (spec §4.4).
+  // Le service possède ses fichiers de blocage dans C:\ProgramData\Vethos (spec §4.4).
   const dataDir = serviceDataDir()
   await ensureServiceDataDirSecurity(dataDir).catch((err) => {
     log.warn('[service] unable to apply data directory ACL', err)
@@ -22,10 +21,11 @@ async function main(): Promise<void> {
   const host = createBlockingHost(createBlockingAdapters(storage))
 
   const server: BridgeServer = await createBridgeServer({
+    pipePath: process.env.VETHOS_DEV === 'true' ? '\\\\.\\pipe\\VethosDevServiceBridge' : undefined,
     handlers: {
       PING: async () => 'pong',
       GET_SERVICE_INFO: async (): Promise<ServiceInfo> => ({
-        version: SERVICE_VERSION,
+        version: BLOCKING_SERVICE_VERSION,
         pid: process.pid,
         uptimeMs: Date.now() - startedAt,
       }),

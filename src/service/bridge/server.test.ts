@@ -3,7 +3,7 @@ import net from 'node:net'
 import { createBridgeServer, type BridgeServer } from './server'
 import { encodeMessage, createMessageDecoder, type ServiceMessage } from '@shared/service-protocol'
 
-const testPipe = (): string => `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+const testPipe = (): string => `\\\\.\\pipe\\vethos-test-${process.pid}-${Math.random().toString(36).slice(2)}`
 
 let server: BridgeServer | null = null
 afterEach(async () => {

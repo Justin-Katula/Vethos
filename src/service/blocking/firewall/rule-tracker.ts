@@ -26,7 +26,7 @@ export function createFirewallTracker(): FirewallTracker {
     },
     async removeAll() {
       const all = await listRuleNames().catch(() => [] as string[])
-      const orphans = all.filter((n) => n.startsWith('Nexus_Block_'))
+      const orphans = all.filter((n) => n.startsWith('Vethos_Block_'))
       const toDelete = new Set([...applied, ...orphans])
       for (const name of toDelete) {
         await deleteRuleByName(name).catch(() => {})
@@ -36,7 +36,7 @@ export function createFirewallTracker(): FirewallTracker {
     async removeOrphansExcept(validNames) {
       const valid = new Set(validNames)
       const all = await listRuleNames().catch(() => [] as string[])
-      const orphans = all.filter((n) => n.startsWith('Nexus_Block_') && !valid.has(n))
+      const orphans = all.filter((n) => n.startsWith('Vethos_Block_') && !valid.has(n))
       for (const name of orphans) {
         await deleteRuleByName(name).catch(() => {})
       }

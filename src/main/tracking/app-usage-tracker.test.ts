@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createTracker } from './app-usage-tracker'
+import { createTracker, distractingActivityMinutesBetween } from './app-usage-tracker'
 import type { DeclaredApp, DeclaredAppUsageState } from '@shared/schemas'
 
 const APP_VSCODE: DeclaredApp = {
@@ -258,5 +258,46 @@ describe('app-usage-tracker', () => {
     // L'entrée du 2025-01-01 doit être éliminée (>90 jours du 2026-05-05)
     expect(state!.entries.find((e) => e.date === '2025-01-01')).toBeUndefined()
     expect(state!.entries.find((e) => e.date === '2026-05-05')).toBeDefined()
+  })
+
+  it('compte les minutes distrayantes pendant une fenêtre de carry-over', () => {
+    const state: DeclaredAppUsageState = {
+      entries: [],
+      lastTickAt: null,
+      activityEvents: [
+        {
+          at: '2026-05-05T10:00:10.000Z',
+          kind: 'distracting-app-active',
+          label: 'YouTube',
+          domain: 'youtube.com',
+        },
+        {
+          at: '2026-05-05T10:00:45.000Z',
+          kind: 'distracting-app-active',
+          label: 'YouTube',
+          domain: 'youtube.com',
+        },
+        {
+          at: '2026-05-05T10:01:05.000Z',
+          kind: 'browser-site',
+          label: 'Docs',
+          domain: 'developer.mozilla.org',
+        },
+        {
+          at: '2026-05-05T10:02:00.000Z',
+          kind: 'distracting-app-active',
+          label: 'TikTok',
+          domain: 'tiktok.com',
+        },
+      ],
+    }
+
+    expect(
+      distractingActivityMinutesBetween(
+        state,
+        new Date('2026-05-05T10:00:00.000Z'),
+        new Date('2026-05-05T10:03:00.000Z'),
+      ),
+    ).toBe(2)
   })
 })

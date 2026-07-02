@@ -7,17 +7,17 @@ describe('buildAppLockerPolicyXml', () => {
 
     expect(xml).toContain('EnforcementMode="AuditOnly"')
     expect(xml).toContain('Action="Deny"')
-    expect(xml.match(/Nexus block chrome\.exe/g)).toHaveLength(1)
-    expect(xml).toContain('Nexus block Discord.exe')
+    expect(xml.match(/Vethos block chrome\.exe/g)).toHaveLength(1)
+    expect(xml).toContain('Vethos block Discord.exe')
     expect(xml).toContain('Path="*\\chrome.exe"')
   })
 
   it('includes default allow rules to avoid locking down Windows globally', () => {
     const xml = buildAppLockerPolicyXml(['Code.exe'], 'Enabled')
 
-    expect(xml).toContain('Nexus allow Windows')
+    expect(xml).toContain('Vethos allow Windows')
     expect(xml).toContain('%WINDIR%\\*')
-    expect(xml).toContain('Nexus allow Program Files')
+    expect(xml).toContain('Vethos allow Program Files')
   })
 })
 

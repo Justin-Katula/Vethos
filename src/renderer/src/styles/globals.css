@@ -4,33 +4,59 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .info-panel {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-card);
+    background-image: none;
+    box-shadow: var(--shadow-card);
+    transition:
+      border-color var(--duration-slow) var(--ease-out),
+      background-color var(--duration-slow) var(--ease-out),
+      background-image var(--duration-slow) var(--ease-out),
+      box-shadow var(--duration-slow) var(--ease-out),
+      transform var(--duration-slow) var(--ease-out);
+  }
+
+  .info-panel:hover {
+    border-color: var(--border-strong);
+    background-image:
+      radial-gradient(circle at center, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%, transparent);
+    background-size: 6px 6px, auto;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 14px 34px rgba(0, 0, 0, 0.42);
+  }
+}
+
 @layer base {
   :root {
     /* Backgrounds */
-    --bg-base: #0B0F14;
-    --bg-elevated: #0F141B;
-    --bg-card: #0F141B;
-    --bg-card-hover: #161D26;
+    --bg-base: #020202;
+    --bg-elevated: rgba(12, 12, 13, 0.94);
+    --bg-card: rgba(20, 20, 22, 0.78);
+    --bg-card-hover: rgba(31, 31, 34, 0.88);
 
     /* Borders */
-    --border-subtle: #1E2530;
-    --border-strong: rgba(255, 255, 255, 0.12);
+    --border-subtle: rgba(216, 216, 216, 0.1);
+    --border-strong: rgba(216, 216, 216, 0.22);
 
     /* Text */
-    --text-primary: #FFFFFF;
-    --text-secondary: #8E9BAE;
-    --text-muted: #5A6B80;
+    --text-primary: #E8E8E8;
+    --text-secondary: #B4B4B6;
+    --text-muted: #7E7E82;
 
-    /* Accent (Bleu principal) */
-    --accent: #3BA3FF;
-    --accent-hover: #69BEFF;
-    --accent-soft: rgba(59, 163, 255, 0.2);
+    /* Accent neutre, cohérent avec le fond animé. */
+    --accent: #D8D8D8;
+    --accent-hover: #F0F0F0;
+    --accent-soft: rgba(216, 216, 216, 0.16);
 
     /* Spec Colors */
-    --color-cyan: #00D1FF;
-    --color-orange: #FF8A00;
-    --color-yellow: #FFD54F;
-    --color-dark-grey: #1E2530;
+    --color-cyan: #C9CDD2;
+    --color-orange: #B8B8B8;
+    --color-yellow: #E4E4E4;
+    --color-dark-grey: #151518;
 
     /* Radii */
     --radius-sm: 12px;
@@ -39,8 +65,8 @@
     --radius-xl: 20px;
 
     /* Shadows */
-    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.4);
-    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 48px rgba(0, 0, 0, 0.5);
+    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 28px rgba(0, 0, 0, 0.52);
+    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 56px rgba(0, 0, 0, 0.62);
 
     /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

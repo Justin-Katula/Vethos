@@ -8,7 +8,7 @@ describe('scanBrowserHistoryDomains', () => {
   let dir: string
 
   beforeEach(async () => {
-    dir = await fs.mkdtemp(join(tmpdir(), 'nexus-history-'))
+    dir = await fs.mkdtemp(join(tmpdir(), 'vethos-history-'))
   })
 
   afterEach(async () => {
@@ -23,7 +23,7 @@ describe('scanBrowserHistoryDomains', () => {
       'latin1',
     )
 
-    await expect(scanBrowserHistoryDomains([history])).resolves.toEqual([
+    await expect(scanBrowserHistoryDomains([history], 1)).resolves.toEqual([
       'github.com',
       'youtube.com',
     ])

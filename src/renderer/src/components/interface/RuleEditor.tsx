@@ -5,6 +5,7 @@ import type { BlockingProfile, TimeRule } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { PALETTE, ICON_OPTIONS } from '@/lib/rule-palette'
 import { useShortcut } from '@/lib/use-shortcut'
+import { Button } from '@/components/ui/Button'
 
 type SaveDraft = {
   id?: string
@@ -126,13 +127,14 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                   {initial ? 'Modifier la règle' : 'Nouvelle règle'}
                 </h2>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={onClose}
-                className="rounded-md p-1.5 text-text-muted hover:bg-bg-card hover:text-text-primary"
               >
                 <X size={18} />
-              </button>
+              </Button>
             </header>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -152,14 +154,17 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                   {PALETTE.map((c) => {
                     const selected = color.toLowerCase() === c.toLowerCase()
                     return (
-                      <button
+                      <Button
                         key={c}
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setColor(c)}
                         className={cn(
-                          'group relative h-10 w-full rounded-md ring-offset-2 ring-offset-bg-elevated transition-all',
+                          'relative h-10 w-full rounded-md p-0 ring-offset-2 ring-offset-bg-elevated',
                           selected ? 'ring-2 ring-text-primary' : 'hover:scale-105',
                         )}
+                        contentClassName="absolute inset-0"
                         style={{ backgroundColor: c }}
                         aria-label={`Couleur ${c}`}
                       >
@@ -170,7 +175,7 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                             className="absolute inset-0 m-auto text-white drop-shadow"
                           />
                         )}
-                      </button>
+                      </Button>
                     )
                   })}
                 </div>
@@ -188,20 +193,22 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                   {ICON_OPTIONS.map(({ name: n, Icon }) => {
                     const selected = icon === n
                     return (
-                      <button
+                      <Button
                         key={n}
                         type="button"
+                        variant={selected ? 'solid' : 'default'}
+                        size="sm"
                         onClick={() => setIcon(selected ? undefined : n)}
                         className={cn(
-                          'flex h-10 w-full items-center justify-center rounded-md border transition-colors',
+                          'h-10 w-full rounded-md p-0',
                           selected
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-border-subtle bg-bg-base text-text-muted hover:border-border-strong hover:text-text-primary',
+                            ? 'border-accent/60 bg-accent/15 text-accent hover:bg-accent/20'
+                            : 'bg-bg-base text-text-muted',
                         )}
                         aria-label={`Icône ${n}`}
                       >
                         <Icon size={16} />
-                      </button>
+                      </Button>
                     )
                   })}
                 </div>
@@ -222,7 +229,7 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                 </select>
               </Field>
 
-              <Field label="Profil de blocage lié" hint="Optionnel — purement informatif (l'auto-déclenchement viendra plus tard)">
+              <Field label="Profil de blocage lié" hint="Optionnel — démarre automatiquement ce profil pendant ce bloc horaire.">
                 <select
                   value={linkedProfileId ?? ''}
                   onChange={(e) => setLinkedProfileId(e.target.value || null)}
@@ -246,12 +253,12 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
 
             <footer className="flex items-center justify-between gap-2 border-t border-border-subtle px-6 py-4">
               {initial && onDelete ? (
-                <button
+                <Button
                   type="button"
+                  variant="danger"
                   onClick={handleDelete}
                   disabled={busy}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors',
                     confirmDelete
                       ? 'bg-red-500 text-white hover:bg-red-600'
                       : 'text-red-400 hover:bg-red-500/10',
@@ -259,31 +266,26 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                 >
                   <Trash2 size={14} />
                   {confirmDelete ? 'Confirmer' : 'Supprimer'}
-                </button>
+                </Button>
               ) : (
                 <div />
               )}
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={onClose}
-                  className="rounded-md px-4 py-2 text-sm text-text-secondary hover:bg-bg-card"
                 >
                   Annuler
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="solid"
                   onClick={handleSave}
                   disabled={!canSave}
-                  className={cn(
-                    'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                    canSave
-                      ? 'bg-accent text-white hover:bg-accent-hover'
-                      : 'cursor-not-allowed bg-bg-card text-text-muted',
-                  )}
                 >
                   {busy ? 'Sauvegarde...' : 'Sauvegarder'}
-                </button>
+                </Button>
               </div>
             </footer>
           </motion.aside>

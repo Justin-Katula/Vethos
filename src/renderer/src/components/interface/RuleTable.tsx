@@ -3,6 +3,7 @@ import { Plus, Lock } from 'lucide-react'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
 import { iconByName } from '@/lib/rule-palette'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   rules: TimeRule[]
@@ -11,6 +12,8 @@ type Props = {
   onEdit: (rule: TimeRule) => void
 }
 
+const MotionButton = motion(Button)
+
 export function RuleTable({ rules, entries, onCreate, onEdit }: Props) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
@@ -18,16 +21,17 @@ export function RuleTable({ rules, entries, onCreate, onEdit }: Props) {
         const count = entries.filter((e) => e.ruleId === r.id).length
         const Icon = iconByName(r.icon)
         return (
-          <motion.button
+          <MotionButton
             key={r.id}
             type="button"
+            variant="default"
             onClick={() => onEdit(r)}
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             className={cn(
-              'group relative flex min-w-[180px] items-center gap-3 overflow-hidden rounded-lg border px-4 py-3 text-left transition-colors',
-              'border-border-subtle bg-bg-card hover:border-border-strong',
+              'info-panel group min-w-[180px] rounded-lg bg-bg-card px-4 py-3 text-left',
             )}
+            contentClassName="w-full items-center justify-start gap-3"
           >
             <div
               className="absolute inset-0 opacity-0 transition-opacity group-hover:opacity-10"
@@ -50,19 +54,21 @@ export function RuleTable({ rules, entries, onCreate, onEdit }: Props) {
                 {count} {count <= 1 ? 'bloc' : 'blocs'}
               </div>
             </div>
-          </motion.button>
+          </MotionButton>
         )
       })}
-      <motion.button
+      <MotionButton
         type="button"
+        variant="default"
         onClick={onCreate}
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
-        className="flex min-w-[180px] items-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-3 text-sm text-text-secondary transition-colors hover:border-accent hover:text-accent"
+        className="info-panel min-w-[180px] rounded-lg border-dashed px-4 py-3 text-sm text-text-secondary hover:border-accent hover:text-accent"
+        contentClassName="w-full items-center justify-start gap-2"
       >
         <Plus size={14} strokeWidth={2.5} />
         Nouvelle règle
-      </motion.button>
+      </MotionButton>
     </div>
   )
 }

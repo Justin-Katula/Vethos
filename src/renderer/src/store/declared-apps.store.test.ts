@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('@/lib/ipc', () => ({
-  nexus: {
+  vethos: {
     storage: {
       read: vi.fn(),
       write: vi.fn(),
@@ -11,20 +11,21 @@ vi.mock('@/lib/ipc', () => ({
 }))
 
 import { useDeclaredAppsStore } from './declared-apps.store'
-import { nexus } from '@/lib/ipc'
+import { vethos } from '@/lib/ipc'
 
-const mockStorage = nexus.storage as unknown as {
+const mockStorage = vethos.storage as unknown as {
   read: ReturnType<typeof vi.fn>
   write: ReturnType<typeof vi.fn>
   exists: ReturnType<typeof vi.fn>
 }
+const TEST_USER_ID = 'user_123'
 
 beforeEach(() => {
   mockStorage.read.mockReset()
   mockStorage.write.mockReset()
   mockStorage.exists.mockReset()
   // reset zustand state between tests
-  useDeclaredAppsStore.setState({ loaded: false, apps: [] })
+  useDeclaredAppsStore.setState({ userId: TEST_USER_ID, loaded: false, apps: [] })
 })
 
 describe('useDeclaredAppsStore', () => {
@@ -60,13 +61,12 @@ describe('useDeclaredAppsStore', () => {
       exeName: 'Notion.exe',
       linkedObjectiveId: null,
     })
-    expect(created.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    )
+    expect(created.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     expect(useDeclaredAppsStore.getState().apps).toHaveLength(1)
     expect(mockStorage.write).toHaveBeenCalledWith(
       'declared_apps',
       expect.objectContaining({ apps: expect.any(Array) }),
+      TEST_USER_ID,
     )
   })
 
@@ -78,7 +78,7 @@ describe('useDeclaredAppsStore', () => {
       linkedObjectiveId: null,
       createdAt: '2026-01-01T00:00:00.000Z',
     }
-    useDeclaredAppsStore.setState({ loaded: true, apps: [original] })
+    useDeclaredAppsStore.setState({ userId: TEST_USER_ID, loaded: true, apps: [original] })
     mockStorage.write.mockResolvedValue({ ok: true })
 
     const updated = await useDeclaredAppsStore.getState().saveApp({
@@ -101,7 +101,7 @@ describe('useDeclaredAppsStore', () => {
       linkedObjectiveId: null,
       createdAt: '2026-01-01T00:00:00.000Z',
     }
-    useDeclaredAppsStore.setState({ loaded: true, apps: [app] })
+    useDeclaredAppsStore.setState({ userId: TEST_USER_ID, loaded: true, apps: [app] })
     mockStorage.write.mockResolvedValue({ ok: true })
 
     await useDeclaredAppsStore.getState().deleteApp(app.id)
@@ -110,7 +110,7 @@ describe('useDeclaredAppsStore', () => {
   })
 
   it('saveApp() rejette si update sur id inexistant', async () => {
-    useDeclaredAppsStore.setState({ loaded: true, apps: [] })
+    useDeclaredAppsStore.setState({ userId: TEST_USER_ID, loaded: true, apps: [] })
     await expect(
       useDeclaredAppsStore.getState().saveApp({
         id: '99999999-9999-9999-9999-999999999999',

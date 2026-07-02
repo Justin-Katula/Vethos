@@ -3,7 +3,7 @@ import { createBridgeServer, type BridgeServer } from '@service/bridge/server'
 import { createServiceClient, type ServiceClient } from './client'
 
 const testPipe = (): string =>
-  `\\\\.\\pipe\\nexus-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+  `\\\\.\\pipe\\vethos-test-${process.pid}-${Math.random().toString(36).slice(2)}`
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 let server: BridgeServer | null = null

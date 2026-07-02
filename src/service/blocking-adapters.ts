@@ -1,13 +1,12 @@
 import { promises as fsp } from 'node:fs'
 import { createFirewallTracker } from './blocking/firewall/rule-tracker'
 import { listRuleNames } from './blocking/firewall/netsh'
-import { applyNexusBlock, clearNexusBlock, HOSTS_PATH } from './blocking/hosts/writer'
+import { applyVethosBlock, clearVethosBlock, HOSTS_PATH } from './blocking/hosts/writer'
 import { flushDns } from './blocking/hosts/flush-dns'
 import { startProcessKiller } from './blocking/processes/killer'
 import {
+  clearManagedAppLockerRules,
   getWindowsEdition,
-  pickBlockingStrategy,
-  startAppLockerBlocker,
   type WindowsEdition,
 } from './blocking/applocker/policy'
 import { createBlockingPersistence } from './blocking/session/persistence'
@@ -18,61 +17,32 @@ import type { BlockingHostDeps, ProcessControl } from './blocking-host'
 import log from './blocking/engine-log'
 
 /**
- * Couche process réelle : sélection AppLocker vs process kill, suivi du statut.
- * Porté de `blocking.handlers.ts` — sans le `notifyServiceNotStarted` (notifs
- * réservées à l'UI, spec §6) : l'échec AppLocker est exposé via `status() = 'error'`.
+ * Couche process réelle : observe les applications ciblées et déclenche le
+ * rappel UI. Les processus restent ouverts ; les sites et règles réseau sont
+ * toujours gérés par leurs couches respectives.
  */
-export function createProcessControl(cfg: {
+export function createProcessControl(_cfg: {
   elevated: boolean
   edition: WindowsEdition
 }): ProcessControl {
   let status: LayerStatusValue = 'inactive'
-  let strictBlocking = true
   return {
-    setStrictBlocking(strict) {
-      strictBlocking = strict
-    },
+    setStrictBlocking(_strict) {},
     status: () => status,
-    start(forbidden) {
-      if (forbidden.length === 0) {
+    start(forbidden, onBlocked, options) {
+      if (forbidden.length === 0 && options?.mode !== 'allowlist') {
         status = 'inactive'
         return { stop: () => undefined }
       }
-      const strategy = pickBlockingStrategy({
-        elevated: cfg.elevated,
-        strictBlocking,
-        edition: cfg.edition,
+      status = 'ok'
+      log.info('[blocking] surveillance de rappel active; aucun processus ne sera ferme')
+      const watcher = startProcessKiller(forbidden, 100, onBlocked, {
+        mode: options?.mode,
+        allowedExeNames: options?.allowedExeNames,
       })
-      if (strategy.processLayer !== 'applocker') {
-        status = 'ok'
-        log.warn('[blocking] AppLocker indisponible, repli sur process kill', strategy.reason)
-        const killer = startProcessKiller(forbidden)
-        return {
-          stop: () => {
-            killer.stop()
-            status = 'inactive'
-          },
-        }
-      }
-      const appLocker = startAppLockerBlocker(forbidden, strategy.appLockerMode)
-      if (appLocker.applied) {
-        status = 'ok'
-        return {
-          stop: () => {
-            appLocker.stop()
-            status = 'inactive'
-          },
-        }
-      }
-      // AppLocker (blocage fort) a échoué. Le process kill prend le relais, mais
-      // la couche n'est pas pleinement opérationnelle : on reste en 'error' pour
-      // que GET_LAYER_STATUS le reflète honnêtement (ne pas remettre 'ok').
-      status = 'error'
-      log.warn('[blocking] AppLocker indisponible', appLocker.error)
-      const killer = startProcessKiller(forbidden)
       return {
         stop: () => {
-          killer.stop()
+          watcher.stop()
           status = 'inactive'
         },
       }
@@ -86,9 +56,15 @@ export function createProcessControl(cfg: {
  */
 export function createBlockingAdapters(storage: Storage): BlockingHostDeps {
   const edition = getWindowsEdition()
+  const appLockerCleanup = clearManagedAppLockerRules()
+  if (appLockerCleanup.error) {
+    log.warn('[blocking] nettoyage des anciennes règles AppLocker échoué', appLockerCleanup.error)
+  } else if (appLockerCleanup.removed) {
+    log.info('[blocking] anciennes règles AppLocker Nexus/Vethos supprimées')
+  }
   const hosts: HostsAdapter = {
-    apply: applyNexusBlock,
-    clear: clearNexusBlock,
+    apply: applyVethosBlock,
+    clear: clearVethosBlock,
     flushDns,
   }
   return {

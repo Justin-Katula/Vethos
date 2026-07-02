@@ -1,5 +1,5 @@
 import { promises as fsp } from 'node:fs'
-import { HOSTS_PATH, applyNexusBlock } from '../hosts/writer'
+import { HOSTS_PATH, applyVethosBlock } from '../hosts/writer'
 import { parseHostsFile } from '../hosts/parser'
 import { flushDns } from '../hosts/flush-dns'
 import { listRuleNames } from '../firewall/netsh'
@@ -30,11 +30,11 @@ export function createDriftDetector(): DriftDetector {
           // hosts
           const raw = await fsp.readFile(HOSTS_PATH, 'utf8')
           const parsed = parseHostsFile(raw)
-          const hasBlock = parsed.nexusBlock != null
+          const hasBlock = parsed.vethosBlock != null
           const expectedEntryCount = active.profileSnapshot.blockedSites.length * 8 // 4 préfixes × 2 IPs
-          const blockMatches = parsed.nexusBlock?.entries.length === expectedEntryCount
+          const blockMatches = parsed.vethosBlock?.entries.length === expectedEntryCount
           if (!hasBlock || !blockMatches) {
-            await applyNexusBlock({
+            await applyVethosBlock({
               sessionId: active.id,
               startedAt: active.startedAt,
               domains: active.profileSnapshot.blockedSites,

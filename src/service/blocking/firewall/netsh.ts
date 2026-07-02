@@ -6,7 +6,7 @@ const execAsync = promisify(exec)
 
 export function ruleNameFor(sessionId: string, exePath: string): string {
   const base = path.basename(exePath)
-  return `Nexus_Block_${sessionId}_${base}`
+  return `Vethos_Block_${sessionId}_${base}`
 }
 
 export function parseNetshShowRules(stdout: string): string[] {

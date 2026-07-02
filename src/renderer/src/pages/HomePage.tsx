@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { ArrowRight, Shield, Clock, Target, BarChart3, Timer } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowRight, Shield, Clock, Target, BarChart3, Timer, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { TimeCircle } from '@/components/interface/TimeCircle'
@@ -9,12 +9,20 @@ import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { useBlockingStore } from '@/store/blocking.store'
 import { useTasksStore } from '@/store/tasks.store'
+import { useSettingsStore } from '@/store/settings.store'
+import { useRegistryStore } from '@/store/registry.store'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
-import { formatAllocatedTime, computeFreeTimeSlots } from '@/lib/free-time-calculator'
+import {
+  formatAllocatedTime,
+  computeFreeTimeSlots,
+  parseClockTimeToMinute,
+} from '@/lib/free-time-calculator'
 import { usePlacement, localDateKey } from '@/lib/use-placement'
 import { checkPaletteCollisions } from '@/lib/color-similarity'
+import { SLEEP_LOCKDOWN_PROCESS_MARKER } from '@shared/blocking'
+import type { BlockingProfile, RegistryItem } from '@shared/schemas'
 
 const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
@@ -29,21 +37,62 @@ export default function HomePage() {
   const loadBlocking = useBlockingStore((s) => s.load)
   const blockingLoaded = useBlockingStore((s) => s.loaded)
   const tasks = useTasksStore((s) => s.tasks)
+  const tasksUserId = useTasksStore((s) => s.userId)
   const loadTasks = useTasksStore((s) => s.load)
   const tasksLoaded = useTasksStore((s) => s.loaded)
+  const sleepEnd = useSettingsStore((s) => s.sleepEnd)
+  const registryItems = useRegistryStore((s) => s.items)
+  const registryLoaded = useRegistryStore((s) => s.loaded)
+  const loadRegistry = useRegistryStore((s) => s.load)
+  const scheduleLoadUserRef = useRef<string | null>(null)
+  const [showBlockedApps, setShowBlockedApps] = useState(false)
 
   useEffect(() => {
-    void load()
-    if (!levelsLoaded) void loadLevels()
-    if (!blockingLoaded) void loadBlocking()
-    if (!tasksLoaded) void loadTasks()
-  }, [load, loadLevels, loadBlocking, loadTasks, levelsLoaded, blockingLoaded, tasksLoaded])
+    if (!tasksUserId) return
+    if (!loaded && scheduleLoadUserRef.current !== tasksUserId) {
+      scheduleLoadUserRef.current = tasksUserId
+      void load(tasksUserId).finally(() => {
+        if (scheduleLoadUserRef.current === tasksUserId) scheduleLoadUserRef.current = null
+      })
+    }
+    if (!levelsLoaded) void loadLevels(tasksUserId)
+    if (!blockingLoaded) void loadBlocking(tasksUserId)
+    if (!tasksLoaded) void loadTasks(tasksUserId)
+    if (!registryLoaded) void loadRegistry(tasksUserId)
+  }, [
+    load,
+    loadLevels,
+    loadBlocking,
+    loadTasks,
+    loadRegistry,
+    loaded,
+    levelsLoaded,
+    blockingLoaded,
+    tasksLoaded,
+    registryLoaded,
+    tasksUserId,
+  ])
 
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
+    let intervalId: ReturnType<typeof setInterval> | null = null
+    const scheduleFromNextMinute = () => {
+      const current = new Date()
+      const msUntilNextMinute =
+        (60 - current.getSeconds()) * 1000 - current.getMilliseconds()
+
+      return setTimeout(() => {
+        setNow(new Date())
+        intervalId = setInterval(() => setNow(new Date()), 60_000)
+      }, msUntilNextMinute === 0 ? 60_000 : msUntilNextMinute)
+    }
+
+    const timeoutId = scheduleFromNextMinute()
+    return () => {
+      clearTimeout(timeoutId)
+      if (intervalId) clearInterval(intervalId)
+    }
   }, [])
 
   const dow = jsDateToDayOfWeek(now)
@@ -53,20 +102,22 @@ export default function HomePage() {
 
   // Current activity
   const currentMinute = now.getHours() * 60 + now.getMinutes()
-  const currentEntry = todayEntries.find(
-    (e) => currentMinute >= e.startMinute && currentMinute < e.endMinute,
-  )
-  const currentRule = currentEntry ? ruleById.get(currentEntry.ruleId) : null
-  const currentObjective = currentRule
-    ? objectives.find((objective) => objective.linkedRuleIds.includes(currentRule.id))
-    : undefined
 
   // ─── CORE: Time distribution via le moteur unifié ───
   const rangeEnd = useMemo(() => {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6)
     return localDateKey(d)
   }, [now])
-  const { blocks } = usePlacement(now, rangeEnd)
+  const { blocks } = usePlacement(now, rangeEnd, { todayStartMinute: 0 })
+  const todayPlannedBlocks = useMemo(
+    () =>
+      blocks.filter(
+        (b) =>
+          b.date === todayStr &&
+          (b.kind === 'task' || b.kind === 'objective' || b.kind === 'break'),
+      ),
+    [blocks, todayStr],
+  )
 
   const todayMinutesByTask = useMemo(() => {
     const m = new Map<string, number>()
@@ -88,7 +139,7 @@ export default function HomePage() {
   const totalTodayWorkMinutes = useMemo(
     () =>
       blocks
-        .filter((b) => b.date === todayStr && b.kind !== 'free')
+        .filter((b) => b.date === todayStr && (b.kind === 'task' || b.kind === 'objective'))
         .reduce((s, b) => s + (b.endMinute - b.startMinute), 0),
     [blocks, todayStr],
   )
@@ -97,9 +148,12 @@ export default function HomePage() {
   // créneaux non-préparation), indépendant du nouveau moteur.
   const todayDow = (now.getDay() + 6) % 7
   const todayFreeMinutes = useMemo(() => {
-    const slots = computeFreeTimeSlots(todayDow, entries, rules)
+    const slots = computeFreeTimeSlots(todayDow, entries, rules, {
+      wakeMinute: parseClockTimeToMinute(sleepEnd),
+      morningBufferMinutes: 30,
+    })
     return slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
-  }, [todayDow, entries, rules])
+  }, [todayDow, entries, rules, sleepEnd])
   const colorCollisions = useMemo(() => {
     const colors = todayEntries
       .map((entry) => ruleById.get(entry.ruleId))
@@ -116,14 +170,58 @@ export default function HomePage() {
 
   // Average level
   const avgLevel =
-    objectives.length > 0
-      ? objectives.reduce((sum, o) => sum + o.level, 0) / objectives.length
-      : 0
+    objectives.length > 0 ? objectives.reduce((sum, o) => sum + o.level, 0) / objectives.length : 0
 
   // Tasks accomplished
-  const activeTasks = tasks.filter((t) => t.status === 'active')
-  const completedToday = tasks.filter((t) => t.status === 'history')
-  const sessionRuleProgress = getSessionRuleProgress(blockingState.history, active, now)
+  const activeTasks = useMemo(() => tasks.filter((t) => t.status === 'active'), [tasks])
+  const completedToday = useMemo(
+    () =>
+      tasks.filter(
+        (t) => t.status === 'completed' && isSameLocalDate(t.completedAt, todayStr),
+      ),
+    [tasks, todayStr],
+  )
+  const sessionRuleProgress = useMemo(
+    () => getSessionRuleProgress(blockingState.history, active, now),
+    [blockingState.history, active, now],
+  )
+  const productiveTime = useMemo(
+    () => formatProductiveTime(blockingState.history, now),
+    [blockingState.history, now],
+  )
+  const blockedTotals = useMemo(() => {
+    const sites = new Set<string>()
+    const apps = new Set<string>()
+
+    for (const profile of blockingState.profiles) {
+      for (const site of profile.blockedSites) {
+        const normalized = normalizeBlockedValue(site)
+        if (normalized) sites.add(normalized)
+      }
+      for (const processName of profile.blockedProcesses) {
+        const normalized = normalizeBlockedValue(processName)
+        if (normalized) apps.add(normalized)
+      }
+    }
+
+    return { sites: sites.size, apps: apps.size }
+  }, [blockingState.profiles])
+  const activeBlockingProfile = useMemo(
+    () => blockingState.profiles.find((profile) => profile.id === active?.profileId) ?? null,
+    [active?.profileId, blockingState.profiles],
+  )
+  const blockedAppEntries = useMemo(
+    () =>
+      resolveBlockedAppEntries(
+        active?.profileSnapshot
+          ? [active.profileSnapshot]
+          : activeBlockingProfile
+            ? [activeBlockingProfile]
+            : blockingState.profiles,
+        registryItems,
+      ),
+    [active?.profileSnapshot, activeBlockingProfile, blockingState.profiles, registryItems],
+  )
 
   if (!loaded) {
     return (
@@ -150,7 +248,8 @@ export default function HomePage() {
       <div className="flex h-full flex-col gap-8 overflow-y-auto px-12 pb-16 pt-16">
         <header>
           <div className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            {DAYS_FR_FULL[dow]} · {now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+            {DAYS_FR_FULL[dow]} ·{' '}
+            {now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
           </div>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">{"Aujourd'hui"}</h1>
         </header>
@@ -163,28 +262,7 @@ export default function HomePage() {
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="flex flex-col items-center gap-4"
           >
-            <TimeCircle rules={rules} entries={entries} size={460} />
-
-            {/* ─── B. Texte sous le cercle: "Maintenant" ─── */}
-            <div className="text-center">
-              <div className="text-[10px] font-medium uppercase tracking-widest text-text-muted">
-                Maintenant
-              </div>
-              <div className="mt-1 text-xl font-bold text-text-primary">
-                {currentRule ? (
-                  <span style={{ color: currentRule.color }}>{currentRule.name}</span>
-                ) : (
-                  <span className="text-text-muted">Temps libre</span>
-                )}
-              </div>
-              {currentRule && currentEntry && (
-                <div className="mt-0.5 text-xs text-text-muted">
-                  {currentObjective
-                    ? `Niveau ${currentObjective.level.toFixed(1)}${currentObjective.deadline ? ` · ${formatDeadline(currentObjective.deadline)}` : ''}`
-                    : `${minuteToClockLabel(currentEntry.startMinute)} — ${minuteToClockLabel(currentEntry.endMinute)}`}
-                </div>
-              )}
-            </div>
+            <TimeCircle rules={rules} entries={entries} blocks={blocks} size={460} />
           </motion.div>
 
           {/* ─── D. Légende + Distribution du temps ─── */}
@@ -200,7 +278,7 @@ export default function HomePage() {
 
             {isEmpty ? (
               <EmptyHint />
-            ) : todayEntries.length === 0 ? (
+            ) : todayEntries.length === 0 && todayPlannedBlocks.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border-subtle p-6 text-center text-sm text-text-muted">
                 {"Aucun bloc prévu aujourd'hui. Rendez-vous au planning."}
               </div>
@@ -216,23 +294,37 @@ export default function HomePage() {
                     <motion.li
                       key={e.id}
                       whileHover={{ x: 2 }}
-                      className={`group flex items-center gap-3 overflow-hidden rounded-lg border px-4 py-3 ${
-                        isNow
-                          ? 'border-accent/40 bg-accent/5'
-                          : 'border-border-subtle bg-bg-card'
+                      className={`info-panel group flex items-center gap-3 rounded-lg px-4 py-3 ${
+                        isNow ? 'border-accent/40 bg-accent/5' : ''
                       }`}
                     >
-                      <div className="h-10 w-1.5 flex-shrink-0 rounded-2xl" style={{ backgroundColor: display.color, opacity: display.opacity }} />
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: display.color === 'transparent' ? 'rgba(255,255,255,0.06)' : display.color + '22', color: display.color === 'transparent' ? 'var(--text-muted)' : display.color }}>
+                      <div
+                        className="h-10 w-1.5 flex-shrink-0 rounded-2xl"
+                        style={{ backgroundColor: display.color, opacity: display.opacity }}
+                      />
+                      <div
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl"
+                        style={{
+                          backgroundColor:
+                            display.color === 'transparent'
+                              ? 'rgba(255,255,255,0.06)'
+                              : display.color + '22',
+                          color:
+                            display.color === 'transparent' ? 'var(--text-muted)' : display.color,
+                        }}
+                      >
                         {Icon ? <Icon size={14} /> : null}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-text-primary">
                           {rule.name}
-                          {isNow && <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-2xl bg-accent" />}
+                          {isNow && (
+                            <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-2xl bg-accent" />
+                          )}
                         </div>
                         <div className="text-xs text-text-muted">
-                          {minuteToClockLabel(e.startMinute)} — {minuteToClockLabel(e.endMinute)} · {durationLabel(e.endMinute - e.startMinute)}
+                          {minuteToClockLabel(e.startMinute)} — {minuteToClockLabel(e.endMinute)} ·{' '}
+                          {durationLabel(e.endMinute - e.startMinute)}
                         </div>
                       </div>
                     </motion.li>
@@ -248,31 +340,45 @@ export default function HomePage() {
 
             {todayMinutesByObjective.size > 0 && (
               <div className="mt-8">
-                <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
-                  <Target size={14} />
+                <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                  <Target size={14} className="text-accent" />
                   Répartition par objectif (aujourd&apos;hui)
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                   {[...todayMinutesByObjective.entries()].map(([objectiveId, minutes]) => {
                     const obj = objectives.find((o) => o.id === objectiveId)
                     if (!obj) return null
                     return (
                       <div
                         key={objectiveId}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
+                        className="info-panel group flex items-center justify-between gap-4 rounded-xl p-4 pl-6 transition-all duration-300 hover:-translate-y-0.5 will-change-transform"
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <span className="h-9 w-1.5 shrink-0 rounded-2xl" style={{ backgroundColor: obj.color }} />
+                        {/* Left color bar */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
+                          style={{ backgroundColor: obj.color }}
+                        />
+
+                        <div className="relative flex min-w-0 flex-1 items-center gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-text-primary">{obj.name}</div>
-                            <div className="mt-0.5 text-[10px] text-text-muted">Niveau {obj.level.toFixed(1)}</div>
+                            <div className="truncate text-sm font-semibold text-text-primary group-hover:text-accent transition-colors">
+                              {obj.name}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/5 border border-border-subtle/50 text-text-muted uppercase">
+                                Niveau {obj.level.toFixed(1)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
+
+                        <div className="relative text-right shrink-0">
                           <div className="text-lg font-bold tabular-nums text-text-primary">
                             {formatAllocatedTime(minutes)}
                           </div>
-                          <div className="text-[10px] text-text-muted">alloué</div>
+                          <div className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">
+                            alloué
+                          </div>
                         </div>
                       </div>
                     )
@@ -283,28 +389,58 @@ export default function HomePage() {
 
             {todayMinutesByTask.size > 0 && (
               <div className="mt-8">
-                <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
-                  <Target size={14} />
+                <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                  <Target size={14} className="text-accent" />
                   Ce que tu dois faire aujourd&apos;hui
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                   {[...todayMinutesByTask.entries()].map(([taskId, minutes]) => {
                     const task = tasks.find((t) => t.id === taskId)
                     if (!task) return null
+                    const obj = task.linkedObjectiveId
+                      ? objectives.find((o) => o.id === task.linkedObjectiveId)
+                      : undefined
+                    const accentColor = obj ? obj.color : 'var(--accent)'
                     return (
                       <div
                         key={taskId}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
+                        className="info-panel group flex items-center justify-between gap-4 rounded-xl p-4 pl-6 transition-all duration-300 hover:-translate-y-0.5 will-change-transform"
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-text-primary">{task.title}</div>
-                          <div className="mt-0.5 text-[10px] text-text-muted">Niveau {task.level} · échéance {task.deadline}</div>
+                        {/* Left color bar */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-1 transition-all group-hover:w-1.5"
+                          style={{ backgroundColor: accentColor }}
+                        />
+
+                        <div className="relative flex min-w-0 flex-1 items-center gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-text-primary group-hover:text-accent transition-colors">
+                              {task.title}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/5 border border-border-subtle/50 text-text-muted uppercase">
+                                Niveau {task.level}
+                              </span>
+                              {obj && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-text-secondary bg-white/5 border border-border-subtle/50 px-1.5 py-0.5 rounded">
+                                  <span
+                                    className="h-1.5 w-1.5 rounded-full"
+                                    style={{ backgroundColor: obj.color }}
+                                  />
+                                  {obj.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
+
+                        <div className="relative text-right shrink-0">
                           <div className="text-lg font-bold tabular-nums text-text-primary">
                             {formatAllocatedTime(minutes)}
                           </div>
-                          <div className="text-[10px] text-text-muted">à travailler</div>
+                          <div className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">
+                            à travailler
+                          </div>
                         </div>
                       </div>
                     )
@@ -322,7 +458,7 @@ export default function HomePage() {
             className="flex w-full flex-col gap-4"
           >
             {/* ─── C. Temps libre disponible ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+            <InfoPanel>
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-yellow" />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -336,10 +472,10 @@ export default function HomePage() {
                 Réparti entre {todayMinutesByTask.size + todayMinutesByObjective.size} item
                 {todayMinutesByTask.size + todayMinutesByObjective.size !== 1 ? 's' : ''}
               </div>
-            </div>
+            </InfoPanel>
 
             {/* ─── E. Bloc règles de session actives ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+            <InfoPanel>
               <div className="flex items-center gap-2">
                 <Clock size={16} />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -360,15 +496,20 @@ export default function HomePage() {
                 <div className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-base/50 p-2.5">
                   <Timer size={14} className="text-orange" />
                   <div className="text-[10px] text-text-secondary leading-tight">
-                    <strong>Max 2 jours sans temps libre</strong><br/>
+                    <strong>Max 2 jours sans temps libre</strong>
+                    <br />
                     3ème jour = temps libre obligatoire
                   </div>
                 </div>
               </div>
-            </div>
+            </InfoPanel>
 
             {/* ─── F. Bloc blocage ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+            <button
+              type="button"
+              onClick={() => setShowBlockedApps(true)}
+              className="info-panel rounded-xl p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
               <div className="flex items-center gap-2">
                 <Shield size={16} />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -382,7 +523,8 @@ export default function HomePage() {
                     <span className="text-sm font-semibold text-red-400">BLOCAGE ACTIF</span>
                   </div>
                   <div className="text-xs text-text-muted">
-                    Session : {blockingState.profiles.find((p) => p.id === active.profileId)?.name ?? '—'}
+                    Session :{' '}
+                    {blockingState.profiles.find((p) => p.id === active.profileId)?.name ?? '—'}
                   </div>
                 </div>
               ) : (
@@ -392,14 +534,24 @@ export default function HomePage() {
                 </div>
               )}
               <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border-subtle pt-3">
-                <StatMini label="Sites" value={blockingState.profiles.reduce((s, p) => s + p.blockedSites.length, 0)} />
-                <StatMini label="Apps" value={blockingState.profiles.reduce((s, p) => s + p.blockedProcesses.length, 0)} />
+                <StatMini
+                  label="Sites"
+                  value={blockedTotals.sites}
+                />
+                <StatMini
+                  label="Apps"
+                  value={blockedTotals.apps}
+                />
                 <StatMini label="Tentatives" value={blockingState.history.length} />
               </div>
-            </div>
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-xs text-text-secondary">
+                <span>{blockedAppEntries.length} app{blockedAppEntries.length !== 1 ? 's' : ''} à voir</span>
+                <span className="text-accent">Ouvrir</span>
+              </div>
+            </button>
 
             {/* ─── G. Stats rapides ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+            <InfoPanel>
               <div className="flex items-center gap-2">
                 <BarChart3 size={16} />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -410,7 +562,7 @@ export default function HomePage() {
                 <StatCard
                   icon={<Timer size={14} className="text-accent" />}
                   label="Temps productif"
-                  value={formatProductiveTime(blockingState.history)}
+                  value={productiveTime}
                 />
                 <StatCard
                   icon={<Clock size={14} className="text-yellow" />}
@@ -428,17 +580,29 @@ export default function HomePage() {
                   value={avgLevel.toFixed(1)}
                 />
               </div>
-            </div>
+            </InfoPanel>
           </motion.div>
         </div>
+
+        <AnimatePresence>
+          {showBlockedApps && (
+            <BlockedAppsDialog
+              active={Boolean(activeBlockingProfile)}
+              entries={blockedAppEntries}
+              onClose={() => setShowBlockedApps(false)}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </PageTransition>
   )
 }
 
-
-
 // ─── Helper components ──────────────────────────────────────────────────────
+
+function InfoPanel({ children }: { children: React.ReactNode }) {
+  return <div className="info-panel rounded-xl p-5">{children}</div>
+}
 
 function StatMini({ label, value }: { label: string; value: number }) {
   return (
@@ -449,9 +613,105 @@ function StatMini({ label, value }: { label: string; value: number }) {
   )
 }
 
+type BlockedAppEntry = {
+  key: string
+  name: string
+  processName: string
+  iconDataUrl?: string
+}
+
+function BlockedAppsDialog({
+  active,
+  entries,
+  onClose,
+}: {
+  active: boolean
+  entries: BlockedAppEntry[]
+  onClose: () => void
+}) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 px-6 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 8 }}
+        transition={{ duration: 0.18 }}
+        className="info-panel max-h-[78vh] w-full max-w-xl overflow-hidden rounded-2xl bg-bg-elevated shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border-subtle p-5">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Blocage
+            </div>
+            <h2 className="mt-1 text-xl font-semibold text-text-primary">
+              {active ? 'Applications bloquées maintenant' : 'Applications bloquées dans tes profils'}
+            </h2>
+            <p className="mt-1 text-xs text-text-secondary">
+              Liste construite depuis tes règles et les apps détectées localement par Vethos.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border-subtle p-2 text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+            aria-label="Fermer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="max-h-[56vh] overflow-y-auto p-5">
+          {entries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border-subtle p-6 text-center text-sm text-text-secondary">
+              Aucune application bloquée à afficher pour l’instant.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {entries.map((entry) => (
+                <li
+                  key={entry.key}
+                  className="flex items-center gap-3 rounded-xl border border-border-subtle bg-white/[0.03] p-3"
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-bg-base">
+                    {entry.iconDataUrl ? (
+                      <img
+                        src={entry.iconDataUrl}
+                        alt=""
+                        className="h-8 w-8 object-contain"
+                        draggable={false}
+                      />
+                    ) : (
+                      <Shield size={18} className="text-text-muted" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-text-primary">
+                      {entry.name}
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-text-muted">
+                      {entry.processName}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border border-border-subtle bg-bg-base px-3 py-2.5">
+    <div className="info-panel flex items-center gap-2.5 rounded-lg bg-bg-base px-3 py-2.5">
       {icon}
       <div>
         <div className="text-[10px] uppercase tracking-wider text-text-muted">{label}</div>
@@ -461,7 +721,15 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
   )
 }
 
-function SessionRuleItem({ label, description, progress }: { label: string; description: string; progress: number }) {
+function SessionRuleItem({
+  label,
+  description,
+  progress,
+}: {
+  label: string
+  description: string
+  progress: number
+}) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -477,16 +745,12 @@ function SessionRuleItem({ label, description, progress }: { label: string; desc
 
 function formatProductiveTime(
   history: Array<{ startedAt: string; endedAt: string; completedNormally: boolean }>,
+  now: Date,
 ): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
   let totalMin = 0
   for (const h of history) {
     if (!h.completedNormally) continue
-    const ended = new Date(h.endedAt)
-    if (ended < today) continue
-    const start = new Date(h.startedAt)
-    totalMin += Math.max(0, Math.round((ended.getTime() - start.getTime()) / 60000))
+    totalMin += minutesOverlappingToday(h.startedAt, h.endedAt, now)
   }
   if (totalMin >= 60) {
     return `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}`
@@ -504,28 +768,18 @@ function getSessionRuleProgress(
   active: { profileId: string; startedAt: string } | null,
   now: Date,
 ): { sameProject: number; allProjects: number } {
-  const startOfToday = new Date(now)
-  startOfToday.setHours(0, 0, 0, 0)
   const byProfile = new Map<string, number>()
   let allMinutes = 0
 
   for (const entry of history) {
     if (!entry.completedNormally) continue
-    const ended = new Date(entry.endedAt)
-    if (ended < startOfToday) continue
-    const minutes = Math.max(
-      0,
-      Math.round((ended.getTime() - new Date(entry.startedAt).getTime()) / 60_000),
-    )
+    const minutes = minutesOverlappingToday(entry.startedAt, entry.endedAt, now)
     allMinutes += minutes
     byProfile.set(entry.profileId, (byProfile.get(entry.profileId) ?? 0) + minutes)
   }
 
   if (active) {
-    const activeMinutes = Math.max(
-      0,
-      Math.round((now.getTime() - new Date(active.startedAt).getTime()) / 60_000),
-    )
+    const activeMinutes = minutesOverlappingToday(active.startedAt, now, now)
     allMinutes += activeMinutes
     byProfile.set(active.profileId, (byProfile.get(active.profileId) ?? 0) + activeMinutes)
   }
@@ -537,30 +791,142 @@ function getSessionRuleProgress(
   }
 }
 
+function minutesOverlappingToday(startedAt: string, endedAt: string | Date, now: Date): number {
+  const startMs = new Date(startedAt).getTime()
+  const endMs = endedAt instanceof Date ? endedAt.getTime() : new Date(endedAt).getTime()
+  const nowMs = now.getTime()
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfTodayMs = startOfToday.getTime()
+
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isFinite(endMs) ||
+    !Number.isFinite(nowMs) ||
+    !Number.isFinite(startOfTodayMs)
+  ) {
+    return 0
+  }
+
+  const clippedStart = Math.max(startMs, startOfTodayMs)
+  const clippedEnd = Math.min(endMs, nowMs)
+  return Math.max(0, Math.round((clippedEnd - clippedStart) / 60_000))
+}
+
+function isSameLocalDate(value: string | undefined, dateKey: string): boolean {
+  if (!value) return false
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return false
+  return localDateKey(date) === dateKey
+}
+
+function normalizeBlockedValue(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function normalizeProcessName(value: string): string {
+  return value.trim().replace(/^.*[\\/]/u, '').toLowerCase()
+}
+
+function processDisplayName(processName: string): string {
+  const clean = normalizeProcessName(processName).replace(/\.exe$/iu, '')
+  if (!clean) return processName
+  return clean
+    .split(/[\s._-]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+const INTERNAL_BLOCKED_PROCESS_NAMES = new Set([
+  normalizeProcessName(SLEEP_LOCKDOWN_PROCESS_MARKER),
+  'vethos.exe',
+  'vethos dev.exe',
+  'nexus.exe',
+  'electron.exe',
+  'vethosblockingservice.exe',
+  'nexusblockingservice.exe',
+])
+
+function isUserFacingBlockedProcess(processName: string): boolean {
+  const normalized = normalizeProcessName(processName)
+  if (!normalized || INTERNAL_BLOCKED_PROCESS_NAMES.has(normalized)) return false
+  if (/^(vethos|nexus).*(lockdown|service|helper|probe)\.exe$/iu.test(normalized)) return false
+  return true
+}
+
+function registryProcessName(item: RegistryItem): string {
+  const executable = item.executableName ? normalizeProcessName(item.executableName) : ''
+  if (executable) return executable
+  const identifier = normalizeProcessName(item.identifier)
+  return identifier.endsWith('.exe') ? identifier : ''
+}
+
+function resolveBlockedAppEntries(
+  profiles: BlockingProfile[],
+  registryItems: RegistryItem[],
+): BlockedAppEntry[] {
+  const registryApps = registryItems.filter((item) => item.kind === 'app')
+  const byExecutable = new Map<string, RegistryItem>()
+  for (const item of registryApps) {
+    const executable = item.executableName ? normalizeProcessName(item.executableName) : ''
+    if (executable && !byExecutable.has(executable)) byExecutable.set(executable, item)
+    const identifier = normalizeProcessName(item.identifier)
+    if (identifier.endsWith('.exe') && !byExecutable.has(identifier)) byExecutable.set(identifier, item)
+  }
+
+  const entries = new Map<string, BlockedAppEntry>()
+  for (const profile of profiles) {
+    for (const rawProcess of profile.blockedProcesses) {
+      const processName = normalizeProcessName(rawProcess)
+      if (!isUserFacingBlockedProcess(processName) || entries.has(processName)) continue
+      const item = byExecutable.get(processName)
+      entries.set(processName, {
+        key: processName,
+        name: item?.displayName ?? processDisplayName(processName),
+        processName,
+        iconDataUrl: item?.iconDataUrl,
+      })
+    }
+  }
+
+  if (entries.size === 0) {
+    for (const item of registryApps) {
+      if (item.blockable === false) continue
+      if (item.classified && !item.demoted) continue
+      const processName = registryProcessName(item)
+      if (!isUserFacingBlockedProcess(processName) || entries.has(processName)) continue
+      entries.set(processName, {
+        key: processName,
+        name: item.displayName,
+        processName,
+        iconDataUrl: item.iconDataUrl,
+      })
+    }
+  }
+  return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+}
+
 function displayColorForRule(rule: { color: string; categoryType?: string }) {
-  if (rule.categoryType === 'sleep') return { color: '#1E3A8A', opacity: 1 }
-  if (rule.categoryType === 'school') return { color: '#FFFFFF', opacity: 0.7 }
-  if (rule.categoryType === 'work') return { color: '#3BA3FF', opacity: 1 }
+  if (rule.categoryType === 'sleep') return { color: '#111113', opacity: 1 }
+  if (rule.categoryType === 'school') return { color: '#E2E2E2', opacity: 0.72 }
+  if (rule.categoryType === 'work') return { color: '#A8A8AC', opacity: 1 }
   if (rule.categoryType === 'free') return { color: 'transparent', opacity: 1 }
   return { color: rule.color, opacity: 1 }
 }
 
-function formatDeadline(deadline: string): string {
-  const [year, month, day] = deadline.split('-')
-  if (!year || !month || !day) return deadline
-  return `${day}/${month}/${year}`
-}
-
 function EmptyHint() {
   return (
-    <div className="rounded-lg border border-dashed border-border-subtle bg-bg-card p-6">
+    <div className="info-panel rounded-lg border-dashed p-6">
       <div className="text-sm font-medium text-text-primary">Pose ta première règle.</div>
       <p className="mt-1 text-xs text-text-secondary">
-        {"Ouvre Mon planning pour créer une règle (couleur + label) et dessine tes blocs de temps. Le cercle 24h se peuplera automatiquement."}
+        {
+          'Ouvre Mon planning pour créer une règle (couleur + label) et dessine tes blocs de temps. Le cercle 24h se peuplera automatiquement.'
+        }
       </p>
       <Link
         to="/planning"
-        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-black transition-colors hover:bg-accent-hover"
       >
         Aller au planning <ArrowRight size={12} strokeWidth={2.5} />
       </Link>

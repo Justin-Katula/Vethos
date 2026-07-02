@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' 'unsafe-inline' data: http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vethos Preview</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ;(() => {
+        const params = new URLSearchParams(window.location.search)
+        const scenario = params.get('scenario') || 'weak'
+        const now = new Date()
+        const today = localDateKey(now)
+
+        function localDateKey(date) {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        }
+
+        function plusDays(days) {
+          return localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + days))
+        }
+
+        function iso(days = 0) {
+          return new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() + days,
+            9,
+            0,
+            0,
+          ).toISOString()
+        }
+
+        function id(n) {
+          return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+        }
+
+        function clone(value) {
+          return value == null ? value : JSON.parse(JSON.stringify(value))
+        }
+
+        function rule(n, name, color, categoryType, icon) {
+          return {
+            id: id(n),
+            name,
+            color,
+            icon,
+            categoryType,
+            linkedProfileId: null,
+            createdAt: iso(),
+          }
+        }
+
+        function entry(n, ruleId, dayOfWeek, startMinute, endMinute) {
+          return {
+            id: id(n),
+            ruleId,
+            dayOfWeek,
+            startMinute,
+            endMinute,
+            createdAt: iso(),
+          }
+        }
+
+        function task(n, patch) {
+          return {
+            id: id(n),
+            title: 'Tache demo',
+            deadline: plusDays(6),
+            linkedObjectiveId: null,
+            deadlineImpact: 'recoverable',
+            complexity: 'normal',
+            estimatedMinutes: undefined,
+            remainingMinutes: undefined,
+            level: 5,
+            status: 'active',
+            createdAt: iso(),
+            ...patch,
+          }
+        }
+
+        function objective(n, patch) {
+          return {
+            id: id(n),
+            name: 'Objectif demo',
+            description: '',
+            color: '#3BA3FF',
+            icon: 'Target',
+            linkedRuleIds: [],
+            level: 3,
+            createdAt: iso(),
+            ...patch,
+          }
+        }
+
+        function baseSchedule(options = {}) {
+          const sleep = rule(101, 'Sommeil', '#263244', 'sleep', 'Moon')
+          const focus = rule(102, options.fixedName || 'Cours', '#315c86', 'school', 'GraduationCap')
+          const work = rule(103, 'Travail', '#5b5f97', 'work', 'Briefcase')
+          const commitment = rule(104, 'Rendez-vous', '#775c38', 'commitment', 'Calendar')
+          const rules = [sleep, focus, work, commitment]
+          const entries = []
+
+          for (let day = 0; day < 7; day += 1) {
+            if (options.tight) {
+              entries.push(entry(1000 + day * 10 + 1, sleep.id, day, 0, 420))
+              entries.push(entry(1000 + day * 10 + 2, commitment.id, day, 450, 1410))
+              entries.push(entry(1000 + day * 10 + 3, sleep.id, day, 1410, 1440))
+              continue
+            }
+
+            if (day === options.packedDayOfWeek) {
+              entries.push(entry(1000 + day * 10 + 1, sleep.id, day, 0, 420))
+              entries.push(entry(1000 + day * 10 + 2, focus.id, day, 420, 1320))
+              entries.push(entry(1000 + day * 10 + 3, commitment.id, day, 1350, 1410))
+              entries.push(entry(1000 + day * 10 + 4, sleep.id, day, 1410, 1440))
+              continue
+            }
+
+            entries.push(entry(1000 + day * 10 + 1, sleep.id, day, 0, 420))
+            entries.push(entry(1000 + day * 10 + 2, focus.id, day, 540, 720))
+            entries.push(entry(1000 + day * 10 + 3, work.id, day, 780, 960))
+            entries.push(entry(1000 + day * 10 + 4, sleep.id, day, 1410, 1440))
+          }
+
+          return { rules, entries }
+        }
+
+        function buildScenario() {
+          const accountId = id(900)
+          const auth = {
+            account: {
+              id: accountId,
+              name: 'Utilisateur demo',
+              email: 'demo@vethos.local',
+              provider: 'clerk',
+              emailVerified: true,
+              createdAt: iso(),
+              updatedAt: iso(),
+            },
+            session: {
+              accountId,
+              signedInAt: iso(),
+              expiresAt: iso(1),
+              tokenType: 'bearer',
+            },
+          }
+          const settings = {
+            username: 'Utilisateur demo',
+            onboardingCompleted: true,
+            userProfile: 'both',
+            sleepStart: '23:30',
+            sleepEnd: '07:00',
+            sessionRulesEnabled: true,
+            autoSave: true,
+            browserHistoryScanEnabled: false,
+            defaultUnlockCooldownMinutes: 10,
+            defaultUnlockJustificationWords: 50,
+            firstLaunchDate: iso(-7),
+            savedAt: iso(),
+          }
+          const levels = {
+            calculatedDailyFreeMinutes: 0,
+            calculatedAt: null,
+            lastCalculatedDate: today,
+            lastProcessedSessionId: null,
+            lastProcessedAppUsageByApp: {},
+          }
+
+          if (scenario === 'objective') {
+            const schedule = baseSchedule()
+            const objectives = [
+              objective(201, {
+                name: 'Portfolio IA',
+                description: 'Objectif niveau 7 : Vethos lui reserve des blocs de 120 min.',
+                color: '#FF8A00',
+                icon: 'Rocket',
+                level: 7,
+              }),
+            ]
+            return { auth, settings, levels, schedule, objectives: { objectives }, tasks: { tasks: [] } }
+          }
+
+          if (scenario === 'impossible') {
+            const schedule = baseSchedule({ tight: true, fixedName: 'Journee verrouillee' })
+            const tasks = [
+              task(301, {
+                title: 'Dossier final a rendre',
+                deadline: plusDays(1),
+                deadlineImpact: 'hard',
+                complexity: 'hard',
+                remainingMinutes: 300,
+                estimatedMinutes: 300,
+                level: 10,
+              }),
+            ]
+            return { auth, settings, levels, schedule, objectives: { objectives: [] }, tasks: { tasks } }
+          }
+
+          if (scenario === 'personal') {
+            const schedule = baseSchedule()
+            const tasks = [
+              task(401, {
+                title: 'Revision controle',
+                deadline: plusDays(4),
+                remainingMinutes: 75,
+                estimatedMinutes: 75,
+                level: 5,
+              }),
+            ]
+            return { auth, settings, levels, schedule, objectives: { objectives: [] }, tasks: { tasks } }
+          }
+
+          if (scenario === 'month') {
+            const packedDay = (new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getDay() + 6) % 7
+            const schedule = baseSchedule({ packedDayOfWeek: packedDay })
+            const tasks = [
+              task(501, {
+                title: 'Preparation examen',
+                deadline: plusDays(6),
+                remainingMinutes: 120,
+                estimatedMinutes: 120,
+                level: 6,
+              }),
+            ]
+            return { auth, settings, levels, schedule, objectives: { objectives: [] }, tasks: { tasks } }
+          }
+
+          const schedule = baseSchedule()
+          const tasks = [
+            task(101, {
+              title: 'Scanner le reçu',
+              deadline: plusDays(6),
+              complexity: 'easy',
+              remainingMinutes: 15,
+              estimatedMinutes: 15,
+              level: 1,
+            }),
+          ]
+          return { auth, settings, levels, schedule, objectives: { objectives: [] }, tasks: { tasks } }
+        }
+
+        let state = buildScenario()
+        const noopUnsubscribe = () => {}
+
+        window.vethos = {
+          auth: {
+            getSession: async () => clone(state.auth),
+            signUp: async ({ name, email }) => {
+              state.auth = {
+                account: {
+                  id: id(901),
+                  name,
+                  email,
+                  provider: 'clerk',
+                  emailVerified: false,
+                  createdAt: iso(),
+                  updatedAt: iso(),
+                },
+                session: null,
+                emailVerificationRequired: true,
+              }
+              return clone(state.auth)
+            },
+            signIn: async ({ email }) => {
+              state.auth = {
+                account: {
+                  id: accountId,
+                  name: 'Utilisateur demo',
+                  email,
+                  provider: 'clerk',
+                  emailVerified: true,
+                  createdAt: iso(),
+                  updatedAt: iso(),
+                },
+                session: {
+                  accountId,
+                  signedInAt: iso(),
+                  expiresAt: iso(1),
+                  tokenType: 'bearer',
+                },
+              }
+              return clone(state.auth)
+            },
+            signOut: async () => {
+              state.auth = { account: state.auth.account, session: null }
+              return clone(state.auth)
+            },
+          },
+          storage: {
+            read: async (key) => {
+              if (key === 'schedule') return clone(state.schedule)
+              if (key === 'tasks') return clone(state.tasks)
+              if (key === 'objectives') return clone(state.objectives)
+              if (key === 'levels') return clone(state.levels)
+              if (key === 'settings') return clone(state.settings)
+              if (key === 'auth') return clone(state.auth)
+              if (key === 'declared_apps') return { apps: [] }
+              if (key === 'blocking') return { profiles: [], history: [], nextSessionPenaltyMinutes: 0 }
+              if (key === 'blocking_history') return { history: [] }
+              if (key === 'declared_app_usage') return { entries: [], lastTickAt: null }
+              return null
+            },
+            write: async (key, value) => {
+              if (key === 'schedule') state.schedule = clone(value)
+              if (key === 'tasks') state.tasks = clone(value)
+              if (key === 'objectives') state.objectives = clone(value)
+              if (key === 'levels') state.levels = clone(value)
+              if (key === 'settings') state.settings = clone(value)
+              if (key === 'auth') state.auth = clone(value)
+              return { ok: true }
+            },
+            exists: async (key) => Boolean(await window.vethos.storage.read(key)),
+          },
+          app: {
+            getVersion: async () => '0.12.2-preview',
+            openLogs: async () => {},
+            discoverInstalledApps: async () => [],
+            onFlushDebounces: () => noopUnsubscribe,
+            onUpdateAvailable: () => noopUnsubscribe,
+            onUpdateDownloaded: () => noopUnsubscribe,
+          },
+          blocking: {
+            getInitialState: async () => ({
+              state: { profiles: [], history: [], nextSessionPenaltyMinutes: 0 },
+              active: null,
+            }),
+            saveProfile: async (draft) => ({ ...draft, id: id(800), createdAt: iso() }),
+            deleteProfile: async () => {},
+            startSession: async () => null,
+            requestUnlock: async () => ({ phase: 'unlocked', reason: 'preview' }),
+            submitJustification: async () => ({ ok: true }),
+            getLayerStatus: async () => ({ hosts: 'inactive', processes: 'inactive', firewall: 'inactive' }),
+            getServiceStatus: async () => 'unavailable',
+            repairService: async () => false,
+            onServiceStatus: () => noopUnsubscribe,
+            onSessionChanged: () => noopUnsubscribe,
+            onLayerDrift: () => noopUnsubscribe,
+            onClockTamper: () => noopUnsubscribe,
+            onBreakRequired: () => noopUnsubscribe,
+          },
+          appUsage: {
+            get: async () => ({ entries: [], lastTickAt: null }),
+            onTick: () => noopUnsubscribe,
+          },
+          tasks: {
+            notify: async () => {},
+          },
+        }
+      })()
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

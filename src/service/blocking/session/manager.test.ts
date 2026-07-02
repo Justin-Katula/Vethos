@@ -5,6 +5,7 @@ import type { BlockingProfile } from '@shared/schemas'
 const PROFILE: BlockingProfile = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'P',
+  mode: 'blocklist',
   blockedSites: ['example.com'],
   blockedProcesses: ['notepad.exe'],
   blockedNetworkApps: ['C:\\Windows\\System32\\notepad.exe'],
@@ -51,13 +52,72 @@ describe('SessionManager', () => {
   it('start happy path applies all 3 layers atomically', async () => {
     const a = makeAdapters()
     const m = createSessionManager(a)
-    await m.startSession({ profileId: PROFILE.id, durationMinutes: 60 })
+    const session = await m.startSession({ profileId: PROFILE.id, durationMinutes: 60 })
     expect(a.hosts.apply).toHaveBeenCalled()
-    expect(a.processes.start).toHaveBeenCalledWith(['notepad.exe'])
+    expect(a.processes.start).toHaveBeenCalledWith(['notepad.exe'], expect.any(Function), {
+      mode: 'blocklist',
+      allowedExeNames: undefined,
+    })
     expect(a.firewall.applyAll).toHaveBeenCalled()
     expect(a.hosts.flushDns).toHaveBeenCalled()
     expect(a.persistence.writeActive).toHaveBeenCalled()
     expect(m.getPhase()).toBe('active')
+    expect(session.protectionResult).toEqual(
+      expect.objectContaining({
+        applied: true,
+        appliedLayers: ['hosts', 'process_watcher', 'firewall'],
+        failedLayers: [],
+      }),
+    )
+  })
+
+  it('passes the original process allowlist to the process layer', async () => {
+    const a = makeAdapters()
+    const m = createSessionManager(a)
+    const resolvedProfile: BlockingProfile = {
+      ...PROFILE,
+      mode: 'allowlist',
+      blockedProcesses: ['discord.exe', 'steam.exe'],
+    }
+
+    const session = await m.startSession({
+      profileId: PROFILE.id,
+      durationMinutes: 60,
+      resolvedProfile,
+      processAllowlist: ['code.exe'],
+    })
+
+    expect(session.processAllowlist).toEqual(['code.exe'])
+    expect(a.processes.start).toHaveBeenCalledWith(['discord.exe', 'steam.exe'], expect.any(Function), {
+      mode: 'allowlist',
+      allowedExeNames: ['code.exe'],
+    })
+  })
+
+  it('refuses an empty allowlist before applying any blocking layer', async () => {
+    const a = makeAdapters()
+    const m = createSessionManager(a)
+    const emptyAllowlist: BlockingProfile = {
+      ...PROFILE,
+      mode: 'allowlist',
+      blockedSites: [],
+      blockedProcesses: [],
+      blockedNetworkApps: [],
+    }
+
+    await expect(
+      m.startSession({
+        profileId: PROFILE.id,
+        durationMinutes: 60,
+        resolvedProfile: emptyAllowlist,
+        processAllowlist: [],
+      }),
+    ).rejects.toThrow('Empty allowlist refused')
+
+    expect(a.hosts.apply).not.toHaveBeenCalled()
+    expect(a.processes.start).not.toHaveBeenCalled()
+    expect(a.firewall.applyAll).not.toHaveBeenCalled()
+    expect(m.getPhase()).toBe('idle')
   })
 
   it('rolls back hosts if firewall throws', async () => {
@@ -69,6 +129,29 @@ describe('SessionManager', () => {
     ).rejects.toThrow()
     expect(a.hosts.clear).toHaveBeenCalled()
     expect(m.getPhase()).toBe('idle')
+  })
+
+  it('records a failed runtime layer honestly in the active session audit', async () => {
+    const a = makeAdapters()
+    const m = createSessionManager(a)
+    await m.startSession({ profileId: PROFILE.id, durationMinutes: 60 })
+
+    const result = await m.updateProtectionAudit(
+      ['hosts', 'process_watcher'],
+      [{ layer: 'firewall', message: 'firewall: drifted' }],
+    )
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        applied: false,
+        appliedLayers: ['hosts', 'process_watcher'],
+        failedLayers: ['firewall'],
+        warnings: ['firewall: drifted'],
+      }),
+    )
+    expect(a.persistence.writeActive).toHaveBeenLastCalledWith(
+      expect.objectContaining({ protectionResult: result }),
+    )
   })
 
   it('refuses requestUnlock+submitJustification before cooldown elapses', async () => {
@@ -119,5 +202,42 @@ describe('SessionManager', () => {
     expect(a.firewall.removeAll).toHaveBeenCalled()
     expect(a.hosts.clear).toHaveBeenCalled()
     expect(a.hosts.flushDns).toHaveBeenCalled()
+  })
+
+  it('réarme et rejoue la surveillance des processus à chaque reconnexion', async () => {
+    const a = makeAdapters()
+    const active = {
+      id: '22222222-2222-4222-8222-222222222222',
+      userId: 'user_123',
+      profileId: PROFILE.id,
+      profileSnapshot: PROFILE,
+      startedAt: '2026-05-04T09:30:00.000Z',
+      endsAt: '2026-05-04T11:30:00.000Z',
+      startedAtWall: new Date('2026-05-04T09:30:00.000Z').getTime(),
+      durationMinutes: 120,
+      unlockState: { phase: 'locked' as const },
+      appliedFirewallRules: [],
+    }
+    a.persistence.readActive.mockResolvedValue(active)
+    const firstStop = vi.fn()
+    const secondStop = vi.fn()
+    a.processes.start
+      .mockReturnValueOnce({ stop: firstStop })
+      .mockReturnValueOnce({ stop: secondStop })
+    const m = createSessionManager(a)
+
+    await m.hydrateFromDisk()
+    await m.hydrateFromDisk()
+
+    expect(a.processes.start).toHaveBeenCalledTimes(2)
+    expect(firstStop).toHaveBeenCalledTimes(1)
+    expect(m.getActive()?.id).toBe(active.id)
+    expect(m.getActive()?.protectionResult?.appliedLayers).toEqual([
+      'hosts',
+      'process_watcher',
+      'firewall',
+      'service_recovery',
+    ])
+    expect(m.getPhase()).toBe('active')
   })
 })

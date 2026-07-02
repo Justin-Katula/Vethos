@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Play, Pencil, Globe, Cpu, Wifi } from 'lucide-react'
 import type { BlockingProfile } from '@shared/schemas'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   profile: BlockingProfile
@@ -20,24 +21,38 @@ export function ProfileCard({ profile, disabled, onStart, onEdit }: Props) {
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        'group relative overflow-hidden rounded-lg border border-border-subtle bg-bg-card p-5',
-        'shadow-card transition-colors duration-200',
+        'info-panel group rounded-lg p-5',
+        'transition-colors duration-200',
         !disabled && 'hover:bg-bg-card-hover',
       )}
     >
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="truncate text-base font-semibold tracking-tight text-text-primary">
-            {profile.name}
-          </h3>
-          <button
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold tracking-tight text-text-primary">
+              {profile.name}
+            </h3>
+            <div className="mt-1">
+              <span className={cn(
+                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                profile.mode === 'allowlist' 
+                  ? "bg-accent/15 text-accent border border-accent/20" 
+                  : "bg-bg-base text-text-muted border border-border-subtle"
+              )}>
+                {profile.mode === 'allowlist' ? 'Focus strict' : 'Filtre actif'}
+              </span>
+            </div>
+          </div>
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => onEdit(profile)}
-            className="rounded-md p-1.5 text-text-muted opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:bg-bg-base hover:text-text-primary"
+            className="opacity-0 transition-opacity duration-200 group-hover:opacity-100"
             aria-label="Modifier"
           >
             <Pencil size={14} strokeWidth={2} />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-3 flex items-center gap-4 text-xs text-text-muted">
@@ -56,21 +71,16 @@ export function ProfileCard({ profile, disabled, onStart, onEdit }: Props) {
           {policyLabel(profile.unlockPolicy)}
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="solid"
           onClick={() => onStart(profile)}
           disabled={disabled}
-          className={cn(
-            'mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2',
-            'text-sm font-medium transition-all duration-200 ease-out',
-            disabled
-              ? 'cursor-not-allowed bg-bg-card-hover text-text-muted'
-              : 'bg-accent text-white hover:bg-accent-hover',
-          )}
+          className="mt-5 w-full"
         >
           <Play size={14} strokeWidth={2.5} />
           Démarrer
-        </button>
+        </Button>
       </div>
     </motion.div>
   )

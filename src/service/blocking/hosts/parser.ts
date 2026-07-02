@@ -1,22 +1,22 @@
 import { SENTINEL_BEGIN, SENTINEL_END } from './sentinels'
 
 export type HostsEntry = { ip: string; host: string }
-export type NexusBlock = {
+export type VethosBlock = {
   sessionId: string | null
   startedAt: string | null
   entries: HostsEntry[]
 }
 export type ParsedHosts = {
   outside: string
-  nexusBlock: NexusBlock | null
+  vethosBlock: VethosBlock | null
 }
 
 const META_RE = /^# session:\s*(\S+)\s*\|\s*started:\s*(\S+)\s*$/
 const ENTRY_RE = /^(127\.0\.0\.1|::1)\s+([A-Za-z0-9.-]+)\s*$/
 
 /**
- * Parse un hosts file. Extrait le PREMIER bloc Nexus (entre sentinels) et
- * retourne tout le reste comme `outside` (les autres blocs Nexus éventuels
+ * Parse un hosts file. Extrait le PREMIER bloc Vethos (entre sentinels) et
+ * retourne tout le reste comme `outside` (les autres blocs Vethos éventuels
  * sont aussi retirés de `outside` pour éviter une corruption persistante).
  */
 export function parseHostsFile(raw: string): ParsedHosts {
@@ -24,11 +24,11 @@ export function parseHostsFile(raw: string): ParsedHosts {
 
   const beginIdx = raw.indexOf(SENTINEL_BEGIN)
   if (beginIdx === -1) {
-    return { outside: raw, nexusBlock: null }
+    return { outside: raw, vethosBlock: null }
   }
   const endIdx = raw.indexOf(SENTINEL_END, beginIdx)
   if (endIdx === -1) {
-    return { outside: raw.slice(0, beginIdx), nexusBlock: null }
+    return { outside: raw.slice(0, beginIdx), vethosBlock: null }
   }
 
   const blockEnd = endIdx + SENTINEL_END.length
@@ -61,5 +61,5 @@ export function parseHostsFile(raw: string): ParsedHosts {
     if (m && m[1] && m[2]) entries.push({ ip: m[1], host: m[2] })
   }
 
-  return { outside, nexusBlock: { sessionId, startedAt, entries } }
+  return { outside, vethosBlock: { sessionId, startedAt, entries } }
 }

@@ -1,7 +1,7 @@
 /**
- * Wrapper typé sur window.nexus.
+ * Wrapper typé sur window.vethos.
  * Permet d'importer une API testable plutôt que d'accéder à window directement.
  */
-import type { NexusApi } from '../../../preload/index'
+import type { VethosApi } from '../../../preload/index'
 
-export const nexus: NexusApi = window.nexus
+export const vethos: VethosApi = window.vethos

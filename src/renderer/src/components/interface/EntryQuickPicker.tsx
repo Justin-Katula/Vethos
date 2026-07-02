@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import type { TimeRule } from '@shared/schemas'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   rules: TimeRule[]
@@ -49,28 +50,32 @@ export function EntryQuickPicker({ rules, x, y, onPick, onCreateNew, onCancel }:
         <div className="px-2 py-1 text-xs text-text-muted">Aucune règle. Crée-en une ↓</div>
       )}
       {rules.map((r) => (
-        <button
+        <Button
           key={r.id}
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => onPick(r.id)}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-text-primary transition-colors hover:bg-bg-card"
+          className="justify-start gap-2 text-left"
         >
           <span
             className="h-3 w-3 flex-shrink-0 rounded-2xl ring-2 ring-bg-base"
             style={{ backgroundColor: r.color }}
           />
           <span className="truncate">{r.name}</span>
-        </button>
+        </Button>
       ))}
       <div className="my-1 h-px bg-border-subtle" />
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={onCreateNew}
-        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+        className="justify-start gap-2 text-left"
       >
         <Plus size={12} strokeWidth={2.5} />
         Nouvelle règle…
-      </button>
+      </Button>
     </motion.div>
   )
 }

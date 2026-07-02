@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trash2 } from 'lucide-react'
+import { Lock, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
 import { hasOverlap, snapTo15 } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
@@ -15,8 +16,14 @@ import {
   type CalendarViewport,
 } from '@/lib/calendar-viewport'
 import type { PlacedBlock } from '@/lib/placement-engine'
+import type { PlacementResult } from '@shared/engine-results'
+import { workBlockLabel, workBlockTitle } from '@/lib/planning-ui'
+import {
+  decisionExplanationTitle,
+  explainPlanningBlock,
+  type DecisionExplanation,
+} from '@/lib/decision-explanation'
 import type { Task, Objective } from '@shared/schemas'
-import { localDateKey } from '@/lib/use-placement'
 
 type Props = {
   rules: TimeRule[]
@@ -24,7 +31,7 @@ type Props = {
   viewport: CalendarViewport
   weekDates: string[]
   workBlocks: PlacedBlock[]
-  now: Date
+  placementResults: Map<string, PlacementResult>
   taskById: Map<string, Task>
   objectiveById: Map<string, Objective>
   onCreateEntry: (draft: {
@@ -66,13 +73,22 @@ type PickerState = {
   y: number
 }
 
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number) as [number, number, number]
+  return new Date(year, month - 1, day)
+}
+
+function dayOfWeekOf(dateStr: string): number {
+  return (parseLocalDate(dateStr).getDay() + 6) % 7
+}
+
 export function WeekCalendar({
   rules,
   entries,
   viewport,
   weekDates,
   workBlocks,
-  now,
+  placementResults,
   taskById,
   objectiveById,
   onCreateEntry,
@@ -85,11 +101,27 @@ export function WeekCalendar({
   const [drag, setDrag] = useState<Drag | null>(null)
   const [picker, setPicker] = useState<PickerState | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [activeExplanation, setActiveExplanation] = useState<DecisionExplanation | null>(null)
 
   const totalHeight = viewportHeightPx(viewport, HOUR_HEIGHT)
   const visibleHours = useMemo(() => visibleHoursOfViewport(viewport), [viewport])
 
   const ruleById = useMemo(() => new Map(rules.map((r) => [r.id, r])), [rules])
+  const columns = useMemo(
+    () =>
+      weekDates.map((date) => {
+        const parsed = parseLocalDate(date)
+        const dayOfWeek = dayOfWeekOf(date)
+        return {
+          date,
+          dayOfWeek,
+          label: DAYS_FR[dayOfWeek],
+          dayNumber: parsed.getDate(),
+          monthNumber: parsed.getMonth() + 1,
+        }
+      }),
+    [weekDates],
+  )
 
   const minuteFromY = useCallback((clientY: number): number => {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -227,7 +259,7 @@ export function WeekCalendar({
     const clippedStart = Math.max(eff.startMinute, viewport.startMinute)
     const clippedEnd = Math.min(eff.endMinute, viewport.endMinute)
     if (clippedEnd <= clippedStart) return null
-    const liveTop = HEADER_HEIGHT + minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const liveTop = minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
     const liveHeight = minuteToYPx(viewport, clippedEnd, HOUR_HEIGHT) - minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
 
     return (
@@ -285,34 +317,38 @@ export function WeekCalendar({
                 Changer de règle
               </div>
               {rules.map((r) => (
-                <button
+                <Button
                   key={r.id}
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={async () => {
                     if (r.id !== entry.ruleId) await onChangeRule(entry.id, r.id)
                     setActiveMenu(null)
                   }}
-                  className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-primary hover:bg-bg-card"
+                  className="justify-start gap-2 text-left"
                 >
                   <span
                     className="h-2.5 w-2.5 rounded-2xl"
                     style={{ backgroundColor: r.color }}
                   />
                   <span className="truncate">{r.name}</span>
-                </button>
+                </Button>
               ))}
               <div className="my-0.5 h-px bg-border-subtle" />
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={async () => {
                   await onDeleteEntry(entry.id)
                   setActiveMenu(null)
                 }}
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-red-400 hover:bg-red-500/10"
+                className="justify-start gap-2 text-left"
               >
                 <Trash2 size={11} />
                 Supprimer
-              </button>
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -328,7 +364,7 @@ export function WeekCalendar({
       startMinute: drag.startMinute,
       endMinute: drag.endMinute,
     })
-    const top = HEADER_HEIGHT + minuteToYPx(viewport, drag.startMinute, HOUR_HEIGHT)
+    const top = minuteToYPx(viewport, drag.startMinute, HOUR_HEIGHT)
     const height =
       minuteToYPx(viewport, drag.endMinute, HOUR_HEIGHT) -
       minuteToYPx(viewport, drag.startMinute, HOUR_HEIGHT)
@@ -350,70 +386,125 @@ export function WeekCalendar({
   // Couleur neutre pour les tâches autonomes (sans objectif).
   const STANDALONE_TASK_COLOR = '#64748b' // slate-500
 
-  const renderWorkBlock = (block: PlacedBlock, dayOfWeek: number) => {
+  const renderWorkBlock = (block: PlacedBlock) => {
     const clippedStart = Math.max(block.startMinute, viewport.startMinute)
     const clippedEnd = Math.min(block.endMinute, viewport.endMinute)
     if (clippedEnd <= clippedStart) return null
 
-    const top = HEADER_HEIGHT + minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const top = minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
     const height =
       minuteToYPx(viewport, clippedEnd, HOUR_HEIGHT) -
       minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
 
     // Couleur, libellé principal, et tâche en sous-titre.
     let color = STANDALONE_TASK_COLOR
-    let title = '…'
+    let title = block.label || '...'
     let subtitle: string | null = null
+    let taskForExplanation: Task | null = null
+    let objectiveForExplanation: Objective | null = null
 
-    if (block.kind === 'task' && block.refId) {
+    if (block.kind === 'break') {
+      color = '#0f766e'
+      title = 'Récupération'
+      subtitle = '20-20-20 · respiration · épaules'
+    } else if (block.kind === 'task' && block.refId) {
       const task = taskById.get(block.refId)
-      if (task) title = task.title
+      if (task) {
+        taskForExplanation = task
+        title = task.title
+        if (task.linkedObjectiveId) {
+          objectiveForExplanation = objectiveById.get(task.linkedObjectiveId) ?? null
+        }
+      }
     } else if (block.kind === 'objective' && block.refId) {
       const obj = objectiveById.get(block.refId)
       if (obj) {
+        objectiveForExplanation = obj
         title = obj.name
         color = obj.color
       }
-      if (block.linkedTaskId) {
-        const linked = taskById.get(block.linkedTaskId)
-        if (linked) subtitle = linked.title
+      const linkedTaskIds =
+        block.linkedTaskIds.length > 0
+          ? block.linkedTaskIds
+          : block.linkedTaskId
+            ? [block.linkedTaskId]
+            : []
+      const linkedTaskTitles = linkedTaskIds
+        .map((id) => taskById.get(id)?.title)
+        .filter((title): title is string => Boolean(title))
+      const firstLinkedTitle = linkedTaskTitles[0]
+      if (linkedTaskIds[0]) {
+        taskForExplanation = taskById.get(linkedTaskIds[0]) ?? null
+      }
+      if (firstLinkedTitle) {
+        subtitle =
+          linkedTaskTitles.length === 1
+            ? firstLinkedTitle
+            : `${firstLinkedTitle} +${linkedTaskTitles.length - 1}`
       }
     }
 
-    // « Terminé » : bloc d'aujourd'hui dont l'heure de fin est passée.
-    const todayStr = localDateKey(now)
-    const nowMinute = now.getHours() * 60 + now.getMinutes()
-    const isToday = block.date === todayStr
-    const isFinished = isToday && block.endMinute <= nowMinute
-
-    void dayOfWeek
+    const blockMinutes = block.endMinute - block.startMinute
+    const label = workBlockLabel(block)
+    const placementResult = placementResults.get(block.id)
+    const fallbackExplanation = explainPlanningBlock(block, taskForExplanation, objectiveForExplanation)
+    const explanation: DecisionExplanation = placementResult ? {
+      targetType: 'planning_block',
+      targetId: block.id,
+      reasonTags: fallbackExplanation.reasonTags,
+      humanTitle: `Placement ${placementResult.placementQuality}`,
+      humanReasons: [...placementResult.reasons, ...placementResult.warnings],
+      severity: placementResult.placementQuality === 'impossible' ? 'critical' : placementResult.placementQuality === 'poor' ? 'high' : placementResult.warnings.length ? 'medium' : 'low',
+      confidence: placementResult.placementScore,
+      debug: { score: placementResult.placementScore, remainingMinutes: placementResult.durationMinutes },
+    } : fallbackExplanation
+    const titleWithExplanation = `${workBlockTitle(block)}\n\n${decisionExplanationTitle(explanation)}`
 
     return (
       <div
         key={block.id}
-        className={cn(
-          'pointer-events-none absolute left-1 right-1 overflow-hidden rounded-md ring-1 ring-white/10',
-          isFinished && 'opacity-40',
-        )}
+        data-locked-work-block
+        title={titleWithExplanation}
+        className="absolute left-1 right-1 cursor-default overflow-hidden rounded-md ring-1 ring-white/10"
         style={{
           top,
           height,
           backgroundColor: color,
         }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
         <div className="relative flex h-full flex-col p-1.5 text-white drop-shadow-sm">
           <div className="flex items-center gap-1 text-[11px] font-semibold leading-tight">
+            {height > 16 && <Lock size={10} strokeWidth={2.5} />}
             <span className="truncate">{title}</span>
-            {isFinished && <span className="ml-auto text-[9px] uppercase opacity-80">Terminé</span>}
           </div>
+          {height > 18 && (
+            <div className="truncate text-[9px] font-medium uppercase tracking-wider opacity-75">
+              {label}
+            </div>
+          )}
           {height > 28 && subtitle && (
             <div className="truncate text-[10px] leading-tight opacity-80">{subtitle}</div>
           )}
           {height > 50 && (
             <div className="text-[10px] leading-tight opacity-70">
               {minuteToClockLabel(block.startMinute)} — {minuteToClockLabel(block.endMinute)}
+              {blockMinutes < 30 && <> · {durationLabel(blockMinutes)}</>}
             </div>
+          )}
+          {height > 76 && explanation.humanReasons.length > 0 && (
+            <button
+              type="button"
+              className="mt-auto w-fit rounded bg-black/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/85 transition-colors hover:bg-black/40 hover:text-white"
+              onClick={(event) => {
+                event.stopPropagation()
+                setActiveExplanation(explanation)
+              }}
+            >
+              Pourquoi ?
+            </button>
           )}
         </div>
       </div>
@@ -423,7 +514,7 @@ export function WeekCalendar({
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden rounded-lg border border-border-subtle bg-bg-card"
+      className="info-panel rounded-lg"
       style={{ height: totalHeight + HEADER_HEIGHT }}
     >
       {/* Header jours */}
@@ -432,12 +523,15 @@ export function WeekCalendar({
         style={{ height: HEADER_HEIGHT }}
       >
         <div style={{ width: GUTTER_WIDTH }} />
-        {DAYS_FR.map((d) => (
+        {columns.map((column) => (
           <div
-            key={d}
-            className="flex flex-1 items-center justify-center text-xs font-medium uppercase tracking-wider text-text-muted"
+            key={column.date}
+            className="flex flex-1 flex-col items-center justify-center text-text-muted"
           >
-            {d}
+            <span className="text-xs font-medium uppercase tracking-wider">{column.label}</span>
+            <span className="text-[10px] leading-none">
+              {column.dayNumber}/{column.monthNumber}
+            </span>
           </div>
         ))}
       </div>
@@ -451,7 +545,7 @@ export function WeekCalendar({
           <div
             key={h}
             className="absolute left-0 right-1 text-right text-[10px] font-mono text-text-muted"
-            style={{ top: minuteToYPx(viewport, h * 60, HOUR_HEIGHT) - 6 }}
+            style={{ top: Math.max(0, minuteToYPx(viewport, h * 60, HOUR_HEIGHT) - 6) }}
           >
             {`${String(h).padStart(2, '0')}h`}
           </div>
@@ -467,11 +561,11 @@ export function WeekCalendar({
           height: totalHeight,
         }}
       >
-        {DAYS_FR.map((_, dayOfWeek) => (
+        {columns.map((column) => (
           <div
-            key={dayOfWeek}
+            key={column.date}
             className="relative flex-1 border-r border-border-subtle/60 last:border-r-0"
-            onMouseDown={(e) => onCellMouseDown(e, dayOfWeek)}
+            onMouseDown={(e) => onCellMouseDown(e, column.dayOfWeek)}
           >
             {/* lignes horaires */}
             {visibleHours.map((h) => (
@@ -489,21 +583,12 @@ export function WeekCalendar({
                 style={{ top: minuteToYPx(viewport, h * 60 + 30, HOUR_HEIGHT) }}
               />
             ))}
-             {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
+            {entries.filter((e) => e.dayOfWeek === column.dayOfWeek).map(renderEntryBlock)}
             {/* Blocs de travail (lecture seule, par-dessus la grille) */}
             {workBlocks
-              .filter((b) => b.date === weekDates[dayOfWeek])
-              .map((b) => renderWorkBlock(b, dayOfWeek))}
-            {drag?.type === 'create' && drag.dayOfWeek === dayOfWeek && (
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{ top: -HEADER_HEIGHT }}
-              >
-                <div style={{ position: 'relative', height: totalHeight + HEADER_HEIGHT }}>
-                  {renderGhost()}
-                </div>
-              </div>
-            )}
+              .filter((b) => b.date === column.date)
+              .map((b) => renderWorkBlock(b))}
+            {drag?.type === 'create' && drag.dayOfWeek === column.dayOfWeek && renderGhost()}
           </div>
         ))}
       </div>
@@ -522,6 +607,91 @@ export function WeekCalendar({
           onCancel={() => setPicker(null)}
         />
       )}
+
+      <DecisionExplanationDialog
+        explanation={activeExplanation}
+        onClose={() => setActiveExplanation(null)}
+      />
     </div>
+  )
+}
+
+function DecisionExplanationDialog({
+  explanation,
+  onClose,
+}: {
+  explanation: DecisionExplanation | null
+  onClose: () => void
+}) {
+  return (
+    <AnimatePresence>
+      {explanation && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-6 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={(event) => {
+            event.stopPropagation()
+            onClose()
+          }}
+        >
+          <motion.div
+            className="w-full max-w-lg rounded-2xl border border-border-subtle bg-bg-card p-6 shadow-2xl"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">
+                  Explication Vethos
+                </div>
+                <h3 className="mt-2 text-xl font-semibold text-text-primary">
+                  {explanation.humanTitle}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-sm text-text-muted transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+                onClick={onClose}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-border-subtle bg-bg-base/40 p-4">
+              <div className="text-sm font-medium text-text-primary">
+                Vethos a placé ce bloc ici parce que :
+              </div>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-text-secondary">
+                {explanation.humanReasons.map((reason) => (
+                  <li key={reason} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent" />
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-4 text-xs text-text-muted">
+              {explanation.severity === 'critical' || explanation.severity === 'high'
+                ? 'Ce placement demande une attention particulière.'
+                : explanation.severity === 'medium'
+                  ? 'Ce placement reste raisonnable, avec quelques points à surveiller.'
+                  : 'Ce placement est cohérent avec ton temps disponible.'}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <Button type="button" size="sm" onClick={onClose}>
+                Compris
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

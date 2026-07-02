@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertOctagon, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   children: ReactNode
@@ -44,14 +45,14 @@ export class ErrorBoundary extends Component<Props, State> {
           <pre className="max-w-lg overflow-auto rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-left font-mono text-xs text-text-muted">
             {this.state.error.message}
           </pre>
-          <button
+          <Button
             type="button"
             onClick={this.handleReload}
-            className="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            variant="solid"
           >
             <RefreshCw size={16} />
             Recharger
-          </button>
+          </Button>
         </div>
       )
     }

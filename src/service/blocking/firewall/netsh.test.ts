@@ -3,7 +3,7 @@ import { parseNetshShowRules, ruleNameFor } from './netsh'
 
 const FIXTURE = `
 
-Rule Name:                            Nexus_Block_abc123_chrome.exe
+Rule Name:                            Vethos_Block_abc123_chrome.exe
 ----------------------------------------------------------------------
 Enabled:                              Yes
 Direction:                            Out
@@ -18,7 +18,7 @@ Enabled:                              Yes
 describe('parseNetshShowRules', () => {
   it('extracts rule names', () => {
     expect(parseNetshShowRules(FIXTURE)).toEqual([
-      'Nexus_Block_abc123_chrome.exe',
+      'Vethos_Block_abc123_chrome.exe',
       'SomeOtherRule',
     ])
   })
@@ -30,6 +30,6 @@ describe('parseNetshShowRules', () => {
 
 describe('ruleNameFor', () => {
   it('builds a stable rule name', () => {
-    expect(ruleNameFor('abc-123', 'C:\\foo\\bar.exe')).toBe('Nexus_Block_abc-123_bar.exe')
+    expect(ruleNameFor('abc-123', 'C:\\foo\\bar.exe')).toBe('Vethos_Block_abc-123_bar.exe')
   })
 })

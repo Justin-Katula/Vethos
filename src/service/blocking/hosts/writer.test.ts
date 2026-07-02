@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { renderNexusBlock } from './writer'
+import { renderVethosBlock } from './writer'
 import { SENTINEL_BEGIN, SENTINEL_END } from './sentinels'
 
-describe('renderNexusBlock', () => {
+describe('renderVethosBlock', () => {
   it('renders sentinels and entries', () => {
-    const out = renderNexusBlock({
+    const out = renderVethosBlock({
       sessionId: 'abc-123',
       startedAt: '2026-05-04T10:00:00Z',
       domains: ['facebook.com', 'twitter.com'],
@@ -19,7 +19,7 @@ describe('renderNexusBlock', () => {
   })
 
   it('produces a block when no domains', () => {
-    const out = renderNexusBlock({
+    const out = renderVethosBlock({
       sessionId: 'x',
       startedAt: '2026-05-04T10:00:00Z',
       domains: [],
@@ -34,6 +34,6 @@ describe('renderNexusBlock', () => {
       startedAt: '2026-05-04T10:00:00Z',
       domains: ['x.com'],
     }
-    expect(renderNexusBlock(args)).toBe(renderNexusBlock(args))
+    expect(renderVethosBlock(args)).toBe(renderVethosBlock(args))
   })
 })

@@ -1,2 +1,2 @@
-export const SENTINEL_BEGIN = '# === NEXUS BLOCKING START — DO NOT EDIT (managed by Nexus) ==='
-export const SENTINEL_END = '# === NEXUS BLOCKING END ==='
+export const SENTINEL_BEGIN = '# === VETHOS BLOCKING START — DO NOT EDIT (managed by Vethos) ==='
+export const SENTINEL_END = '# === VETHOS BLOCKING END ==='

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { SLEEP_LOCKDOWN_PROCESS_MARKER, type BlockedAttemptPayload } from '@shared/blocking'
 import { BlockingProfileSchema } from '@shared/schemas'
 import type {
   ActiveSession,
@@ -30,6 +31,8 @@ import type { BlockingPersistence } from './blocking/session/persistence'
 import type { ServiceRequest } from '@shared/service-protocol'
 import type { RequestHandler } from './bridge/server'
 import log from './blocking/engine-log'
+import type { ProtectionLayer } from '@shared/engine-results'
+import type { ProtectionFailure } from '@shared/protection-result'
 
 // ── Types injectables ───────────────────────────────────────────────────────
 
@@ -64,10 +67,13 @@ export type BlockingHostDeps = {
 // ── Protocole exposé ────────────────────────────────────────────────────────
 
 export type StartSessionArgs = {
+  userId?: string
   profileId: string
   durationMinutes: number
   sessionRulesEnabled: boolean
   strictBlocking: boolean
+  resolvedProfile?: BlockingProfile
+  processAllowlist?: string[]
 }
 
 export type BlockingHostEvent =
@@ -76,8 +82,11 @@ export type BlockingHostEvent =
   | { type: 'LAYER_DRIFT'; payload: DriftEvent }
   | { type: 'CLOCK_TAMPER'; payload: { driftMs: number } }
   | { type: 'BREAK_REQUIRED'; payload: { reason: string; restMinutes: number } }
+  | { type: 'BLOCKED_ATTEMPT'; payload: BlockedAttemptPayload }
 
 export type BlockingHost = {
+  setUserId: (userId?: string) => void
+  disconnectUser: () => Promise<void>
   getState: () => Promise<{ state: BlockingState; active: ActiveSession | null }>
   saveProfile: (draft: unknown) => Promise<BlockingProfile>
   deleteProfile: (id: string) => Promise<void>
@@ -87,6 +96,8 @@ export type BlockingHost = {
   getLayerStatus: () => Promise<LayerStatus>
   /** Ré-applique une session active trouvée sur disque, ou nettoie les orphelins. */
   hydrate: () => Promise<void>
+  /** Ré-applique les couches et réarme les détections pour un client reconnecté. */
+  resync: () => Promise<{ state: BlockingState; active: ActiveSession | null }>
   /** Abonne un écouteur. Pas de désabonnement : le service enregistre un seul
    *  écouteur au démarrage (cf. index.ts). */
   on: (cb: (e: BlockingHostEvent) => void) => void
@@ -125,6 +136,9 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
   })
   manager.on('sessionEnded', (entry, session) => {
     emit({ type: 'SESSION_ENDED', payload: { entry, session } })
+  })
+  manager.on('blockedAttempt', (payload) => {
+    emit({ type: 'BLOCKED_ATTEMPT', payload })
   })
 
   const drift = deps.drift ?? createDriftDetector()
@@ -170,7 +184,41 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
     void checkSessionRules()
   }, SESSION_RULES_CHECK_INTERVAL_MS)
 
+  async function hydrateManagerWithRecoveredOwner(): Promise<void> {
+    await manager.hydrateFromDisk()
+    const recovered = manager.getActive()
+    if (!persistence.getUserId() && recovered?.userId) {
+      // Après un boot Windows, le miroir global est lisible avant Clerk. Une
+      // fois la session retrouvée, rattacher immédiatement toutes les futures
+      // écritures (fin, historique, cooldown) à son véritable propriétaire.
+      persistence.setUserId(recovered.userId)
+    }
+  }
+
+  function isSleepLockdownProfile(profile: BlockingProfile | undefined): boolean {
+    return Boolean(
+      profile?.blockedProcesses
+        .map((processName) => processName.toLowerCase())
+        .includes(SLEEP_LOCKDOWN_PROCESS_MARKER),
+    )
+  }
+
   return {
+    setUserId(userId) {
+      persistence.setUserId(userId)
+    },
+
+    async disconnectUser() {
+      await manager.endSessionForce('disconnect').catch((err) => {
+        log.warn('[blocking-host] session cleanup on user disconnect failed', err)
+      })
+      await firewall.removeAll().catch((err) => {
+        log.warn('[blocking-host] firewall cleanup on user disconnect failed', err)
+      })
+      liveRuleNotifiedFor = null
+      persistence.setUserId(undefined)
+    },
+
     async getState() {
       const state = await persistence.readState()
       return { state, active: manager.getActive() }
@@ -183,9 +231,11 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
         createdAt: (draft as { createdAt?: string }).createdAt ?? new Date().toISOString(),
       }
       const profile = BlockingProfileSchema.parse(merged)
-      for (const exeName of profile.blockedProcesses) {
-        if (isSafeListed(exeName)) {
-          throw new Error(`System process refused: ${exeName}`)
+      if (profile.mode === 'blocklist') {
+        for (const exeName of profile.blockedProcesses) {
+          if (isSafeListed(exeName)) {
+            throw new Error(`System process refused: ${exeName}`)
+          }
         }
       }
       const state = await persistence.readState()
@@ -213,6 +263,10 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
       const state = await persistence.readState()
       const penaltyMinutes = state.nextSessionPenaltyMinutes ?? 0
       const durationMinutes = Math.min(24 * 60, args.durationMinutes + penaltyMinutes)
+      const storedProfile = state.profiles.find((p) => p.id === args.profileId)
+      if (isSleepLockdownProfile(args.resolvedProfile ?? storedProfile) && manager.getActive()) {
+        await manager.endSessionForce('timer')
+      }
       if (args.sessionRulesEnabled) {
         // Pas de freeMinutesByDate : le service re-valide avec son propre
         // historique (spec §4.3) — il ne voit pas les données d'app-usage de l'UI.
@@ -224,8 +278,11 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
         if (!decision.ok) throw new Error(decision.reason)
       }
       const session = await manager.startSession({
+        userId: args.userId,
         profileId: args.profileId,
         durationMinutes,
+        resolvedProfile: args.resolvedProfile,
+        processAllowlist: args.processAllowlist,
       })
       if (penaltyMinutes > 0) {
         const latestState = await persistence.readState()
@@ -250,7 +307,7 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
         const expectedEntryCount = active.profileSnapshot.blockedSites.length * 8
         if (
           expectedEntryCount > 0 &&
-          (!parsed.nexusBlock || parsed.nexusBlock.entries.length !== expectedEntryCount)
+          (!parsed.vethosBlock || parsed.vethosBlock.entries.length !== expectedEntryCount)
         ) {
           hostsStatus = 'drifted'
         }
@@ -265,13 +322,52 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
       } catch {
         firewallStatus = 'error'
       }
-      return { hosts: hostsStatus, processes: processes.status(), firewall: firewallStatus }
+      const processStatus = processes.status()
+      const appliedLayers: ProtectionLayer[] = []
+      const failures: ProtectionFailure[] = []
+      const profile = active.profileSnapshot
+      const recordLayer = (
+        layer: ProtectionLayer,
+        requested: boolean,
+        status: LayerStatusValue,
+      ): void => {
+        if (!requested) return
+        if (status === 'ok') appliedLayers.push(layer)
+        else failures.push({ layer, message: `${layer}: ${status}` })
+      }
+      recordLayer('hosts', profile.blockedSites.length > 0, hostsStatus)
+      recordLayer(
+        'process_watcher',
+        profile.mode === 'allowlist' || profile.blockedProcesses.length > 0,
+        processStatus,
+      )
+      recordLayer('firewall', profile.blockedNetworkApps.length > 0, firewallStatus)
+      if (active.protectionResult?.appliedLayers.includes('service_recovery')) {
+        appliedLayers.push('service_recovery')
+      }
+      await manager.updateProtectionAudit(appliedLayers, failures)
+      return { hosts: hostsStatus, processes: processStatus, firewall: firewallStatus }
     },
 
     async hydrate() {
-      await manager.hydrateFromDisk().catch((err) => {
+      await hydrateManagerWithRecoveredOwner().catch((err) => {
         log.error('[blocking-host] hydrate failed', err)
       })
+    },
+
+    async resync() {
+      await hydrateManagerWithRecoveredOwner()
+      const state = await persistence.readState()
+      const active = manager.getActive()
+      const needsProcessGuard = Boolean(
+        active &&
+          (active.profileSnapshot.mode === 'allowlist' ||
+            active.profileSnapshot.blockedProcesses.length > 0),
+      )
+      if (needsProcessGuard && processes.status() !== 'ok') {
+        throw new Error('La surveillance réelle des applications n’a pas pu être restaurée.')
+      }
+      return { state, active }
     },
 
     on(cb) {
@@ -293,15 +389,58 @@ export function createBlockingHost(deps: BlockingHostDeps): BlockingHost {
  * quelles (le bridge les transforme en réponse `ok: false`).
  */
 export function createBlockingHandlers(host: BlockingHost): Record<string, RequestHandler> {
+  function useRequestUserId(payload: unknown): void {
+    const userId = (payload as { userId?: string } | null | undefined)?.userId
+    host.setUserId(userId)
+  }
+
   return {
-    GET_STATE: () => host.getState(),
-    SAVE_PROFILE: (req: ServiceRequest) => host.saveProfile(req.payload),
-    DELETE_PROFILE: (req: ServiceRequest) =>
-      host.deleteProfile((req.payload as { id: string }).id),
-    START_SESSION: (req: ServiceRequest) => host.startSession(req.payload as StartSessionArgs),
-    REQUEST_UNLOCK: () => host.requestUnlock(),
-    SUBMIT_JUSTIFICATION: (req: ServiceRequest) =>
-      host.submitJustification((req.payload as { text: string }).text),
-    GET_LAYER_STATUS: () => host.getLayerStatus(),
+    SET_USER_CONTEXT: async (req: ServiceRequest) => {
+      const payload = req.payload as { userId?: string } | undefined
+      const userId = payload?.userId?.trim()
+      if (userId) {
+        host.setUserId(userId)
+        await host.resync()
+        return { ok: true }
+      }
+      await host.disconnectUser()
+      return { ok: true }
+    },
+    GET_STATE: (req: ServiceRequest) => {
+      useRequestUserId(req.payload)
+      return host.getState()
+    },
+    RESYNC_BLOCKING: (req: ServiceRequest) => {
+      useRequestUserId(req.payload)
+      return host.resync()
+    },
+    SAVE_PROFILE: (req: ServiceRequest) => {
+      const payload = req.payload as { draft?: unknown; userId?: string } | undefined
+      useRequestUserId(payload)
+      return host.saveProfile(payload && 'draft' in payload ? payload.draft : payload)
+    },
+    DELETE_PROFILE: (req: ServiceRequest) => {
+      const payload = req.payload as { id: string; userId?: string }
+      useRequestUserId(payload)
+      return host.deleteProfile(payload.id)
+    },
+    START_SESSION: (req: ServiceRequest) => {
+      const payload = req.payload as StartSessionArgs
+      useRequestUserId(payload)
+      return host.startSession(payload)
+    },
+    REQUEST_UNLOCK: (req: ServiceRequest) => {
+      useRequestUserId(req.payload)
+      return host.requestUnlock()
+    },
+    SUBMIT_JUSTIFICATION: (req: ServiceRequest) => {
+      const payload = req.payload as { text: string; userId?: string }
+      useRequestUserId(payload)
+      return host.submitJustification(payload.text)
+    },
+    GET_LAYER_STATUS: (req: ServiceRequest) => {
+      useRequestUserId(req.payload)
+      return host.getLayerStatus()
+    },
   }
 }

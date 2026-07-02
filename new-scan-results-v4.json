@@ -1,0 +1,1360 @@
+[
+  {
+    "name": "21st - Infrastructure and UI building blocks for the agentic internet",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "AMD Chipset Software",
+    "exeName": "AMDChipsetSoftware.exe",
+    "exePath": "",
+    "publisher": "Advanced Micro Devices, Inc.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "AMD Install Manager",
+    "exeName": "7z.exe",
+    "exePath": "C:\\Program Files\\AMD\\AMDInstallManager\\7z.exe",
+    "publisher": "Advanced Micro Devices, Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "AMD Radeon Software",
+    "exeName": "LauncherRSXRuntime.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\AdvancedMicroDevicesInc-RSXCM_22.10.0.0_x64__v2es6h43hjn86\\LauncherRSXRuntime.exe",
+    "publisher": "Advanced Micro Devices Inc.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "AdvancedMicroDevicesInc-RSXCM_v2es6h43hjn86"
+  },
+  {
+    "name": "AMD Software",
+    "exeName": "AMDSoftwareCompatibilityTool.exe",
+    "exePath": "C:\\Program Files\\AMD\\CIM\\BIN64\\AMDSoftwareCompatibilityTool.exe",
+    "publisher": "Advanced Micro Devices, Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "An African Safari",
+    "exeName": "AnAfricanSafari.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Microsoft.AnAfricanSafari_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Antigravity 2.0.10",
+    "exeName": "Antigravity.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\antigravity\\Antigravity.exe",
+    "publisher": "Google",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "AnythingLLM 1.11.1",
+    "exeName": "AnythingLLM.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\AnythingLLM\\AnythingLLM.exe",
+    "publisher": "Mintplex Labs Inc",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "AppleInc.AppleMusicWin",
+    "exeName": "AppleMusic.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa\\AppleMusic.exe",
+    "publisher": "Apple Inc.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "AppleInc.AppleMusicWin_nzyj5cx40ttqa"
+  },
+  {
+    "name": "Armoury Crate",
+    "exeName": "ArmouryCrate.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\B9ECED6F.ArmouryCrate_6.5.7.0_x64__qmba6cd70vzyy\\ArmouryCrate.exe",
+    "publisher": "ASUSTeK COMPUTER INC.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "B9ECED6F.ArmouryCrate_qmba6cd70vzyy"
+  },
+  {
+    "name": "Armoury Crate Service",
+    "exeName": "ArmouryCrateService.exe",
+    "exePath": "",
+    "publisher": "ASUSTeK COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "ASUS DriverHub",
+    "exeName": "ASUSDriverHub.exe",
+    "exePath": "",
+    "publisher": "ASUS",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "ASUS Framework Service",
+    "exeName": "asus_framework.exe",
+    "exePath": "C:\\Program Files (x86)\\ASUS\\ArmouryDevice\\asus_framework.exe",
+    "publisher": "ASUSTeK Computer Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "ASUS Motherboard",
+    "exeName": "ASUSMotherboard.exe",
+    "exePath": "",
+    "publisher": "ASUSTek Computer Inc.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "AURA Creator",
+    "exeName": "AuraEditor.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\B9ECED6F.AURACreator_4.5.4.0_x64__qmba6cd70vzyy\\AuraEditor.exe",
+    "publisher": "ASUSTeK COMPUTER INC.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "B9ECED6F.AURACreator_qmba6cd70vzyy"
+  },
+  {
+    "name": "AURA lighting effect add-on",
+    "exeName": "AURAlightingeffectadd-on.exe",
+    "exePath": "",
+    "publisher": "ASUSTek COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "AURA lighting effect add-on x64",
+    "exeName": "AURAlightingeffectadd-onx64.exe",
+    "exePath": "",
+    "publisher": "ASUSTek COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "AURA Service",
+    "exeName": "AURAService.exe",
+    "exePath": "",
+    "publisher": "ASUSTeK COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Battlefield™ 6",
+    "exeName": "bf6.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Battlefield 6\\bf6.exe",
+    "publisher": "Battlefield Studios",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Blender",
+    "exeName": "blender-launcher.exe",
+    "exePath": "C:\\Program Files\\Blender Foundation\\Blender 5.0\\blender-launcher.exe",
+    "publisher": "Blender Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Call of Duty®",
+    "exeName": "cod.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Call of Duty HQ\\cod.exe",
+    "publisher": "Treyarch",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Canva",
+    "exeName": "Canva.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Canva\\Canva.exe",
+    "publisher": "Canva Pty Ltd",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Car Mechanic Simulator 2018",
+    "exeName": "cms2018.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Car Mechanic Simulator 2018\\cms2018.exe",
+    "publisher": "Red Dot Games",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "ChatGPT",
+    "exeName": "ChatGPT.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\OpenAI.ChatGPT-Desktop_1.2026.133.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+    "publisher": "OpenAI",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0"
+  },
+  {
+    "name": "Cinebench",
+    "exeName": "Cinebench.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\MAXONComputerGmbH.Cinebench_2026.1.0.0_x64__rsne5bsk8s7tj\\Cinebench.exe",
+    "publisher": "MAXON Computer GmbH",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "MAXONComputerGmbH.Cinebench_rsne5bsk8s7tj"
+  },
+  {
+    "name": "Cineby",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Claude",
+    "exeName": "Claude.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Claude_1.9659.4.0_x64__pzs8sxrjxfjjc\\app\\Claude.exe",
+    "publisher": "Anthropic, PBC",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Claude_pzs8sxrjxfjjc"
+  },
+  {
+    "name": "Clipchamp.Clipchamp",
+    "exeName": "Clipchamp.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Clipchamp.Clipchamp_4.5.10620.0_x64__yxz26nhyzhsrt\\Clipchamp\\Clipchamp.exe",
+    "publisher": "Microsoft Corp.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Clipchamp.Clipchamp_yxz26nhyzhsrt"
+  },
+  {
+    "name": "Cocos Dashboard 1.0.14.2515",
+    "exeName": "atom.exe",
+    "exePath": "C:\\WINDOWS\\Installer\\{5B686938-99D9-4ED6-94E2-59E5CC7C3D94}\\atom.exe",
+    "publisher": "Xiamen Yaji Software Co., Ltd.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Codex",
+    "exeName": "Codex.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.601.2237.0_x64__2p2nqsd0c76g0\\app\\Codex.exe",
+    "publisher": "OpenAI",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "OpenAI.Codex_2p2nqsd0c76g0"
+  },
+  {
+    "name": "Cold Turkey Blocker",
+    "exeName": "Cold Turkey Blocker.exe",
+    "exePath": "C:\\Program Files\\Cold Turkey\\Cold Turkey Blocker.exe",
+    "publisher": "Cold Turkey Software, Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Comet",
+    "exeName": "comet.exe",
+    "exePath": "C:\\Program Files\\Perplexity\\Comet\\Application\\comet.exe",
+    "publisher": "The Comet Authors",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Copilot",
+    "exeName": "mscopilot_proxy.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.Copilot_148.0.3967.70_neutral__8wekyb3d8bbwe\\mscopilot_proxy.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.Copilot_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Cosmic Beauty",
+    "exeName": "CosmicBeauty.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Microsoft.CosmicBeauty_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Crunchyroll",
+    "exeName": "Crunchyroll.exe",
+    "exePath": "",
+    "publisher": "Crunchyroll, LLC",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "15EF7777.Crunchyroll_mgdgtskya6f22"
+  },
+  {
+    "name": "Cursor (User)",
+    "exeName": "Cursor.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\cursor\\Cursor.exe",
+    "publisher": "Anysphere",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Cyberpunk 2077 Bonus Content",
+    "exeName": "Cyberpunk2077BonusContent.exe",
+    "exePath": "",
+    "publisher": "CD PROJEKT RED",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "DeepSeek",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Denuvo Anti-Cheat",
+    "exeName": "DenuvoAnti-Cheat.exe",
+    "exePath": "",
+    "publisher": "Denuvo GmbH",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Detroit: Become Human",
+    "exeName": "DetroitBecomeHuman.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Detroit Become Human\\DetroitBecomeHuman.exe",
+    "publisher": "Quantic Dream",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Discord",
+    "exeName": "Discord.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Discord\\app-1.0.9219\\Discord.exe",
+    "publisher": "Discord Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Disney+",
+    "exeName": "Disney.exe",
+    "exePath": "",
+    "publisher": "Disney",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Disney.37853FC22B2CE_6rarf9sa4v8jt"
+  },
+  {
+    "name": "Display Driver Uninstaller",
+    "exeName": "DisplayDriverUninstaller.exe",
+    "exePath": "",
+    "publisher": "Wagnardsoft",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Docker Desktop",
+    "exeName": "Docker Desktop.exe",
+    "exePath": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+    "publisher": "Docker Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Docs",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "DS4Windows version 3.3.3",
+    "exeName": "DS4Windows.exe",
+    "exePath": "C:\\Controller\\DS4Windows\\DS4Windows.exe",
+    "publisher": "Ryochan7",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "EbSynth",
+    "exeName": "EbSynth.exe",
+    "exePath": "",
+    "publisher": "ebsynth.com",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "ebsynth.com-26C6EF06_7yncbbhxydqkg"
+  },
+  {
+    "name": "eFootball™",
+    "exeName": "eFootballTM.exe",
+    "exePath": "",
+    "publisher": "KONAMI",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Epic Games Launcher",
+    "exeName": "EpicGamesLauncher.exe",
+    "exePath": "C:\\Users\\obedi\\Epic games\\Epic Games\\Launcher\\Portal\\Binaries\\Win64\\EpicGamesLauncher.exe",
+    "publisher": "Epic Games, Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Epic Online Services",
+    "exeName": "EpicOnlineServices.exe",
+    "exePath": "",
+    "publisher": "Epic Games, Inc.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Facebook",
+    "exeName": "Facebook.exe",
+    "exePath": "",
+    "publisher": "Meta",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "FACEBOOK.FACEBOOK_8xx8rvfyw5nnt"
+  },
+  {
+    "name": "Futuremark SystemInfo",
+    "exeName": "FuturemarkSystemInfo.exe",
+    "exePath": "",
+    "publisher": "Futuremark",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Game Bar",
+    "exeName": "GameBar.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.XboxGamingOverlay_7.326.5041.0_x64__8wekyb3d8bbwe\\GameBar.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.XboxGamingOverlay_8wekyb3d8bbwe"
+  },
+  {
+    "name": "GameSDK Service",
+    "exeName": "GameSDK.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{021d69c3-d686-4a94-8fb5-fd1ee782fb14}\\GameSDK.exe",
+    "publisher": "ASUSTek COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Gemini",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "GIMP",
+    "exeName": "gimp-3.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\GIMP.43237F745459_3.2.44.0_x64__nq49gba4h4mx8\\VFS\\ProgramFilesX64\\GIMP\\bin\\gimp-3.exe",
+    "publisher": "GIMP",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "GIMP.43237F745459_nq49gba4h4mx8"
+  },
+  {
+    "name": "Git",
+    "exeName": "git.exe",
+    "exePath": "C:\\Program Files\\Git\\bin\\git.exe",
+    "publisher": "The Git Development Community",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "GitHub Desktop",
+    "exeName": "GitHubDesktop.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\GitHubDesktop\\GitHubDesktop.exe",
+    "publisher": "GitHub, Inc.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Google Chrome",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google LLC",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Google One",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Graveyard Keeper",
+    "exeName": "Graveyard Keeper.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Graveyard Keeper\\Graveyard Keeper.exe",
+    "publisher": "Lazy Bear Games",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "HidHide",
+    "exeName": "HidHideCLI.exe",
+    "exePath": "C:\\Program Files\\Nefarius Software Solutions\\HidHide\\x64\\HidHideCLI.exe",
+    "publisher": "Nefarius Software Solutions e.U.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "HITMAN World of Assassination",
+    "exeName": "Launcher.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\HITMAN 3\\Launcher.exe",
+    "publisher": "IO Interactive A/S",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "IncrediBuild 10.31.2 (build 16403)",
+    "exeName": "IncrediBuild10.31.2build16403.exe",
+    "exePath": "",
+    "publisher": "Incredibuild",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Indeed",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Ink.Handwriting.Main.en-CA.1.0",
+    "exeName": "StoreStub.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.Ink.Handwriting.Main.en-CA.1.0_0.1082.2350.0_x64__8wekyb3d8bbwe\\StoreStub.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.Ink.Handwriting.Main.en-CA.1.0_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Instant Gaming",
+    "exeName": "InstantGaming.exe",
+    "exePath": "",
+    "publisher": "www.instant-gaming.com",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "www.instant-gaming.com-D5C0CDF1_a2cxkb6n30eec"
+  },
+  {
+    "name": "itch",
+    "exeName": "itch.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\itch\\app-26.6.0\\itch.exe",
+    "publisher": "itch corp.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Kimi",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Kinguin",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "LM Studio 0.4.6+1",
+    "exeName": "LM Studio.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\LM Studio\\LM Studio.exe",
+    "publisher": "LM Studio",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft .NET Runtime - 8.0.21 (x64)",
+    "exeName": "dotnet-runtime-8.0.21-win-x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{cf83f56a-4c10-4d97-9594-0764dfeb96e3}\\dotnet-runtime-8.0.21-win-x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft .NET Runtime - 8.0.27 (x64)",
+    "exeName": "dotnet-runtime-8.0.27-win-x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{785c0558-c01e-44e3-8799-90ea5ea70ae6}\\dotnet-runtime-8.0.27-win-x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft 365 Copilot",
+    "exeName": "M365Copilot.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.MicrosoftOfficeHub_19.2605.59121.0_x64__8wekyb3d8bbwe\\M365Copilot.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft Edge",
+    "exeName": "msedge_proxy.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.MicrosoftEdge.Stable_145.0.3800.70_neutral__8wekyb3d8bbwe\\msedge_proxy.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.MicrosoftEdge.Stable_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft GameInput",
+    "exeName": "MicrosoftGameInput.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Microsoft OneDrive",
+    "exeName": "MicrosoftOneDrive.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Microsoft Store",
+    "exeName": "WinStore.App.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsStore_22604.1401.8.0_x64__8wekyb3d8bbwe\\WinStore.App.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsStore_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft Teams",
+    "exeName": "ms-teams_modulehost.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\msteams_25306.804.4102.7193_x64__8wekyb3d8bbwe\\ms-teams_modulehost.exe",
+    "publisher": "Microsoft",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "MSTeams_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft Visual C++ 2010  x64 Redistributable - 10.0.40219",
+    "exeName": "MicrosoftVisualC2010x64Redistributable-10.0.40219.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Microsoft Visual C++ 2010  x86 Redistributable - 10.0.40219",
+    "exeName": "MicrosoftVisualC2010x86Redistributable-10.0.40219.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Microsoft Visual C++ 2012 Redistributable (x64) - 11.0.61030",
+    "exeName": "vcredist_x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{ca67548a-5ebe-413a-b50c-4b9ceb6d66c6}\\vcredist_x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual C++ 2012 Redistributable (x86) - 11.0.61030",
+    "exeName": "vcredist_x86.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{33d1fd90-4274-48a1-9bc1-97e33d9c2d6f}\\vcredist_x86.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual C++ 2013 Redistributable (x64) - 12.0.40664",
+    "exeName": "vcredist_x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{042d26ef-3dbe-4c25-95d3-4c1b11b235a7}\\vcredist_x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual C++ 2013 Redistributable (x86) - 12.0.40664",
+    "exeName": "vcredist_x86.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{9dff3540-fc85-4ed5-ac84-9e3c7fd8bece}\\vcredist_x86.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.51.36231",
+    "exeName": "VC_redist.x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{c157798c-9519-4e56-98d9-f696f78f4a61}\\VC_redist.x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual C++ 2015-2022 Redistributable (x86) - 14.51.36231",
+    "exeName": "VC_redist.x86.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{73fd1972-7030-4d2d-9ede-dd38a78c1d52}\\VC_redist.x86.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual Studio Code (User)",
+    "exeName": "Code.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Visual Studio Installer",
+    "exeName": "feedback.exe",
+    "exePath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\feedback.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Windows Desktop Runtime - 8.0.27 (x64)",
+    "exeName": "windowsdesktop-runtime-8.0.27-win-x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{2e63a120-0290-4d41-b713-28bf4b7f0631}\\windowsdesktop-runtime-8.0.27-win-x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft Windows Desktop Runtime - 9.0.16 (x64)",
+    "exeName": "windowsdesktop-runtime-9.0.16-win-x64.exe",
+    "exePath": "C:\\ProgramData\\Package Cache\\{b842def2-5667-4a78-8bfa-9b1df75dfa5e}\\windowsdesktop-runtime-9.0.16-win-x64.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Microsoft.AVCEncoderVideoExtension",
+    "exeName": "Microsoft.AVCEncoderVideoExtension.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Microsoft.AVCEncoderVideoExtension_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.BingWeather",
+    "exeName": "Microsoft.Msn.Weather.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.BingWeather_4.54.63040.0_x64__8wekyb3d8bbwe\\Microsoft.Msn.Weather.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.BingWeather_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.GamingServices",
+    "exeName": "TCUI-App.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.GamingServices_36.113.14003.0_x64__8wekyb3d8bbwe\\TCUI-App.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.GamingServices_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.GetHelp",
+    "exeName": "GetHelp.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.GetHelp_10.2409.41132.0_x64__8wekyb3d8bbwe\\GetHelp.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.GetHelp_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.MicrosoftEdgeDevToolsClient",
+    "exeName": "Microsoft.MicrosoftEdgeDevToolsClient.exe",
+    "exePath": "",
+    "publisher": "",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Microsoft.MicrosoftEdgeDevToolsClient_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.MicrosoftStickyNotes",
+    "exeName": "StickyNotesStub.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.MicrosoftStickyNotes_4.0.6104.0_x64__8wekyb3d8bbwe\\StickyNotesStub.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.MPEG2VideoExtension",
+    "exeName": "Microsoft.MPEG2VideoExtension.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "Microsoft.MPEG2VideoExtension_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.Paint",
+    "exeName": "mspaint.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.Paint_11.2603.251.0_x64__8wekyb3d8bbwe\\PaintApp\\mspaint.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.Paint_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.ScreenSketch",
+    "exeName": "SnippingTool.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.ScreenSketch_11.2602.47.0_x64__8wekyb3d8bbwe\\SnippingTool\\SnippingTool.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.ScreenSketch_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.Todos",
+    "exeName": "Todo.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.Todos_2.175.6901.0_x64__8wekyb3d8bbwe\\Todo.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.Todos_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsAlarms",
+    "exeName": "Time.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsAlarms_11.2512.0.0_x64__8wekyb3d8bbwe\\Time.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsAlarms_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsCamera",
+    "exeName": "WindowsCamera.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsCamera_2025.2510.2.0_x64__8wekyb3d8bbwe\\WindowsCamera.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsCamera_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsFeedbackHub",
+    "exeName": "PilotshubApp.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsFeedbackHub_1.2602.13304.0_x64__8wekyb3d8bbwe\\PilotshubApp.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsFeedbackHub_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsNotepad",
+    "exeName": "Notepad.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsNotepad_11.2604.5.0_x64__8wekyb3d8bbwe\\Notepad\\Notepad.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsNotepad_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsSoundRecorder",
+    "exeName": "SoundRec.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsSoundRecorder_1.1.86.0_x64__8wekyb3d8bbwe\\SoundRec.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.WindowsTerminal",
+    "exeName": "WindowsTerminal.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.24.11321.0_x64__8wekyb3d8bbwe\\WindowsTerminal.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.WindowsTerminal_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.YourPhone",
+    "exeName": "PhoneExperienceHost.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.YourPhone_1.26032.102.0_x64__8wekyb3d8bbwe\\PhoneExperienceHost.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.YourPhone_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Microsoft.ZuneMusic",
+    "exeName": "Microsoft.Media.Player.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.ZuneMusic_11.2604.9.0_x64__8wekyb3d8bbwe\\Microsoft.Media.Player.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.ZuneMusic_8wekyb3d8bbwe"
+  },
+  {
+    "name": "MicrosoftCorporationII.QuickAssist",
+    "exeName": "QuickAssist.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\MicrosoftCorporationII.QuickAssist_2.0.35.0_x64__8wekyb3d8bbwe\\Microsoft.RemoteAssistance.QuickAssist\\QuickAssist.exe",
+    "publisher": "Microsoft Corp.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "MicrosoftCorporationII.QuickAssist_8wekyb3d8bbwe"
+  },
+  {
+    "name": "MicrosoftCorporationII.WindowsSubsystemForLinux",
+    "exeName": "wsl.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\MicrosoftCorporationII.WindowsSubsystemForLinux_2.6.3.0_x64__8wekyb3d8bbwe\\wsl.exe",
+    "publisher": "Microsoft Corp.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "MicrosoftCorporationII.WindowsSubsystemForLinux_8wekyb3d8bbwe"
+  },
+  {
+    "name": "MSI Afterburner 4.6.6",
+    "exeName": "MSIAfterburner.exe",
+    "exePath": "C:\\Program Files (x86)\\MSI Afterburner\\MSIAfterburner.exe",
+    "publisher": "MSI Co., LTD",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Vethos",
+    "exeName": "Vethos.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Vethos\\Vethos.exe",
+    "publisher": "Vethos",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Node.js",
+    "exeName": "node.exe",
+    "exePath": "C:\\Program Files\\nodejs\\node.exe",
+    "publisher": "Node.js Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "OBS Studio",
+    "exeName": "obs64.exe",
+    "exePath": "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe",
+    "publisher": "OBS Project",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Obsidian",
+    "exeName": "Obsidian.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Obsidian\\Obsidian.exe",
+    "publisher": "Obsidian",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Ollama version 0.30.0",
+    "exeName": "ollama.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
+    "publisher": "Ollama",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "OneDrive",
+    "exeName": "stub.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.OneDriveSync_26084.504.7.0_neutral__8wekyb3d8bbwe\\stub.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.OneDriveSync_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Open WebUI",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Outlook for Windows",
+    "exeName": "olk.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\microsoft.outlookforwindows_1.2025.1111.100_x64__8wekyb3d8bbwe\\olk.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.OutlookForWindows_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Path of Exile",
+    "exeName": "PathOfExileSteam.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Path of Exile\\PathOfExileSteam.exe",
+    "publisher": "Grinding Gear Games",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "PC Remote Receiver 7.8.1",
+    "exeName": "PCRemoteReceiver.exe",
+    "exePath": "C:\\Program Files\\PC Remote Receiver\\PCRemoteReceiver.exe",
+    "publisher": "Monect (Suzhou) Co., Ltd.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Perplexity 1.3.0",
+    "exeName": "Perplexity.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Programs\\Perplexity\\Perplexity.exe",
+    "publisher": "Perplexity",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "PixelLab",
+    "exeName": "PixelLab.exe",
+    "exePath": "",
+    "publisher": "www.pixellab.ai",
+    "source": "appx",
+    "hasExecutablePath": false,
+    "packageId": "www.pixellab.ai-8C8B1132_0zctr6wt75ya8"
+  },
+  {
+    "name": "Planet of Lana",
+    "exeName": "Planet of Lana.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Planet of Lana\\Planet of Lana.exe",
+    "publisher": "Wishfully",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Poseidon Scans",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Power Automate",
+    "exeName": "PAD.Console.Host.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.PowerAutomateDesktop_11.2605.237.0_x64__8wekyb3d8bbwe\\dotnet\\PAD.Console.Host.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.PowerAutomateDesktop_8wekyb3d8bbwe"
+  },
+  {
+    "name": "PowerShell 7-x64",
+    "exeName": "PowerShell7-x64.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "PyCharm 2026.1",
+    "exeName": "pycharm64.exe",
+    "exePath": "C:\\Program Files\\JetBrains\\PyCharm 2025.3.3\\bin\\pycharm64.exe",
+    "publisher": "JetBrains s.r.o.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Python 3.12.9 (64-bit)",
+    "exeName": "python-3.12.9-amd64.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{95f11c27-5079-4ec7-b5b0-fda34467b15e}\\python-3.12.9-amd64.exe",
+    "publisher": "Python Software Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Python 3.14.2",
+    "exeName": "python.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "publisher": "Python Software Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Python 3.14.4 (64-bit)",
+    "exeName": "python-3.14.4-amd64.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Package Cache\\{21bd423a-1cbb-41b4-b464-5e7c059ec5a4}\\python-3.14.4-amd64.exe",
+    "publisher": "Python Software Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Python Install Manager",
+    "exeName": "py-manager.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\PythonSoftwareFoundation.PythonManager_26.1.240.0_x64__3847v3x7pw1km\\py-manager.exe",
+    "publisher": "Python Software Foundation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "PythonSoftwareFoundation.PythonManager_3847v3x7pw1km"
+  },
+  {
+    "name": "Python Launcher",
+    "exeName": "python.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "publisher": "Python Software Foundation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Realtek Audio Control",
+    "exeName": "RtkUWP.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\RealtekSemiconductorCorp.RealtekAudioControl_1.53.376.0_x64__dt26b99r8h8gj\\RtkUWP.exe",
+    "publisher": "Realtek Semiconductor Corp",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "RealtekSemiconductorCorp.RealtekAudioControl_dt26b99r8h8gj"
+  },
+  {
+    "name": "Realtek Audio Driver",
+    "exeName": "RealtekAudioDriver.exe",
+    "exePath": "",
+    "publisher": "Realtek Semiconductor Corp.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Realtek Ethernet Controller Driver",
+    "exeName": "RealtekEthernetControllerDriver.exe",
+    "exePath": "",
+    "publisher": "Realtek",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Red Dead Redemption 2",
+    "exeName": "PlayRDR2.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Red Dead Redemption 2\\PlayRDR2.exe",
+    "publisher": "Rockstar Games",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "RipGrep MSVC",
+    "exeName": "rg.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\\ripgrep-15.1.0-x86_64-pc-windows-msvc\\rg.exe",
+    "publisher": "BurntSushi",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "RivaTuner Statistics Server 7.3.7",
+    "exeName": "RTSS.exe",
+    "exePath": "C:\\Program Files (x86)\\RivaTuner Statistics Server\\RTSS.exe",
+    "publisher": "Unwinder",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Rockstar Games Launcher",
+    "exeName": "Launcher.exe",
+    "exePath": "C:\\Program Files\\Rockstar Games\\Launcher\\Launcher.exe",
+    "publisher": "Rockstar Games",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Rockstar Games SDK",
+    "exeName": "RockstarGamesSDK.exe",
+    "exePath": "",
+    "publisher": "Rockstar Games",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "ROG FAN XPERT 4",
+    "exeName": "ROGFANXPERT4.exe",
+    "exePath": "",
+    "publisher": "ASUSTek Computer Inc.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "ROG Live Service",
+    "exeName": "ROGLiveService.exe",
+    "exePath": "",
+    "publisher": "ASUSTek COMPUTER INC.",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "ROGFontInstaller",
+    "exeName": "ROGFontInstaller.exe",
+    "exePath": "",
+    "publisher": "ASUS",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Scan Manga",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Sky: Children of the Light",
+    "exeName": "Sky.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Sky Children of the Light\\Sky.exe",
+    "publisher": "thatgamecompany",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Spotify",
+    "exeName": "Spotify.exe",
+    "exePath": "C:\\Users\\obedi\\AppData\\Roaming\\Spotify\\Spotify.exe",
+    "publisher": "Spotify AB",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Steam",
+    "exeName": "Steam.exe",
+    "exePath": "C:\\Program Files (x86)\\Steam\\Steam.exe",
+    "publisher": "Valve Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Stitch",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Ubisoft Connect",
+    "exeName": "UbisoftConnect.exe",
+    "exePath": "C:\\Program Files (x86)\\Ubisoft\\Ubisoft Game Launcher\\UbisoftConnect.exe",
+    "publisher": "Ubisoft",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "ViGEm Bus Driver",
+    "exeName": "nefconw.exe",
+    "exePath": "C:\\Program Files\\Nefarius Software Solutions\\ViGEm Bus Driver\\nefconw.exe",
+    "publisher": "Nefarius Software Solutions e.U.",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Virtual Assistant",
+    "exeName": "Virtual Pet.exe",
+    "exePath": "C:\\Program Files\\ASUS\\Virtual Pet\\Virtual Pet.exe",
+    "publisher": "ASUS",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Visual Studio Build Tools 2026 (2)",
+    "exeName": "DDConfigCA.exe",
+    "exePath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\Common7\\IDE\\DDConfigCA.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Visual Studio Code",
+    "exeName": "Code.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.VisualStudioCode_1.0.120.0_neutral__8wekyb3d8bbwe\\Code.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.VisualStudioCode_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Visual Studio Community 2026",
+    "exeName": "devenv.exe",
+    "exePath": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\devenv.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "vs_CoreEditorFonts",
+    "exeName": "vs_CoreEditorFonts.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "WaveWatch",
+    "exeName": "chrome.exe",
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "publisher": "Google\\Chrome",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "WhatsApp",
+    "exeName": "WhatsApp.Root.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\5319275A.WhatsAppDesktop_2.2620.102.0_x64__cv1g1gvanyjgm\\WhatsApp.Root.exe",
+    "publisher": "WhatsApp Inc.",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "5319275A.WhatsAppDesktop_cv1g1gvanyjgm"
+  },
+  {
+    "name": "Windows SDK AddOn",
+    "exeName": "WindowsSDKAddOn.exe",
+    "exePath": "",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": false
+  },
+  {
+    "name": "Windows Software Development Kit - Windows 10.0.26100.8249",
+    "exeName": "explorer.exe",
+    "exePath": "C:\\WINDOWS\\explorer.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "registry",
+    "hasExecutablePath": true
+  },
+  {
+    "name": "Xbox",
+    "exeName": "XboxPcAppCE.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.GamingApp_2605.1001.14.0_x64__8wekyb3d8bbwe\\XboxPcAppCE.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.GamingApp_8wekyb3d8bbwe"
+  },
+  {
+    "name": "Xbox TCUI",
+    "exeName": "TCUI-App.exe",
+    "exePath": "C:\\Program Files\\WindowsApps\\Microsoft.Xbox.TCUI_1.24.10001.0_x64__8wekyb3d8bbwe\\TCUI-App.exe",
+    "publisher": "Microsoft Corporation",
+    "source": "appx",
+    "hasExecutablePath": true,
+    "packageId": "Microsoft.Xbox.TCUI_8wekyb3d8bbwe"
+  }
+]

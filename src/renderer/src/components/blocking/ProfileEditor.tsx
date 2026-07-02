@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, X, Trash2 } from 'lucide-react'
+import { X, Trash2, Shield, ShieldCheck } from 'lucide-react'
 import type { BlockingProfile, DiscoveredSite } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
 import { useSettingsStore } from '@/store/settings.store'
-import { nexus } from '@/lib/ipc'
+import { vethos } from '@/lib/ipc'
+import { Button } from '@/components/ui/Button'
+import { AppSearchPicker } from './AppSearchPicker'
 
 type PolicyType = BlockingProfile['unlockPolicy']['type']
 
@@ -13,19 +15,18 @@ type Props = {
   open: boolean
   initial: BlockingProfile | null
   onClose: () => void
-  onSave: (
-    draft: Partial<BlockingProfile> & { name: string },
-  ) => Promise<BlockingProfile>
+  onSave: (draft: Partial<BlockingProfile> & { name: string }) => Promise<BlockingProfile>
   onDelete?: (id: string) => Promise<void>
 }
 
-type DiscoveredApp = Awaited<ReturnType<typeof nexus.app.discoverInstalledApps>>[number]
+type DiscoveredApp = Awaited<ReturnType<typeof vethos.app.discoverInstalledApps>>[number]
 
 export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Props) {
   const [name, setName] = useState('')
   const [sites, setSites] = useState('')
   const [procs, setProcs] = useState('')
   const [apps, setApps] = useState('')
+  const [mode, setMode] = useState<'blocklist' | 'allowlist'>('blocklist')
   const [policyType, setPolicyType] = useState<PolicyType>('cooldown_and_justification')
   const [minutes, setMinutes] = useState(10)
   const [minWords, setMinWords] = useState(50)
@@ -34,10 +35,24 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
   const [discoveredApps, setDiscoveredApps] = useState<DiscoveredApp[]>([])
   const [discoveredSites, setDiscoveredSites] = useState<DiscoveredSite[]>([])
   const [error, setError] = useState<string | null>(null)
+  const userId = useSettingsStore((s) => s.userId)
   const defaultCooldownMinutes = useSettingsStore((s) => s.defaultUnlockCooldownMinutes)
   const defaultJustificationWords = useSettingsStore((s) => s.defaultUnlockJustificationWords)
 
   useShortcut('Escape', onClose, { enabled: open && !busy })
+
+  const handleScanApps = useCallback(async (): Promise<void> => {
+    setScanningApps(true)
+    setError(null)
+    try {
+      const apps = await vethos.app.discoverInstalledApps()
+      setDiscoveredApps(apps)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setScanningApps(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -46,11 +61,10 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
       setSites(initial.blockedSites.join('\n'))
       setProcs(initial.blockedProcesses.join('\n'))
       setApps(initial.blockedNetworkApps.join('\n'))
+      setMode(initial.mode ?? 'blocklist')
       setPolicyType(initial.unlockPolicy.type)
       setMinutes(
-        'minutes' in initial.unlockPolicy
-          ? initial.unlockPolicy.minutes
-          : defaultCooldownMinutes,
+        'minutes' in initial.unlockPolicy ? initial.unlockPolicy.minutes : defaultCooldownMinutes,
       )
       setMinWords(
         'minWords' in initial.unlockPolicy
@@ -62,15 +76,23 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
       setSites('')
       setProcs('')
       setApps('')
+      setMode('blocklist')
       setPolicyType('cooldown_and_justification')
       setMinutes(defaultCooldownMinutes)
       setMinWords(defaultJustificationWords)
     }
     setError(null)
-    void nexus.storage.read<{ sites: DiscoveredSite[] }>('discovered_sites').then((state) => {
-      setDiscoveredSites(state?.sites.slice(0, 12) ?? [])
-    })
-  }, [open, initial, defaultCooldownMinutes, defaultJustificationWords])
+    if (userId) {
+      void vethos.storage
+        .read<{ sites: DiscoveredSite[] }>('discovered_sites', userId)
+        .then((state) => {
+          setDiscoveredSites(state?.sites.slice(0, 12) ?? [])
+        })
+    } else {
+      setDiscoveredSites([])
+    }
+    void handleScanApps()
+  }, [open, initial, defaultCooldownMinutes, defaultJustificationWords, handleScanApps, userId])
 
   const handleSave = async () => {
     setBusy(true)
@@ -89,6 +111,7 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
         ...(initial?.id ? { id: initial.id } : {}),
         ...(initial?.createdAt ? { createdAt: initial.createdAt } : {}),
         name: name.trim(),
+        mode,
         blockedSites: splitDomains(sites),
         blockedProcesses: splitExeNames(procs),
         blockedNetworkApps: splitExePaths(apps),
@@ -115,19 +138,6 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
     })
   }
 
-  const handleScanApps = async (): Promise<void> => {
-    setScanningApps(true)
-    setError(null)
-    try {
-      const apps = await nexus.app.discoverInstalledApps()
-      setDiscoveredApps(apps)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setScanningApps(false)
-    }
-  }
-
   return (
     <AnimatePresence>
       {open && (
@@ -151,16 +161,32 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
               <h2 className="text-lg font-semibold tracking-tight">
                 {initial ? 'Modifier le profile' : 'Nouveau profile'}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md p-1.5 text-text-muted hover:bg-bg-card hover:text-text-primary"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
                 <X size={18} />
-              </button>
+              </Button>
             </header>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="mb-5">
+                <label className="block text-xs font-medium uppercase tracking-wider text-text-muted mb-2">
+                  Mode de blocage
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <ModeButton
+                    selected={mode === 'blocklist'}
+                    icon={<Shield size={14} />}
+                    label="Bloquer la sélection"
+                    onClick={() => setMode('blocklist')}
+                  />
+                  <ModeButton
+                    selected={mode === 'allowlist'}
+                    icon={<ShieldCheck size={14} />}
+                    label="Autoriser seulement"
+                    onClick={() => setMode('allowlist')}
+                  />
+                </div>
+              </div>
+
               <Field label="Nom">
                 <input
                   type="text"
@@ -172,8 +198,12 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
               </Field>
 
               <Field
-                label="Sites bloqués"
-                hint="Un domaine par ligne. Ex : facebook.com, twitter.com"
+                label={mode === 'allowlist' ? 'Sites autorisés' : 'Sites bloqués'}
+                hint={
+                  mode === 'allowlist'
+                    ? 'Un domaine utile par ligne. Ex : docs.google.com'
+                    : 'Un domaine par ligne. Ex : facebook.com, twitter.com'
+                }
               >
                 <textarea
                   value={sites}
@@ -184,21 +214,25 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                 {discoveredSites.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {discoveredSites.map((site) => (
-                      <button
+                      <Button
                         key={site.domain}
                         type="button"
+                        variant="default"
+                        size="sm"
                         onClick={() => appendLine(setSites, site.domain)}
-                        className="rounded-2xl border border-border-subtle bg-bg-base px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+                        className="rounded-2xl bg-bg-base px-2.5 py-1 text-[10px] text-text-secondary"
                       >
                         {site.domain}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
               </Field>
 
               <Field
-                label="Apps bloquées (processus)"
+                label={
+                  mode === 'allowlist' ? 'Apps autorisées (processus)' : 'Apps bloquées (processus)'
+                }
                 hint="Un nom .exe par ligne. Utilise le scanner pour éviter les noms invalides."
               >
                 <textarea
@@ -210,7 +244,7 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
               </Field>
 
               <Field
-                label="Apps réseau (par chemin)"
+                label={mode === 'allowlist' ? 'Apps réseau autorisées' : 'Apps réseau (par chemin)'}
                 hint="Chemin .exe complet, un par ligne"
               >
                 <textarea
@@ -221,55 +255,19 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
                 />
               </Field>
 
-              <Field label="Scanner les applications" hint="Lit le registre Windows localement et propose les apps trouvées.">
-                <button
-                  type="button"
-                  onClick={() => void handleScanApps()}
-                  disabled={scanningApps}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-md border border-border-subtle px-3 py-2 text-xs font-medium transition-colors',
-                    scanningApps
-                      ? 'cursor-wait text-text-muted'
-                      : 'text-text-secondary hover:border-border-strong hover:text-text-primary',
-                  )}
-                >
-                  <RefreshCw size={13} className={scanningApps ? 'animate-spin' : undefined} />
-                  {scanningApps ? 'Scan...' : 'Scanner mes applications'}
-                </button>
-                {discoveredApps.length > 0 && (
-                  <div className="mt-3 max-h-52 overflow-y-auto rounded-lg border border-border-subtle bg-bg-base">
-                    {discoveredApps.map((app) => (
-                      <div
-                        key={`${app.exePath}-${app.exeName}`}
-                        className="flex items-center gap-3 border-b border-border-subtle px-3 py-2 last:border-b-0"
-                      >
-                        <AppIcon app={app} />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-medium text-text-primary">
-                            {app.name}
-                          </div>
-                          <div className="truncate font-mono text-[10px] text-text-muted">
-                            {app.exeName}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => appendLine(setProcs, app.exeName)}
-                          className="rounded-md border border-border-subtle px-2 py-1 text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
-                        >
-                          Processus
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => appendLine(setApps, app.exePath)}
-                          className="rounded-md border border-border-subtle px-2 py-1 text-[10px] text-text-secondary hover:border-border-strong hover:text-text-primary"
-                        >
-                          Réseau
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <Field
+                label="Rechercher une distraction"
+                hint="Combine registre Windows, raccourcis, dossiers d'installation et winget list. Le résultat est caché côté main."
+              >
+                <AppSearchPicker
+                  apps={discoveredApps}
+                  scanning={scanningApps}
+                  onScan={handleScanApps}
+                  scanLabel="Rafraîchir"
+                  onPickProcess={(exeName) => appendLine(setProcs, exeName)}
+                  onPickNetwork={(exePath) => appendLine(setApps, exePath)}
+                  emptyHint="Le scan se lance automatiquement. Cherche une app, puis ajoute-la."
+                />
               </Field>
 
               <Field label="Politique d'arrêt anticipé">
@@ -342,41 +340,32 @@ export function ProfileEditor({ open, initial, onClose, onSave, onDelete }: Prop
 
             <footer className="flex items-center justify-between gap-2 border-t border-border-subtle px-6 py-4">
               {initial && onDelete ? (
-                <button
+                <Button
                   type="button"
+                  variant="danger"
                   onClick={async () => {
                     await onDelete(initial.id)
                     onClose()
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10"
                 >
                   <Trash2 size={14} />
                   Supprimer
-                </button>
+                </Button>
               ) : (
                 <div />
               )}
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-md px-4 py-2 text-sm text-text-secondary hover:bg-bg-card"
-                >
+                <Button type="button" variant="ghost" onClick={onClose}>
                   Annuler
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="solid"
                   onClick={handleSave}
                   disabled={busy || !name.trim()}
-                  className={cn(
-                    'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                    busy || !name.trim()
-                      ? 'cursor-not-allowed bg-bg-card text-text-muted'
-                      : 'bg-accent text-white hover:bg-accent-hover',
-                  )}
                 >
                   {busy ? 'Sauvegarde...' : 'Sauvegarder'}
-                </button>
+                </Button>
               </div>
             </footer>
           </motion.aside>
@@ -424,15 +413,15 @@ function RadioRow({
 }) {
   const isSelected = selected === value
   return (
-    <button
+    <Button
       type="button"
+      variant={isSelected ? 'solid' : 'default'}
       onClick={() => onSelect(value)}
       className={cn(
-        'flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors duration-200',
-        isSelected
-          ? 'border-accent bg-accent/10'
-          : 'border-border-subtle bg-bg-base hover:border-border-strong',
+        'w-full rounded-md px-3 py-2.5 text-left',
+        isSelected ? 'border-accent/60 bg-accent/15 hover:bg-accent/20' : 'bg-bg-base',
       )}
+      contentClassName="w-full items-start justify-start gap-3"
     >
       <div
         className={cn(
@@ -444,7 +433,7 @@ function RadioRow({
         <div className="text-sm font-medium text-text-primary">{label}</div>
         <div className="text-xs text-text-muted">{sub}</div>
       </div>
-    </button>
+    </Button>
   )
 }
 
@@ -453,25 +442,6 @@ function splitLines(s: string): string[] {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
-}
-
-function AppIcon({ app }: { app: DiscoveredApp }) {
-  if (app.iconDataUrl) {
-    return (
-      <img
-        src={app.iconDataUrl}
-        alt=""
-        className="h-8 w-8 flex-shrink-0 rounded-md object-contain"
-        draggable={false}
-      />
-    )
-  }
-
-  return (
-    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border-subtle bg-bg-card text-xs font-semibold text-text-muted">
-      {app.name.trim().charAt(0).toUpperCase() || '?'}
-    </div>
-  )
 }
 
 const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z]{2,})+$/
@@ -514,4 +484,33 @@ function splitExePaths(s: string): string[] {
     }
     return line
   })
+}
+
+function ModeButton({
+  selected,
+  icon,
+  label,
+  onClick,
+}: {
+  selected: boolean
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      type="button"
+      variant={selected ? 'solid' : 'default'}
+      onClick={onClick}
+      className={cn(
+        'min-h-[44px] rounded-md px-3 py-2 text-xs',
+        selected
+          ? 'border-accent/60 bg-accent/15 text-accent hover:bg-accent/20'
+          : 'bg-bg-elevated text-text-secondary',
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </Button>
+  )
 }

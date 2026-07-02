@@ -1,16 +1,16 @@
 /**
  * notifications.ts
  *
- * Système de notifications Windows natives pour Nexus.
+ * Système de notifications Windows natives pour Vethos.
  * Deux types combinés (comme demandé dans le prompt) :
  * 1. Notification Windows native pour appeler l'attention
- * 2. Quand l'utilisateur clique → fenêtre Nexus s'ouvre avec overlay interne
+ * 2. Quand l'utilisateur clique → fenêtre Vethos s'ouvre avec overlay interne
  */
 
 import { Notification, BrowserWindow } from 'electron'
 import log from './logging/setup'
 
-export type NexusNotification = {
+export type VethosNotification = {
   title: string
   body: string
   /** Données à envoyer au renderer quand l'utilisateur clique */
@@ -19,10 +19,10 @@ export type NexusNotification = {
 
 /**
  * Envoie une notification Windows native.
- * Quand cliquée, focus la fenêtre Nexus et envoie un événement au renderer.
+ * Quand cliquée, focus la fenêtre Vethos et envoie un événement au renderer.
  */
 export function sendNativeNotification(
-  notif: NexusNotification,
+  notif: VethosNotification,
   getMainWindow: () => BrowserWindow | null,
 ): void {
   if (!Notification.isSupported()) {
@@ -42,7 +42,7 @@ export function sendNativeNotification(
     if (win && !win.isDestroyed()) {
       focusWindow(win)
       // Envoyer l'événement au renderer pour afficher l'overlay interne
-      win.webContents.send('nexus:notification-clicked', {
+      win.webContents.send('vethos:notification-clicked', {
         title: notif.title,
         body: notif.body,
         payload: notif.payload,
@@ -120,7 +120,7 @@ export function notifyClockTamper(
   sendNativeNotification(
     {
       title: 'Horloge modifiée',
-      body: `Nexus a détecté un saut d'horloge de ${Math.round(driftMs / 1000)} secondes.`,
+      body: `Vethos a détecté un saut d'horloge de ${Math.round(driftMs / 1000)} secondes.`,
       payload: { type: 'clock-tamper', driftMs },
     },
     getMainWindow,
@@ -131,7 +131,7 @@ export function notifyCrashRecovered(getMainWindow: () => BrowserWindow | null):
   sendNativeNotification(
     {
       title: 'Crash récupéré',
-      body: 'Nexus a restauré son état après un arrêt inattendu.',
+      body: 'Vethos a restauré son état après un arrêt inattendu.',
       payload: { type: 'crash-recovered' },
     },
     getMainWindow,
@@ -142,7 +142,7 @@ export function notifyServiceDown(getMainWindow: () => BrowserWindow | null): vo
   sendNativeNotification(
     {
       title: 'Service de blocage indisponible',
-      body: "Nexus ne peut pas démarrer de session tant que le service Windows n'est pas joignable.",
+      body: "Vethos ne peut pas démarrer de session tant que le service Windows n'est pas joignable.",
       payload: { type: 'service-down' },
     },
     getMainWindow,
@@ -157,8 +157,8 @@ export function notifyUpdateReady(
     {
       title: 'Mise à jour disponible',
       body: version
-        ? `Nexus ${version} est disponible et se téléchargera en arrière-plan.`
-        : 'Une mise à jour Nexus est disponible.',
+        ? `Vethos ${version} est disponible et se téléchargera en arrière-plan.`
+        : 'Une mise à jour Vethos est disponible.',
       payload: { type: 'update-ready', version },
     },
     getMainWindow,
@@ -220,7 +220,7 @@ export function notifyTaskEvent(
       sendNativeNotification(
         {
           title: 'Tâche urgente forcée au niveau 3',
-          body: `"${event.taskTitle}" est due dans moins d'un jour. Nexus l'a forcée au niveau 3.`,
+          body: `"${event.taskTitle}" est due dans moins d'un jour. Vethos l'a forcée au niveau 3.`,
           payload: event as unknown as Record<string, unknown>,
         },
         getMainWindow,

@@ -2,16 +2,16 @@ import { promises as fsp, constants } from 'node:fs'
 import { join } from 'node:path'
 
 /**
- * Fichiers de blocage migrés de `%APPDATA%\Nexus` (ancien emplacement, quand le
- * blocage tournait dans le main) vers `C:\ProgramData\Nexus` (emplacement du
- * service). `hosts.nexus.staging` n'y figure pas : c'est un fichier transitoire
+ * Fichiers de blocage migrés de `%APPDATA%\Vethos` (ancien emplacement, quand le
+ * blocage tournait dans le main) vers `C:\ProgramData\Vethos` (emplacement du
+ * service). `hosts.vethos.staging` n'y figure pas : c'est un fichier transitoire
  * d'écriture atomique, recréé à la volée — rien à migrer.
  */
 const BLOCKING_FILES = [
-  'nexus_blocking.json',
-  'nexus_blocking_history.json',
-  'nexus_blocking_active.json',
-  'hosts.nexus.backup',
+  'vethos_blocking.json',
+  'vethos_blocking_history.json',
+  'vethos_blocking_active.json',
+  'hosts.vethos.backup',
 ] as const
 
 async function fileExists(path: string): Promise<boolean> {

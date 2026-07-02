@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   open: boolean
@@ -57,7 +58,7 @@ export function ConfirmDialog({
             exit={{ scale: 0.94, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-xl border border-border-subtle bg-bg-elevated p-6 shadow-2xl"
+            className="info-panel w-full max-w-md rounded-xl bg-bg-elevated p-6 shadow-2xl"
           >
             <div className="flex items-start gap-4">
               <div
@@ -79,27 +80,22 @@ export function ConfirmDialog({
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onCancel}
                 disabled={busy}
-                className="inline-flex items-center rounded-md border border-border-subtle px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-card hover:text-text-primary disabled:opacity-50"
               >
                 {cancelLabel}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={variant === 'danger' ? 'danger' : 'solid'}
                 onClick={() => void onConfirm()}
                 disabled={busy}
-                className={cn(
-                  'inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50',
-                  variant === 'danger'
-                    ? 'bg-red-500 hover:bg-red-400'
-                    : 'bg-accent hover:bg-accent-hover',
-                )}
               >
                 {busy ? '…' : confirmLabel}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>

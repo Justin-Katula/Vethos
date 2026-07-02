@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Target, Check, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui/Button'
 import { PALETTE } from '@/lib/rule-palette'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { areColorsSimilar } from '@/lib/color-similarity'
+import {
+  DEFAULT_OBJECTIVE_LEVEL,
+  OBJECTIVE_DAILY_MINUTES_BY_LEVEL,
+  OBJECTIVE_LEVEL_MAX,
+  OBJECTIVE_LEVEL_MIN,
+  clampObjectiveLevel,
+} from '@shared/schemas'
 
 type Props = {
   preselectedRuleIds: string[]
   onObjectiveCreated: (id: string, color: string) => void
+  registerCommit?: (commit: () => Promise<boolean>) => void
 }
 
 const COMMITMENT_OPTIONS = [
@@ -24,10 +32,12 @@ const COMMITMENT_OPTIONS = [
 export function ObjectiveStep({
   preselectedRuleIds,
   onObjectiveCreated,
+  registerCommit,
 }: Props): JSX.Element {
   const rules = useScheduleStore((s) => s.rules)
   const loadLevels = useLevelsStore((s) => s.load)
   const levelsLoaded = useLevelsStore((s) => s.loaded)
+  const levelsUserId = useLevelsStore((s) => s.userId)
   const saveObjective = useLevelsStore((s) => s.saveObjective)
   const objectives = useLevelsStore((s) => s.objectives)
 
@@ -41,8 +51,7 @@ export function ObjectiveStep({
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(initialColor)
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>(preselectedRuleIds)
-  const [level, setLevel] = useState(5)
-  const [deadline, setDeadline] = useState('')
+  const [level, setLevel] = useState(DEFAULT_OBJECTIVE_LEVEL)
   const [selectedCommitments, setSelectedCommitments] = useState<string[]>([])
   const [customCommitments, setCustomCommitments] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
@@ -50,8 +59,9 @@ export function ObjectiveStep({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!levelsLoaded) void loadLevels()
-  }, [levelsLoaded, loadLevels])
+    if (!levelsUserId) return
+    if (!levelsLoaded) void loadLevels(levelsUserId)
+  }, [levelsLoaded, levelsUserId, loadLevels])
 
   // Si on est arrivé après un re-render, recale color et rules sur la sélection
   useEffect(() => {
@@ -81,7 +91,6 @@ export function ObjectiveStep({
             color,
             linkedRuleIds,
             level,
-            deadline: deadline || undefined,
             protectedCommitments,
           })
         } catch (err) {
@@ -90,22 +99,10 @@ export function ObjectiveStep({
       })()
     }, 500)
     return () => clearTimeout(t)
-  }, [
-    savedId,
-    name,
-    description,
-    color,
-    linkedRuleIds,
-    level,
-    deadline,
-    protectedCommitments,
-    saveObjective,
-  ])
+  }, [savedId, name, description, color, linkedRuleIds, level, protectedCommitments, saveObjective])
 
   const toggleRule = (id: string): void => {
-    setLinkedRuleIds((prev) =>
-      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
-    )
+    setLinkedRuleIds((prev) => (prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]))
   }
 
   const toggleCommitment = (commitment: string): void => {
@@ -116,7 +113,7 @@ export function ObjectiveStep({
     )
   }
 
-  const handleCreate = async (): Promise<void> => {
+  const handleCreate = useCallback(async (): Promise<void> => {
     if (!name.trim()) return
     if (savedId) return
     setBusy(true)
@@ -128,7 +125,6 @@ export function ObjectiveStep({
         color,
         linkedRuleIds,
         level,
-        deadline: deadline || undefined,
         protectedCommitments,
       })
       setSavedId(created.id)
@@ -138,12 +134,31 @@ export function ObjectiveStep({
     } finally {
       setBusy(false)
     }
-  }
+  }, [
+    color,
+    description,
+    level,
+    linkedRuleIds,
+    name,
+    onObjectiveCreated,
+    protectedCommitments,
+    saveObjective,
+    savedId,
+  ])
+
+  useEffect(() => {
+    registerCommit?.(async () => {
+      if (!name.trim() || savedId) return true
+      await handleCreate()
+      return true
+    })
+  }, [handleCreate, name, registerCommit, savedId])
 
   const alreadyExists = objectives.length > 0 && !savedId
   const canCreate = name.trim().length > 0 && !busy && !savedId
-  const closeColorWarning = objectives.some((objective) =>
-    objective.id !== savedId && areColorsSimilar(objective.color, color),
+  const dailyMinutes = OBJECTIVE_DAILY_MINUTES_BY_LEVEL[level] ?? 0
+  const closeColorWarning = objectives.some(
+    (objective) => objective.id !== savedId && areColorsSimilar(objective.color, color),
   )
 
   return (
@@ -155,11 +170,11 @@ export function ObjectiveStep({
         >
           <Target size={22} />
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {"Donne un cap à tes sessions."}
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">{'Donne un cap à tes sessions.'}</h1>
         <p className="max-w-xl text-sm text-text-secondary">
-          {"Crée un objectif. Chaque minute concentrée sur les règles liées le fera grandir vers le niveau 10."}
+          {
+            'Crée un objectif. Chaque minute concentrée sur les règles liées le fera grandir vers le niveau 10.'
+          }
         </p>
       </header>
 
@@ -173,7 +188,8 @@ export function ObjectiveStep({
               Quels engagements sont non-négociables ?
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              Garde visibles les activités que Nexus doit t’aider à préserver avant de remplir ton objectif.
+              Garde visibles les activités que Vethos doit t’aider à préserver avant de remplir ton
+              objectif.
             </p>
           </div>
         </div>
@@ -181,19 +197,21 @@ export function ObjectiveStep({
           {COMMITMENT_OPTIONS.map((commitment) => {
             const selected = selectedCommitments.includes(commitment)
             return (
-              <button
+              <Button
                 key={commitment}
                 type="button"
+                variant={selected ? 'solid' : 'default'}
+                size="sm"
                 onClick={() => toggleCommitment(commitment)}
                 className={cn(
-                  'rounded-2xl border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'rounded-2xl px-3 py-1.5',
                   selected
-                    ? 'border-accent bg-accent text-white'
-                    : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
+                    ? 'border-accent/60 bg-accent text-black'
+                    : 'bg-bg-base text-text-secondary',
                 )}
               >
                 {commitment}
-              </button>
+              </Button>
             )
           })}
         </div>
@@ -206,7 +224,7 @@ export function ObjectiveStep({
         />
       </section>
 
-      <div className="flex flex-col gap-4 rounded-xl border border-border-subtle bg-bg-elevated p-5">
+      <div className="info-panel flex flex-col gap-4 rounded-xl bg-bg-elevated p-5">
         <div>
           <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
             Nom
@@ -243,14 +261,19 @@ export function ObjectiveStep({
             {PALETTE.map((c) => {
               const selected = color.toLowerCase() === c.toLowerCase()
               return (
-                <button
+                <Button
                   key={c}
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setColor(c)}
                   className={cn(
-                    'relative h-8 w-full rounded-md transition-all',
-                    selected ? 'ring-2 ring-text-primary ring-offset-2 ring-offset-bg-elevated' : 'hover:scale-110',
+                    'relative h-8 w-full rounded-md p-0',
+                    selected
+                      ? 'ring-2 ring-text-primary ring-offset-2 ring-offset-bg-elevated'
+                      : 'hover:scale-110',
                   )}
+                  contentClassName="absolute inset-0"
                   style={{ backgroundColor: c }}
                   aria-label={`Couleur ${c}`}
                 >
@@ -261,7 +284,7 @@ export function ObjectiveStep({
                       className="absolute inset-0 m-auto text-white drop-shadow"
                     />
                   )}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -273,22 +296,22 @@ export function ObjectiveStep({
           </label>
           {rules.length === 0 ? (
             <p className="mt-2 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-xs text-text-muted">
-              {"Aucune règle liée pour l’instant. Tu peux continuer et les relier plus tard."}
+              {'Aucune règle liée pour l’instant. Tu peux continuer et les relier plus tard.'}
             </p>
           ) : (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {rules.map((r) => {
                 const selected = linkedRuleIds.includes(r.id)
                 return (
-                  <button
+                  <Button
                     key={r.id}
                     type="button"
+                    variant={selected ? 'solid' : 'default'}
+                    size="sm"
                     onClick={() => toggleRule(r.id)}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1 text-xs font-medium transition-colors',
-                      selected
-                        ? 'border-transparent text-white'
-                        : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
+                      'rounded-2xl px-3 py-1',
+                      selected ? 'border-transparent text-white' : 'bg-bg-base text-text-secondary',
                     )}
                     style={selected ? { backgroundColor: r.color } : undefined}
                   >
@@ -297,7 +320,7 @@ export function ObjectiveStep({
                       style={{ backgroundColor: selected ? 'white' : r.color }}
                     />
                     {r.name}
-                  </button>
+                  </Button>
                 )
               })}
             </div>
@@ -306,47 +329,36 @@ export function ObjectiveStep({
 
         <div className="space-y-4 pt-2">
           <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
-            Intensité (Niveau recommandé: 5)
+            Intensité
           </label>
           <div className="flex items-center justify-between">
-             <span className="text-3xl font-bold text-text-primary">{level}</span>
-             <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}>
-                {level === 5 ? 'Recommandé' : 'Manuel'}
-             </span>
+            <span className="text-3xl font-bold text-text-primary">{level}</span>
+            <span className="rounded bg-bg-base px-2 py-0.5 text-[10px] font-bold uppercase text-text-muted">
+              {dailyMinutes} min/jour
+            </span>
           </div>
           <input
             type="range"
-            min="3"
-            max="7"
+            min={OBJECTIVE_LEVEL_MIN}
+            max={OBJECTIVE_LEVEL_MAX}
             step="1"
             value={level}
-            onChange={(e) => setLevel(parseInt(e.target.value))}
+            onChange={(e) => setLevel(clampObjectiveLevel(parseInt(e.target.value)))}
             className="w-full accent-accent h-1.5 rounded-2xl bg-bg-base appearance-none cursor-pointer"
           />
           <div className="flex justify-between text-[10px] text-text-muted font-mono">
-            <span>3</span>
-            <span>4</span>
-            <span className="text-accent font-bold">5</span>
-            <span>6</span>
-            <span>7</span>
+            {[3, 4, 5, 6, 7].map((n) => (
+              <span key={n} className={n === level ? 'font-bold text-accent' : undefined}>
+                {n}
+              </span>
+            ))}
           </div>
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
-            Deadline optionnelle
-          </label>
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-base px-4 py-3 text-sm text-text-primary outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
-          />
         </div>
 
         {closeColorWarning && (
           <div className="rounded-md border border-orange/40 bg-orange/10 px-3 py-2 text-xs text-orange">
-            Cette couleur ressemble beaucoup à un objectif existant. Tu peux la garder, mais elle sera moins lisible sur le cercle.
+            Cette couleur ressemble beaucoup à un objectif existant. Tu peux la garder, mais elle
+            sera moins lisible sur le cercle.
           </div>
         )}
 
@@ -361,22 +373,15 @@ export function ObjectiveStep({
             {savedId
               ? '✓ Sauvegardé. Tu peux encore ajuster.'
               : alreadyExists
-              ? 'Tu as déjà un objectif. Cette étape est optionnelle.'
-              : 'Tu pourras créer des objectifs plus tard depuis l’onglet Mes objectifs.'}
+                ? 'Tu as déjà un objectif. Cette étape est optionnelle.'
+                : 'Tu pourras créer des objectifs plus tard depuis l’onglet Mes objectifs.'}
           </p>
-          <motion.button
+          <Button
             type="button"
+            variant="solid"
             onClick={() => void handleCreate()}
             disabled={!canCreate}
-            whileHover={canCreate ? { y: -1 } : undefined}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors',
-              canCreate
-                ? 'bg-accent text-white hover:bg-accent-hover'
-                : savedId
-                ? 'bg-emerald-500/15 text-emerald-300'
-                : 'cursor-not-allowed bg-bg-card text-text-muted',
-            )}
+            className={savedId ? 'bg-emerald-500/15 text-emerald-300' : undefined}
           >
             {savedId ? (
               <>
@@ -388,7 +393,7 @@ export function ObjectiveStep({
             ) : (
               'Créer cet objectif'
             )}
-          </motion.button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Moon, Target } from 'lucide-react'
 import type { ScheduleEntry, ScheduleState, TimeRule } from '@shared/schemas'
 import {
   dateToMinuteOfDay,
@@ -12,17 +13,23 @@ import { formatCountdown, minuteToClockLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import { useLevelsStore } from '@/store/levels.store'
 import { useTasksStore } from '@/store/tasks.store'
+import type { PlacedBlock } from '@/lib/placement-engine'
 
 type Props = {
   rules: TimeRule[]
   entries: ScheduleEntry[]
+  blocks?: PlacedBlock[]
   size?: number
+}
+
+type CirclePlannedBlock = PlacedBlock & {
+  color: string
+  opacity: number
+  route: string | null
 }
 
 // Géométrie SVG
 const STROKE = 28
-const TICK_OUTER = 8
-const TICK_LABEL_OFFSET = 22
 const ARC_JOIN_OVERLAP_MINUTES = 0.5
 
 const URGENCY_STYLES = {
@@ -58,11 +65,12 @@ function minuteToAngle(minute: number): number {
 }
 
 function displayColorForRule(rule: TimeRule): { color: string; opacity: number } {
-  if (rule.categoryType === 'sleep') return { color: '#1E3A8A', opacity: 1 }
-  if (rule.categoryType === 'school') return { color: '#FFFFFF', opacity: 0.7 }
-  if (rule.categoryType === 'work') return { color: '#3BA3FF', opacity: 1 }
+  if (rule.categoryType === 'sleep') return { color: '#111113', opacity: 1 }
+  if (rule.categoryType === 'school') return { color: '#E2E2E2', opacity: 0.72 }
+  if (rule.categoryType === 'work') return { color: '#A8A8AC', opacity: 1 }
+  if (rule.categoryType === 'commitment') return { color: '#525252', opacity: 0.9 }
   if (rule.categoryType === 'free') return { color: 'transparent', opacity: 1 }
-  return { color: rule.color, opacity: 0.9 }
+  return { color: '#737373', opacity: 0.9 }
 }
 
 function localDateKey(date: Date): string {
@@ -81,7 +89,7 @@ function daysBetweenLocalDates(fromDateStr: string, toDateStr: string): number {
   const [toYear, toMonth, toDay] = toDateStr.split('-').map(Number) as [number, number, number]
   const from = new Date(fromYear, fromMonth - 1, fromDay)
   const to = new Date(toYear, toMonth - 1, toDay)
-  return Math.ceil((to.getTime() - from.getTime()) / 86_400_000)
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000)
 }
 
 function useSecondNow(): Date {
@@ -115,8 +123,10 @@ function useMinuteNow(): Date {
   return now
 }
 
-export function TimeCircle({ rules, entries, size = 480 }: Props) {
+export function TimeCircle({ rules, entries, blocks = [], size = 480 }: Props) {
   const navigate = useNavigate()
+  const glowId = useId()
+  const subtleGlowId = useId()
   const objectives = useLevelsStore((s) => s.objectives)
   const tasks = useTasksStore((s) => s.tasks)
   const now = useMinuteNow()
@@ -160,6 +170,38 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
   const state: ScheduleState = useMemo(() => ({ rules, entries }), [rules, entries])
   const current = getCurrentEntry(state, now)
   const currentEntryId = current?.entry.id
+
+  const plannedBlocks = useMemo<CirclePlannedBlock[]>(
+    () =>
+      blocks
+        .filter(
+          (block) =>
+            block.date === todayStr &&
+            (block.kind === 'task' || block.kind === 'objective' || block.kind === 'break'),
+        )
+        .map((block) => {
+          const color =
+            block.kind === 'break' ? '#525252' : block.kind === 'objective' ? '#737373' : '#8A8A8A'
+          const route =
+            block.kind === 'objective' && block.refId
+              ? `/objectives?objective=${block.refId}`
+              : block.kind === 'task'
+                ? '/tasks'
+                : null
+          return {
+            ...block,
+            color,
+            opacity: block.kind === 'break' ? 0.8 : 1,
+            route,
+          }
+        })
+        .sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute),
+    [blocks, todayStr],
+  )
+
+  const currentPlannedBlock = plannedBlocks.find(
+    (block) => minuteOfDay >= block.startMinute && minuteOfDay < block.endMinute,
+  )
 
   const segments = useMemo(
     () =>
@@ -217,10 +259,11 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
                 cy={cy}
                 r={trackRadius}
                 fill="none"
-                stroke={display.color}
-                strokeWidth={STROKE}
+                stroke={currentEntryId === e.id ? '#FFFFFF' : display.color}
+                strokeWidth={currentEntryId === e.id ? STROKE + 1 : STROKE}
                 strokeLinecap="round"
                 opacity={display.opacity}
+                filter={currentEntryId === e.id ? `url(#${glowId})` : undefined}
                 className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
                 pointerEvents={clickable ? 'stroke' : undefined}
               />
@@ -261,10 +304,11 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
             <path
               d={pathD}
               fill="none"
-              stroke={display.color}
-              strokeWidth={STROKE}
+              stroke={currentEntryId === e.id ? '#FFFFFF' : display.color}
+              strokeWidth={currentEntryId === e.id ? STROKE + 1 : STROKE}
               strokeLinecap="round"
               opacity={currentEntryId === e.id ? 1 : Math.min(display.opacity, 0.7)}
+              filter={currentEntryId === e.id ? `url(#${glowId})` : undefined}
               className={clickable ? 'transition-opacity hover:opacity-100' : undefined}
               pointerEvents={clickable ? 'stroke' : undefined}
               style={{
@@ -278,6 +322,7 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
       currentEntryId,
       cx,
       cy,
+      glowId,
       navigate,
       objectiveByRuleId,
       ruleById,
@@ -287,89 +332,158 @@ export function TimeCircle({ rules, entries, size = 480 }: Props) {
     ],
   )
 
+  const plannedSegments = useMemo(
+    () =>
+      plannedBlocks.map((block) => {
+        const clickable = Boolean(block.route)
+        const startMinute = Math.max(0, block.startMinute - ARC_JOIN_OVERLAP_MINUTES)
+        const endMinute = Math.min(1440, block.endMinute + ARC_JOIN_OVERLAP_MINUTES)
+        const startA = minuteToAngle(startMinute)
+        const endA = minuteToAngle(endMinute)
+        const isCurrent = currentPlannedBlock?.id === block.id
+        const strokeWidth = block.kind === 'break' ? STROKE - 18 : isCurrent ? STROKE + 1 : STROKE - 4
+        const commonProps = {
+          fill: 'none',
+          stroke: isCurrent ? '#FFFFFF' : block.color,
+          strokeWidth,
+          strokeLinecap: 'round' as const,
+          opacity: isCurrent ? 1 : block.opacity,
+          filter: isCurrent ? `url(#${glowId})` : undefined,
+          className: clickable ? 'transition-opacity hover:opacity-100' : undefined,
+          pointerEvents: clickable ? ('stroke' as const) : undefined,
+          style: { transition: 'opacity 250ms' },
+        }
+
+        const onActivate = clickable && block.route ? () => navigate(block.route!) : undefined
+        const onKeyDown =
+          clickable && block.route
+            ? (event: React.KeyboardEvent<SVGGElement>) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  navigate(block.route!)
+                }
+              }
+            : undefined
+
+        return (
+          <g
+            key={block.id}
+            role={clickable ? 'button' : undefined}
+            tabIndex={clickable ? 0 : undefined}
+            onClick={onActivate}
+            onKeyDown={onKeyDown}
+            className={clickable ? 'cursor-pointer' : undefined}
+          >
+            <path d={describeArc(cx, cy, trackRadius, startA, endA)} {...commonProps} />
+          </g>
+        )
+      }),
+    [currentPlannedBlock?.id, cx, cy, glowId, navigate, plannedBlocks, trackRadius],
+  )
+
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block">
-        <defs>
-          <radialGradient id="tc-bg" cx="50%" cy="50%" r="50%">
-            <stop offset="60%" stopColor="hsl(220 16% 8%)" stopOpacity="0" />
-            <stop offset="100%" stopColor="hsl(220 16% 6%)" stopOpacity="0.6" />
-          </radialGradient>
-        </defs>
+    <div className="relative flex flex-col items-center">
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <div className="absolute left-1/2 top-0 -translate-x-1/2 text-[10px] font-semibold tracking-widest text-text-muted">
+          00:00
+        </div>
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-widest text-text-muted">
+          12:00
+        </div>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-semibold tracking-widest text-text-muted">
+          06:00
+        </div>
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 text-[10px] font-semibold tracking-widest text-text-muted">
+          18:00
+        </div>
 
-        {/* halo de fond */}
-        <circle cx={cx} cy={cy} r={innerRadius + STROKE} fill="url(#tc-bg)" />
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="absolute inset-0 block drop-shadow-xl"
+        >
+          <defs>
+            <radialGradient id="tc-bg" cx="50%" cy="50%" r="50%">
+              <stop offset="54%" stopColor="#020202" stopOpacity="0" />
+              <stop offset="100%" stopColor="#111113" stopOpacity="0.66" />
+            </radialGradient>
+            <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <filter id={subtleGlowId} x="-12%" y="-12%" width="124%" height="124%">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
 
-        {/* anneau gris (track) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={trackRadius}
-          fill="none"
-          stroke="hsl(220 14% 16%)"
-          strokeWidth={STROKE}
-          strokeLinecap="round"
+          <circle cx={cx} cy={cy} r={innerRadius + STROKE} fill="url(#tc-bg)" />
+          <circle
+            cx={cx}
+            cy={cy}
+            r={trackRadius}
+            fill="none"
+            stroke="#121212"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+          />
+
+          {Array.from({ length: 24 }, (_, h) => {
+            const angle = minuteToAngle(h * 60)
+            const inner = polarToCartesian(cx, cy, tickRadius - 14, angle)
+            const outer = polarToCartesian(cx, cy, tickRadius - 6, angle)
+            const major = h % 6 === 0
+            return (
+              <line
+                key={h}
+                x1={inner.x}
+                y1={inner.y}
+                x2={outer.x}
+                y2={outer.y}
+                stroke={major ? '#525252' : '#262626'}
+                strokeWidth={major ? 2 : 1}
+                strokeLinecap="round"
+              />
+            )
+          })}
+
+          {segments}
+          {plannedSegments}
+
+          <TimeCircleNeedle cx={cx} cy={cy} trackRadius={trackRadius} glowId={glowId} />
+        </svg>
+
+        <div
+          className="pointer-events-none absolute rounded-full border border-white/5 bg-bg-base/70 shadow-[inset_0_0_70px_rgba(255,255,255,0.025)] backdrop-blur-xl"
+          style={{
+            inset: size * 0.22,
+          }}
         />
 
-        {/* arcs colorés du jour */}
-        {segments}
-
-        {/* tick marks 24h */}
-        {Array.from({ length: 24 }, (_, h) => {
-          const angle = minuteToAngle(h * 60)
-          const inner = polarToCartesian(cx, cy, tickRadius, angle)
-          const outer = polarToCartesian(cx, cy, tickRadius + TICK_OUTER, angle)
-          const major = h % 6 === 0
-          return (
-            <line
-              key={h}
-              x1={inner.x}
-              y1={inner.y}
-              x2={outer.x}
-              y2={outer.y}
-              stroke={major ? 'hsl(220 12% 50%)' : 'hsl(220 12% 30%)'}
-              strokeWidth={major ? 2 : 1}
-              strokeLinecap="round"
-            />
-          )
-        })}
-
-        {/* labels 0/6/12/18 */}
-        {[0, 6, 12, 18].map((h) => {
-          const angle = minuteToAngle(h * 60)
-          const p = polarToCartesian(cx, cy, tickRadius + TICK_OUTER + TICK_LABEL_OFFSET, angle)
-          return (
-            <text
-              key={h}
-              x={p.x}
-              y={p.y}
-              fill="hsl(220 12% 60%)"
-              fontSize="11"
-              fontFamily="ui-monospace, SFMono-Regular, monospace"
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {String(h).padStart(2, '0')}
-            </text>
-          )
-        })}
-
-        <TimeCircleNeedle cx={cx} cy={cy} trackRadius={trackRadius} />
-      </svg>
-
-      {/* Centre : heure + label + countdown */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="font-mono text-6xl font-light tabular-nums tracking-tight text-text-primary">
-          {minuteToClockLabel(Math.floor(minuteOfDay))}
-        </div>
-        {current ? (
-          <CurrentChip rule={current.rule} />
-        ) : (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-bg-card px-3 py-1 text-xs uppercase tracking-wider text-text-muted">
-            Temps libre
+        <div className="pointer-events-none absolute inset-[22%] z-10 flex flex-col items-center justify-center text-center">
+          <CurrentGlyph currentRule={current?.rule ?? null} hasPlannedBlock={Boolean(currentPlannedBlock)} />
+          {currentPlannedBlock ? (
+            <CurrentPlannedBlockChip block={currentPlannedBlock} />
+          ) : current ? (
+            <CurrentChip rule={current.rule} />
+          ) : (
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">
+              Temps libre
+            </div>
+          )}
+          <div className="mt-1 font-mono text-6xl font-medium tabular-nums tracking-tighter text-text-primary">
+            {minuteToClockLabel(Math.floor(minuteOfDay))}
           </div>
-        )}
-        <CountdownText state={state} />
+          <div className="mb-3 mt-2 h-px w-12 bg-gradient-to-r from-transparent via-border-strong to-transparent" />
+          <CountdownText state={state} blocks={plannedBlocks} />
+        </div>
+      </div>
+
+      <div className="mt-3 flex justify-center gap-6">
+        <LegendItem color="#FFFFFF" glow label="Focus" />
+        <LegendItem color="#737373" label="Planifié" />
+        <LegendItem color="#525252" thin label="Pause" />
       </div>
     </div>
   )
@@ -379,64 +493,189 @@ function TimeCircleNeedle({
   cx,
   cy,
   trackRadius,
+  glowId,
 }: {
   cx: number
   cy: number
   trackRadius: number
+  glowId: string
 }): JSX.Element {
   const now = useSecondNow()
   const minuteOfDay = dateToMinuteOfDay(now) + now.getSeconds() / 60 + now.getMilliseconds() / 60000
   const angle = minuteToAngle(minuteOfDay)
-  const inner = polarToCartesian(cx, cy, trackRadius - STROKE / 2 - 2, angle)
-  const outer = polarToCartesian(cx, cy, trackRadius + STROKE / 2 + 2, angle)
+  const inner = polarToCartesian(cx, cy, 0, angle)
+  const mutedOuter = polarToCartesian(cx, cy, trackRadius - 10, angle)
+  const outer = polarToCartesian(cx, cy, trackRadius + STROKE / 2 + 3, angle)
+  const marker = polarToCartesian(cx, cy, trackRadius + STROKE / 2 + 15, angle)
 
   return (
-    <line
-      x1={inner.x}
-      y1={inner.y}
-      x2={outer.x}
-      y2={outer.y}
-      stroke="white"
-      strokeWidth={2}
-      strokeLinecap="round"
-      pointerEvents="none"
-    />
+    <g pointerEvents="none">
+      <line
+        x1={inner.x}
+        y1={inner.y}
+        x2={mutedOuter.x}
+        y2={mutedOuter.y}
+        stroke="#FFFFFF"
+        strokeWidth={1}
+        opacity={0.13}
+        strokeLinecap="round"
+      />
+      <line
+        x1={mutedOuter.x}
+        y1={mutedOuter.y}
+        x2={outer.x}
+        y2={outer.y}
+        stroke="#FFFFFF"
+        strokeWidth={1.5}
+        opacity={0.85}
+        strokeLinecap="round"
+      />
+      <circle cx={outer.x} cy={outer.y} r={5} fill="#FFFFFF" filter={`url(#${glowId})`} />
+      <circle cx={marker.x} cy={marker.y} r={2} fill="#FFFFFF" opacity={0.9} />
+    </g>
   )
 }
 
-function CountdownText({ state }: { state: ScheduleState }): JSX.Element | null {
+function CurrentGlyph({
+  currentRule,
+  hasPlannedBlock,
+}: {
+  currentRule: TimeRule | null
+  hasPlannedBlock: boolean
+}): JSX.Element {
+  const Icon = hasPlannedBlock
+    ? Target
+    : currentRule?.categoryType === 'sleep'
+      ? Moon
+      : iconByName(currentRule?.icon) ?? Target
+
+  return (
+    <div className="mb-1 flex h-8 items-center justify-center text-text-primary">
+      <Icon size={24} strokeWidth={1.6} />
+    </div>
+  )
+}
+
+function LegendItem({
+  color,
+  label,
+  glow = false,
+  thin = false,
+}: {
+  color: string
+  label: string
+  glow?: boolean
+  thin?: boolean
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={thin ? 'h-0.5 w-3 rounded-full' : 'h-2 w-2 rounded-full'}
+        style={{
+          backgroundColor: color,
+          boxShadow: glow ? '0 0 8px rgba(255,255,255,0.85)' : undefined,
+        }}
+      />
+      <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+        {label}
+      </span>
+    </div>
+  )
+}
+
+function CountdownText({
+  state,
+  blocks,
+}: {
+  state: ScheduleState
+  blocks: CirclePlannedBlock[]
+}): JSX.Element | null {
   const now = useSecondNow()
   const next = getNextChange(state, now)
+  const todayStr = localDateKey(now)
+  const minuteOfDay = dateToMinuteOfDay(now)
+
+  const blockCandidate = blocks
+    .filter((block) => block.date === todayStr)
+    .flatMap((block) => {
+      if (minuteOfDay >= block.startMinute && minuteOfDay < block.endMinute) {
+        return [
+          {
+            atMinute: block.endMinute,
+            label: block.label,
+            color: block.color,
+            prefix: 'avant la fin de',
+          },
+        ]
+      }
+      if (minuteOfDay < block.startMinute) {
+        return [
+          {
+            atMinute: block.startMinute,
+            label: block.label,
+            color: block.color,
+            prefix: 'avant',
+          },
+        ]
+      }
+      return []
+    })
+    .sort((a, b) => a.atMinute - b.atMinute)[0]
+
+  const blockCountdownMs = blockCandidate
+    ? (blockCandidate.atMinute - minuteOfDay) * 60_000 -
+      now.getSeconds() * 1000 -
+      now.getMilliseconds()
+    : Number.POSITIVE_INFINITY
+
+  if (!next && !blockCandidate) return null
+
+  let scheduleCountdownMs = Number.POSITIVE_INFINITY
+  if (next) {
+    const nowMow = dateToMinuteOfWeek(now)
+    let deltaMin = next.atMinuteOfWeek - nowMow
+    if (deltaMin < 0) deltaMin += 10080
+    scheduleCountdownMs = deltaMin * 60_000 - now.getSeconds() * 1000 - now.getMilliseconds()
+  }
+
+  if (blockCandidate && blockCountdownMs <= scheduleCountdownMs) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-elevated/80 px-3 py-1 shadow-inner">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+        <span className="font-mono text-xs font-medium tabular-nums text-text-secondary">
+          {formatCountdown(blockCountdownMs)}
+        </span>
+        <span className="text-xs font-normal text-text-muted">restant</span>
+      </div>
+    )
+  }
 
   if (!next) return null
 
-  const nowMow = dateToMinuteOfWeek(now)
-  let deltaMin = next.atMinuteOfWeek - nowMow
-  if (deltaMin < 0) deltaMin += 10080
-  const countdownMs = deltaMin * 60_000 - now.getSeconds() * 1000 - now.getMilliseconds()
-
   return (
-    <div className="mt-3 text-xs text-text-muted">
-      <span className="text-text-secondary">{formatCountdown(countdownMs)}</span>{' '}
-      {next.rule ? (
-        <>
-          avant <span style={{ color: next.rule.color }}>{next.rule.name}</span>
-        </>
-      ) : (
-        <>avant la fin</>
-      )}
+    <div className="flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-elevated/80 px-3 py-1 shadow-inner">
+      <span className="h-1.5 w-1.5 rounded-full bg-text-muted" />
+      <span className="font-mono text-xs font-medium tabular-nums text-text-secondary">
+        {formatCountdown(scheduleCountdownMs)}
+      </span>
+      <span className="text-xs font-normal text-text-muted">
+        {next.rule ? 'avant changement' : 'avant la fin'}
+      </span>
+    </div>
+  )
+}
+
+function CurrentPlannedBlockChip({ block }: { block: CirclePlannedBlock }) {
+  return (
+    <div className="mt-1 inline-flex max-w-[78%] items-center gap-2 truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">
+      <span className="truncate">{block.label}</span>
     </div>
   )
 }
 
 function CurrentChip({ rule }: { rule: TimeRule }) {
-  const Icon = iconByName(rule.icon)
   return (
-    <div
-      className="mt-3 inline-flex items-center gap-2 rounded-2xl px-3 py-1 text-xs font-medium uppercase tracking-wider text-white shadow-elevated"
-      style={{ backgroundColor: rule.color }}
-    >
-      {Icon && <Icon size={12} strokeWidth={2.5} />}
+    <div className="mt-1 inline-flex max-w-[78%] items-center gap-2 truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">
       {rule.name}
     </div>
   )

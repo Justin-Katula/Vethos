@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Shield, Globe, Cpu, Wifi } from 'lucide-react'
 import type { ActiveSession } from '@shared/schemas'
 import type { LayerStatus } from '../../../../preload/index'
+import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 
 export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props) {
   const [now, setNow] = useState(() => Date.now())
+  const [showWhy, setShowWhy] = useState(false)
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
@@ -27,7 +29,7 @@ export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-xl border border-accent/30 bg-bg-card p-6 shadow-card"
+      className="info-panel rounded-xl border-accent/30 p-6"
     >
       <div className="relative">
         <div className="flex items-start justify-between gap-6">
@@ -35,19 +37,30 @@ export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-accent">
               <Shield size={14} strokeWidth={2.5} />
               Session active
+              <span className={cn(
+                "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ml-1.5",
+                session.profileSnapshot.mode === 'allowlist' 
+                  ? "bg-accent/15 text-accent border border-accent/20" 
+                  : "bg-bg-base text-text-muted border border-border-subtle"
+              )}>
+                {session.profileSnapshot.mode === 'allowlist' ? 'Focus strict' : 'Filtre actif'}
+              </span>
             </div>
             <h2 className="mt-2 truncate text-2xl font-semibold tracking-tight text-text-primary">
               {session.profileSnapshot.name}
             </h2>
             <div className="mt-2 flex items-center gap-4 text-sm text-text-secondary">
               <span className="flex items-center gap-1.5">
-                <Globe size={13} /> {session.profileSnapshot.blockedSites.length} sites
+                <Globe size={13} /> {session.profileSnapshot.blockedSites.length}{' '}
+                {session.profileSnapshot.mode === 'allowlist' ? 'autorisés' : 'sites'}
               </span>
               <span className="flex items-center gap-1.5">
-                <Cpu size={13} /> {session.profileSnapshot.blockedProcesses.length} apps
+                <Cpu size={13} /> {session.profileSnapshot.blockedProcesses.length}{' '}
+                {session.profileSnapshot.mode === 'allowlist' ? 'autorisées' : 'apps'}
               </span>
               <span className="flex items-center gap-1.5">
-                <Wifi size={13} /> {session.profileSnapshot.blockedNetworkApps.length} net
+                <Wifi size={13} /> {session.profileSnapshot.blockedNetworkApps.length}{' '}
+                {session.profileSnapshot.mode === 'allowlist' ? 'réseau' : 'net'}
               </span>
             </div>
           </div>
@@ -87,20 +100,25 @@ export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props
             />
           </div>
 
-          <button
+          <Button
             type="button"
             onClick={onRequestStop}
             disabled={session.unlockState.phase !== 'locked'}
-            className={cn(
-              'rounded-md border border-border-subtle bg-bg-base px-4 py-2 text-sm',
-              'font-medium text-text-secondary transition-colors duration-200',
-              'hover:border-border-strong hover:text-text-primary',
-              session.unlockState.phase !== 'locked' && 'cursor-not-allowed opacity-50',
-            )}
           >
             Demander à arrêter
-          </button>
+          </Button>
         </div>
+        <button type="button" className="mt-4 text-xs font-medium text-accent hover:underline" onClick={() => setShowWhy((value) => !value)}>
+          Pourquoi cette protection ?
+        </button>
+        {showWhy && (
+          <div className="mt-3 rounded-lg border border-border-subtle bg-bg-base/50 p-3 text-xs leading-relaxed text-text-secondary">
+            <p>{session.profileSnapshot.mode === 'allowlist' ? 'Cette session préserve uniquement les outils déclarés utiles pour éviter les détours.' : 'Cette session bloque seulement les distractions connues pour préserver ton travail.'}</p>
+            {session.protectionResult?.applied
+              ? <p className="mt-1">La protection a bien été appliquée par les couches nécessaires.</p>
+              : session.protectionResult?.warnings.map((warning) => <p key={warning} className="mt-1">{warning}</p>)}
+          </div>
+        )}
       </div>
     </motion.section>
   )

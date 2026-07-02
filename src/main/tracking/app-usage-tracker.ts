@@ -1,8 +1,4 @@
-import type {
-  DeclaredApp,
-  DeclaredAppUsageEntry,
-  DeclaredAppUsageState,
-} from '@shared/schemas'
+import type { DeclaredApp, DeclaredAppUsageEntry, DeclaredAppUsageState } from '@shared/schemas'
 import log from '@main/logging/setup'
 
 const RETENTION_DAYS = 90
@@ -46,10 +42,43 @@ function entryKey(appId: string, date: string): string {
   return `${appId}|${date}`
 }
 
+type ActivityEvent = NonNullable<DeclaredAppUsageState['activityEvents']>[number]
+
+export function activityMinutesBetween(
+  state: DeclaredAppUsageState | null | undefined,
+  startAt: Date,
+  endAt: Date,
+  kinds: ActivityEvent['kind'][],
+): number {
+  const startMs = startAt.getTime()
+  const endMs = endAt.getTime()
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0
+
+  const allowedKinds = new Set(kinds)
+  const minuteBuckets = new Set<number>()
+  for (const event of state?.activityEvents ?? []) {
+    if (!allowedKinds.has(event.kind)) continue
+    const atMs = Date.parse(event.at)
+    if (!Number.isFinite(atMs) || atMs < startMs || atMs >= endMs) continue
+    minuteBuckets.add(Math.floor((atMs - startMs) / 60_000))
+  }
+  return minuteBuckets.size
+}
+
+export function distractingActivityMinutesBetween(
+  state: DeclaredAppUsageState | null | undefined,
+  startAt: Date,
+  endAt: Date,
+): number {
+  return activityMinutesBetween(state, startAt, endAt, ['distracting-app-active'])
+}
+
 export type Tracker = {
   hydrate: () => Promise<void>
   tick: () => Promise<void>
   flushNow: () => Promise<void>
+  clear: () => void
+  recordActivityEvent: (event: NonNullable<DeclaredAppUsageState['activityEvents']>[number]) => void
   start: (intervalMs?: number, flushMs?: number) => void
   stop: () => void
   getState: () => DeclaredAppUsageState
@@ -61,6 +90,7 @@ export function createTracker(deps: TrackerDeps): Tracker {
 
   // Buffer en mémoire keyed par "appId|date"
   const buffer = new Map<string, number>()
+  let activityEvents: NonNullable<DeclaredAppUsageState['activityEvents']> = []
   let lastTickAt: string | null = null
   let dirty = false
 
@@ -96,44 +126,78 @@ export function createTracker(deps: TrackerDeps): Tracker {
     for (const e of state.entries) {
       buffer.set(entryKey(e.appId, e.date), e.minutes)
     }
+    activityEvents = (state.activityEvents ?? []).slice(-2000)
     lastTickAt = state.lastTickAt
     dirty = false
   }
 
   async function tick(): Promise<void> {
-    const apps = await deps.getDeclaredApps()
-    if (apps.length === 0) {
-      lastTickAt = now().toISOString()
-      return
-    }
-    const procs = await deps.listProcesses()
-    const procNames = new Set(procs.map((p) => p.name.toLowerCase()))
-    const today = localDate()
-
-    pruneOld(today)
-
-    for (const app of apps) {
-      if (procNames.has(app.exeName.toLowerCase())) {
-        const key = entryKey(app.id, today)
-        buffer.set(key, (buffer.get(key) ?? 0) + 1)
-        dirty = true
+    try {
+      const apps = await deps.getDeclaredApps()
+      if (apps.length === 0) {
+        lastTickAt = now().toISOString()
+        return
       }
+      const procs = await deps.listProcesses()
+      const procNames = new Set(procs.map((p) => p.name.toLowerCase()))
+      const today = localDate()
+
+      pruneOld(today)
+
+      for (const app of apps) {
+        if (app.exeName && procNames.has(app.exeName.toLowerCase())) {
+          const key = entryKey(app.id, today)
+          buffer.set(key, (buffer.get(key) ?? 0) + 1)
+          activityEvents.push({
+            at: now().toISOString(),
+            kind: 'declared-app-active',
+            label: app.name,
+            appId: app.id,
+          })
+          if (activityEvents.length > 2000) {
+            activityEvents = activityEvents.slice(-2000)
+          }
+          dirty = true
+        }
+      }
+      lastTickAt = now().toISOString()
+    } catch (err) {
+      tlog.error('tick error caught inside function', err)
     }
-    lastTickAt = now().toISOString()
   }
 
   async function flushNow(): Promise<void> {
-    if (!dirty) return
-    const state: DeclaredAppUsageState = {
-      entries: bufferToEntries().sort((a, b) => {
-        if (a.date !== b.date) return a.date.localeCompare(b.date)
-        return a.appId.localeCompare(b.appId)
-      }),
-      lastTickAt,
+    try {
+      if (!dirty) return
+      const state: DeclaredAppUsageState = {
+        entries: bufferToEntries().sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date)
+          return a.appId.localeCompare(b.appId)
+        }),
+        lastTickAt,
+        activityEvents,
+      }
+      await deps.storage.write(state)
+      dirty = false
+      deps.onFlush?.(state)
+    } catch (err) {
+      tlog.error('flushNow error caught inside function', err)
     }
-    await deps.storage.write(state)
+  }
+
+  function recordActivityEvent(
+    event: NonNullable<DeclaredAppUsageState['activityEvents']>[number],
+  ): void {
+    activityEvents.push(event)
+    if (activityEvents.length > 2000) activityEvents = activityEvents.slice(-2000)
+    dirty = true
+  }
+
+  function clear(): void {
+    buffer.clear()
+    activityEvents = []
+    lastTickAt = null
     dirty = false
-    deps.onFlush?.(state)
   }
 
   function start(intervalMs = DEFAULT_TICK_MS, flushMs = DEFAULT_FLUSH_MS): void {
@@ -161,8 +225,9 @@ export function createTracker(deps: TrackerDeps): Tracker {
     return {
       entries: bufferToEntries(),
       lastTickAt,
+      activityEvents,
     }
   }
 
-  return { hydrate, tick, flushNow, start, stop, getState }
+  return { hydrate, tick, flushNow, clear, recordActivityEvent, start, stop, getState }
 }

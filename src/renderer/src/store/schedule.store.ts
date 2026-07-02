@@ -1,9 +1,14 @@
 import { create } from 'zustand'
-import { nexus } from '@/lib/ipc'
+import { vethos } from '@/lib/ipc'
 import type { ScheduleEntry, ScheduleState, TimeRule } from '@shared/schemas'
 import { hasOverlap } from '@/lib/schedule-selectors'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { useToastStore } from './toast.store'
+import {
+  normalizeStorageUserId,
+  resolveStorageUserId,
+  storageUserIdFromState,
+} from './scoped-storage'
 
 type SaveRuleDraft = {
   id?: string
@@ -23,11 +28,14 @@ type SaveEntryDraft = {
 }
 
 type ScheduleStore = {
+  userId: string | null
   loaded: boolean
   rules: TimeRule[]
   entries: ScheduleEntry[]
 
-  load: () => Promise<void>
+  setUserId: (userId?: string | null) => void
+  reset: () => void
+  load: (userId?: string) => Promise<void>
   saveRule: (draft: SaveRuleDraft) => Promise<TimeRule>
   deleteRule: (id: string) => Promise<void>
   saveEntry: (draft: SaveEntryDraft) => Promise<ScheduleEntry>
@@ -37,8 +45,14 @@ type ScheduleStore = {
 }
 
 const SCHEDULE_DEBOUNCE_MS = 500
+const DEFAULT_SCHEDULE_STATE = {
+  userId: null,
+  loaded: false,
+  rules: [],
+  entries: [],
+}
 
-let pendingState: ScheduleState | null = null
+let pendingState: { state: ScheduleState; userId: string } | null = null
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 let pendingResolvers: Array<{
   resolve: () => void
@@ -57,14 +71,26 @@ function notifyPersistError(err: unknown): void {
   })
 }
 
-async function writeSchedule(state: ScheduleState): Promise<void> {
+async function writeSchedule(state: ScheduleState, userId?: string): Promise<void> {
+  if (!userId) return
   try {
-    const result = await nexus.storage.write('schedule', state)
+    const result = await vethos.storage.write('schedule', state, userId)
     assertStorageWrite(result, 'schedule')
   } catch (err) {
     notifyPersistError(err)
     throw err
   }
+}
+
+function clearPendingSchedulePersist(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  const waiters = pendingResolvers
+  pendingState = null
+  pendingResolvers = []
+  waiters.forEach(({ resolve }) => resolve())
 }
 
 export async function flushSchedulePersist(): Promise<void> {
@@ -74,21 +100,22 @@ export async function flushSchedulePersist(): Promise<void> {
   }
   if (!pendingState) return
 
-  const state = pendingState
+  const { state, userId } = pendingState
   const waiters = pendingResolvers
   pendingState = null
   pendingResolvers = []
 
   try {
-    await writeSchedule(state)
+    await writeSchedule(state, userId)
     waiters.forEach(({ resolve }) => resolve())
   } catch (err) {
     waiters.forEach(({ reject }) => reject(err))
   }
 }
 
-function persistDebounced(state: ScheduleState): Promise<void> {
-  pendingState = state
+function persistDebounced(state: ScheduleState, userId?: string): Promise<void> {
+  if (!userId) return Promise.resolve()
+  pendingState = { state, userId }
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(() => {
     void flushSchedulePersist()
@@ -100,20 +127,41 @@ function persistDebounced(state: ScheduleState): Promise<void> {
 }
 
 export const useScheduleStore = create<ScheduleStore>((set, get) => ({
-  loaded: false,
-  rules: [],
-  entries: [],
+  ...DEFAULT_SCHEDULE_STATE,
 
-  async load() {
-    const stored = await nexus.storage.read<ScheduleState>('schedule')
+  setUserId(rawUserId) {
+    const userId = normalizeStorageUserId(rawUserId) ?? null
+    if (get().userId === userId) return
+    clearPendingSchedulePersist()
+    set({ ...DEFAULT_SCHEDULE_STATE, userId })
+  },
+
+  reset() {
+    clearPendingSchedulePersist()
+    set({ ...DEFAULT_SCHEDULE_STATE })
+  },
+
+  async load(rawUserId) {
+    const userId = resolveStorageUserId(rawUserId, get())
+    if (!userId) {
+      get().reset()
+      return
+    }
+    if (get().userId !== userId) {
+      clearPendingSchedulePersist()
+      set({ ...DEFAULT_SCHEDULE_STATE, userId })
+    }
+
+    const stored = await vethos.storage.read<ScheduleState>('schedule', userId)
     if (stored) {
-      set({ loaded: true, rules: stored.rules, entries: stored.entries })
+      set({ userId, loaded: true, rules: stored.rules, entries: stored.entries })
     } else {
-      set({ loaded: true, rules: [], entries: [] })
+      set({ userId, loaded: true, rules: [], entries: [] })
     }
   },
 
   async saveRule(draft) {
+    const userId = storageUserIdFromState(get())
     const now = new Date().toISOString()
     const rules = get().rules.slice()
     let saved: TimeRule
@@ -142,18 +190,20 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       rules.push(saved)
     }
     set({ rules })
-    await persistDebounced({ rules, entries: get().entries })
+    await persistDebounced({ rules, entries: get().entries }, userId)
     return saved
   },
 
   async deleteRule(id) {
+    const userId = storageUserIdFromState(get())
     const rules = get().rules.filter((r) => r.id !== id)
     const entries = get().entries.filter((e) => e.ruleId !== id)
     set({ rules, entries })
-    await persistDebounced({ rules, entries })
+    await persistDebounced({ rules, entries }, userId)
   },
 
   async saveEntry(draft) {
+    const userId = storageUserIdFromState(get())
     if (draft.endMinute <= draft.startMinute) {
       throw new Error('Fin doit être après le début')
     }
@@ -196,18 +246,20 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       entries.push(saved)
     }
     set({ entries })
-    await persistDebounced({ rules: get().rules, entries })
+    await persistDebounced({ rules: get().rules, entries }, userId)
     return saved
   },
 
   async deleteEntry(id) {
+    const userId = storageUserIdFromState(get())
     const entries = get().entries.filter((e) => e.id !== id)
     set({ entries })
-    await persistDebounced({ rules: get().rules, entries })
+    await persistDebounced({ rules: get().rules, entries }, userId)
   },
 
   async replaceAll(rules, entries) {
+    const userId = storageUserIdFromState(get())
     set({ rules, entries })
-    await persistDebounced({ rules, entries })
+    await persistDebounced({ rules, entries }, userId)
   },
 }))

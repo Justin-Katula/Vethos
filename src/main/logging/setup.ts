@@ -26,7 +26,7 @@ export function setupLogging(): void {
   log.initialize({ preload: true, spyRendererConsole: true })
 
   log.transports.file.resolvePathFn = (): string =>
-    join(app.getPath('userData'), 'logs', 'nexus.log')
+    join(app.getPath('userData'), 'logs', 'vethos.log')
   log.transports.file.maxSize = 10 * 1024 * 1024
   log.transports.file.format =
     '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] [{processType}] {text}'

@@ -1,9 +1,12 @@
 import { motion } from 'framer-motion'
 import { Sparkles, ArrowRight } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 
 type Props = {
   onContinue: () => void
 }
+
+const MotionButton = motion(Button)
 
 export function WelcomeStep({ onContinue }: Props): JSX.Element {
   return (
@@ -39,7 +42,7 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
             fontSize={52}
             fill="white"
           >
-            N
+            V
           </text>
         </svg>
       </motion.div>
@@ -55,25 +58,26 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
           Premier lancement
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-text-primary sm:text-5xl">
-          Bienvenue dans Nexus.
+          Bienvenue dans Vethos.
         </h1>
         <p className="mx-auto max-w-xl text-base leading-relaxed text-text-secondary">
           {"Le travail concentré devient progression mesurable. En 3 minutes, on pose ton emploi du temps, tes engagements protégés, et ton premier objectif."}
         </p>
       </motion.div>
 
-      <motion.button
+      <MotionButton
         type="button"
+        variant="solid"
+        size="lg"
         onClick={onContinue}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.25 }}
         whileHover={{ y: -2 }}
-        className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-white shadow-elevated transition-colors hover:bg-accent-hover"
       >
         Commencer
         <ArrowRight size={18} />
-      </motion.button>
+      </MotionButton>
     </div>
   )
 }

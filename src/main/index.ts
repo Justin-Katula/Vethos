@@ -7,8 +7,18 @@ import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
 import { installService, uninstallService } from './service-install'
+import { requestServiceInstall } from './elevated-install'
+import {
+  getBlockingServiceInfo,
+  getServiceStatus,
+  isVethosBlockingServiceDetected,
+} from './service-client/service-status'
+import { BLOCKING_SERVICE_VERSION } from '@shared/service-protocol'
+import {
+  prewarmProcessWindowProbe,
+  stopProcessWindowProbe,
+} from './tracking/process-window-probe'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -19,6 +29,7 @@ setupLogging()
 // l'UI, puis on quitte. Détecté AVANT le verrou d'instance unique et whenReady.
 const wantsInstallService = process.argv.includes('--install-service')
 const wantsUninstallService = process.argv.includes('--uninstall-service')
+const isBackgroundLaunch = process.argv.includes('--background')
 if (wantsInstallService || wantsUninstallService) {
   const routine = wantsInstallService ? installService : uninstallService
   routine()
@@ -33,17 +44,23 @@ if (wantsInstallService || wantsUninstallService) {
       app.exit(1)
     })
 } else {
-  startNexusApp()
+  startVethosApp()
 }
 
 const isDev = !app.isPackaged
 
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.nexus.blocking')
+  app.setAppUserModelId('com.vethos.blocking')
+}
+
+if (isDev) {
+  process.env.VETHOS_DEV = 'true'
+  app.setName('Vethos Dev')
+  app.setPath('userData', join(app.getPath('appData'), 'Vethos Dev'))
 }
 
 function crashMarkerPath(): string {
-  return join(app.getPath('userData'), 'nexus-main-alive.marker')
+  return join(app.getPath('userData'), 'vethos-main-alive.marker')
 }
 
 function writeCrashMarker(): void {
@@ -70,6 +87,44 @@ function handleFatalProcessError(label: string, err: unknown): void {
   app.exit(1)
 }
 
+async function ensureBlockingServiceAtBoot(): Promise<void> {
+  if (process.platform !== 'win32' || isDev) return
+
+  try {
+    const expectedVersion = BLOCKING_SERVICE_VERSION
+    const [serviceDetected, serviceStatus, serviceInfo] = await Promise.all([
+      isVethosBlockingServiceDetected(),
+      getServiceStatus(),
+      getBlockingServiceInfo(),
+    ])
+
+    if (
+      serviceDetected &&
+      serviceStatus === 'ok' &&
+      serviceInfo?.version === expectedVersion
+    ) {
+      return
+    }
+
+    log.warn('[main] service VethosBlockingService absent ou obsolète, remplacement', {
+      serviceDetected,
+      serviceStatus,
+      runningVersion: serviceInfo?.version,
+      expectedVersion,
+    })
+
+    const launched = await requestServiceInstall()
+    if (!launched) throw new Error('Installation élevée du service refusée ou échouée')
+
+    const nextStatus = await getServiceStatus()
+    log.info('[main] auto-install du service VethosBlockingService terminée', {
+      serviceStatus: nextStatus,
+    })
+  } catch (err) {
+    log.error('[main] auto-install du service VethosBlockingService échouée', err)
+  }
+}
+
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -80,6 +135,7 @@ function createMainWindow(): BrowserWindow {
     show: false, // affichée seulement après ready-to-show
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
+    icon: join(__dirname, '../../build/icon.png'),
     titleBarOverlay: {
       color: '#0a0a0c',
       symbolColor: '#a1a1aa',
@@ -114,35 +170,50 @@ function createMainWindow(): BrowserWindow {
 
 let mainWindow: BrowserWindow | null = null
 let quitAfterDebounceFlush = false
+let isBlockingSessionActive: () => boolean = () => false
 
-function startNexusApp(): void {
+function ensureMainWindow(): BrowserWindow {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    focusWindow(mainWindow)
+    return mainWindow
+  }
+  const win = createMainWindow()
+  mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+  })
+  return win
+}
+
+function startVethosApp(): void {
   app
     .whenReady()
     .then(async () => {
+      if (!isDev) {
+        app.setLoginItemSettings({
+          openAtLogin: true,
+          path: process.execPath,
+          args: ['--background'],
+        })
+      }
       const recoveredFromCrash = existsSync(crashMarkerPath())
       writeCrashMarker()
+      prewarmProcessWindowProbe()
+      void ensureBlockingServiceAtBoot()
 
       const storage = createStorage(app.getPath('userData'))
-      await recalculateFreeTimeAtBoot(storage).catch((err) => {
-        log.warn('boot free-time recalculation failed', err)
+      const runtime = await registerAllIpcHandlers(storage, () => mainWindow, {
+        isDevelopment: isDev,
       })
-      const runtime = await registerAllIpcHandlers(storage, () => mainWindow)
+      isBlockingSessionActive = runtime.isSessionActive
 
-      mainWindow = createMainWindow()
-      mainWindow.on('closed', () => {
-        mainWindow = null
-      })
+      if (!isBackgroundLaunch) ensureMainWindow()
 
       if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
       startUpdater(() => mainWindow, runtime.isSessionActive)
 
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-          mainWindow = createMainWindow()
-          mainWindow.on('closed', () => {
-            mainWindow = null
-          })
-        }
+        ensureMainWindow()
       })
     })
     .catch((err) => {
@@ -151,7 +222,12 @@ function startNexusApp(): void {
     })
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+    if (process.platform === 'darwin') return
+    // En production, le garde reste résident afin que fermer la fenêtre Vethos
+    // ne désarme jamais les overlays. En développement, il reste seulement si
+    // une session de blocage réelle est active.
+    if (!isDev || isBlockingSessionActive()) return
+    app.quit()
   })
 
   const gotLock = app.requestSingleInstanceLock()
@@ -159,13 +235,12 @@ function startNexusApp(): void {
     app.quit()
   } else {
     app.on('second-instance', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        focusWindow(mainWindow)
-      }
+      void app.whenReady().then(() => ensureMainWindow())
     })
   }
 
   app.on('before-quit', (event) => {
+    stopProcessWindowProbe()
     if (quitAfterDebounceFlush) {
       clearCrashMarker()
       return

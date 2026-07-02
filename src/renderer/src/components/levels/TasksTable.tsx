@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Task } from '@shared/schemas'
-import { getDeadlineMultiplier } from '@/lib/free-time-calculator'
+import { getDeadlineMultiplier, taskDeadlineLabel } from '@/lib/free-time-calculator'
+import { momentumPhrase, priorityPhrase, stagnationPhrase, urgencyPhrase, workloadPhrase } from '@/lib/human-score-language'
 
 type Props = {
   tasks: Task[]
@@ -12,14 +13,14 @@ export function TasksTable({ tasks }: Props) {
 
   if (activeTasks.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border-subtle p-8 text-center">
+      <div className="info-panel rounded-xl border-dashed p-8 text-center">
         <div className="text-sm text-text-muted">Aucune tâche urgente.</div>
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card">
+    <div className="info-panel rounded-xl">
       <table className="w-full text-left text-sm">
         <thead className="bg-bg-base/50 text-[10px] uppercase tracking-widest text-text-muted">
           <tr>
@@ -30,15 +31,11 @@ export function TasksTable({ tasks }: Props) {
         </thead>
         <tbody className="divide-y divide-border-subtle">
           {activeTasks.map((task) => {
-            const multiplier = getDeadlineMultiplier(task.deadline, today)
-            const diffDays = Math.ceil(
-              (new Date(task.deadline).getTime() - new Date(today).getTime()) /
-                (1000 * 60 * 60 * 24),
-            )
-
-            let deadlineLabel = `${diffDays} jours`
-            if (diffDays <= 0) deadlineLabel = 'En retard'
-            if (diffDays === 1) deadlineLabel = 'Demain'
+            const multiplier =
+              task.deadline === today && task.deadlineTime
+                ? 2
+                : getDeadlineMultiplier(task.deadline, today)
+            const deadlineLabel = taskDeadlineLabel(task, today)
 
             return (
               <motion.tr
@@ -50,7 +47,17 @@ export function TasksTable({ tasks }: Props) {
               >
                 <td className="px-5 py-4">
                   <div className="font-medium text-text-primary">{task.title}</div>
-                  <div className="text-[10px] text-text-muted">Analyse statistique</div>
+                  <div className="mt-1 text-[10px] text-text-muted">{priorityPhrase(task.priorityScoreV2?.priorityScore ?? task.level * 10)}</div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-text-muted">
+                    <span>{urgencyPhrase(task.priorityScoreV2?.urgencyScore ?? 0)}</span>
+                    <span>{workloadPhrase(task.priorityScoreV2?.workloadScore ?? 0)}</span>
+                    <span>{stagnationPhrase(task.priorityScoreV2?.stagnationScore ?? 0)}</span>
+                    <span>{momentumPhrase(task.priorityScoreV2?.momentumScore ?? 0)}</span>
+                  </div>
+                  <details className="mt-2 text-[10px] text-text-secondary">
+                    <summary className="cursor-pointer text-accent">Pourquoi ?</summary>
+                    {(task.priorityScoreV2?.reasons ?? ['Le niveau et la deadline actuels déterminent cette recommandation.']).map((reason) => <p key={reason} className="mt-1">• {reason}</p>)}
+                  </details>
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex flex-col items-center gap-1">

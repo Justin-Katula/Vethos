@@ -1,5 +1,8 @@
 /** Chemin du named pipe UI <-> Service. */
-export const PIPE_PATH = '\\\\.\\pipe\\NexusServiceBridge'
+export const PIPE_PATH = '\\\\.\\pipe\\VethosServiceBridge'
+
+/** Version du moteur embarqué, comparée au service déjà chargé au démarrage. */
+export const BLOCKING_SERVICE_VERSION = '0.12.3-recovery'
 
 export type ServiceRequest = {
   kind: 'request'
@@ -35,7 +38,9 @@ export type ServiceInfo = {
 export type ServiceRequestType =
   | 'PING'
   | 'GET_SERVICE_INFO'
+  | 'SET_USER_CONTEXT'
   | 'GET_STATE'
+  | 'RESYNC_BLOCKING'
   | 'SAVE_PROFILE'
   | 'DELETE_PROFILE'
   | 'START_SESSION'
@@ -53,6 +58,7 @@ export type ServiceEventType =
   | 'LAYER_DRIFT'
   | 'CLOCK_TAMPER'
   | 'BREAK_REQUIRED'
+  | 'BLOCKED_ATTEMPT'
 
 /** Sérialise un message en ligne JSON terminée par `\n`. */
 export function encodeMessage(msg: ServiceMessage): string {

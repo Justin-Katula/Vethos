@@ -1,8 +1,13 @@
 import type { ActiveSession } from '@shared/schemas'
+import { uptime } from 'node:os'
 import log from '../engine-log'
 
 export function monotonicNowMs(): number {
   return Number(process.hrtime.bigint() / 1_000_000n)
+}
+
+export function currentBootWallMs(nowWallMs = Date.now(), uptimeSeconds = uptime()): number {
+  return Math.round(nowWallMs - uptimeSeconds * 1000)
 }
 
 function durationMs(session: ActiveSession): number {
@@ -14,9 +19,12 @@ export function remainingSessionMs(
   session: ActiveSession,
   nowWallMs = Date.now(),
   nowMonoMs = monotonicNowMs(),
+  bootWallMs = currentBootWallMs(nowWallMs),
 ): number {
   const total = durationMs(session)
   if (
+    typeof session.startedAtBootWall === 'number' &&
+    Math.abs(session.startedAtBootWall - bootWallMs) < 120_000 &&
     typeof session.startedAtMono === 'number' &&
     session.startedAtMono > 0 &&
     nowMonoMs >= session.startedAtMono

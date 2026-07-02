@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.mock('@/lib/ipc', () => ({
-  nexus: {
+  vethos: {
     appUsage: {
       get: vi.fn(),
       onTick: vi.fn(),
@@ -15,12 +15,13 @@ import {
   selectMinutesThisWeek,
   selectMinutesByDay,
 } from './app-usage.store'
-import { nexus } from '@/lib/ipc'
+import { vethos } from '@/lib/ipc'
 
-const mockApi = nexus.appUsage as unknown as {
+const mockApi = vethos.appUsage as unknown as {
   get: ReturnType<typeof vi.fn>
   onTick: ReturnType<typeof vi.fn>
 }
+const TEST_USER_ID = 'user_123'
 
 function todayLocal(): string {
   const d = new Date()
@@ -33,20 +34,24 @@ function todayLocal(): string {
 beforeEach(() => {
   mockApi.get.mockReset()
   mockApi.onTick.mockReset()
-  useAppUsageStore.setState({ loaded: false, entries: [], lastTickAt: null })
+  useAppUsageStore.setState({
+    userId: TEST_USER_ID,
+    loaded: false,
+    entries: [],
+    lastTickAt: null,
+  })
 })
 
 describe('useAppUsageStore', () => {
-  it('load() hydrate depuis l\'API', async () => {
+  it("load() hydrate depuis l'API", async () => {
     mockApi.get.mockResolvedValue({
-      entries: [
-        { appId: 'app-1', date: '2026-05-05', minutes: 12 },
-      ],
+      entries: [{ appId: 'app-1', date: '2026-05-05', minutes: 12 }],
       lastTickAt: '2026-05-05T10:00:00.000Z',
     })
     await useAppUsageStore.getState().load()
     const s = useAppUsageStore.getState()
     expect(s.loaded).toBe(true)
+    expect(mockApi.get).toHaveBeenCalledWith(TEST_USER_ID)
     expect(s.entries).toHaveLength(1)
     expect(s.lastTickAt).toBe('2026-05-05T10:00:00.000Z')
   })

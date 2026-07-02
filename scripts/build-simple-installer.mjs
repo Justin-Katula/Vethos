@@ -10,8 +10,8 @@ const version = pkg.version ?? '0.0.0'
 const version4 = version.split('.').concat(['0', '0', '0']).slice(0, 4).join('.')
 
 const sourceDir = join(root, 'release', 'win-unpacked')
-const outFile = join(root, 'release', `Nexus-Setup-${version}.exe`)
-const script = join(root, 'scripts', 'nexus-simple-installer.nsi')
+const outFile = join(root, 'release', `Vethos-Setup-${version}.exe`)
+const script = join(root, 'scripts', 'vethos-simple-installer.nsi')
 
 if (!existsSync(sourceDir)) {
   throw new Error(`Missing ${sourceDir}. Run electron-builder --win --dir first.`)

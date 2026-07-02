@@ -1,7 +1,7 @@
-import { exec } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 export type Process = { name: string; pid: number }
 
@@ -41,6 +41,11 @@ export function parseTasklistCsv(csv: string): Process[] {
 }
 
 export async function listProcesses(): Promise<Process[]> {
-  const { stdout } = await execAsync('tasklist /FO CSV /NH', { windowsHide: true })
-  return parseTasklistCsv(stdout)
+  try {
+    const { stdout } = await execFileAsync('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true })
+    return parseTasklistCsv(stdout)
+  } catch (err) {
+    console.error('[processes] listProcesses error:', err)
+    return []
+  }
 }

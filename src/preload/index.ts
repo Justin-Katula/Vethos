@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
+import type { BlockedAttemptPayload } from '@shared/blocking'
 import type {
   ActiveSession,
   BlockingProfile,
@@ -7,6 +8,9 @@ import type {
   DeclaredAppUsageState,
   StorageKey,
 } from '@shared/schemas'
+import type { CoachResult } from '@shared/coach-result'
+import type { DeepSeekChatRequest, DeepSeekChatResult } from '@shared/deepseek'
+import type { UpdaterCheckResult, UpdaterEventInfo } from '@shared/updater'
 
 export type StorageWriteResult = { ok: true } | { ok: false; error: string }
 
@@ -19,57 +23,88 @@ export type LayerStatus = {
 export type ServiceStatus = 'ok' | 'unavailable'
 
 const api = {
+  auth: {
+    setUserId: (userId?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_SET_USER_ID, userId),
+  },
   storage: {
-    read: <T>(key: StorageKey): Promise<T | null> =>
-      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_READ, key),
-    write: <T>(key: StorageKey, data: T): Promise<StorageWriteResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_WRITE, key, data),
-    exists: (key: StorageKey): Promise<boolean> =>
-      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_EXISTS, key),
+    read: <T>(key: StorageKey, userId?: string): Promise<T | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_READ, key, userId),
+    write: <T>(key: StorageKey, data: T, userId?: string): Promise<StorageWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_WRITE, key, data, userId),
+    exists: (key: StorageKey, userId?: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.STORAGE_EXISTS, key, userId),
   },
   app: {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     openLogs: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_LOGS),
-    discoverInstalledApps: (): Promise<
+    discoverInstalledApps: (options?: { forceRefresh?: boolean }): Promise<
       Array<{
         name: string
         exeName: string
         exePath: string
         publisher: string
+        source?: string
+        packageId?: string
+        hasExecutablePath?: boolean
         iconDataUrl?: string
       }>
-    > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),
+    > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST, options),
     onFlushDebounces: (cb: () => void): (() => void) => {
       const listener = () => cb()
       ipcRenderer.on(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)
     },
-    onUpdateAvailable: (cb: (info: { version?: string }) => void): (() => void) => {
-      const listener = (_: unknown, payload: { version?: string }) => cb(payload)
+    checkForUpdates: (): Promise<UpdaterCheckResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_CHECK_NOW),
+    onUpdateAvailable: (cb: (info: UpdaterEventInfo) => void): (() => void) => {
+      const listener = (_: unknown, payload: UpdaterEventInfo) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.UPDATER_EVENT_AVAILABLE, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_EVENT_AVAILABLE, listener)
     },
-    onUpdateDownloaded: (cb: (info: { version?: string }) => void): (() => void) => {
-      const listener = (_: unknown, payload: { version?: string }) => cb(payload)
+    onUpdateDownloaded: (cb: (info: UpdaterEventInfo) => void): (() => void) => {
+      const listener = (_: unknown, payload: UpdaterEventInfo) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
     },
   },
   blocking: {
-    getInitialState: (): Promise<{ state: BlockingState; active: ActiveSession | null }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_INITIAL_STATE),
-    saveProfile: (draft: Partial<BlockingProfile> & { name: string }): Promise<BlockingProfile> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SAVE_PROFILE, draft),
-    deleteProfile: (id: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_DELETE_PROFILE, id),
-    startSession: (args: { profileId: string; durationMinutes: number }): Promise<ActiveSession> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_START_SESSION, args),
-    requestUnlock: (): Promise<ActiveSession['unlockState']> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_UNLOCK),
-    submitJustification: (text: string): Promise<{ ok: true } | { ok: false; reason: string }> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SUBMIT_JUSTIFICATION, text),
-    getLayerStatus: (): Promise<LayerStatus> =>
-      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS),
+    getInitialState: (
+      userId?: string,
+    ): Promise<{ state: BlockingState; active: ActiveSession | null }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_INITIAL_STATE, userId),
+    saveProfile: (
+      draft: Partial<BlockingProfile> & { name: string },
+      userId?: string,
+    ): Promise<BlockingProfile> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SAVE_PROFILE, draft, userId),
+    deleteProfile: (id: string, userId?: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_DELETE_PROFILE, id, userId),
+    startSession: (
+      args: { profileId: string; durationMinutes: number },
+      userId?: string,
+    ): Promise<ActiveSession> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_START_SESSION, args, userId),
+    startTest: (userId?: string): Promise<ActiveSession> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_START_TEST, userId),
+    requestUnlock: (userId?: string): Promise<ActiveSession['unlockState']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REQUEST_UNLOCK, userId),
+    submitJustification: (
+      text: string,
+      userId?: string,
+    ): Promise<{ ok: true } | { ok: false; reason: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SUBMIT_JUSTIFICATION, text, userId),
+    submitAppExplanation: (args: {
+      token: string
+      text: string
+    }): Promise<{ allowed: boolean; reason: string; allowMinutes: number }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_SUBMIT_APP_EXPLANATION, args),
+    minimizeAppWindow: (args: { token: string; windowId: string }): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_MINIMIZE_APP_WINDOW, args),
+    closeAppWindow: (args: { token: string; windowId: string }): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_CLOSE_APP_WINDOW, args),
+    getLayerStatus: (userId?: string): Promise<LayerStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_LAYER_STATUS, userId),
     getServiceStatus: (): Promise<ServiceStatus> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_SERVICE_STATUS),
     repairService: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_REPAIR_SERVICE),
@@ -98,28 +133,84 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_BREAK_REQUIRED, listener)
     },
+    onBlockedAttempt: (cb: (e: BlockedAttemptPayload) => void): (() => void) => {
+      const listener = (_: unknown, payload: BlockedAttemptPayload) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_BLOCKED_ATTEMPT, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_BLOCKED_ATTEMPT, listener)
+    },
   },
   appUsage: {
-    get: (): Promise<DeclaredAppUsageState> => ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET),
+    get: (userId?: string): Promise<DeclaredAppUsageState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET, userId),
     onTick: (cb: (state: DeclaredAppUsageState) => void): (() => void) => {
       const listener = (_: unknown, payload: DeclaredAppUsageState) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
     },
   },
+  registry: {
+    onItemObserved: (
+      cb: (item: { kind: 'site' | 'app'; identifier: string; displayName: string }) => void,
+    ): (() => void) => {
+      const listener = (
+        _: unknown,
+        payload: { kind: 'site' | 'app'; identifier: string; displayName: string },
+      ) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.REGISTRY_EVENT_ITEM_OBSERVED, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.REGISTRY_EVENT_ITEM_OBSERVED, listener)
+    },
+  },
+  deepseek: {
+    chat: (request: DeepSeekChatRequest): Promise<DeepSeekChatResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DEEPSEEK_CHAT, request),
+  },
+  coach: {
+    analyzeTask: (args: {
+      taskTitle: string
+    }): Promise<CoachResult<{ clear: boolean; suggestedQuestion?: string }>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COACH_ANALYZE_TASK, args),
+    generateSubtasks: (args: {
+      taskTitle: string
+      contextNotes: string
+      totalMinutes: number
+    }): Promise<CoachResult<Array<{ title: string; durationMinutes: number }>>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COACH_GENERATE_SUBTASKS, args),
+    categorizeApps: (args: {
+      apps: Array<{ name: string; exeName: string }>
+    }): Promise<CoachResult<Record<string, string>>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COACH_CATEGORIZE_APPS, args),
+    classifyAppsForTask: (args: {
+      taskTitle: string
+      contextNotes: string
+      apps: Array<{ identifier: string; displayName: string }>
+      currentUsefulApps: string[]
+    }): Promise<CoachResult<Record<string, 'useful' | 'distraction' | 'neutral'>>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COACH_CLASSIFY_APPS_FOR_TASK, args),
+    classifyAppsForObjective: (args: {
+      objectiveName: string
+      objectiveDescription: string
+      apps: Array<{ identifier: string; displayName: string }>
+      currentUsefulApps: string[]
+    }): Promise<CoachResult<Record<string, 'useful' | 'distraction' | 'neutral'>>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COACH_CLASSIFY_APPS_FOR_OBJECTIVE, args),
+  },
   tasks: {
-    /** V2 P9 — Demande au main de fire une notification native pour cet event. */
+    /** Demande au main de déclencher une notification native pour cet événement. */
     notify: (
       event:
-        | { type: 'task-hit-zero'; taskTitle: string }
-        | { type: 'task-auto-rescued'; taskTitle: string; daysLeft: number }
-        | { type: 'task-forced-three'; taskTitle: string }
         | { type: 'task-degraded'; taskTitle: string; newLevel: number }
-        | { type: 'task-urgent'; taskTitle: string; daysLeft: number },
+        | { type: 'task-expired'; taskTitle: string }
+        | { type: 'task-urgent'; taskTitle: string; daysLeft: number }
+        | {
+            type: 'work-block-started'
+            title: string
+            startLabel: string
+            endLabel: string
+          },
     ): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.TASKS_NOTIFY, event),
   },
 }
 
-contextBridge.exposeInMainWorld('nexus', api)
+contextBridge.exposeInMainWorld('vethos', api)
 
-export type NexusApi = typeof api
+export type VethosApi = typeof api

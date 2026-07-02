@@ -1,0 +1,26 @@
+export const realActivationProtocolFlags = {
+  realActivationProtocolEnabled: true,
+  realActivationProtocolAuditEnabled: true,
+  minimalExecutionBoundaryEnabled: true,
+  realActivationPermissionMatrixEnabled: true,
+  realActivationRiskEngineEnabled: true,
+  realActivationProtocolDraftBuilderEnabled: true,
+  realActivationReadinessEngineEnabled: true,
+  realActivationDiagnosticsEnabled: true,
+  realActivationExplanationEnabled: true,
+  realActivationUiEnabled: true,
+
+  realActivationControlsRealManagers: false,
+  realActivationControlsStoreWrites: false,
+  realActivationControlsLocalStorage: false,
+  realActivationControlsCreateSessions: false,
+  realActivationControlsStartSessions: false,
+  realActivationControlsApplyPlanning: false,
+  realActivationControlsBlocking: false,
+  realActivationControlsTaskCompletion: false,
+  realActivationControlsOsAccess: false,
+  realActivationControlsIpc: false,
+  realActivationControlsElectronMain: false,
+  realActivationControlsAutoExecute: false,
+  realActivationControlsPersistProtocol: false
+}
