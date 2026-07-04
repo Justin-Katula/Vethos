@@ -37,7 +37,7 @@ export function guardExecutionPreviewActions(viewModel: ExecutionPreviewViewMode
 
   // Status conflicts
   if (viewModel.status === 'unsafe') {
-    const hasEnabledFixAction = viewModel.actions.some(a => a.enabled && !['debug_only', 'disabled_apply', 'disabled_start_session', 'disabled_blocking', 'rebuild_shadow'].includes(a.actionType))
+    const hasEnabledFixAction = viewModel.actions.some(a => a.enabled && !['debug_only', 'disabled_apply', 'disabled_start_session', 'disabled_blocking', 'rebuild_proposed'].includes(a.actionType))
     if (hasEnabledFixAction) {
       // Manual review/fix inputs can be enabled, but we just flag if it's strictly unsafe and not manual_review.
       // We'll allow manual review to be enabled, but let's check for any weird custom handlers

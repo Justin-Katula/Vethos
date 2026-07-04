@@ -45,7 +45,7 @@ function context(freeWindows: FreeTimeWindow[]): PlanningContextV2 {
     weeklySummary: { rawFreeMinutes: day.rawFreeMinutes, usableFreeMinutes: day.usableFreeMinutes, deepWorkMinutes: day.deepWorkMinutes, recoveryMinutes: 0, overloadedDays: 0, noUsableTimeDays: 0 },
     rulesApplied: [],
     confidence: 80,
-    metadata: { modelVersion: 2, createdAt: '2026-06-22T00:00:00.000Z', updatedAt: '2026-06-22T00:00:00.000Z', source: 'shadow_planning_context' },
+    metadata: { modelVersion: 2, createdAt: '2026-06-22T00:00:00.000Z', updatedAt: '2026-06-22T00:00:00.000Z', source: 'planning_context_builder' },
   }
 }
 

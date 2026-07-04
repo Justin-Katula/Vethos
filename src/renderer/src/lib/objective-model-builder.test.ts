@@ -67,7 +67,7 @@ describe('objective-model-builder intégré', () => {
       now: NOW,
     })
 
-    expect('shadowOnly' in model.metadata).toBe(false)
+    expect('advisoryOnly' in model.metadata).toBe(false)
     expect(model.metadata.source).toBe('objective_model_builder')
     expect(model.metadata.flags.objectiveControlsBlocking).toBe(false)
     expect(model.nextAction.kind).toBe('create_task')

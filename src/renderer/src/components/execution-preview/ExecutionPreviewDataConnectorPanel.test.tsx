@@ -27,9 +27,9 @@ describe('ExecutionPreviewDataConnectorPanel', () => {
     })
 
     render(<ExecutionPreviewDataConnectorPanel />)
-    expect(screen.getByText(/Cliquez sur "Générer Preview Shadow" pour lire l'état actuel/i)).toBeInTheDocument()
+    expect(screen.getByText(/Cliquez sur « Générer l’aperçu V2 » pour lire l'état actuel/i)).toBeInTheDocument()
     
-    const btn = screen.getByRole('button', { name: /Générer Preview/i })
+    const btn = screen.getByRole('button', { name: /Générer l’aperçu V2/i })
     expect(btn).toBeInTheDocument()
     
     fireEvent.click(btn)

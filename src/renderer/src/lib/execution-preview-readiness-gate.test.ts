@@ -13,6 +13,19 @@ describe('execution-preview-readiness-gate', () => {
     expect(res.canApplyLater).toBe(false)
   })
 
+  it('garantit canApplyLater=false même avec engineV2Execution=true et readiness saine', () => {
+    // C'est le test qui couvrait le trou : avant la correction, ce chemin produisait
+    // canApplyLater=true en production (engineV2Execution=true par défaut dans le
+    // settings store + readiness saine). La garantie structurelle du Point 10 exige
+    // false sans condition.
+    const res = runExecutionPreviewReadinessGate({
+      ...baseInput,
+      settings: { engineV2Execution: true },
+    })
+    expect(res.readiness).toBe('ready_for_ui_preview')
+    expect(res.canApplyLater).toBe(false)
+  })
+
   it('marks as unsafe if safety check is critical', () => {
     const res = runExecutionPreviewReadinessGate({
       ...baseInput,

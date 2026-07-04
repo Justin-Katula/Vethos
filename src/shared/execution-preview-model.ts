@@ -1,5 +1,5 @@
 export type ExecutionPreviewMode =
-  | 'shadow_only'
+  | 'proposed_only'
   | 'debug_preview'
   | 'ui_preview'
   | 'manual_review_required'

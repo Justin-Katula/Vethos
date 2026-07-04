@@ -1,5 +1,5 @@
 /**
- * deadline-crisis-context-engine.ts — shadow only.
+ * deadline-crisis-context-engine.ts.
  *
  * Builds a DeadlineCrisisContext for a task or objective approaching a deadline.
  * This engine ONLY calculates a context snapshot. It does NOT:
@@ -294,7 +294,7 @@ function determineModeFromCrisis(
     case 'tight':
       return 'intensive_plan'
     case 'critical':
-      return minimumViable ? 'rescue_plan' : 'rescue_plan'
+      return 'rescue_plan'
     case 'rescue_required':
       return minimumViable ? 'rescue_plan' : 'minimum_viable_plan'
     case 'impossible_full_completion':
@@ -445,9 +445,9 @@ function assessSleepProtection(args: {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds a DeadlineCrisisContext shadow snapshot.
+ * Builds a DeadlineCrisisContext snapshot.
  *
- * Shadow only — does NOT modify the planning, sessions, blocking, or any score.
+ * Does NOT modify the planning, sessions, blocking, or any score.
  * The caller is responsible for deciding whether to act on this context.
  */
 export function buildDeadlineCrisisContext(input: BuildDeadlineCrisisContextInput): DeadlineCrisisContext {

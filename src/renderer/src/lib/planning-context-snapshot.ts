@@ -113,7 +113,12 @@ function dayReasons(status: DayAvailabilitySnapshot['status'], windows: FreeTime
   return reasons
 }
 
-function buildDaySnapshot(input: BuildPlanningContextV2Input, date: string, createdAt: string): {
+function buildDaySnapshot(
+  input: BuildPlanningContextV2Input,
+  date: string,
+  createdAt: string,
+  previousDays?: DayAvailabilitySnapshot[],
+): {
   day: DayAvailabilitySnapshot
   rulesApplied: PlanningRuleResult[]
 } {
@@ -147,6 +152,7 @@ function buildDaySnapshot(input: BuildPlanningContextV2Input, date: string, crea
     userModel: input.userModel,
     cognitiveModel: input.cognitiveModel,
     settings: input.settings,
+    previousDays,
   })
   const timeline = applyRecoverySegmentsToTimeline(preparation.updatedTimeline, recovery.recoverySegments)
   const finalWindows = recovery.updatedFreeWindows
@@ -231,7 +237,13 @@ export function buildPlanningContextV2(input: BuildPlanningContextV2Input): Plan
   const now = input.now ?? new Date()
   const createdAt = now.toISOString()
   const dates = enumerateDateRange(input.dateRange.startDate, input.dateRange.endDate)
-  const dayResults = dates.map((date) => buildDaySnapshot(input, date, createdAt))
+  
+  const dayResults: { day: DayAvailabilitySnapshot; rulesApplied: PlanningRuleResult[] }[] = []
+  for (const date of dates) {
+    const previousDays = dayResults.map((r) => r.day)
+    dayResults.push(buildDaySnapshot(input, date, createdAt, previousDays))
+  }
+  
   const days = dayResults.map((result) => result.day)
   const rulesApplied = dayResults.flatMap((result) => result.rulesApplied)
 
@@ -260,7 +272,7 @@ export function buildPlanningContextV2(input: BuildPlanningContextV2Input): Plan
       modelVersion: PLANNING_CONTEXT_V2_MODEL_VERSION,
       createdAt,
       updatedAt: createdAt,
-      source: 'shadow_planning_context',
+      source: 'planning_context_builder',
     },
   }
 }

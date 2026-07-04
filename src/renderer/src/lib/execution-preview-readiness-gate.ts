@@ -59,11 +59,15 @@ export function runExecutionPreviewReadinessGate(input: {
     canDisplayPreview = true
   }
 
-  const executionEnabled = input.settings?.engineV2Execution === true
-
   return {
     canDisplayPreview,
-    canApplyLater: executionEnabled && readiness === 'ready_for_ui_preview',
+    // Point 10 — garantie structurelle : ce pipeline de prévisualisation ne devient
+    // jamais celui qui applique quoi que ce soit. canApplyLater est false en
+    // permanence, sans condition. L'application réelle passe par les propres
+    // mécanismes d'activation des Points 7/8/9, jamais par la preview.
+    // (executionEnabled reste utilisé par le plan-builder uniquement pour choisir
+    // le mode d'affichage ui_preview vs debug_preview, pas une capacité d'application.)
+    canApplyLater: false,
     readiness,
     blockers,
     warnings,

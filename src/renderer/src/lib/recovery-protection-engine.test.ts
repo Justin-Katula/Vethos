@@ -50,4 +50,27 @@ describe('recovery-protection-engine', () => {
 
     expect(result.updatedFreeWindows[0]!.usableDurationMinutes).toBeLessThan(freeWindows[0]!.usableDurationMinutes)
   })
+
+  it('détecte le risque de fatigue extrême après plusieurs jours consécutifs sans temps libre', () => {
+    const timeline = buildDayTimeline({ date, normalizedScheduleSegments: [] })
+    const freeWindows = calculateUsableFreeWindows({
+      date,
+      rawFreeWindows: calculateRawFreeTime(timeline).rawFreeWindows,
+      timeline,
+    })
+
+    const previousDays: any[] = [
+      { date: '2026-06-20', usableFreeMinutes: 0 },
+      { date: '2026-06-21', usableFreeMinutes: 0 },
+    ]
+
+    const result = applyRecoveryProtection({
+      timeline,
+      freeWindows,
+      previousDays,
+    })
+
+    expect(result.rulesApplied.some((rule) => rule.rule === 'consecutive_no_free_time_risk')).toBe(true)
+    expect(result.rulesApplied.find((rule) => rule.rule === 'consecutive_no_free_time_risk')?.reason).toContain('2 jours consécutifs')
+  })
 })

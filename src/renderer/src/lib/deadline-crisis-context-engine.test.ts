@@ -27,7 +27,7 @@ function emptyContext(): PlanningContextV2 {
       modelVersion: 2,
       createdAt: '2026-06-22T00:00:00.000Z',
       updatedAt: '2026-06-22T00:00:00.000Z',
-      source: 'shadow_planning_context',
+      source: 'planning_context_builder',
     },
   }
 }
@@ -317,7 +317,7 @@ describe('deadline-crisis-context-engine', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test: shadow — output is a plain serialisable object
+  // Test: output is a plain serialisable object
   // -------------------------------------------------------------------------
 
   it('retourne un objet serialisable sans valeurs interdites (pas Infinity, pas NaN)', () => {

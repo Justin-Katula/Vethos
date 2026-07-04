@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { runExecutionPreviewShadowPipeline } from './execution-preview-shadow-pipeline-runner'
+import { runExecutionPreviewProposedPipeline } from './execution-preview-proposed-pipeline-runner'
 import type { ExecutionPreviewSanitizedSnapshot } from '@shared/execution-preview-data-connector-model'
 
-describe('execution-preview-shadow-pipeline-runner', () => {
+describe('execution-preview-proposed-pipeline-runner', () => {
   const baseSanitized: ExecutionPreviewSanitizedSnapshot = {
     userId: 'user1',
     tasks: [],
@@ -11,7 +11,7 @@ describe('execution-preview-shadow-pipeline-runner', () => {
     sessions: [],
     apps: [],
     sites: [],
-    settings: {},
+    settings: { engineV2Execution: true },
     dateRange: { startDate: '2025-01-01', endDate: '2025-01-02' },
     warnings: [],
     confidence: 100,
@@ -23,7 +23,7 @@ describe('execution-preview-shadow-pipeline-runner', () => {
   }
 
   it('returns unsafe mode if userId is MISSING_USER_ID', () => {
-    const res = runExecutionPreviewShadowPipeline({
+    const res = runExecutionPreviewProposedPipeline({
       snapshot: { ...baseSanitized, userId: 'MISSING_USER_ID' }
     })
     expect(res.mode).toBe('unsafe')
@@ -31,13 +31,13 @@ describe('execution-preview-shadow-pipeline-runner', () => {
   })
 
   it('runs the pipeline and ensures canApplyLater remains false on the returned preview plan', () => {
-    // We pass empty data, which should trigger partial_preview and generate a plan
-    const res = runExecutionPreviewShadowPipeline({
+    // Snapshot avec engineV2Execution=true : avant la correction du Point 10, ce chemin
+    // produisait canApplyLater=true. La garantie structurelle exige false.
+    const res = runExecutionPreviewProposedPipeline({
       snapshot: baseSanitized,
       idFactory: () => 'test-id'
     })
-    console.log(res.errors)
-    expect(res.mode).toBe('preview_only')
     expect(res.previewPlan).toBeDefined()
+    expect(res.previewPlan!.readiness.canApplyLater).toBe(false)
   })
 })

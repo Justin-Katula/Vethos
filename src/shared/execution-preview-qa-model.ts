@@ -90,7 +90,7 @@ export type ExecutionPreviewCalibrationReport = {
     nextAction:
       | 'adjust_mapping'
       | 'improve_input_data'
-      | 'improve_shadow_builder'
+      | 'improve_proposed_builder'
       | 'manual_review'
       | 'do_not_activate'
   }>

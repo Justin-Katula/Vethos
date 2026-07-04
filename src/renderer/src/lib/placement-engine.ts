@@ -19,6 +19,7 @@ import {
   estimateMinutesForLevel,
   getDeadlineMultiplier,
 } from './free-time-calculator'
+import type { PlacementPlanV2, ProposedPlacementBlock } from '@shared/placement-model'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,9 @@ export type PlacedBlock = {
   locked: true
   linkedTaskId: string | null // pour un objectif : tâche liée mise en avant
   linkedTaskIds: string[] // toutes les tâches actives qui contribuent au bloc
+  /** Contrat Point 7 conservé jusqu'au runtime Point 8. */
+  sourcePlacementBlock?: ProposedPlacementBlock
+  sourcePlacementPlanV2?: PlacementPlanV2
 }
 
 /** Un item qui concourt pour le temps libre (interne au moteur). */

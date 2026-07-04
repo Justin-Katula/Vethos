@@ -1,6 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronDown, Shield, ShieldCheck } from 'lucide-react'
+import { useRegistryStore } from '@/store/registry.store'
+import { useUserModelStore } from '@/store/user-model.store'
+import { useTasksStore } from '@/store/tasks.store'
+import { useSettingsStore } from '@/store/settings.store'
+import { useLevelsStore } from '@/store/levels.store'
+import { scoreObjectivePriorityV2 } from '@/lib/objective-priority-scorer-v2'
+import { scoreTaskPriorityV2 } from '@/lib/task-priority-scorer-v2'
+import { buildTaskModelV2 } from '@/lib/task-model-builder'
+import { selectPrimaryObjectiveId } from '@/lib/priority-engine'
+import { buildPriorityUiData } from '@/lib/priority-ui-data'
 import type { ObjectiveModelV2 } from '@shared/objective-model'
 import {
   OBJECTIVE_LEVEL_MAX,
@@ -38,6 +48,56 @@ export function ObjectiveCard({
   onClick,
 }: Props): JSX.Element {
   const [showWhy, setShowWhy] = useState(false)
+  const registry = useRegistryStore((s) => s.items)
+  const userModel = useUserModelStore((s) => s.model)
+  const tasks = useTasksStore((s) => s.tasks)
+  const engineV2Priority = useSettingsStore((s) => s.engineV2Priority)
+  const objectives = useLevelsStore((s) => s.objectives)
+
+  const uiData = useMemo(() => {
+    if (!engineV2Priority || !model) return null
+    try {
+      const now = new Date()
+      const primaryObjectiveId = selectPrimaryObjectiveId(objectives, userModel)
+      
+      const objTasks = tasks.filter((t) => t.linkedObjectiveId === objective.id)
+      const linkedTaskScores = objTasks.map((t) => {
+        const taskModel = buildTaskModelV2({
+          task: t,
+          objective,
+          objectiveModel: model,
+          registry,
+          now,
+        })
+        return scoreTaskPriorityV2({
+          taskModelV2: taskModel,
+          linkedObjectiveModelV2: model,
+          userModel: userModel ?? null,
+          planningContext: null,
+          cognitiveModel: null,
+          completionGateResult: null,
+          oldScore: undefined,
+          now,
+        })
+      })
+
+      const scoreV2 = scoreObjectivePriorityV2({
+        objectiveModelV2: model,
+        linkedTaskScores,
+        userModel: userModel ?? null,
+        planningContext: null,
+        cognitiveModel: null,
+        oldScore: undefined,
+        now,
+      })
+
+      return buildPriorityUiData(scoreV2)
+    } catch (e) {
+      console.error('Failed to compute V2 objective score in ObjectiveCard:', e)
+      return null
+    }
+  }, [objective, model, registry, userModel, tasks, engineV2Priority, objectives])
+
   const Icon = iconByName(objective.icon)
   const integerLevel = Math.floor(objective.level)
   const progress = objective.level - integerLevel
@@ -115,12 +175,24 @@ export function ObjectiveCard({
             <span>Progression <strong className="text-text-primary">{model.progress.progressPercent}%</strong></span>
             <span>Cette semaine <strong className="text-text-primary">{Math.floor(model.progress.investedMinutesThisWeek / 60)}h{String(model.progress.investedMinutesThisWeek % 60).padStart(2, '0')}</strong></span>
             <span className="truncate">Prochaine action : <strong className="text-text-primary">{model.nextAction.label}</strong></span>
-            <span>{priorityPhrase(objective.priorityScoreV2?.priorityScore ?? model.mission.declaredImportanceScore)}</span>
-            <span>{urgencyPhrase(objective.priorityScoreV2?.urgencyScore ?? model.risk.deadlineRiskScore)}</span>
-            <span>{workloadPhrase(objective.priorityScoreV2?.workloadScore ?? model.risk.overloadRiskScore)}</span>
-            <span>{stagnationPhrase(objective.priorityScoreV2?.stagnationScore ?? model.risk.stagnationScore)}</span>
-            <span>{momentumPhrase(objective.priorityScoreV2?.momentumScore ?? model.progress.momentumScore)}</span>
-            <span>{protectionPhrase(model.protection.recommendedProtectionLevel)}</span>
+            {uiData ? (
+              <>
+                <span>Priorité : <strong className="text-text-primary capitalize">{uiData.priorityLabel}</strong></span>
+                <span>Urgence : <span className="capitalize">{uiData.urgencyLabel}</span></span>
+                <span>Risque : <span className="capitalize">{uiData.riskLabel === 'safe' ? 'sûr' : uiData.riskLabel === 'watch' ? 'à surveiller' : uiData.riskLabel === 'at_risk' ? 'à risque' : 'critique'}</span></span>
+                <span>Faisabilité : <span className="capitalize">{uiData.feasibilityLabel === 'easy' ? 'facile' : uiData.feasibilityLabel === 'possible' ? 'possible' : uiData.feasibilityLabel === 'tight' ? 'serrée' : uiData.feasibilityLabel === 'hard' ? 'difficile' : 'impossible'}</span></span>
+                <span>Protection : <span className="capitalize">{uiData.protectionLabel === 'none' ? 'aucune' : uiData.protectionLabel === 'light' ? 'légère' : uiData.protectionLabel === 'normal' ? 'normale' : uiData.protectionLabel === 'strong' ? 'forte' : 'stricte'}</span></span>
+              </>
+            ) : (
+              <>
+                <span>{priorityPhrase(objective.priorityScoreV2?.priorityScore ?? model.mission.declaredImportanceScore)}</span>
+                <span>{urgencyPhrase(objective.priorityScoreV2?.urgencyScore ?? model.risk.deadlineRiskScore)}</span>
+                <span>{workloadPhrase(objective.priorityScoreV2?.workloadScore ?? model.risk.overloadRiskScore)}</span>
+                <span>{stagnationPhrase(objective.priorityScoreV2?.stagnationScore ?? model.risk.stagnationScore)}</span>
+                <span>{momentumPhrase(objective.priorityScoreV2?.momentumScore ?? model.progress.momentumScore)}</span>
+                <span>{protectionPhrase(model.protection.recommendedProtectionLevel)}</span>
+              </>
+            )}
           </div>
         )}
 
@@ -162,11 +234,25 @@ export function ObjectiveCard({
           )}
         </div>
         {model && showWhy && (
-          <div className="rounded-lg border border-border-subtle/50 bg-bg-base/50 p-3 text-[11px] leading-relaxed text-text-secondary">
-            <p className="text-text-primary">{model.explanation.summary}</p>
-            <ul className="mt-2 list-disc space-y-1 pl-4">
-              {model.explanation.reasons.slice(0, 4).map((reason) => <li key={reason}>{reason}</li>)}
-            </ul>
+          <div className="rounded-lg border border-border-subtle/50 bg-bg-base/50 p-3 text-[11px] leading-relaxed text-text-secondary space-y-1">
+            {uiData ? (
+              <>
+                <p className="font-semibold text-text-primary">{uiData.mainReason}</p>
+                {uiData.why.slice(1).map((reason) => (
+                  <p key={reason}>• {reason}</p>
+                ))}
+                {uiData.warnings.map((warning) => (
+                  <p key={warning} className="text-accent">• Attention : {warning}</p>
+                ))}
+              </>
+            ) : (
+              <>
+                <p className="text-text-primary">{model.explanation.summary}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-4">
+                  {model.explanation.reasons.slice(0, 4).map((reason) => <li key={reason}>{reason}</li>)}
+                </ul>
+              </>
+            )}
           </div>
         )}
       </div>

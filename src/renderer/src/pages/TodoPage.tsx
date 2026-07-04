@@ -35,6 +35,9 @@ import { useUserModelStore } from '@/store/user-model.store'
 import { getEngineFlags, withV1FallbackSync } from '@/lib/engine-activation'
 import { sortTasksV2 } from '@/lib/placement-v2-adapter'
 import { buildObjectiveModelV2 } from '@/lib/objective-model-builder'
+import { buildTaskModelV2 } from '@/lib/task-model-builder'
+import { scoreTaskPriorityV2 } from '@/lib/task-priority-scorer-v2'
+import { buildPriorityUiData } from '@/lib/priority-ui-data'
 import { buildTaskStatus } from '@/lib/task-intelligence'
 import { momentumPhrase, priorityPhrase, stagnationPhrase, urgencyPhrase, workloadPhrase } from '@/lib/human-score-language'
 import { buildObjectivePriorityResult, buildTaskPriorityResult, selectPrimaryObjectiveId } from '@/lib/priority-engine'
@@ -504,7 +507,54 @@ function TaskCard({
   onComplete: () => void
 }) {
   const [showWhy, setShowWhy] = useState(false)
+  const registry = useRegistryStore((s) => s.items)
+  const userModel = useUserModelStore((s) => s.model)
+  const tasks = useTasksStore((s) => s.tasks)
+  const engineV2Priority = useSettingsStore((s) => s.engineV2Priority)
+
   const obj = objectives.find((o) => o.id === task.linkedObjectiveId)
+
+  const uiData = useMemo(() => {
+    if (!engineV2Priority) return null
+    try {
+      const now = new Date()
+      const primaryObjectiveId = selectPrimaryObjectiveId(objectives, userModel)
+      let objectiveModel = null
+      if (obj) {
+        const objTasks = tasks.filter((t) => t.linkedObjectiveId === obj.id)
+        objectiveModel = buildObjectiveModelV2({
+          objective: obj,
+          tasks: objTasks,
+          registry,
+          userModel,
+          now,
+          priorityContext: { primaryObjectiveId },
+        })
+      }
+      const taskModel = buildTaskModelV2({
+        task,
+        objective: obj,
+        objectiveModel,
+        registry,
+        now,
+      })
+      const scoreV2 = scoreTaskPriorityV2({
+        taskModelV2: taskModel,
+        linkedObjectiveModelV2: objectiveModel,
+        userModel: userModel ?? null,
+        planningContext: null,
+        cognitiveModel: null,
+        completionGateResult: null,
+        oldScore: undefined,
+        now,
+      })
+      return buildPriorityUiData(scoreV2)
+    } catch (e) {
+      console.error('Failed to build PriorityUiData in TaskCard:', e)
+      return null
+    }
+  }, [task, objectives, registry, userModel, tasks, engineV2Priority, obj])
+
   const blocking = resolveWorkBlockingForTask(task, obj)
   const today = todayDateStr()
   const multiplier =
@@ -591,21 +641,44 @@ function TaskCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-1.5 text-[10px] text-text-secondary sm:grid-cols-2">
-          <span><strong className="text-text-primary">{priorityPhrase(score?.priorityScore ?? task.level * 10)}</strong></span>
-          <span>{urgencyPhrase(score?.urgencyScore ?? 0)}</span>
-          <span>{workloadPhrase(score?.workloadScore ?? 0)}</span>
-          <span>{stagnationPhrase(score?.stagnationScore ?? 0)}</span>
-          <span>{momentumPhrase(score?.momentumScore ?? 0)}</span>
-          <span>Session conseillée : <strong className="text-text-primary">{intelligence.recommendedSessionLength} min</strong></span>
-        </div>
+        {uiData ? (
+          <div className="grid grid-cols-1 gap-1.5 text-[10px] text-text-secondary sm:grid-cols-2">
+            <span>Priorité : <strong className="text-text-primary capitalize">{uiData.priorityLabel}</strong></span>
+            <span>Urgence : <span className="capitalize">{uiData.urgencyLabel}</span></span>
+            <span>Risque : <span className="capitalize">{uiData.riskLabel === 'safe' ? 'sûr' : uiData.riskLabel === 'watch' ? 'à surveiller' : uiData.riskLabel === 'at_risk' ? 'à risque' : 'critique'}</span></span>
+            <span>Faisabilité : <span className="capitalize">{uiData.feasibilityLabel === 'easy' ? 'facile' : uiData.feasibilityLabel === 'possible' ? 'possible' : uiData.feasibilityLabel === 'tight' ? 'serrée' : uiData.feasibilityLabel === 'hard' ? 'difficile' : 'impossible'}</span></span>
+            <span>Protection : <span className="capitalize">{uiData.protectionLabel === 'none' ? 'aucune' : uiData.protectionLabel === 'light' ? 'légère' : uiData.protectionLabel === 'normal' ? 'normale' : uiData.protectionLabel === 'strong' ? 'forte' : 'stricte'}</span></span>
+            <span>Session conseillée : <strong className="text-text-primary">{intelligence.recommendedSessionLength} min</strong></span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-1.5 text-[10px] text-text-secondary sm:grid-cols-2">
+            <span><strong className="text-text-primary">{priorityPhrase(score?.priorityScore ?? task.level * 10)}</strong></span>
+            <span>{urgencyPhrase(score?.urgencyScore ?? 0)}</span>
+            <span>{workloadPhrase(score?.workloadScore ?? 0)}</span>
+            <span>{stagnationPhrase(score?.stagnationScore ?? 0)}</span>
+            <span>{momentumPhrase(score?.momentumScore ?? 0)}</span>
+            <span>Session conseillée : <strong className="text-text-primary">{intelligence.recommendedSessionLength} min</strong></span>
+          </div>
+        )}
 
         <button type="button" className="w-fit text-[10px] font-medium text-accent hover:underline" onClick={() => setShowWhy((value) => !value)}>
           Pourquoi ?
         </button>
         {showWhy && (
-          <div className="rounded-lg border border-border-subtle/50 bg-bg-base/50 p-3 text-[11px] leading-relaxed text-text-secondary">
-            {(score?.reasons.length ? score.reasons : intelligence.reasons).map((reason) => <p key={reason}>• {reason}</p>)}
+          <div className="rounded-lg border border-border-subtle/50 bg-bg-base/50 p-3 text-[11px] leading-relaxed text-text-secondary space-y-1">
+            {uiData ? (
+              <>
+                <p className="font-semibold text-text-primary">{uiData.mainReason}</p>
+                {uiData.why.slice(1).map((reason) => (
+                  <p key={reason}>• {reason}</p>
+                ))}
+                {uiData.warnings.map((warning) => (
+                  <p key={warning} className="text-accent">• Attention : {warning}</p>
+                ))}
+              </>
+            ) : (
+              (score?.reasons.length ? score.reasons : intelligence.reasons).map((reason) => <p key={reason}>• {reason}</p>)
+            )}
           </div>
         )}
 

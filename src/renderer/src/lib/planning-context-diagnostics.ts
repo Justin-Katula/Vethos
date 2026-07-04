@@ -1,11 +1,14 @@
-import type { PlanningContextDiagnostics, PlanningContextDiagnosticIssue, PlanningContextV2 } from '@shared/planning-time-model'
+import type { PlanningContextDiagnostics, PlanningContextDiagnosticIssue, PlanningContextV2, DeadlineAvailabilityResult } from '@shared/planning-time-model'
 import { MINUTES_PER_DAY, segmentEndMinute, segmentStartMinute, sortSegments, totalDurationMinutes } from './planning-time-utils'
 
 function issue(args: PlanningContextDiagnosticIssue): PlanningContextDiagnosticIssue {
   return args
 }
 
-export function runPlanningContextDiagnostics(planningContext: PlanningContextV2): PlanningContextDiagnostics {
+export function runPlanningContextDiagnostics(
+  planningContext: PlanningContextV2,
+  deadlineAvailabilities?: DeadlineAvailabilityResult[],
+): PlanningContextDiagnostics {
   const issues: PlanningContextDiagnosticIssue[] = []
 
   if (planningContext.days.length === 0) {
@@ -113,6 +116,30 @@ export function runPlanningContextDiagnostics(planningContext: PlanningContextV2
         message: 'Du temps utilisable existe, mais aucun vrai bloc de deep work.',
       }))
     }
+
+    const prepRecovTransitionMinutes = day.preparationMinutes + day.recoveryMinutes + day.transitionMinutes
+    if (prepRecovTransitionMinutes > day.rawFreeMinutes) {
+      issues.push(issue({
+        id: 'contradictory_rules',
+        severity: 'warning',
+        date: day.date,
+        message: 'Les règles de protection et de récupération dépassent le temps libre brut disponible.',
+        metadata: { prepRecovTransitionMinutes, rawFreeMinutes: day.rawFreeMinutes },
+      }))
+    }
+  }
+
+  if (deadlineAvailabilities) {
+    for (const availability of deadlineAvailabilities) {
+      if (availability.status === 'impossible' || availability.status === 'overdue') {
+        issues.push(issue({
+          id: `deadline_availability_${availability.status}`,
+          severity: 'critical',
+          message: `Disponibilité impossible ou en retard pour la deadline : ${availability.deadline}.`,
+          metadata: { deadline: availability.deadline, status: availability.status },
+        }))
+      }
+    }
   }
 
   const status: PlanningContextDiagnostics['status'] = issues.some((item) => item.severity === 'critical')
@@ -126,7 +153,7 @@ export function runPlanningContextDiagnostics(planningContext: PlanningContextV2
     issues,
     summary:
       issues.length === 0
-        ? ['Aucun problème majeur détecté dans le contexte de planning shadow.']
+        ? ['Aucun problème majeur détecté dans le contexte de planning.']
         : issues.slice(0, 5).map((item) => item.message),
   }
 }

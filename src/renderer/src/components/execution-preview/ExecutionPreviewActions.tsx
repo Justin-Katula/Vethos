@@ -14,8 +14,7 @@ export function ExecutionPreviewActions({ actions }: { actions: ExecutionPreview
           // Strictly no handlers for apply/start/block
           const isDangerous = ['disabled_apply', 'disabled_start_session', 'disabled_blocking'].includes(action.actionType)
           
-          // Rebuild shadow is completely disabled in Point 11
-          const isDisabled = !action.enabled || isDangerous || action.actionType === 'rebuild_shadow'
+          const isDisabled = !action.enabled || isDangerous
           
           return (
             <div key={i} className="flex flex-col gap-1">

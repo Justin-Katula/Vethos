@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { ExecutionPreviewFlags } from './execution-preview-flags'
 
 describe('execution-preview-flags', () => {
-  it('enables all shadow features', () => {
+  it('enables all proposed-pipeline features', () => {
     expect(ExecutionPreviewFlags.executionPreviewV2Enabled).toBe(true)
     expect(ExecutionPreviewFlags.executionPreviewInputAdapterEnabled).toBe(true)
     expect(ExecutionPreviewFlags.executionPreviewDependencyResolverEnabled).toBe(true)

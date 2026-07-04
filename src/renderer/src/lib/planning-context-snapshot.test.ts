@@ -35,7 +35,7 @@ describe('planning-context-snapshot', () => {
     })
 
     expect(context.days).toHaveLength(7)
-    expect(context.metadata.source).toBe('shadow_planning_context')
+    expect(context.metadata.source).toBe('planning_context_builder')
     expect(context.weeklySummary.rawFreeMinutes).toBeGreaterThan(0)
     expect(context.rulesApplied.some((ruleResult) => ruleResult.rule === 'daily_capacity_limit')).toBe(true)
   })

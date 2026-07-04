@@ -18,7 +18,7 @@ export function buildExecutionPreviewEmptyState(reason: EmptyStateReason): Execu
     case 'no_preview_built':
       return {
         title: 'Aucune preview générée',
-        description: 'Le planificateur n’a pas encore généré de plan shadow pour cette période.',
+        description: 'Le planificateur n’a pas encore généré de plan proposé pour cette période.',
         icon: 'info',
       }
     case 'missing_planning_context':

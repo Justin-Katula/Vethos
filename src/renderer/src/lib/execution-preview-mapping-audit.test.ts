@@ -17,7 +17,7 @@ describe('execution-preview-mapping-audit', () => {
         id: '1',
         userId: 'user-1',
         dateRange: { startDate: '2026-06-26', endDate: '2026-06-26' },
-        mode: 'shadow_only',
+        mode: 'proposed_only',
         status: 'ready_for_preview',
         dependencies: [],
         days: [{

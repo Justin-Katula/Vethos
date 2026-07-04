@@ -1,28 +1,28 @@
 import type {
   ExecutionPreviewSanitizedSnapshot,
-  ShadowPipelineBuildResult,
-  ShadowPipelineBuildMode,
+  ProposedPipelineBuildResult,
+  ProposedPipelineBuildMode,
 } from '@shared/execution-preview-data-connector-model'
 
 import { buildExecutionPreviewPlanV2 } from './execution-preview-plan-builder'
 
-export type ShadowPipelineInput = {
+export type ProposedPipelineInput = {
   snapshot: ExecutionPreviewSanitizedSnapshot
   now?: string
   idFactory?: () => string
 }
 
-export function runExecutionPreviewShadowPipeline(
-  input: ShadowPipelineInput
-): ShadowPipelineBuildResult {
+export function runExecutionPreviewProposedPipeline(
+  input: ProposedPipelineInput
+): ProposedPipelineBuildResult {
   const { snapshot, now } = input
   const warnings: string[] = [...snapshot.warnings]
   const errors: string[] = []
   let confidence = snapshot.confidence
-  let mode: ShadowPipelineBuildMode = 'preview_only'
+  let mode: ProposedPipelineBuildMode = 'preview_only'
 
   if (snapshot.userId === 'MISSING_USER_ID') {
-    errors.push("Impossible de construire le pipeline shadow : userId manquant.")
+    errors.push("Impossible de construire le pipeline proposé : userId manquant.")
     return {
       mode: 'unsafe',
       warnings,
@@ -70,7 +70,7 @@ export function runExecutionPreviewShadowPipeline(
     }
 
   } catch (err) {
-    errors.push(`Erreur fatale dans le pipeline shadow : ${err instanceof Error ? err.message : String(err)}`)
+    errors.push(`Erreur fatale dans le pipeline proposé : ${err instanceof Error ? err.message : String(err)}`)
     return {
       mode: 'unsafe',
       warnings,

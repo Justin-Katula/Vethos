@@ -61,7 +61,7 @@ export interface ExecutionPreviewActionViewModel {
     | 'debug_only'
     | 'manual_review'
     | 'fix_inputs'
-    | 'rebuild_shadow'
+    | 'rebuild_proposed'
     | 'disabled_apply'
     | 'disabled_start_session'
     | 'disabled_blocking'
@@ -140,10 +140,10 @@ export function buildExecutionPreviewViewModel(input: {
     })
   }
 
-  // Rebuild shadow (disabled for point 11)
+  // Reconstruire le plan proposé (disabled for point 11)
   actions.push({
-    label: 'Reconstruire shadow',
-    actionType: 'rebuild_shadow',
+    label: 'Reconstruire le plan proposé',
+    actionType: 'rebuild_proposed',
     enabled: false,
     reason: 'Disabled in Point 11: preview UI is read-only.',
   })

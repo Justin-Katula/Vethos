@@ -1,7 +1,8 @@
 import type { ExecutionPreviewProviderState } from '@shared/execution-preview-data-connector-model'
+import { ExecutionPreviewFlags } from '@shared/execution-preview-flags'
 import { buildExecutionPreviewRawSnapshot } from './execution-preview-readonly-snapshot'
 import { sanitizeExecutionPreviewSnapshot } from './execution-preview-snapshot-sanitizer'
-import { runExecutionPreviewShadowPipeline } from './execution-preview-shadow-pipeline-runner'
+import { runExecutionPreviewProposedPipeline } from './execution-preview-proposed-pipeline-runner'
 
 export type BuildPreviewFromReadOnlyDataInput = {
   userId?: string
@@ -26,6 +27,23 @@ export function buildExecutionPreviewFromReadOnlyData(
 ): ExecutionPreviewProviderState {
   const { now, idFactory, dateRange, ...rawData } = input
 
+  // Point 10 — Flag de rollback principal : si executionPreviewV2Enabled est false,
+  // le pipeline de prévisualisation est désactivé et on retourne un état inactif
+  // sans rien construire. Cela rend le flag réellement consommé (il ne l'était pas
+  // avant) et permet un rollback global du pipeline.
+  if (!ExecutionPreviewFlags.executionPreviewV2Enabled) {
+    return {
+      status: 'idle',
+      previewPlan: undefined,
+      lastBuildAt: now ?? new Date().toISOString(),
+      warnings: ['Pipeline de prévisualisation désactivé (executionPreviewV2Enabled=false).'],
+      errors: [],
+      canGeneratePreview: false,
+      canApplyPreview: false,
+      confidence: 0,
+    }
+  }
+
   // 1. Raw Snapshot
   const rawSnapshot = buildExecutionPreviewRawSnapshot({
     ...rawData,
@@ -40,8 +58,8 @@ export function buildExecutionPreviewFromReadOnlyData(
     now,
   })
 
-  // 3. Shadow Pipeline Runner
-  const pipelineResult = runExecutionPreviewShadowPipeline({
+  // 3. Proposed Pipeline Runner
+  const pipelineResult = runExecutionPreviewProposedPipeline({
     snapshot: sanitizedSnapshot,
     now,
     idFactory,

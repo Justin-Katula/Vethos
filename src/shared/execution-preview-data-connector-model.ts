@@ -2,7 +2,7 @@ import type { ExecutionPreviewPlanV2 } from './execution-preview-model'
 
 export type ExecutionPreviewDataConnectorMode =
   | 'read_only'
-  | 'manual_shadow_build'
+  | 'manual_proposed_build'
   | 'auto_build_disabled'
   | 'unsafe'
   | 'manual_review_required'
@@ -99,7 +99,7 @@ export type ExecutionPreviewSanitizedSnapshot = {
   }
 }
 
-export type ShadowPipelineBuildMode =
+export type ProposedPipelineBuildMode =
   | 'preview_only'
   | 'partial_preview'
   | 'manual_review_required'
@@ -116,8 +116,8 @@ export type ExecutionPreviewDataConnectorDiagnostics = {
   summary: string[]
 }
 
-export type ShadowPipelineBuildResult = {
-  mode: ShadowPipelineBuildMode
+export type ProposedPipelineBuildResult = {
+  mode: ProposedPipelineBuildMode
   previewPlan?: ExecutionPreviewPlanV2
   userModel?: unknown
   objectiveModelsV2?: unknown[]

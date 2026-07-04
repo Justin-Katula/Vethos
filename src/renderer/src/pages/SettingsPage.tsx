@@ -29,6 +29,7 @@ import { ExecutionPreviewUiFlags } from '@shared/execution-preview-ui-flags'
 import { ExecutionPreviewDataConnectorPanel } from '@/components/execution-preview/ExecutionPreviewDataConnectorPanel'
 import { Eye, EyeOff } from 'lucide-react'
 import { UserModelPanel } from '@/components/user-model/UserModelPanel'
+import { RuntimeCoordinatorPanel } from '@/components/runtime-coordinator/RuntimeCoordinatorPanel'
 
 function ToggleRow({
   label,
@@ -355,7 +356,7 @@ export default function SettingsPage() {
           />
         </section>
 
-        {/* --- Moteurs Actifs V2 (Shadow) --- */}
+        {/* --- Moteurs actifs V2 --- */}
         <section className="max-w-lg space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
             Moteurs V2 (Activation)
@@ -604,13 +605,14 @@ export default function SettingsPage() {
         </section>
 
         {import.meta.env.DEV && <UserModelPanel />}
+        {import.meta.env.DEV && <RuntimeCoordinatorPanel />}
 
-        {/* --- Shadow Orchestrator Preview --- */}
+        {/* --- Aperçu de l’orchestrateur --- */}
         {ExecutionPreviewUiFlags.executionPreviewUiEnabled && (
           <section className="max-w-4xl space-y-3 pt-8 border-t border-border-subtle mt-8">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                Développeur : Shadow Orchestrator V2
+                Développeur : aperçu Orchestrator V2
               </h2>
               <Button
                 variant="ghost"

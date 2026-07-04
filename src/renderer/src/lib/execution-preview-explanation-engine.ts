@@ -10,7 +10,7 @@ export function explainExecutionPreviewPlan(plan: Omit<ExecutionPreviewPlanV2, '
 
   if (safety.status === 'critical' || safety.status === 'unsafe') {
     summary = 'This preview contains unsafe or real actions and cannot be applied.'
-    warnings.push('CRITICAL: Real actions detected in shadow plan.')
+    warnings.push('CRITICAL: Des actions réelles ont été détectées dans le plan proposé.')
     nextRecommendedAction = 'do_not_apply'
   } else if (readiness.readiness === 'blocked' || readiness.readiness === 'partial_preview_only') {
     summary = 'This preview is incomplete due to missing dependencies.'

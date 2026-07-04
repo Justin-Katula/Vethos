@@ -20,10 +20,10 @@ describe('execution-preview-model', () => {
     const dummyPlan: Partial<ExecutionPreviewPlanV2> = {
       id: 'test',
       status: 'ready_for_preview',
-      mode: 'shadow_only',
+      mode: 'proposed_only',
     }
     const serialized = JSON.parse(JSON.stringify(dummyPlan))
     expect(serialized.id).toBe('test')
-    expect(serialized.mode).toBe('shadow_only')
+    expect(serialized.mode).toBe('proposed_only')
   })
 })

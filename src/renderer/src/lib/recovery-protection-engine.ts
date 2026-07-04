@@ -1,4 +1,4 @@
-import type { DayTimelineSegment, FreeTimeWindow, PlanningRuleResult } from '@shared/planning-time-model'
+import type { DayAvailabilitySnapshot, DayTimelineSegment, FreeTimeWindow, PlanningRuleResult } from '@shared/planning-time-model'
 import type { UserCognitiveModel, UserModel } from '@shared/user-model'
 import type { Settings } from '@shared/schemas'
 import {
@@ -15,6 +15,7 @@ export type ApplyRecoveryProtectionInput = {
   userModel?: UserModel | null
   cognitiveModel?: UserCognitiveModel | null
   settings?: Settings | null
+  previousDays?: DayAvailabilitySnapshot[]
 }
 
 export type RecoveryProtectionResult = {
@@ -39,6 +40,28 @@ export function applyRecoveryProtection(input: ApplyRecoveryProtectionInput): Re
   const cognitiveModel = input.cognitiveModel ?? input.userModel?.cognitiveModel ?? null
   const rulesApplied: PlanningRuleResult[] = []
   const recoverySegments: DayTimelineSegment[] = []
+
+  // Check for consecutive days without free time
+  let consecutiveDaysCount = 0
+  if (input.previousDays) {
+    for (let i = input.previousDays.length - 1; i >= 0; i--) {
+      if (input.previousDays[i]!.usableFreeMinutes <= 0) {
+        consecutiveDaysCount++
+      } else {
+        break
+      }
+    }
+  }
+
+  if (consecutiveDaysCount >= 2) {
+    rulesApplied.push({
+      id: segmentId(['rule', input.timeline[0]?.date ?? 'default', 'consecutive-no-free-time-risk']),
+      rule: 'consecutive_no_free_time_risk',
+      applied: true,
+      affectedMinutes: 0,
+      reason: `Risque élevé de fatigue : déjà ${consecutiveDaysCount} jours consécutifs sans aucun temps libre utilisable.`,
+    })
+  }
 
   const updatedFreeWindows = input.freeWindows.map((window) => {
     const previous = findAdjacentSegment(input.timeline, window, 'previous')

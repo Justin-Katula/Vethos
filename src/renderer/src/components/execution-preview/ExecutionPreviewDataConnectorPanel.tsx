@@ -30,9 +30,9 @@ export function ExecutionPreviewDataConnectorPanel() {
     <div className="flex flex-col gap-4 border border-border-subtle rounded-xl p-4 bg-bg-base shadow-sm">
       <div className="flex items-center justify-between border-b border-border-subtle pb-4">
         <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-semibold text-text-primary">Shadow Data Connector</h3>
+          <h3 className="text-lg font-semibold text-text-primary">Connecteur de données d’aperçu</h3>
           <p className="text-xs text-text-muted">
-            Pont de connexion Read-Only entre les données réelles et le pipeline shadow V2.
+            Pont en lecture seule entre les données réelles et le pipeline d’aperçu V2.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ export function ExecutionPreviewDataConnectorPanel() {
             ) : (
               <RefreshCw size={14} className="mr-2" />
             )}
-            Générer Preview Shadow
+            Générer l’aperçu V2
           </Button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export function ExecutionPreviewDataConnectorPanel() {
       
       {state.status === 'idle' && (
         <div className="py-12 text-center text-sm text-text-muted">
-          Cliquez sur "Générer Preview Shadow" pour lire l'état actuel et construire un plan V2.<br/>
+          Cliquez sur « Générer l’aperçu V2 » pour lire l'état actuel et construire un plan V2.<br/>
           (Lecture seule garantie, aucune modification ne sera appliquée).
         </div>
       )}

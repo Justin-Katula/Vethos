@@ -2,7 +2,7 @@ export const ExecutionPreviewDataConnectorFlags = {
   executionPreviewDataConnectorEnabled: true,
   executionPreviewReadOnlySnapshotEnabled: true,
   executionPreviewSnapshotSanitizerEnabled: true,
-  executionPreviewShadowPipelineRunnerEnabled: true,
+  executionPreviewProposedPipelineRunnerEnabled: true,
   executionPreviewDataProviderEnabled: true,
   executionPreviewManualGenerateEnabled: true,
   executionPreviewDataConnectorDiagnosticsEnabled: true,

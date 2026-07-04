@@ -3,7 +3,7 @@ import { buildExecutionPreviewPlanV2 } from './execution-preview-plan-builder'
 import type { ExecutionPreviewInputPayload } from './execution-preview-input-adapter'
 
 describe('execution-preview-plan-builder', () => {
-  it('builds a shadow plan without calling real managers', () => {
+  it('builds a proposed plan without calling real managers', () => {
     const input: ExecutionPreviewInputPayload = {
       userId: 'u1',
       dateRange: { startDate: '2026-06-26T00:00:00Z', endDate: '2026-06-26T23:59:59Z' },
@@ -21,7 +21,7 @@ describe('execution-preview-plan-builder', () => {
 
     const plan = buildExecutionPreviewPlanV2(input)
 
-    // Verify purely shadow
+    // Verify purely proposed
     expect(plan.id).toBe('pid1')
     expect(plan.metadata.source).toBe('execution_preview')
     expect(plan.readiness.canApplyLater).toBe(false)

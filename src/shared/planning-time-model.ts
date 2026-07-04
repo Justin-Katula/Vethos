@@ -65,6 +65,7 @@ export type PlanningRuleResult = {
     | 'fragmentation_detected'
     | 'deep_work_window_detected'
     | 'deadline_crisis_detected'
+    | 'consecutive_no_free_time_risk'
   applied: boolean
   affectedMinutes: number
   reason: string
@@ -113,7 +114,7 @@ export type PlanningContextV2 = {
     modelVersion: number
     createdAt: string
     updatedAt: string
-    source: 'shadow_planning_context'
+    source: 'planning_context_builder'
   }
 }
 
@@ -181,7 +182,7 @@ export type PlanningUiDayData = {
 }
 
 /**
- * DeadlineCrisisContext — shadow only.
+ * DeadlineCrisisContext.
  * Represents the crisis level and recommended strategy for a task or objective
  * approaching a deadline. Never modifies the real planning, sessions, or blocking.
  *

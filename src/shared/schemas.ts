@@ -22,6 +22,7 @@ export const STORAGE_KEYS = [
   'app_block_explanations',
   'user_model',
   'decision_log',
+  'sessions_v2',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -93,6 +94,7 @@ const EXE_NAME_REGEX = /^[A-Za-z0-9_.\- ]+\.exe$/i
 
 export const UnlockPolicySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('none') }),
+  z.object({ type: z.literal('deny_during_strict_session') }),
   z.object({ type: z.literal('cooldown'), minutes: z.number().int().min(1).max(60) }),
   z.object({ type: z.literal('justification'), minWords: z.number().int().min(50).max(500) }),
   z.object({
@@ -336,7 +338,11 @@ export const ObjectiveSchema = z.object({
   blocking: WorkBlockingConfigSchema.optional(),
   unlockPolicy: UnlockPolicySchema.optional(),
   createdAt: z.string().datetime(),
-  /** Cache persistant V2, optionnel et supprimable sans perdre le niveau historique. */
+  /** 
+   * WARNING: Although this field is named priorityScoreV2 in the database for historical and schema compatibility,
+   * it is currently populated in the background using the old 1D V1 priority result (buildObjectivePriorityResult).
+   * True V2 scores (action, planning, protection, recovery) are computed dynamically in-memory.
+   */
   priorityScoreV2: PersistedPriorityScoreSchema.optional(),
 })
 export type Objective = z.infer<typeof ObjectiveSchema>
@@ -426,7 +432,11 @@ export const TaskSchema = z.object({
   devForceStartMinute: z.number().int().min(0).max(1439).optional(),
   devForceEndMinute: z.number().int().min(1).max(1440).optional(),
   createdAt: z.string().datetime(),
-  /** Cache persistant V2, optionnel et supprimable sans perdre le niveau historique. */
+  /** 
+   * WARNING: Although this field is named priorityScoreV2 in the database for historical and schema compatibility,
+   * it is currently populated in the background using the old 1D V1 priority result (buildTaskPriorityResult).
+   * True V2 scores (action, planning, protection, recovery) are computed dynamically in-memory.
+   */
   priorityScoreV2: PersistedPriorityScoreSchema.optional(),
 })
 export type Task = z.infer<typeof TaskSchema>
@@ -653,4 +663,5 @@ export const STORAGE_SCHEMAS = {
   app_block_explanations: AppBlockExplanationsStateSchema,
   user_model: z.unknown(),
   decision_log: z.unknown(),
+  sessions_v2: z.unknown(),
 } as const satisfies Record<StorageKey, z.ZodTypeAny>
