@@ -1,74 +1,71 @@
-import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
+import { describe, expect, it } from 'vitest'
 
-describe('ExecutionPreview Data Connector Anti-Regression', () => {
-  it('ensures pure files do not import real stores or action muscles', () => {
-    const pureForbiddenImports = [
-      'tasks.store',
-      'levels.store',
-      'schedule.store',
-      'blocking.store',
-      'settings.store',
-      'registry.store',
-      'declared-apps.store',
-      'manager.ts',
-      'createSessionManager',
-      'startSession',
-      'stopSession',
-      'hydrateFromDisk',
-      'strict-block-window',
-      'process-window-probe',
-      'hosts writer',
-      'firewall/netsh',
-      'BrowserWindow',
-      'overlay',
-      'localStorage',
-    ]
+const root = path.resolve(__dirname, '../../../../..')
+const pureFiles = [
+  'src/shared/execution-preview-data-connector-model.ts',
+  'src/renderer/src/lib/execution-preview-readonly-snapshot.ts',
+  'src/renderer/src/lib/execution-preview-snapshot-sanitizer.ts',
+  'src/renderer/src/lib/execution-preview-session-normalizer.ts',
+  'src/renderer/src/lib/execution-preview-proposed-pipeline-runner.ts',
+  'src/renderer/src/lib/execution-preview-data-provider.ts',
+]
+const hookFile = 'src/renderer/src/hooks/useExecutionPreviewDataProvider.ts'
+const panelFile = 'src/renderer/src/components/execution-preview/ExecutionPreviewDataConnectorPanel.tsx'
+const source = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
-    const directoriesToCheck = [
-      path.join(__dirname, '../../lib'),
-      path.join(__dirname, '../execution-preview')
-    ]
+describe('ExecutionPreview data connector anti-regression', () => {
+  it('keeps every pure Point 12 file free of stores', () => {
+    for (const file of pureFiles) expect(source(file), file).not.toMatch(/from ['"][^'"]*store\//u)
+  })
 
-    for (const dir of directoriesToCheck) {
-      if (!fs.existsSync(dir)) continue
-      
-      const files = fs.readdirSync(dir)
-      
-      for (const file of files) {
-        if (!file.includes('execution-preview')) continue
-        if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue
-        
-        // Hooks and Panel are allowed to import read-only stores, but they MUST NOT import write muscles
-        const isReactConnector = file.includes('useExecutionPreviewDataProvider') || file.includes('ExecutionPreviewDataConnectorPanel')
-        
-        const content = fs.readFileSync(path.join(dir, file), 'utf8')
-        
-        for (const forbidden of pureForbiddenImports) {
-          if (isReactConnector && forbidden.includes('.store')) {
-            // Connector hook is allowed to import stores to read them via getState()
-            continue
-          }
+  it('allows store imports only in the hook, never in the panel', () => {
+    expect(source(hookFile)).toMatch(/store\/tasks\.store/u)
+    expect(source(panelFile)).not.toMatch(/from ['"][^'"]*store\//u)
+  })
 
-          const regex = new RegExp(`import.*${forbidden}`, 'i')
-          const isImported = regex.test(content)
-          if (isImported) {
-            console.error(`Forbidden import ${forbidden} found in ${file}`)
-          }
-          expect(isImported).toBe(false)
-        }
-        
-        // Add check that we don't dump the whole store into the snapshot or variables
-        if (isReactConnector) {
-          const regexStoreAssign = /([a-zA-Z]+Store(?:State)?(?:\.getState\(\))?)/
-          // We just ensure we don't pass `use.*Store.getState()` directly to buildExecutionPreviewFromReadOnlyData
-          const matches = content.match(/buildExecutionPreviewFromReadOnlyData\(\s*\{([^}]+)\}/s)
-          if (matches) {
-             expect(matches[1]).not.toMatch(/use[A-Za-z]+Store\.getState\(\)/)
-          }
-        }
-      }
+  it('imports or calls no native muscle anywhere in Point 12', () => {
+    const all = [...pureFiles, hookFile, panelFile].map(source).join('\n')
+    for (const pattern of [
+      /createSessionManager|hydrateFromDisk|strict-block-window|process-window-probe/iu,
+      /hosts\/writer|firewall|netsh|BrowserWindow|process.?watcher|media.?control/iu,
+      /\blocalStorage\b/u,
+    ]) expect(all).not.toMatch(pattern)
+  })
+
+  it('contains no automatic generation or store action call in the hook', () => {
+    const hook = source(hookFile)
+    expect(hook).not.toContain('useEffect')
+    for (const call of ['markTaskCompleted', 'saveTask', 'saveObjective', 'replaceAll', 'activate', 'recordOutcome', 'classifyItem', 'updateSettings', 'recordEvent']) {
+      expect(hook).not.toMatch(new RegExp(`\\.${call}\\s*\\(`, 'u'))
+    }
+  })
+
+  it('does not drive behavior by parsing example words', () => {
+    const all = pureFiles.map(source).join('\n')
+    expect(all).not.toMatch(/(?:includes|startsWith|endsWith|match|test)\s*\([^\n]*(?:examen|chapitre|youtube|discord|steam|vs code|école)/iu)
+  })
+
+  it('parcourt le dossier hooks : seul useExecutionPreviewDataProvider importe un store', () => {
+    // B.7 — La couverture statique par nom est complétée par un scan dynamique du
+    // dossier hooks. Tout fichier y touchant à execution-preview ne doit pas importer
+    // de store (sauf le hook connu qui est le seul point de contact autorisé).
+    const hooksDir = path.join(root, 'src/renderer/src/hooks')
+    const hookFiles = fs.existsSync(hooksDir)
+      ? fs.readdirSync(hooksDir).filter((f) => f.endsWith('.ts') || f.endsWith('.tsx'))
+      : []
+    const previewHookFiles = hookFiles.filter((f) => {
+      const content = fs.readFileSync(path.join(hooksDir, f), 'utf8')
+      return /execution.?preview/u.test(content)
+    })
+    // Le hook connu doit apparaître dans le scan.
+    expect(previewHookFiles).toContain('useExecutionPreviewDataProvider.ts')
+    // Aucun autre hook lié à execution-preview ne doit importer un store.
+    for (const f of previewHookFiles) {
+      if (f === 'useExecutionPreviewDataProvider.ts') continue
+      const content = fs.readFileSync(path.join(hooksDir, f), 'utf8')
+      expect(content, `hooks/${f} ne doit pas importer de store`).not.toMatch(/from ['"][^'"]*store\//u)
     }
   })
 })
