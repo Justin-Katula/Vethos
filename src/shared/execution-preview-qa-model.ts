@@ -131,7 +131,12 @@ export type ExecutionPreviewQaReport = {
   calibration: ExecutionPreviewCalibrationReport
   diagnostics: ExecutionPreviewQaDiagnostics
   checks: ExecutionPreviewQaCheck[]
-  canProceedToActivationPlanning: boolean
+  /**
+   * Type littéral `false` (Point 13) : le QA ne déclenche jamais l'activation.
+   * Comme canApplyLater/canApplyPreview, ce n'est pas une étape en attente de
+   * flag, c'est permanent pour ce point.
+   */
+  canProceedToActivationPlanning: false
   warnings: string[]
   blockers: string[]
   explanation: {

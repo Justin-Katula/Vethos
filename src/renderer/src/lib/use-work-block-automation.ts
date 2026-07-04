@@ -278,6 +278,7 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
         userModel,
         planningContext,
         now,
+        engineActivation: { engineV2Priority, engineV2Placement, engineV2Blocking },
       })
       void useSessionV2Store.getState().upsertPlan(sessionPlanV2)
 
