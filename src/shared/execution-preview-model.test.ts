@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, expectTypeOf } from 'vitest'
 import type { PreviewReadinessGateResult, ExecutionPreviewPlanV2 } from './execution-preview-model'
 
 describe('execution-preview-model', () => {
@@ -14,6 +14,7 @@ describe('execution-preview-model', () => {
       confidence: 100,
     }
     expect(readiness.canApplyLater).toBe(false)
+    expectTypeOf(readiness.canApplyLater).toEqualTypeOf<false>()
   })
 
   it('ensures objects are fully serializable without classes or methods', () => {

@@ -54,7 +54,7 @@ export interface ActivationFutureActionDraft {
     | "requires_safety_check"
     | "not_supported_yet";
   reason: string;
-  canExecuteNow: boolean;
+  canExecuteNow: false;
   requiredFutureFlags: string[];
   requiredSafetyChecks: string[];
   confidence: number;
@@ -100,7 +100,7 @@ export interface ActivationPreconditionChecklist {
   warningCount: number;
   failedCount: number;
   blockedCount: number;
-  canActivateNow: boolean;
+  canActivateNow: false;
   confidence: number;
 }
 
@@ -121,13 +121,13 @@ export interface ExecutionContractDraftV2 {
   preconditions: ActivationPreconditionChecklist;
   warnings: string[];
   blockers: string[];
-  canApplyPlanningNow: boolean;
-  canCreateSessionsNow: boolean;
-  canStartSessionsNow: boolean;
-  canEnableBlockingNow: boolean;
-  canCompleteTasksNow: boolean;
-  canPersistContractNow: boolean;
-  canActivateNow: boolean;
+  canApplyPlanningNow: false;
+  canCreateSessionsNow: false;
+  canStartSessionsNow: false;
+  canEnableBlockingNow: false;
+  canCompleteTasksNow: false;
+  canPersistContractNow: false;
+  canActivateNow: false;
   metadata: {
     source: "activation_bridge_contract_draft";
     createdAt: string;
@@ -141,8 +141,8 @@ export interface ActivationBridgeSafetyReport {
   dangerousPermissionDetected: boolean;
   unsafeReasons: string[];
   warnings: string[];
-  canApplyAnythingNow: boolean;
-  canActivateNow: boolean;
+  canApplyAnythingNow: false;
+  canActivateNow: false;
   confidence: number;
 }
 
@@ -150,8 +150,8 @@ export interface ActivationBridgeGateResult {
   status: ActivationBridgeStatus;
   contractDraft?: ExecutionContractDraftV2;
   safety: ActivationBridgeSafetyReport;
-  canProceedToRealActivation: boolean;
-  canApplyAnythingNow: boolean;
+  canProceedToRealActivation: false;
+  canApplyAnythingNow: false;
   blockers: string[];
   warnings: string[];
   nextRecommendedAction:
@@ -198,8 +198,8 @@ export interface ActivationBridgeDraftV2 {
   gateResult: ActivationBridgeGateResult;
   diagnostics: ActivationBridgeDiagnostics;
   explanation: ActivationBridgeExplanation;
-  canProceedToRealActivation: boolean;
-  canApplyAnythingNow: boolean;
+  canProceedToRealActivation: false;
+  canApplyAnythingNow: false;
   createdAt: string;
   confidence: number;
 }

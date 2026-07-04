@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, it, expect } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import { ExecutionPreviewActions } from './ExecutionPreviewActions'
 import type { ExecutionPreviewActionViewModel } from '../../lib/execution-preview-view-model'
 
 describe('ExecutionPreviewActions', () => {
+  afterEach(cleanup)
   it('renders disabled dangerous actions', () => {
     const actions: ExecutionPreviewActionViewModel[] = [
       { label: 'Apply', actionType: 'disabled_apply', enabled: false, reason: 'Reason A' },
@@ -21,5 +22,12 @@ describe('ExecutionPreviewActions', () => {
     expect(screen.getByText('Block').closest('button')).toBeDisabled()
     
     expect(screen.getByText('Reason A')).toBeInTheDocument()
+    expect(screen.getByText('Reason B')).toBeInTheDocument()
+    expect(screen.getByText('Reason C')).toBeInTheDocument()
+  })
+
+  it('accepts no handler prop and invokes no dangerous action', () => {
+    render(<ExecutionPreviewActions actions={[{ label: 'Apply', actionType: 'disabled_apply', enabled: true, reason: 'Toujours bloqué' }]} />)
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled()
   })
 })

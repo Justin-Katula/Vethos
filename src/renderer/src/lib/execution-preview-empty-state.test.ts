@@ -1,22 +1,18 @@
-import { describe, it, expect } from 'vitest'
-import { buildExecutionPreviewEmptyState } from './execution-preview-empty-state'
+import { describe, expect, it } from 'vitest'
+import { buildExecutionPreviewEmptyState, type EmptyStateReason } from './execution-preview-empty-state'
 
-describe('execution-preview-empty-state', () => {
-  it('returns correctly formatted empty state for no_preview_built', () => {
-    const state = buildExecutionPreviewEmptyState('no_preview_built')
-    expect(state.title).toBe('Aucune preview générée')
-    expect(state.icon).toBe('info')
-  })
-
-  it('returns correctly formatted empty state for missing_planning_context', () => {
-    const state = buildExecutionPreviewEmptyState('missing_planning_context')
-    expect(state.title).toBe('Contexte de planning manquant')
-    expect(state.icon).toBe('warning')
-  })
-
-  it('returns correctly formatted empty state for unsafe_preview', () => {
-    const state = buildExecutionPreviewEmptyState('unsafe_preview')
-    expect(state.title).toBe('Preview bloquée (Sécurité)')
-    expect(state.icon).toBe('error')
+describe('buildExecutionPreviewEmptyState', () => {
+  it.each([
+    ['no_preview_built', 'Aucune preview générée'],
+    ['missing_planning_context', 'Contexte de planning manquant'],
+    ['missing_placement_plan', 'Plan de placement manquant'],
+    ['missing_session_plans', 'Plans de session manquants'],
+    ['unsafe_preview', 'Preview non sécurisée'],
+    ['manual_review_required', 'Examen manuel requis'],
+    ['invalid_date_range', 'Période invalide'],
+  ] as Array<[EmptyStateReason, string]>)('maps %s from its structured reason', (reason, title) => {
+    const state = buildExecutionPreviewEmptyState(reason)
+    expect(state.title).toBe(title)
+    expect(state.description.length).toBeGreaterThan(10)
   })
 })

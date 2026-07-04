@@ -26,6 +26,7 @@ import { useToast } from '@/lib/use-toast'
 import { vethos } from '@/lib/ipc'
 import type { UpdaterCheckResult } from '@shared/updater'
 import { ExecutionPreviewUiFlags } from '@shared/execution-preview-ui-flags'
+import { ExecutionPreviewDataConnectorFlags } from '@shared/execution-preview-data-connector-flags'
 import { ExecutionPreviewDataConnectorPanel } from '@/components/execution-preview/ExecutionPreviewDataConnectorPanel'
 import { Eye, EyeOff } from 'lucide-react'
 import { UserModelPanel } from '@/components/user-model/UserModelPanel'
@@ -608,7 +609,9 @@ export default function SettingsPage() {
         {import.meta.env.DEV && <RuntimeCoordinatorPanel />}
 
         {/* --- Aperçu de l’orchestrateur --- */}
-        {ExecutionPreviewUiFlags.executionPreviewUiEnabled && (
+        {import.meta.env.DEV &&
+          ExecutionPreviewUiFlags.executionPreviewUiEnabled &&
+          ExecutionPreviewDataConnectorFlags.executionPreviewDataConnectorEnabled && (
           <section className="max-w-4xl space-y-3 pt-8 border-t border-border-subtle mt-8">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">

@@ -27,7 +27,7 @@ export function runExecutionPreviewDiagnostics(plan: Omit<ExecutionPreviewPlanV2
   }
 
   // 3. canApplyLater / real action overrides (Secondary check for extreme safety)
-  if (plan.readiness.canApplyLater === true) {
+  if ((plan.readiness as { canApplyLater?: boolean }).canApplyLater === true) {
     issues.push({
       id: 'can_apply_later_true',
       severity: 'critical',

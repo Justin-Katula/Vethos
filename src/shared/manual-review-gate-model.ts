@@ -46,7 +46,8 @@ export interface ManualReviewDecisionV2 {
   reason?: string
   createdAt: string
   source: 'manual_review_ui'
-  canApplyDecision: boolean
+  /** Type littéral false (Point 14) : une décision de review n'applique jamais rien. */
+  canApplyDecision: false
 }
 
 export interface ManualReviewDraftV2 {
@@ -61,13 +62,15 @@ export interface ManualReviewDraftV2 {
   warnings: string[]
   blockers: string[]
   
-  canCreateSessions: boolean
-  canStartSessions: boolean
-  canApplyPlanning: boolean
-  canApplyBlocking: boolean
-  canCompleteTasks: boolean
-  canPersistReview: boolean
-  canProceedToActivationBridge: boolean
+  // Tous types littéraux false (Point 14) : une approbation en principe ne donne
+  // jamais le droit d'appliquer quoi que ce soit. Pas des booléens variables.
+  canCreateSessions: false
+  canStartSessions: false
+  canApplyPlanning: false
+  canApplyBlocking: false
+  canCompleteTasks: false
+  canPersistReview: false
+  canProceedToActivationBridge: false
   
   confidence: number
   metadata: {
@@ -82,8 +85,8 @@ export interface ManualReviewGateResult {
   status: 'review_allowed' | 'review_allowed_with_warnings' | 'review_blocked' | 'safety_blocked' | 'invalid'
   reviewDraft: ManualReviewDraftV2
   
-  canProceedToActivationBridge: boolean
-  canApplyAnything: boolean
+  canProceedToActivationBridge: false
+  canApplyAnything: false
   
   blockers: string[]
   warnings: string[]

@@ -32,7 +32,7 @@ export function runManualReviewDiagnostics(input: ManualReviewDiagnosticsInput):
     const dangerousFlags = [
       draft.canApplyPlanning, draft.canStartSessions, draft.canPersistReview,
       draft.canApplyBlocking, draft.canCompleteTasks, draft.canProceedToActivationBridge
-    ]
+    ].map(f => f as boolean)
     if (dangerousFlags.some(f => f === true)) {
       issues.push({ id: 'dangerous_flags_true', severity: 'critical', message: 'One or more dangerous execution flags are true in the draft.' })
       status = 'critical'

@@ -122,7 +122,7 @@ export interface PreviewPipelineTrace {
 
 export interface PreviewReadinessGateResult {
   canDisplayPreview: boolean
-  canApplyLater: boolean
+  canApplyLater: false
   readiness:
     | 'ready_for_debug_preview'
     | 'ready_for_ui_preview'

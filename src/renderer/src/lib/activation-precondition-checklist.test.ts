@@ -24,7 +24,7 @@ describe('activation-precondition-checklist', () => {
       previewPlan: executionPreviewFixture(), qaReport: executionQaFixture(),
       futureActions: [{
         id: 'a1', kind: 'future_start_session', targetType: 'session', label: 'Future session',
-        status: 'requires_future_permission', reason: 'Test', canExecuteNow: true,
+        status: 'requires_future_permission', reason: 'Test', canExecuteNow: true as unknown as false,
         requiredFutureFlags: [], requiredSafetyChecks: [], confidence: 100,
       }],
     })

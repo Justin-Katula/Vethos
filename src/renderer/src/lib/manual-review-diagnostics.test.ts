@@ -28,7 +28,7 @@ describe('runManualReviewDiagnostics', () => {
         decision: 'accepted_in_principle' as const,
         createdAt: '',
         source: 'manual_review_ui' as const,
-        canApplyDecision: true
+        canApplyDecision: true as unknown as false
       }] 
     }
     const diag = runManualReviewDiagnostics({ draft: badDraft, previewPlan: {} })

@@ -4,7 +4,7 @@ import { runExecutionPreviewQaDiagnostics } from './execution-preview-qa-diagnos
 describe('execution-preview-qa-diagnostics', () => {
   it('detects canProceedToActivationPlanning is true', () => {
     const diag = runExecutionPreviewQaDiagnostics({
-      qaReport: { canProceedToActivationPlanning: true as boolean }
+      qaReport: { canProceedToActivationPlanning: true as unknown as false }
     })
     
     expect(diag.issues.some(i => i.severity === 'critical')).toBe(true)

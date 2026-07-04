@@ -45,4 +45,20 @@ describe('execution-preview-snapshot-sanitizer', () => {
     expect(san.tasks.length).toBe(1)
     expect(san.warnings.some(w => w.includes('3 tâches ont été ignorées'))).toBe(true)
   })
+
+  it('keeps an invalid date range for manual review instead of inventing dates', () => {
+    const san = sanitizeExecutionPreviewSnapshot({ rawSnapshot: baseRaw, dateRange: { startDate: '2025-02-02', endDate: '2025-01-01' } })
+    expect(san.dateRange).toEqual({ startDate: '2025-02-02', endDate: '2025-01-01' })
+    expect(san.confidence).toBe(0)
+    expect(san.warnings.some((warning) => warning.includes('examen manuel requis'))).toBe(true)
+  })
+
+  it('does not mutate the raw snapshot or invent tasks/objectives', () => {
+    const raw = structuredClone(baseRaw)
+    const before = structuredClone(raw)
+    const san = sanitizeExecutionPreviewSnapshot({ rawSnapshot: raw, dateRange: { startDate: '2025-01-01', endDate: '2025-01-02' } })
+    expect(raw).toEqual(before)
+    expect(san.tasks).toEqual(baseRaw.tasks)
+    expect(san.objectives).toEqual(baseRaw.objectives)
+  })
 })

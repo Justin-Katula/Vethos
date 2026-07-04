@@ -1,71 +1,31 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { executionPreviewPlanFixture } from './execution-preview-test-fixtures'
 import { buildExecutionPreviewViewModel } from './execution-preview-view-model'
-import type { ExecutionPreviewPlanV2 } from '@shared/execution-preview-model'
 
-describe('execution-preview-view-model', () => {
-  it('returns empty state when no previewPlan is provided', () => {
-    const vm = buildExecutionPreviewViewModel({})
-    expect(vm.hasPreview).toBe(false)
-    expect(vm.status).toBe('empty')
-  })
-
-  it('maps a complete and safe plan correctly', () => {
-    const fakePlan = {
-      id: 'plan-1',
-      mode: 'full',
-      status: 'ready_to_build',
-      confidence: 90,
-      days: [],
-      safety: { status: 'safe', reasons: [] },
-      readiness: { readiness: 'ready_for_ui_preview', warnings: [] },
-      summary: { totalProposedMinutes: 120, totalWarnings: 0, totalBlocked: 0, totalUnsafe: 0 },
-      explanation: { title: 'Titre', summary: 'Sous-titre', warnings: [] },
-      diagnostics: { summary: [] },
-      pipelineTrace: { steps: [] }
-    } as unknown as ExecutionPreviewPlanV2
-
-    const vm = buildExecutionPreviewViewModel({ previewPlan: fakePlan })
+describe('buildExecutionPreviewViewModel', () => {
+  it('returns empty without a plan', () => expect(buildExecutionPreviewViewModel({}).status).toBe('empty'))
+  it('maps a complete structured preview', () => {
+    const vm = buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture() })
     expect(vm.hasPreview).toBe(true)
     expect(vm.status).toBe('ready')
-    expect(vm.title).toBe('Titre')
+    expect(vm.days[0]!.blocks[0]!.kindLabel).toBe('Travail profond')
   })
-
-  it('disables dangerous actions unconditionally', () => {
-    const fakePlan = {
-      id: 'plan-2',
-      mode: 'full',
-      status: 'ready_to_build',
-      confidence: 90,
-      days: [],
-      safety: { status: 'safe', reasons: [] },
-      readiness: { readiness: 'ready_for_ui_preview', warnings: [] },
-      summary: { totalProposedMinutes: 120, totalWarnings: 0, totalBlocked: 0, totalUnsafe: 0 },
-      explanation: { title: 'Titre', summary: 'Sous-titre', warnings: [] },
-      diagnostics: { summary: [] },
-      pipelineTrace: { steps: [] }
-    } as unknown as ExecutionPreviewPlanV2
-
-    const vm = buildExecutionPreviewViewModel({ previewPlan: fakePlan })
-    const applyAction = vm.actions.find(a => a.actionType === 'disabled_apply')
-    const startAction = vm.actions.find(a => a.actionType === 'disabled_start_session')
-    const blockAction = vm.actions.find(a => a.actionType === 'disabled_blocking')
-    
-    expect(applyAction?.enabled).toBe(false)
-    expect(startAction?.enabled).toBe(false)
-    expect(blockAction?.enabled).toBe(false)
+  it('maps partial preview', () => {
+    const base = executionPreviewPlanFixture()
+    expect(buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture({ status: 'partial_preview', readiness: { ...base.readiness, readiness: 'partial_preview_only' } }) }).status).toBe('partial')
   })
-
-  it('detects unsafe status and partial previews', () => {
-    const fakePlan = {
-      mode: 'unsafe',
-      safety: { status: 'unsafe', reasons: [] },
-      readiness: { readiness: 'blocked', warnings: [] },
-      days: [],
-      summary: { totalProposedMinutes: 0, totalWarnings: 0, totalBlocked: 0, totalUnsafe: 0 },
-      explanation: { title: '', summary: '', warnings: [] },
-      pipelineTrace: { steps: [] }
-    } as unknown as ExecutionPreviewPlanV2
-    const vm = buildExecutionPreviewViewModel({ previewPlan: fakePlan })
-    expect(vm.status).toBe('unsafe')
+  it('distinguishes unsafe and manual review', () => {
+    const base = executionPreviewPlanFixture()
+    expect(buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture({ mode: 'unsafe', safety: { ...base.safety, status: 'unsafe' } }) }).status).toBe('unsafe')
+    expect(buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture({ mode: 'manual_review_required' }) }).status).toBe('manual_review')
+  })
+  it('keeps dangerous actions and rebuild_proposed disabled', () => {
+    const actions = buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture() }).actions
+    for (const type of ['disabled_apply', 'disabled_start_session', 'disabled_blocking', 'rebuild_proposed']) expect(actions.find((action) => action.actionType === type)?.enabled).toBe(false)
+  })
+  it('maps confidence and explicit guard facts', () => {
+    const vm = buildExecutionPreviewViewModel({ previewPlan: executionPreviewPlanFixture(), uiData: { value: 1 } })
+    expect(vm.days[0]!.blocks[0]!.confidenceLabel).toBe('92%')
+    expect(vm.guardFacts).toEqual(expect.objectContaining({ canApplyLater: false, realActionHandlerPresent: false, safetyStatus: 'safe' }))
   })
 })

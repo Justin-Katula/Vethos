@@ -1,26 +1,52 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildExecutionPreviewFromReadOnlyData } from './execution-preview-data-provider'
 
-describe('execution-preview-data-provider', () => {
-  it('builds a full state and enforces canApplyPreview is false', () => {
-    const res = buildExecutionPreviewFromReadOnlyData({
-      userId: 'user1',
-      dateRange: { startDate: '2025-01-01', endDate: '2025-01-02' }
-    })
-    
-    // Status can be partial or failed depending on the data, but the flags must be secure.
-    expect(res.canApplyPreview).toBe(false)
-    expect(res.canGeneratePreview).toBe(true)
-    
-    // We didn't pass tasks/schedules, so it will likely be partial or failed
-    expect(res.status).not.toBe('idle')
+const input = {
+  userId: 'user-1',
+  tasks: [], objectives: [], schedules: [], sessions: [], apps: [], sites: [], settings: {},
+  dateRange: { startDate: '2026-07-03', endDate: '2026-07-04' },
+  now: '2026-07-03T12:00:00.000Z',
+  idFactory: () => 'preview-id',
+}
+
+describe('buildExecutionPreviewFromReadOnlyData', () => {
+  it('builds through snapshot, sanitizer and pipeline', () => {
+    const result = buildExecutionPreviewFromReadOnlyData(input)
+    expect(result.status).not.toBe('idle')
+    expect(result.lastBuildAt).toBe(input.now)
+    expect(result.canApplyPreview).toBe(false)
   })
 
-  it('handles missing userId correctly by returning unsafe status', () => {
-    const res = buildExecutionPreviewFromReadOnlyData({
-      dateRange: { startDate: '2025-01-01', endDate: '2025-01-02' }
-    })
-    expect(res.status).toBe('unsafe')
-    expect(res.canApplyPreview).toBe(false)
+  it('keeps canApplyPreview=false even with engineV2Execution=true', () => {
+    const result = buildExecutionPreviewFromReadOnlyData({ ...input, settings: { engineV2Execution: true } })
+    expect(result.canApplyPreview).toBe(false)
+  })
+
+  it('returns unsafe for a missing userId without throwing', () => {
+    const result = buildExecutionPreviewFromReadOnlyData({ ...input, userId: undefined })
+    expect(result.status).toBe('unsafe')
+    expect(result.canApplyPreview).toBe(false)
+  })
+
+  it('does not mutate its input', () => {
+    const mutable = { ...input, idFactory: undefined, tasks: [{ id: 'task-1', title: 'T', deadline: '2026-07-04' }] }
+    const before = structuredClone(mutable)
+    buildExecutionPreviewFromReadOnlyData(mutable)
+    expect(mutable).toEqual(before)
+  })
+
+  it('rejects unnecessary sensitive data without echoing its value', () => {
+    const result = buildExecutionPreviewFromReadOnlyData({ ...input, auth: { accessToken: 'private-value' } })
+    expect(result.status).toBe('unsafe')
+    expect(result.previewPlan).toBeUndefined()
+    expect(result.errors.join(' ')).not.toContain('private-value')
+  })
+
+  it('never writes localStorage', () => {
+    const write = vi.fn()
+    vi.stubGlobal('localStorage', { setItem: write })
+    buildExecutionPreviewFromReadOnlyData(input)
+    expect(write).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 })

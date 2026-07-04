@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import type { ExecutionPreviewProviderState } from './execution-preview-data-connector-model'
+import { describe, it, expect, expectTypeOf } from 'vitest'
+import type { ExecutionPreviewProviderState, ProposedPipelineBuildResult } from './execution-preview-data-connector-model'
 
 describe('ExecutionPreviewDataConnectorModel', () => {
   it('ensures canApplyPreview is literal false in ProviderState', () => {
@@ -12,6 +12,8 @@ describe('ExecutionPreviewDataConnectorModel', () => {
       confidence: 100,
     }
     expect(state.canApplyPreview).toBe(false)
+    expectTypeOf(state.canApplyPreview).toEqualTypeOf<false>()
+    expectTypeOf<ProposedPipelineBuildResult['canApplyPreview']>().toEqualTypeOf<false>()
   })
 
   it('outputs are fully serializable', () => {

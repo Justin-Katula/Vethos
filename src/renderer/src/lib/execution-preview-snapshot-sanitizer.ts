@@ -29,9 +29,15 @@ export function sanitizeExecutionPreviewSnapshot(
   // DateRange Validation
   let startDate = ''
   let endDate = ''
-  if (input.dateRange?.startDate && input.dateRange?.endDate) {
-    startDate = input.dateRange.startDate
-    endDate = input.dateRange.endDate
+  const dateRange = input.dateRange
+  if (dateRange && isValidDateRange(dateRange)) {
+    startDate = dateRange.startDate
+    endDate = dateRange.endDate
+  } else if (dateRange) {
+    startDate = dateRange.startDate
+    endDate = dateRange.endDate
+    warnings.push('Sanitizer: dateRange invalide ; examen manuel requis.')
+    confidence = 0
   } else {
     // Fallback: today -> tomorrow
     const dNow = input.now ? new Date(input.now) : new Date()
@@ -63,6 +69,7 @@ export function sanitizeExecutionPreviewSnapshot(
     apps,
     sites,
     settings: raw.settings,
+    userModel: raw.userModel,
     dateRange: { startDate, endDate },
     warnings,
     confidence: Math.max(0, confidence),
@@ -72,4 +79,13 @@ export function sanitizeExecutionPreviewSnapshot(
       sanitizedAt,
     },
   }
+}
+
+function isValidDateRange(
+  value: SanitizeSnapshotInput['dateRange'],
+): boolean {
+  if (!value?.startDate || !value.endDate) return false
+  const start = new Date(value.startDate).getTime()
+  const end = new Date(value.endDate).getTime()
+  return Number.isFinite(start) && Number.isFinite(end) && start <= end
 }

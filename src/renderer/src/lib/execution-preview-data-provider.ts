@@ -1,8 +1,14 @@
-import type { ExecutionPreviewProviderState } from '@shared/execution-preview-data-connector-model'
+import type {
+  ExecutionPreviewDataSourceReport,
+  ExecutionPreviewProviderState,
+} from '@shared/execution-preview-data-connector-model'
+import { ExecutionPreviewDataConnectorFlags } from '@shared/execution-preview-data-connector-flags'
 import { ExecutionPreviewFlags } from '@shared/execution-preview-flags'
 import { buildExecutionPreviewRawSnapshot } from './execution-preview-readonly-snapshot'
 import { sanitizeExecutionPreviewSnapshot } from './execution-preview-snapshot-sanitizer'
 import { runExecutionPreviewProposedPipeline } from './execution-preview-proposed-pipeline-runner'
+import { runExecutionPreviewDataConnectorDiagnostics } from './execution-preview-data-connector-diagnostics'
+import { normalizeExecutionPreviewSessions } from './execution-preview-session-normalizer'
 
 export type BuildPreviewFromReadOnlyDataInput = {
   userId?: string
@@ -14,6 +20,8 @@ export type BuildPreviewFromReadOnlyDataInput = {
   sites?: unknown[]
   settings?: unknown
   auth?: unknown
+  userModel?: unknown
+  sourceReports?: ExecutionPreviewDataSourceReport[]
   dateRange: {
     startDate: string
     endDate: string
@@ -31,7 +39,11 @@ export function buildExecutionPreviewFromReadOnlyData(
   // le pipeline de prévisualisation est désactivé et on retourne un état inactif
   // sans rien construire. Cela rend le flag réellement consommé (il ne l'était pas
   // avant) et permet un rollback global du pipeline.
-  if (!ExecutionPreviewFlags.executionPreviewV2Enabled) {
+  if (
+    !ExecutionPreviewFlags.executionPreviewV2Enabled ||
+    !ExecutionPreviewDataConnectorFlags.executionPreviewDataConnectorEnabled ||
+    !ExecutionPreviewDataConnectorFlags.executionPreviewDataProviderEnabled
+  ) {
     return {
       status: 'idle',
       previewPlan: undefined,
@@ -47,9 +59,11 @@ export function buildExecutionPreviewFromReadOnlyData(
   // 1. Raw Snapshot
   const rawSnapshot = buildExecutionPreviewRawSnapshot({
     ...rawData,
+    sessions: normalizeExecutionPreviewSessions(rawData.sessions),
     now,
-    sourceReports: [],
+    sourceReports: rawData.sourceReports ?? [],
   })
+  const rawSnapshotBaseline = structuredClone(rawSnapshot)
 
   // 2. Sanitize Snapshot
   const sanitizedSnapshot = sanitizeExecutionPreviewSnapshot({
@@ -110,15 +124,40 @@ export function buildExecutionPreviewFromReadOnlyData(
 
 
 
-  return {
+  const providerState: ExecutionPreviewProviderState = {
     status,
     previewPlan: pipelineResult.previewPlan,
     lastBuildAt: now ?? new Date().toISOString(),
-    warnings: pipelineResult.warnings,
+    warnings: [...new Set([
+      ...rawSnapshot.warnings,
+      ...sanitizedSnapshot.warnings,
+      ...pipelineResult.warnings,
+    ])],
     errors: pipelineResult.errors,
-    canGeneratePreview: true,
-    canApplyPreview: (input.settings as any)?.engineV2Execution === true && (status === 'ready' || status === 'ready_with_warnings'),
+    canGeneratePreview: ExecutionPreviewDataConnectorFlags.executionPreviewManualGenerateEnabled,
+    canApplyPreview: false,
     qaInputSummary,
     confidence: pipelineResult.confidence,
   }
+
+  const diagnostics = runExecutionPreviewDataConnectorDiagnostics({
+    rawSnapshot,
+    rawSnapshotBaseline,
+    sanitizedSnapshot,
+    providerState,
+  })
+  if (diagnostics.status === 'critical') {
+    return {
+      ...providerState,
+      status: 'unsafe',
+      previewPlan: undefined,
+      diagnostics,
+      errors: [...providerState.errors, ...diagnostics.issues
+        .filter((issue) => issue.severity === 'critical')
+        .map((issue) => issue.message)],
+      canApplyPreview: false,
+    }
+  }
+
+  return { ...providerState, diagnostics, canApplyPreview: false }
 }

@@ -26,12 +26,15 @@ describe('ExecutionPreviewBlockCard', () => {
     expect(screen.getByText(/60 min/)).toBeInTheDocument()
     expect(screen.getByText(/Focus/)).toBeInTheDocument()
     expect(screen.getByText(/Max/)).toBeInTheDocument()
+    expect(screen.getByText(/Strict/)).toBeInTheDocument()
     expect(screen.getByText('ready')).toBeInTheDocument()
+    expect(screen.getByText(/Confiance: 100%/)).toBeInTheDocument()
     expect(screen.getByText('Reason A')).toBeInTheDocument()
     expect(screen.getByText('Warn B')).toBeInTheDocument()
     
     // Assure that we don't have start or block buttons
     expect(screen.queryByRole('button', { name: /start/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /block/i })).not.toBeInTheDocument()
   })
 })

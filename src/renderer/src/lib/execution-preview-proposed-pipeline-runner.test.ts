@@ -1,43 +1,42 @@
-import { describe, it, expect } from 'vitest'
-import { runExecutionPreviewProposedPipeline } from './execution-preview-proposed-pipeline-runner'
+import { describe, expect, it } from 'vitest'
 import type { ExecutionPreviewSanitizedSnapshot } from '@shared/execution-preview-data-connector-model'
+import { executionPreviewPlanFixture } from './execution-preview-test-fixtures'
+import { runExecutionPreviewProposedPipeline } from './execution-preview-proposed-pipeline-runner'
 
-describe('execution-preview-proposed-pipeline-runner', () => {
-  const baseSanitized: ExecutionPreviewSanitizedSnapshot = {
-    userId: 'user1',
-    tasks: [],
-    objectives: [],
-    schedules: [],
-    sessions: [],
-    apps: [],
-    sites: [],
-    settings: { engineV2Execution: true },
-    dateRange: { startDate: '2025-01-01', endDate: '2025-01-02' },
-    warnings: [],
-    confidence: 100,
-    metadata: {
-      source: 'read_only_store_snapshot',
-      capturedAt: '2025-01-01T00:00:00Z',
-      sanitizedAt: '2025-01-01T00:00:00Z'
-    }
-  }
+const snapshot: ExecutionPreviewSanitizedSnapshot = {
+  userId: 'user-1', tasks: [], objectives: [], schedules: [], sessions: [], apps: [], sites: [],
+  settings: { engineV2Execution: true }, dateRange: { startDate: '2026-07-03', endDate: '2026-07-04' },
+  warnings: [], confidence: 100,
+  metadata: { source: 'read_only_store_snapshot', capturedAt: '2026-07-03T00:00:00.000Z', sanitizedAt: '2026-07-03T00:00:00.000Z' },
+}
 
-  it('returns unsafe mode if userId is MISSING_USER_ID', () => {
-    const res = runExecutionPreviewProposedPipeline({
-      snapshot: { ...baseSanitized, userId: 'MISSING_USER_ID' }
-    })
-    expect(res.mode).toBe('unsafe')
-    expect(res.errors.some(e => e.includes('userId manquant'))).toBe(true)
+describe('runExecutionPreviewProposedPipeline', () => {
+  it('runs with an injected pure final builder', () => {
+    const result = runExecutionPreviewProposedPipeline({ snapshot, builders: { buildPreviewPlan: () => executionPreviewPlanFixture() } })
+    expect(result.previewPlan?.id).toBe('preview-1')
+    expect(result.errors).toEqual([])
   })
 
-  it('runs the pipeline and ensures canApplyLater remains false on the returned preview plan', () => {
-    // Snapshot avec engineV2Execution=true : avant la correction du Point 10, ce chemin
-    // produisait canApplyLater=true. La garantie structurelle exige false.
-    const res = runExecutionPreviewProposedPipeline({
-      snapshot: baseSanitized,
-      idFactory: () => 'test-id'
-    })
-    expect(res.previewPlan).toBeDefined()
-    expect(res.previewPlan!.readiness.canApplyLater).toBe(false)
+  it('returns partial when a required builder is missing', () => {
+    const result = runExecutionPreviewProposedPipeline({ snapshot, builders: { buildPreviewPlan: null } })
+    expect(result.mode).toBe('partial_preview')
+    expect(result.errors.join(' ')).toContain('builder indisponible')
+  })
+
+  it('contains a builder exception instead of crashing the whole pipeline', () => {
+    const result = runExecutionPreviewProposedPipeline({ snapshot, builders: { buildPreviewPlan: () => { throw new Error('controlled failure') } } })
+    expect(result.mode).toBe('partial_preview')
+    expect(result.errors.join(' ')).toContain('controlled failure')
+  })
+
+  it('returns unsafe for a missing userId', () => {
+    const result = runExecutionPreviewProposedPipeline({ snapshot: { ...snapshot, userId: 'MISSING_USER_ID' } })
+    expect(result.mode).toBe('unsafe')
+  })
+
+  it('keeps both application capabilities false with engineV2Execution=true', () => {
+    const result = runExecutionPreviewProposedPipeline({ snapshot, builders: { buildPreviewPlan: () => executionPreviewPlanFixture() } })
+    expect(result.canApplyPreview).toBe(false)
+    expect(result.previewPlan?.readiness.canApplyLater).toBe(false)
   })
 })

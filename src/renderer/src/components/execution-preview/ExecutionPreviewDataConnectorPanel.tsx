@@ -5,14 +5,15 @@ import { ExecutionPreviewQaPanel } from './ExecutionPreviewQaPanel'
 import { ManualReviewGatePanel } from './ManualReviewGatePanel'
 import { useExecutionPreviewDataProvider } from '../../hooks/useExecutionPreviewDataProvider'
 import { ExecutionPreviewUiFlags } from '@shared/execution-preview-ui-flags'
+import { ExecutionPreviewDataConnectorFlags } from '@shared/execution-preview-data-connector-flags'
 import { Button } from '@/components/ui/Button'
 import { runExecutionPreviewQa } from '@/lib/execution-preview-qa-engine'
 import { executionPreviewQaFlags } from '@shared/execution-preview-qa-flags'
-import { useSettingsStore } from '../../store/settings.store'
 
 export function ExecutionPreviewDataConnectorPanel() {
   const { state, generatePreview, clearPreview } = useExecutionPreviewDataProvider()
-  const settings = useSettingsStore()
+
+  if (!ExecutionPreviewDataConnectorFlags.executionPreviewDataConnectorEnabled) return null
 
   const qaReport = React.useMemo(() => {
     if (!executionPreviewQaFlags.executionPreviewQaEnabled) return undefined
@@ -22,9 +23,8 @@ export function ExecutionPreviewDataConnectorPanel() {
     return runExecutionPreviewQa({
       providerState: state,
       previewPlan: state.previewPlan,
-      settings,
     })
-  }, [state, settings])
+  }, [state])
 
   return (
     <div className="flex flex-col gap-4 border border-border-subtle rounded-xl p-4 bg-bg-base shadow-sm">
@@ -80,11 +80,20 @@ export function ExecutionPreviewDataConnectorPanel() {
         </div>
       )}
 
+      {state.warnings.length > 0 && (
+        <div className="rounded-md border border-yellow-500/20 bg-yellow-500/10 p-4">
+          <div className="mb-2 text-sm font-semibold text-yellow-300">Avertissements</div>
+          <ul className="list-disc space-y-1 pl-4 text-xs text-yellow-200">
+            {[...new Set(state.warnings)].map((warning) => <li key={warning}>{warning}</li>)}
+          </ul>
+        </div>
+      )}
+
       {(state.status === 'ready' || state.status === 'ready_with_warnings' || state.status === 'partial') && (
         <div className="mt-4 flex flex-col gap-4">
-          <ExecutionPreviewPanel 
-            previewPlan={state.previewPlan} 
-            debugMode={ExecutionPreviewUiFlags.executionPreviewDebugPanelEnabled} 
+          <ExecutionPreviewPanel
+            previewPlan={state.previewPlan}
+            debug={ExecutionPreviewUiFlags.executionPreviewDebugPanelEnabled}
           />
           {executionPreviewQaFlags.executionPreviewQaPanelEnabled && qaReport && (
             <ExecutionPreviewQaPanel qaReport={qaReport} debug={true} />

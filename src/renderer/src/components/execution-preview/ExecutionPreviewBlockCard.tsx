@@ -1,4 +1,4 @@
-import { Clock, Shield, PlayCircle } from 'lucide-react'
+import { Clock, Layers3, Shield, PlayCircle } from 'lucide-react'
 import type { ExecutionPreviewBlockViewModel } from '../../lib/execution-preview-view-model'
 import { ExecutionPreviewWarningList } from './ExecutionPreviewWarningList'
 import { cn } from '@/lib/cn'
@@ -25,6 +25,12 @@ export function ExecutionPreviewBlockCard({ block }: { block: ExecutionPreviewBl
               <PlayCircle size={12} />
               {block.kindLabel}
             </span>
+            {block.modeLabel && (
+              <span className="flex items-center gap-1">
+                <Layers3 size={12} />
+                {block.modeLabel}
+              </span>
+            )}
             {block.protectionLabel && (
               <span className="flex items-center gap-1">
                 <Shield size={12} />

@@ -42,14 +42,14 @@ export function runManualReviewGate(input: RunManualReviewGateInput): ManualRevi
     status = 'review_allowed_with_warnings'
   }
 
-  const isAdvisory = input.settings?.engineV2Execution !== true
-  const canProceed = !isAdvisory && draft.status === 'approved_in_principle' && (status === 'review_allowed' || status === 'review_allowed_with_warnings')
-
+  // Point 14 — canProceedToActivationBridge et canApplyAnything sont des littéraux false.
+  // Même si l'utilisateur approuve tout et que engineV2Execution=true, le gate ne donne
+  // jamais le droit d'appliquer quoi que ce soit. (Point 15 gère la suite.)
   return {
     status,
     reviewDraft: draft,
-    canProceedToActivationBridge: canProceed,
-    canApplyAnything: canProceed,
+    canProceedToActivationBridge: false,
+    canApplyAnything: false,
     blockers: [...safety.blockers],
     warnings: [...safety.warnings],
     nextRecommendedAction: nextAction,
