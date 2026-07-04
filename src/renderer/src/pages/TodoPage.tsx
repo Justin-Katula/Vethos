@@ -511,6 +511,8 @@ function TaskCard({
   const userModel = useUserModelStore((s) => s.model)
   const tasks = useTasksStore((s) => s.tasks)
   const engineV2Priority = useSettingsStore((s) => s.engineV2Priority)
+  const engineV2Placement = useSettingsStore((s) => s.engineV2Placement)
+  const engineV2Blocking = useSettingsStore((s) => s.engineV2Blocking)
 
   const obj = objectives.find((o) => o.id === task.linkedObjectiveId)
 

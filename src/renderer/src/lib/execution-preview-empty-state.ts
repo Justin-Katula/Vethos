@@ -41,8 +41,8 @@ export function buildExecutionPreviewEmptyState(reason: EmptyStateReason): Execu
       }
     case 'unsafe_preview':
       return {
-        title: 'Preview bloquée (Sécurité)',
-        description: 'Le plan généré contient des violations de sécurité et ne peut pas être affiché.',
+        title: 'Preview non sécurisée',
+        description: 'Le plan peut être examiné, mais aucune de ses actions ne doit être appliquée.',
         icon: 'error',
       }
     case 'manual_review_required':

@@ -4,7 +4,7 @@ import { executionContractFixture, executionQaFixture } from './activation-test-
 
 describe('activation-bridge-safety-engine', () => {
   it('detects a contract that can activate now', () => {
-    const contract = { ...executionContractFixture(), canActivateNow: true }
+    const contract = { ...executionContractFixture(), canActivateNow: true as unknown as false }
     const result = runActivationBridgeSafetyCheck({ contractDraft: contract })
     expect(result.status).toBe('critical')
   })
@@ -13,7 +13,7 @@ describe('activation-bridge-safety-engine', () => {
     const contract = executionContractFixture()
     contract.futureActions = [{
       id: 'a1', kind: 'future_start_session', targetType: 'session', label: 'Future session',
-      status: 'blocked', reason: 'Test', canExecuteNow: true,
+      status: 'blocked', reason: 'Test', canExecuteNow: true as unknown as false,
       requiredFutureFlags: [], requiredSafetyChecks: [], confidence: 100,
     }]
     expect(runActivationBridgeSafetyCheck({ contractDraft: contract }).status).toBe('critical')

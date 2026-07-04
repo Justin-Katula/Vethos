@@ -29,9 +29,9 @@ export function applyManualReviewDecisionToDraft(input: ApplyManualReviewDecisio
   // Safety checks
   const executionEnabled = input.settings?.engineV2Execution === true
 
-  if (decision.canApplyDecision === true && !executionEnabled) {
+  if ((decision.canApplyDecision as boolean) === true && !executionEnabled) {
     newDraft.warnings.push('Received a decision with canApplyDecision set to true. Forcing to false.')
-    decision.canApplyDecision = false
+    ;(decision as { canApplyDecision: boolean }).canApplyDecision = false
   }
 
   if (qaReport && qaReport.qualityScore && (qaReport.qualityScore.status === 'unsafe' || qaReport.qualityScore.status === 'critical')) {
@@ -114,13 +114,15 @@ export function applyManualReviewDecisionToDraft(input: ApplyManualReviewDecisio
       break
   }
 
-  newDraft.canCreateSessions = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canStartSessions = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canApplyPlanning = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canApplyBlocking = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canCompleteTasks = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canPersistReview = executionEnabled && newDraft.status === 'approved_in_principle'
-  newDraft.canProceedToActivationBridge = executionEnabled && newDraft.status === 'approved_in_principle'
+  // Point 14 — Types littéraux false : une approbation en principe ne donne jamais
+  // le droit d'appliquer quoi que ce soit. Pas de booléen variable.
+  newDraft.canCreateSessions = false
+  newDraft.canStartSessions = false
+  newDraft.canApplyPlanning = false
+  newDraft.canApplyBlocking = false
+  newDraft.canCompleteTasks = false
+  newDraft.canPersistReview = false
+  newDraft.canProceedToActivationBridge = false
 
   return newDraft
 }

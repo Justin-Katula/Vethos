@@ -74,12 +74,12 @@ export function calculateExecutionPreviewQualityScore(
   }
 
   // 5. Hard rules for safety
-  if (previewPlan?.readiness?.canApplyLater === true) {
+  if ((previewPlan?.readiness as { canApplyLater?: boolean } | undefined)?.canApplyLater === true) {
     safety = 0
     reasons.push('canApplyLater is true (forbidden).')
   }
 
-  if (providerState?.canApplyPreview === true) {
+  if ((providerState as { canApplyPreview?: boolean } | undefined)?.canApplyPreview === true) {
     safety = 0
     reasons.push('canApplyPreview is true (forbidden).')
   }

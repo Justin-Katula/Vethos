@@ -22,11 +22,16 @@ describe('manual-review-gate-anti-regression', () => {
       { regex: /useSessionStore/, name: 'SessionStore' },
       { regex: /createSessionManager/, name: 'createSessionManager' },
       { regex: /startSession/, name: 'startSession' },
+      { regex: /stopSession/, name: 'stopSession' },
+      { regex: /hydrateFromDisk/, name: 'hydrateFromDisk' },
       { regex: /generatePreview/, name: 'generatePreview' },
       { regex: /buildExecutionPreviewFromReadOnlyData/, name: 'buildExecutionPreviewFromReadOnlyData' },
       { regex: /runExecutionPreviewQa/, name: 'runExecutionPreviewQa' },
       { regex: /localStorage/, name: 'localStorage' },
-      { regex: /netsh|firewall|hosts|process-window-probe/, name: 'muscles' }
+      { regex: /netsh|firewall|hosts|process-window-probe|strict-block-window/, name: 'muscles natifs' },
+      { regex: /BrowserWindow/, name: 'BrowserWindow' },
+      { regex: /overlay/, name: 'overlay' },
+      { regex: /media/, name: 'media controls' }
     ]
 
     for (const file of allFiles) {
@@ -58,6 +63,20 @@ describe('manual-review-gate-anti-regression', () => {
       for (const danger of dangerousAssignTrue) {
         if (danger.test(content)) {
           throw new Error(`File ${path.basename(file)} dangerously assigns a forbidden execution flag to true!`)
+        }
+      }
+
+      // Check for any UI active buttons in TSX files (same level as Point 15)
+      if (file.endsWith('.tsx')) {
+        const forbiddenPatterns = [
+          /<button[^>]*>\s*(activer|appliquer|démarrer|bloquer|exécuter|auto-fix|start|apply|activate|execute)\s*<\/button>/i,
+          /onClick=\{.*(handle|apply|start|activate|execute)/i
+        ]
+
+        for (const pattern of forbiddenPatterns) {
+          if (pattern.test(content)) {
+            throw new Error(`Forbidden active button pattern found in UI ${path.basename(file)}: ${pattern.source}`)
+          }
         }
       }
     }

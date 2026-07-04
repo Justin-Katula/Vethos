@@ -1,17 +1,26 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { executionPreviewPlanFixture } from '../../lib/execution-preview-test-fixtures'
 import { ExecutionPreviewDiagnosticsPanel } from './ExecutionPreviewDiagnosticsPanel'
 
 describe('ExecutionPreviewDiagnosticsPanel', () => {
-  it('renders when debug info is provided', () => {
-    render(<ExecutionPreviewDiagnosticsPanel debug={{ planId: '123', confidence: 95, pipelineSteps: [] }} diagnosticsSummary={['Test diag']} />)
-    expect(screen.getByText('123')).toBeInTheDocument()
-    expect(screen.getByText('95%')).toBeInTheDocument()
-    expect(screen.getByText('Test diag')).toBeInTheDocument()
+  afterEach(cleanup)
+  it('renders nothing without structured diagnostics', () => {
+    const { container } = render(<ExecutionPreviewDiagnosticsPanel />)
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('renders null when debug is undefined', () => {
-    const { container } = render(<ExecutionPreviewDiagnosticsPanel debug={undefined} diagnosticsSummary={[]} />)
-    expect(container.firstChild).toBeNull()
+  it('renders issues and severity', () => {
+    render(<ExecutionPreviewDiagnosticsPanel diagnostics={{ status: 'warning', issues: [{ id: 'i1', severity: 'high', message: 'Issue visible' }], summary: ['Résumé'] }} />)
+    expect(screen.getByText('Issue visible')).toBeInTheDocument()
+    expect(screen.getByText('high')).toBeInTheDocument()
+  })
+
+  it('renders pipeline steps, failed/warning counts and confidence', () => {
+    const trace = executionPreviewPlanFixture().pipelineTrace
+    render(<ExecutionPreviewDiagnosticsPanel pipelineTrace={{ ...trace, failedStepIds: ['f'], warningStepIds: ['w'] }} />)
+    expect(screen.getByText('96%')).toBeInTheDocument()
+    expect(screen.getAllByText('1')).toHaveLength(2)
+    expect(screen.getByText('input_adaptation')).toBeInTheDocument()
   })
 })

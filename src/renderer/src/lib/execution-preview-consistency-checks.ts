@@ -28,8 +28,7 @@ export function runExecutionPreviewConsistencyChecks(
   }
 
   // 2. canApplyLater / canApplyPreview detection
-  const executionEnabled = settings?.engineV2Execution === true
-  if (previewPlan?.readiness?.canApplyLater === true && !executionEnabled) {
+  if ((previewPlan?.readiness as { canApplyLater?: boolean } | undefined)?.canApplyLater === true) {
     checks.push({
       id: 'cc-2',
       category: 'readiness',
@@ -41,7 +40,7 @@ export function runExecutionPreviewConsistencyChecks(
     })
   }
 
-  if (providerState?.canApplyPreview === true && !executionEnabled) {
+  if ((providerState as { canApplyPreview?: boolean } | undefined)?.canApplyPreview === true) {
     checks.push({
       id: 'cc-3',
       category: 'readiness',

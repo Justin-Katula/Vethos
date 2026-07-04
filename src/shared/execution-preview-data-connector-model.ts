@@ -71,6 +71,7 @@ export type ExecutionPreviewRawSnapshot = {
   sites: unknown[]
   settings?: unknown
   auth?: unknown
+  userModel?: unknown
   sourceReports: ExecutionPreviewDataSourceReport[]
   capturedAt: string
   warnings: string[]
@@ -86,6 +87,7 @@ export type ExecutionPreviewSanitizedSnapshot = {
   apps: unknown[]
   sites: unknown[]
   settings?: unknown
+  userModel?: unknown
   dateRange: {
     startDate: string
     endDate: string
@@ -131,6 +133,7 @@ export type ProposedPipelineBuildResult = {
   errors: string[]
   diagnostics?: ExecutionPreviewDataConnectorDiagnostics
   confidence: number
+  canApplyPreview: false
 }
 
 export type ExecutionPreviewProviderState = {
@@ -147,7 +150,8 @@ export type ExecutionPreviewProviderState = {
   warnings: string[]
   errors: string[]
   canGeneratePreview: boolean
-  canApplyPreview: boolean
+  canApplyPreview: false
   qaInputSummary?: ExecutionPreviewQaInputSummary
+  diagnostics?: ExecutionPreviewDataConnectorDiagnostics
   confidence: number
 }

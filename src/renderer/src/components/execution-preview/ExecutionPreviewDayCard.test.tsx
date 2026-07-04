@@ -23,4 +23,13 @@ describe('ExecutionPreviewDayCard', () => {
     expect(screen.getByText('Day Warn')).toBeInTheDocument()
     expect(screen.getByText(/Aucun bloc planifié pour cette journée./i)).toBeInTheDocument()
   })
+
+  it.each(['Mode secours', 'Examen manuel requis', 'Fragmentée'])('renders the structured special status %s', (statusLabel) => {
+    const day: ExecutionPreviewDayViewModel = {
+      date: '2025-01-01', title: 'Jour spécial', statusLabel, statusSeverity: 'warning',
+      blocks: [], summary: ['Proposé : 0 min'], warnings: [],
+    }
+    render(<ExecutionPreviewDayCard day={day} />)
+    expect(screen.getByText(statusLabel)).toBeInTheDocument()
+  })
 })

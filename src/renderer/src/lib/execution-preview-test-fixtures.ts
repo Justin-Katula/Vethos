@@ -1,0 +1,121 @@
+import type { ExecutionPreviewPlanV2 } from '@shared/execution-preview-model'
+
+export function executionPreviewPlanFixture(
+  overrides: Partial<ExecutionPreviewPlanV2> = {},
+): ExecutionPreviewPlanV2 {
+  const base: ExecutionPreviewPlanV2 = {
+    id: 'preview-1',
+    userId: 'user-1',
+    dateRange: { startDate: '2026-07-03', endDate: '2026-07-04' },
+    mode: 'ui_preview',
+    status: 'ready_for_preview',
+    dependencies: [],
+    days: [
+      {
+        date: '2026-07-03',
+        status: 'healthy',
+        blocks: [
+          {
+            id: 'block-1',
+            targetType: 'task',
+            targetId: 'task-1',
+            title: 'Bloc structuré',
+            date: '2026-07-03',
+            start: '09:00',
+            end: '10:00',
+            durationMinutes: 60,
+            previewKind: 'deep_work_block',
+            sessionMode: 'deep_work',
+            protectionMode: 'strict',
+            readiness: 'ready',
+            reasons: ['Créneau disponible'],
+            warnings: [],
+            confidence: 92,
+          },
+        ],
+        unplacedCount: 0,
+        summary: {
+          proposedWorkMinutes: 60,
+          deepWorkMinutes: 60,
+          rescueMinutes: 0,
+          reviewMinutes: 0,
+          protectedRecoveryMinutes: 0,
+          blockedOrUnsafeCount: 0,
+        },
+        reasons: [],
+        warnings: [],
+        confidence: 92,
+      },
+    ],
+    sessionPlanIds: ['session-plan-1'],
+    runtimeCoordinatorPlanIds: ['runtime-plan-1'],
+    readiness: {
+      canDisplayPreview: true,
+      canApplyLater: false,
+      readiness: 'ready_for_ui_preview',
+      blockers: [],
+      warnings: [],
+      requiredActions: [],
+      confidence: 95,
+    },
+    safety: {
+      status: 'safe',
+      realActionDetected: false,
+      forbiddenDependencyDetected: false,
+      unsafeRuntimePlans: [],
+      warnings: [],
+      reasons: [],
+      confidence: 100,
+    },
+    pipelineTrace: {
+      steps: [
+        {
+          id: 'step-1',
+          name: 'input_adaptation',
+          status: 'success',
+          reason: 'Entrées adaptées',
+          warnings: [],
+          confidence: 100,
+        },
+      ],
+      failedStepIds: [],
+      warningStepIds: [],
+      confidence: 96,
+    },
+    explanation: {
+      title: 'Preview V2',
+      summary: 'Plan proposé en lecture seule.',
+      keyDecisions: [],
+      warnings: [],
+      nextRecommendedAction: 'show_ui_preview',
+      confidence: 96,
+    },
+    diagnostics: { status: 'healthy', issues: [], summary: [] },
+    summary: {
+      totalPreviewBlocks: 1,
+      totalProposedMinutes: 60,
+      totalWarnings: 0,
+      totalBlocked: 0,
+      totalManualReview: 0,
+      totalUnsafe: 0,
+    },
+    confidence: 96,
+    metadata: {
+      modelVersion: 2,
+      createdAt: '2026-07-03T12:00:00.000Z',
+      updatedAt: '2026-07-03T12:00:00.000Z',
+      source: 'execution_preview',
+    },
+  }
+
+  return {
+    ...base,
+    ...overrides,
+    readiness: { ...base.readiness, ...overrides.readiness },
+    safety: { ...base.safety, ...overrides.safety },
+    pipelineTrace: { ...base.pipelineTrace, ...overrides.pipelineTrace },
+    explanation: { ...base.explanation, ...overrides.explanation },
+    summary: { ...base.summary, ...overrides.summary },
+    metadata: { ...base.metadata, ...overrides.metadata },
+  }
+}

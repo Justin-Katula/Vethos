@@ -1,22 +1,15 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { ExecutionPreviewSafetyBanner } from './ExecutionPreviewSafetyBanner'
 
 describe('ExecutionPreviewSafetyBanner', () => {
-  it('renders safe status', () => {
-    render(<ExecutionPreviewSafetyBanner status="safe" reasons={[]} />)
-    expect(screen.getByText(/Ce plan est sûr/i)).toBeInTheDocument()
-  })
-
-  it('renders warning status', () => {
-    render(<ExecutionPreviewSafetyBanner status="warning" reasons={['Reason W']} />)
-    expect(screen.getByText('Avertissement de sécurité')).toBeInTheDocument()
-    expect(screen.getByText('Reason W')).toBeInTheDocument()
-  })
-
-  it('renders unsafe status and warning message', () => {
-    render(<ExecutionPreviewSafetyBanner status="unsafe" reasons={['Reason U']} />)
-    expect(screen.getByText('Preview non sécurisée (Rejetée)')).toBeInTheDocument()
-    expect(screen.getByText('Ce plan ne doit en aucun cas être appliqué.')).toBeInTheDocument()
+  afterEach(cleanup)
+  it('renders safe', () => { render(<ExecutionPreviewSafetyBanner status="safe" reasons={[]} />); expect(screen.getByText(/lecture seule/i)).toBeInTheDocument() })
+  it('renders warning details', () => { render(<ExecutionPreviewSafetyBanner status="warning" reasons={['raison']} warnings={['alerte']} />); expect(screen.getByText('raison')).toBeInTheDocument(); expect(screen.getByText('alerte')).toBeInTheDocument() })
+  it.each(['unsafe', 'critical'] as const)('blocks %s without bypass', (status) => {
+    render(<ExecutionPreviewSafetyBanner status={status} reasons={['danger']} />)
+    expect(screen.getByText('Cette preview ne doit pas être appliquée.')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 })
