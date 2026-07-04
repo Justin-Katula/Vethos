@@ -51,25 +51,25 @@ describe('session-protection-plan-builder', () => {
     expect(res.unlockPolicy).toBe('cooldown')
   })
 
-  it('falls back safely when deep work has an empty allowlist', () => {
+  it('keeps the requested allowlist and warns when resources are missing', () => {
     const res = buildSessionProtectionPlan({
       contract: baseContract,
       inputData: { ...baseInputData, placementBlock: { ...baseInputData.placementBlock, placementMode: 'deep_work' } }
     })
-    expect(res.mode).toBe('blocklist')
-    expect(res.unlockPolicy).toBe('cooldown')
+    expect(res.mode).toBe('allowlist')
+    expect(res.unlockPolicy).toBe('cooldown_and_justification')
     expect(res.shouldUseOverlay).toBe(true)
-    expect(res.warnings[0]).toContain('allowlist refusé')
+    expect(res.warnings[0]).toContain('aucune ressource utile')
   })
 
-  it('falls back safely when a critical crisis has an empty strict allowlist', () => {
+  it('keeps strict protection visible so preflight can block an empty allowlist', () => {
     const res = buildSessionProtectionPlan({
       contract: baseContract,
       inputData: { ...baseInputData, deadlineCrisisContext: { targetId: 't1', crisisLevel: 'critical', recommendedMode: 'rescue_plan' } }
     })
-    expect(res.mode).toBe('blocklist')
-    expect(res.unlockPolicy).toBe('cooldown')
-    expect(res.warnings[0]).toContain('strict_allowlist refusé')
+    expect(res.mode).toBe('strict_allowlist')
+    expect(res.unlockPolicy).toBe('deny_during_strict_session')
+    expect(res.warnings[0]).toContain('aucune ressource utile')
   })
 
   it('does not hardcode app names', () => {
@@ -77,9 +77,13 @@ describe('session-protection-plan-builder', () => {
       contract: baseContract,
       inputData: {
         ...baseInputData,
-        linkedTask: { id: 't1', tags: ['dev'] }
+        linkedTask: { id: 't1', tags: ['dev'] },
+        appSiteContext: {
+          usefulApps: ['generic-tool.exe'], usefulSites: [], distractingApps: [], distractingSites: [],
+          conditionalApps: [], conditionalSites: [],
+        },
       }
     })
-    expect(res.usefulApps[0]).toBe('app_for_tag_dev')
+    expect(res.usefulApps[0]).toBe('generic-tool.exe')
   })
 })

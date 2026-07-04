@@ -1,4 +1,10 @@
-import type { SessionContract, SessionLifecycleProjection, SessionLifecycleState, SessionPreflightResult, SessionProtectionPlan } from '@shared/session-model'
+import type {
+  SessionContract,
+  SessionLifecycleProjection,
+  SessionLifecycleState,
+  SessionPreflightResult,
+  SessionProtectionPlan,
+} from '@shared/session-model'
 import type { SessionTimingResult } from './session-timing-engine'
 
 export interface SessionLifecycleInput {
@@ -10,38 +16,39 @@ export interface SessionLifecycleInput {
 
 export function buildSessionLifecycleProjection(input: SessionLifecycleInput): SessionLifecycleProjection {
   const { preflight, timing } = input
-  
-  let initialState: SessionLifecycleState = 'planned_shadow'
-  const allowedTransitions: SessionLifecycleProjection['allowedTransitions'] = []
-  const reasons: string[] = []
+  const criticalBlock = preflight.blockers.some((blocker) =>
+    /durée|horaire|introuvable|invalide|incomplet/iu.test(blocker),
+  )
+  let initialState: SessionLifecycleState
+  if (!preflight.canStart) initialState = criticalBlock ? 'invalid' : 'planned'
+  else if (preflight.requiredActions.includes('wait_for_planned_time')) initialState = 'planned'
+  else initialState = 'ready'
 
-  if (!preflight.canStart) {
-    if (preflight.readiness === 'blocked_by_missing_data' || preflight.readiness === 'blocked_by_unclear_target') {
-      initialState = 'invalid_shadow'
-      reasons.push("La session est invalide dès le départ en raison de bloqueurs critiques.")
-    } else {
-      initialState = 'planned_shadow'
-    }
-  } else if (preflight.readiness === 'ready' || preflight.readiness === 'ready_with_warnings') {
-    initialState = 'ready_shadow' // Could be 'planned_shadow' if far in the future, but we project its readiness state
-    if (preflight.requiredActions.includes('wait_for_planned_time')) {
-      initialState = 'planned_shadow'
-    }
+  const allowedTransitions: SessionLifecycleProjection['allowedTransitions'] = [
+    { from: 'planned', to: 'ready', reason: 'L’heure prévue est atteinte et le preflight autorise le démarrage.' },
+    { from: 'planned', to: 'missed', reason: 'La grâce de retard est dépassée sans démarrage.' },
+    { from: 'ready', to: 'active', reason: 'Le runtime a effectivement démarré le timer et la protection.' },
+    { from: 'ready', to: 'missed', reason: 'La session prête n’a pas été démarrée dans sa fenêtre.' },
+    { from: 'active', to: 'completed', reason: 'Le timer s’est terminé normalement; la clôture reste distincte de la tâche.' },
+    { from: 'active', to: 'aborted', reason: 'La session a été arrêtée avant sa fin prévue.' },
+  ]
+  const liveStates: SessionLifecycleState[] = ['planned', 'ready', 'active', 'completed', 'aborted', 'missed']
+  for (const state of liveStates) {
+    allowedTransitions.push({
+      from: state,
+      to: 'invalid',
+      reason: 'Un diagnostic critique invalide le contrat ou ses données runtime.',
+    })
   }
 
-  // Transitions
-  if (initialState === 'planned_shadow') {
-    allowedTransitions.push({ from: 'planned_shadow', to: 'ready_shadow', reason: "L'heure de début est atteinte et les bloqueurs sont levés." })
-    allowedTransitions.push({ from: 'planned_shadow', to: 'missed_shadow', reason: "La session a été manquée." })
-  }
-
-  allowedTransitions.push({ from: 'ready_shadow', to: 'active_shadow', reason: "L'utilisateur démarre la session." })
-  allowedTransitions.push({ from: 'ready_shadow', to: 'missed_shadow', reason: "La session n'a pas été démarrée dans les temps." })
-  
-  allowedTransitions.push({ from: 'active_shadow', to: 'completed_shadow', reason: "La session s'est terminée normalement (fin du timer ou complétion)." })
-  allowedTransitions.push({ from: 'active_shadow', to: 'aborted_shadow', reason: "L'utilisateur a interrompu la session avant la fin." })
-
-  // Anything can become invalid if data corrupts, but we'll stick to main ones.
+  const reasons = [
+    `Un retard de ${timing.lateStartGraceMinutes} minutes est toléré avant de considérer la session manquée.`,
+    `Un arrêt anticipé applique une pénalité de ${timing.earlyStopPenaltyMinutes} minutes.`,
+    timing.allowPause
+      ? `Une pause est autorisée${timing.maxPauseMinutes !== undefined ? `, limitée à ${timing.maxPauseMinutes} minutes` : ''}.`
+      : 'La durée de cette session ne justifie pas de pause.',
+    `La politique d’overtime est ${timing.overtimePolicy}.`,
+  ]
 
   return {
     initialState,
@@ -49,8 +56,8 @@ export function buildSessionLifecycleProjection(input: SessionLifecycleInput): S
     lateStartGraceMinutes: timing.lateStartGraceMinutes,
     earlyStopPenaltyMinutes: timing.earlyStopPenaltyMinutes,
     allowPause: timing.allowPause,
-    maxPauseMinutes: timing.maxPauseMinutes,
+    ...(timing.maxPauseMinutes !== undefined ? { maxPauseMinutes: timing.maxPauseMinutes } : {}),
     overtimePolicy: timing.overtimePolicy,
-    reasons
+    reasons,
   }
 }

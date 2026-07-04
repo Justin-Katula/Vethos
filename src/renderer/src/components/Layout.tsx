@@ -9,6 +9,8 @@ import { useWorkBlockAutomation } from '@/lib/use-work-block-automation'
 import { useRestModeStore } from '@/store/rest-mode.store'
 import { useScheduleStore } from '@/store/schedule.store'
 import { CoachPrompt } from './coach/CoachPrompt'
+import { SessionClosurePanel } from './session/SessionClosurePanel'
+import { useSessionV2Runtime } from '@/lib/use-session-v2-runtime'
 
 export function Layout() {
   const location = useLocation()
@@ -29,6 +31,7 @@ export function Layout() {
   const todayStr = localDateKey(now)
   const { blocks } = usePlacement(now, todayStr, { todayStartMinute: 0 })
   useWorkBlockAutomation(now, blocks)
+  useSessionV2Runtime()
   const currentMinute = now.getHours() * 60 + now.getMinutes()
   const rules = useScheduleStore((s) => s.rules)
   const entries = useScheduleStore((s) => s.entries)
@@ -73,6 +76,7 @@ export function Layout() {
       />
       <RelaxationOverlay isActive={restModeActive} />
       <CoachPrompt />
+      <SessionClosurePanel />
       <div className="relative z-10 flex h-full w-full">
         <Sidebar />
         <main className="relative flex-1 overflow-y-auto">

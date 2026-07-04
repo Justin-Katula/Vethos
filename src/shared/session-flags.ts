@@ -14,12 +14,12 @@ export const sessionFlags = {
   sessionExplanationsEnabled: true,
   sessionDiagnosticsEnabled: true,
 
-  // Control flags (MUST BE FALSE to avoid real side effects)
-  sessionControlsDisplay: false,
-  sessionControlsSessionStore: false,
-  sessionControlsTimer: false,
-  sessionControlsBlocking: false,
-  sessionControlsOverlay: false,
-  sessionControlsCompletion: false,
-  sessionControlsAutoStart: false,
+  // Emergency rollback switches. Point 8 is live by default.
+  sessionControlsDisplay: true,
+  sessionControlsSessionStore: true,
+  sessionControlsTimer: true,
+  sessionControlsBlocking: true,
+  sessionControlsOverlay: true,
+  sessionControlsCompletion: true,
+  sessionControlsAutoStart: true,
 }

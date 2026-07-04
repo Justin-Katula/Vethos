@@ -4,6 +4,7 @@ import type { SessionInputData } from './session-input-adapter'
 import type { SessionContract } from '@shared/session-model'
 
 describe('session-preflight-engine', () => {
+  const duringSession = new Date('2026-06-26T10:05:00').toISOString()
   const baseInputData: SessionInputData = {
     targetType: 'task',
     targetId: 't1',
@@ -46,9 +47,8 @@ describe('session-preflight-engine', () => {
     const res = runSessionPreflight({
       contract: baseContract,
       inputData: { ...baseInputData, linkedTask: { id: 't1' } },
-      now: '2026-06-26T10:05:00.000Z' // During the block
+      now: duringSession,
     })
-    console.log(res)
     expect(res.canStart).toBe(true)
     expect(res.readiness).toBe('ready')
   })
@@ -57,6 +57,7 @@ describe('session-preflight-engine', () => {
     const res = runSessionPreflight({
       contract: baseContract,
       inputData: { ...baseInputData, linkedTask: undefined },
+      now: duringSession,
     })
     expect(res.canStart).toBe(false)
     expect(res.readiness).toBe('blocked_by_missing_data')
@@ -70,7 +71,8 @@ describe('session-preflight-engine', () => {
         ...baseInputData,
         placementBlock: { ...baseInputData.placementBlock, placementMode: 'deep_work' },
         linkedTask: { id: 't1', isVague: true }
-      }
+      },
+      now: duringSession,
     })
     expect(res.canStart).toBe(false)
     expect(res.readiness).toBe('blocked_by_unclear_target')
@@ -91,10 +93,27 @@ describe('session-preflight-engine', () => {
   it('low confidence requires manual review', () => {
     const res = runSessionPreflight({
       contract: { ...baseContract, confidence: 40 },
-      inputData: { ...baseInputData, linkedTask: { id: 't1' } }
+      inputData: { ...baseInputData, linkedTask: { id: 't1' } },
+      now: duringSession,
     })
     expect(res.canStart).toBe(true)
     expect(res.readiness).toBe('ready_with_warnings')
     expect(res.requiredActions).toContain('manual_review')
+  })
+
+  it('blocks an empty strict allowlist and asks for useful apps', () => {
+    const res = runSessionPreflight({
+      contract: baseContract,
+      inputData: { ...baseInputData, linkedTask: { id: 't1' } },
+      protection: {
+        mode: 'strict_allowlist', protectionLevel: 90, unlockPolicy: 'deny_during_strict_session',
+        usefulApps: [], usefulSites: [], blockedApps: [], blockedSites: [], conditionalApps: [], conditionalSites: [],
+        shouldUseOverlay: true, shouldMuteDistractingMedia: true, reasons: [], warnings: [], confidence: 80,
+      },
+      now: duringSession,
+    })
+    expect(res.canStart).toBe(false)
+    expect(res.requiredActions).toContain('choose_apps')
+    expect(res.readiness).toBe('manual_review_required')
   })
 })

@@ -49,6 +49,7 @@ describe('session-contract-builder', () => {
   it('forces completion_gate and strict evidence for important tasks', () => {
     const res = buildSessionContract({
       ...baseInput,
+      linkedTask: { id: 't1', title: 'Important work' },
       priorityScore: { targetId: 't1', priorityScore: 90 }
     })
     expect(res.completionPolicy).toBe('completion_gate')
@@ -71,23 +72,26 @@ describe('session-contract-builder', () => {
       targetType: 'objective',
     })
     expect(res.allowedToMarkTaskCompleted).toBe(false)
-    expect(res.completionPolicy).toBe('progress_review')
+    expect(res.completionPolicy).toBe('manual_review')
   })
 
   it('requires strict evidence in deadline crisis rescue', () => {
     const res = buildSessionContract({
       ...baseInput,
+      linkedTask: { id: 't1', title: 'Critical work' },
       deadlineCrisisContext: { targetId: 't1', crisisLevel: 'critical', recommendedMode: 'rescue_plan' }
     })
     // Rescue mode itself does not force strict evidence unless important, but let's check completion policy
     expect(res.completionPolicy).toBe('progress_review')
-    expect(res.progressDefinition).toBe('practice_progress')
+    expect(res.progressDefinition).toBe('artifact_progress')
+    expect(res.requiresStrictEvidence).toBe(true)
   })
 
   it('does not hardcode text like "examen" or "chapitre"', () => {
     // Behavior is tested via structural signals, not strings
     const res = buildSessionContract({
       ...baseInput,
+      linkedTask: { id: 't1', title: 'Neutral work' },
       placementBlock: { ...baseInput.placementBlock, title: 'examen_preparation' }
     })
     // Doesn't trigger strictness just by the word "examen"

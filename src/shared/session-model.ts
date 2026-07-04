@@ -23,13 +23,13 @@ export type SessionStartReadiness =
   | 'manual_review_required'
 
 export type SessionLifecycleState =
-  | 'planned_shadow'
-  | 'ready_shadow'
-  | 'active_shadow'
-  | 'completed_shadow'
-  | 'aborted_shadow'
-  | 'missed_shadow'
-  | 'invalid_shadow'
+  | 'planned'
+  | 'ready'
+  | 'active'
+  | 'completed'
+  | 'aborted'
+  | 'missed'
+  | 'invalid'
 
 export type SessionProtectionMode =
   | 'none'
@@ -141,7 +141,6 @@ export type SessionPreflightResult = {
   requiredActions: Array<
     | 'clarify_task'
     | 'choose_apps'
-    | 'choose_sites'
     | 'review_deadline'
     | 'split_task'
     | 'manual_review'
@@ -202,12 +201,13 @@ export type SessionClosurePlan = {
 
   questions: string[]
 
-  allowedOutcomes:
+  allowedOutcomes: Array<
     | 'no_progress'
     | 'partial_progress'
     | 'confirmed_progress'
     | 'claimed_completed'
     | 'verified_completed'
+  >
 
   requiresSpecificAnswer: boolean
 
@@ -282,4 +282,29 @@ export type SessionDiagnosticIssue = {
   message: string
   targetId?: string
   suggestion?: string
+}
+
+export type SessionRuntimeRecord = {
+  plan: SessionPlanV2
+  state: SessionLifecycleState
+  blockingSessionId?: string
+  startedAt?: string
+  endedAt?: string
+  integrity?: SessionIntegrityResult
+  outcome?: SessionOutcomeV2
+}
+
+export type SessionUiData = {
+  sessionId: string
+  title: string
+  target: string
+  schedule: string
+  duration: string
+  mode: SessionMode
+  protectionLevel: number
+  usefulResources: string[]
+  unlockPolicy: SessionUnlockPolicy
+  expectedClosure: string
+  warnings: string[]
+  why: string[]
 }

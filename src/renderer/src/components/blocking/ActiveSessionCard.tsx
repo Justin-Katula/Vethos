@@ -5,6 +5,9 @@ import type { ActiveSession } from '@shared/schemas'
 import type { LayerStatus } from '../../../../preload/index'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { useSessionV2Store } from '@/store/session-v2.store'
+import { buildSessionUiData } from '@/lib/session-ui-data-adapter'
+import { sessionFlags } from '@shared/session-flags'
 
 type Props = {
   session: ActiveSession
@@ -23,6 +26,8 @@ export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props
   const remaining = Math.max(0, Date.parse(session.endsAt) - now)
   const total = Date.parse(session.endsAt) - Date.parse(session.startedAt)
   const elapsed = Math.max(0, Math.min(1, (total - remaining) / total))
+  const sessionRecord = useSessionV2Store((state) => state.records.find((record) => record.blockingSessionId === session.id))
+  const contractUi = sessionRecord ? buildSessionUiData(sessionRecord.plan) : null
 
   return (
     <motion.section
@@ -117,6 +122,18 @@ export function ActiveSessionCard({ session, layerStatus, onRequestStop }: Props
             {session.protectionResult?.applied
               ? <p className="mt-1">La protection a bien été appliquée par les couches nécessaires.</p>
               : session.protectionResult?.warnings.map((warning) => <p key={warning} className="mt-1">{warning}</p>)}
+          </div>
+        )}
+        {contractUi && sessionFlags.sessionControlsDisplay && (
+          <div className="mt-4 grid gap-2 rounded-lg border border-border-subtle bg-bg-base/50 p-4 text-xs text-text-secondary sm:grid-cols-2">
+            <p><span className="text-text-muted">Cible :</span> {contractUi.target}</p>
+            <p><span className="text-text-muted">Horaire :</span> {contractUi.schedule}</p>
+            <p><span className="text-text-muted">Durée / mode :</span> {contractUi.duration} · {contractUi.mode}</p>
+            <p><span className="text-text-muted">Protection :</span> {contractUi.protectionLevel}/100 · {contractUi.unlockPolicy}</p>
+            <p><span className="text-text-muted">Ressources utiles :</span> {contractUi.usefulResources.join(', ') || 'à confirmer'}</p>
+            <p><span className="text-text-muted">Clôture :</span> {contractUi.expectedClosure}</p>
+            {contractUi.warnings.length > 0 && <p className="sm:col-span-2 text-orange">{contractUi.warnings.join(' · ')}</p>}
+            {contractUi.why.length > 0 && <p className="sm:col-span-2"><span className="text-text-muted">Pourquoi :</span> {contractUi.why[0]}</p>}
           </div>
         )}
       </div>

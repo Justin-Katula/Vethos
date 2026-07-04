@@ -1,77 +1,97 @@
-import type { SessionPlanV2, SessionDiagnostics, SessionDiagnosticIssue } from '@shared/session-model'
+import type { CompletionGateResult } from '@shared/completion-gate'
+import { sessionFlags } from '@shared/session-flags'
+import type { SessionDiagnosticIssue, SessionDiagnostics, SessionOutcomeV2, SessionPlanV2 } from '@shared/session-model'
 
-export function runSessionDiagnostics(sessionPlan: SessionPlanV2): SessionDiagnostics {
+function containsNonFinite(value: unknown, seen = new Set<object>()): boolean {
+  if (typeof value === 'number') return !Number.isFinite(value)
+  if (!value || typeof value !== 'object') return false
+  if (seen.has(value)) return false
+  seen.add(value)
+  return Object.values(value).some((nested) => containsNonFinite(nested, seen))
+}
+
+function instant(date: string, value: string): number {
+  return /^\d{2}:\d{2}$/u.test(value)
+    ? new Date(`${date}T${value}:00`).getTime()
+    : new Date(value).getTime()
+}
+
+function completionGateApproved(result: CompletionGateResult | undefined): boolean {
+  return Boolean(result?.verifiedCompleted && result.decision === 'accept_completion')
+}
+
+export function runSessionDiagnostics(
+  sessionPlan: SessionPlanV2,
+  outcome?: SessionOutcomeV2,
+  completionGateResult?: CompletionGateResult,
+): SessionDiagnostics {
   const issues: SessionDiagnosticIssue[] = []
-  const summary: string[] = []
+  const add = (issue: SessionDiagnosticIssue) => issues.push(issue)
+  const start = instant(sessionPlan.date, sessionPlan.plannedStart)
+  const end = instant(sessionPlan.date, sessionPlan.plannedEnd)
 
-  // NaN/Infinity Checks
-  if (!isFinite(sessionPlan.plannedDurationMinutes)) {
-    issues.push({ id: 'invalid_duration_nan', severity: 'critical', message: 'plannedDurationMinutes is NaN or Infinity.' })
+  if (!Number.isFinite(sessionPlan.plannedDurationMinutes) || sessionPlan.plannedDurationMinutes <= 0) {
+    add({ id: 'invalid_duration', severity: 'critical', message: 'plannedDurationMinutes doit être un nombre fini strictement positif.' })
   }
-
-  // Duration
-  if (sessionPlan.plannedDurationMinutes <= 0) {
-    issues.push({ id: 'invalid_duration_zero', severity: 'critical', message: 'plannedDurationMinutes <= 0.' })
+  if (Number.isFinite(start) && Number.isFinite(end) && start >= end) {
+    add({ id: 'invalid_times', severity: 'critical', message: 'plannedStart doit précéder plannedEnd.' })
   }
-
-  // Dates
-  if (sessionPlan.plannedStart >= sessionPlan.plannedEnd) {
-    issues.push({ id: 'invalid_times', severity: 'critical', message: 'plannedStart >= plannedEnd.' })
-  }
-
-  // Target missing
   if (!sessionPlan.targetId) {
-    issues.push({ id: 'missing_target_id', severity: 'critical', message: 'targetId est manquant.' })
+    add({ id: 'missing_target_id', severity: 'critical', message: 'targetId est manquant.' })
   }
-
-  // Strategy Block marking completion
+  if (sessionPlan.targetType === 'task' && !sessionPlan.linkedTaskId) {
+    add({ id: 'linked_task_missing', severity: 'high', message: 'La session cible une tâche introuvable.', targetId: sessionPlan.targetId })
+  }
   if (sessionPlan.targetType === 'strategy_block' && sessionPlan.contract.allowedToMarkTaskCompleted) {
-    issues.push({ id: 'strategy_block_completion_bug', severity: 'critical', message: 'Un strategy_block ne peut pas avoir allowedToMarkTaskCompleted=true.' })
+    add({ id: 'strategy_block_completion_bug', severity: 'critical', message: 'Un strategy_block ne peut jamais compléter une tâche.' })
   }
-
-  // Completion Gate without closure
   if (sessionPlan.contract.completionPolicy === 'completion_gate' && !sessionPlan.closure.required) {
-    issues.push({ id: 'completion_gate_closure_bug', severity: 'critical', message: 'Une policy completion_gate nécessite une closure obligatoire.' })
+    add({ id: 'completion_gate_closure_bug', severity: 'critical', message: 'Un completion gate exige une clôture obligatoire.' })
   }
-
-  // Strict allowlist without useful apps
-  if (
+  const emptyStrictAllowlist =
     sessionPlan.protection.mode === 'strict_allowlist' &&
     sessionPlan.protection.usefulApps.length === 0 &&
     sessionPlan.protection.usefulSites.length === 0
-  ) {
-    issues.push({ id: 'strict_allowlist_empty', severity: 'medium', message: 'strict_allowlist activé mais aucune application ou site utile défini.' })
+  if (emptyStrictAllowlist && sessionPlan.protection.warnings.length === 0) {
+    add({ id: 'strict_allowlist_empty_without_warning', severity: 'critical', message: 'L’allowlist stricte est vide sans avertissement explicite.' })
+  } else if (emptyStrictAllowlist) {
+    add({ id: 'strict_allowlist_empty', severity: 'medium', message: 'L’allowlist stricte est vide; le preflight doit demander les ressources utiles.' })
   }
-
-  // High protection without unlock policy
   if (sessionPlan.protection.protectionLevel > 80 && sessionPlan.protection.unlockPolicy === 'none') {
-    issues.push({ id: 'high_protection_no_unlock', severity: 'critical', message: 'Protection élevée (>80) sans politique de déblocage.' })
+    add({ id: 'high_protection_no_unlock', severity: 'critical', message: 'Une protection supérieure à 80 exige une politique de sortie.' })
   }
-
-  // Ready despite blockers
   if (sessionPlan.preflight.blockers.length > 0 && sessionPlan.preflight.readiness === 'ready') {
-    issues.push({ id: 'ready_with_blockers_bug', severity: 'critical', message: 'Session marquée ready malgré la présence de bloqueurs.' })
+    add({ id: 'ready_with_blockers_bug', severity: 'critical', message: 'La session est marquée prête malgré des bloqueurs.' })
+  }
+  const missingCriticalData = !sessionPlan.linkedTaskId && sessionPlan.targetType === 'task'
+  if (missingCriticalData && sessionPlan.confidence > 70) {
+    add({ id: 'confidence_too_high', severity: 'high', message: 'La confiance est trop haute malgré des données critiques manquantes.' })
+  }
+  if (sessionPlan.protection.shouldUseOverlay && !sessionFlags.sessionControlsOverlay) {
+    add({ id: 'overlay_disabled', severity: 'high', message: 'Le plan exige l’overlay alors que son contrôle runtime est désactivé.' })
+  }
+  if (outcome?.shouldMarkTaskCompleted && !completionGateApproved(completionGateResult)) {
+    add({ id: 'completion_without_gate', severity: 'critical', message: 'Une complétion de tâche est demandée sans completion gate vérifié.' })
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    add({ id: 'invalid_dates', severity: 'critical', message: 'Les dates ou horaires de la session sont illisibles.' })
+  }
+  if (containsNonFinite(sessionPlan) || (outcome && containsNonFinite(outcome))) {
+    add({ id: 'non_finite_output', severity: 'critical', message: 'Le résultat contient NaN ou Infinity et ne peut pas être sérialisé sûrement.' })
   }
 
-  // ShouldMarkTaskCompleted=true without completion gate approval (not testable easily on plan creation, but good for outcome engine)
-  // We can't check outcome here since this is just the plan.
-
-  let status: 'healthy' | 'warning' | 'critical' = 'healthy'
-  if (issues.length > 0) {
-    if (issues.some(i => i.severity === 'critical')) {
-      status = 'critical'
-    } else {
-      status = 'warning'
-    }
-  }
-
-  if (status === 'critical') summary.push("Le plan de session contient des incohérences critiques.")
-  else if (status === 'warning') summary.push("Le plan de session contient des avertissements mineurs.")
-  else summary.push("Plan de session sain.")
-
+  const status: SessionDiagnostics['status'] = issues.some((issue) => issue.severity === 'critical')
+    ? 'critical'
+    : issues.length > 0 ? 'warning' : 'healthy'
   return {
     status,
     issues,
-    summary
+    summary: [
+      status === 'critical'
+        ? 'Le plan de session contient une incohérence critique.'
+        : status === 'warning'
+          ? 'Le plan de session demande une vérification.'
+          : 'Le plan de session est cohérent et sérialisable.',
+    ],
   }
 }

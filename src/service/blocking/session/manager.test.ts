@@ -178,6 +178,24 @@ describe('SessionManager', () => {
     expect(m.getPhase()).toBe('idle')
   })
 
+  it('denies every early stop request during a strict session', async () => {
+    const a = makeAdapters()
+    const strictProfile: BlockingProfile = {
+      ...PROFILE,
+      unlockPolicy: { type: 'deny_during_strict_session' },
+    }
+    a.persistence.readState.mockResolvedValue({ profiles: [strictProfile], history: [], nextSessionPenaltyMinutes: 0 })
+    const m = createSessionManager(a)
+    await m.startSession({ profileId: strictProfile.id, durationMinutes: 60 })
+
+    expect(await m.requestUnlock()).toEqual({ phase: 'locked' })
+    expect(await m.submitJustification('demande détaillée')).toEqual({
+      ok: false,
+      reason: 'unlock denied during strict session',
+    })
+    expect(m.getPhase()).toBe('active')
+  })
+
   it('adds a 15 minute penalty after early unlock', async () => {
     const a = makeAdapters()
     const m = createSessionManager(a)

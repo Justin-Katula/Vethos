@@ -312,6 +312,9 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
   async function requestUnlock(): Promise<ActiveSession['unlockState']> {
     if (!active) throw new Error('No active session')
     const policy = active.profileSnapshot.unlockPolicy
+    if (policy.type === 'deny_during_strict_session') {
+      return { phase: 'locked' }
+    }
     if (policy.type === 'none') {
       await endSessionForce('unlock')
       return { phase: 'unlocked', reason: 'no policy' }
@@ -334,6 +337,10 @@ export function createSessionManager(adapters: SessionManagerAdapters): SessionM
     if (!active) return { ok: false, reason: 'no active session' }
     const policy = active.profileSnapshot.unlockPolicy
     const now = Date.now()
+
+    if (policy.type === 'deny_during_strict_session') {
+      return { ok: false, reason: 'unlock denied during strict session' }
+    }
 
     if (policy.type === 'none') {
       await endSessionForce('unlock')

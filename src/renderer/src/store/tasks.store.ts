@@ -19,11 +19,14 @@ import { useLevelsStore } from './levels.store'
 import { buildCompletionGateResult } from '@/lib/completion-gate-engine'
 import { getEngineFlags, withV1FallbackSync } from '@/lib/engine-activation'
 import type { CompletionClaim } from '@shared/completion-gate'
+import type { CompletionGateResult } from '@shared/completion-gate'
+import type { SessionOutcomeV2 } from '@shared/session-model'
 import type { PriorityResult } from '@shared/engine-results'
 import { samePersistedPriorityScore, toPersistedPriorityScore } from '@/lib/priority-score-migration'
 import { useUserModelStore } from './user-model.store'
 import { createTaskCompletedEvent, createTaskCreatedEvent } from '@/lib/user-event-collector'
 import { buildLearningUpdatesFromSession, gateLearningUpdate } from '@/lib/learning-engine'
+import { applySessionOutcomeToTask } from '@/lib/session-outcome-task-applier'
 import { useDecisionLogStore } from './decision-log.store'
 import {
   normalizeStorageUserId,
@@ -43,6 +46,11 @@ type TasksStore = {
   saveTask: (draft: Partial<Task> & { title: string; deadline: string }) => Promise<Task>
   deleteTask: (id: string) => Promise<void>
   markTaskCompleted: (id: string) => Promise<void>
+  applyVerifiedSessionOutcome: (
+    taskId: string,
+    outcome: SessionOutcomeV2,
+    completionGateResult?: CompletionGateResult,
+  ) => Promise<void>
   updateTaskLevel: (id: string, newLevel: number) => Promise<void>
   applySessionDegradation: (completedTaskIds: string[]) => Promise<void>
   applyObjectiveProgress: (deltas: Array<{ objectiveId: string; minutes: number }>) => Promise<void>
@@ -497,6 +505,22 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
           ?.notify({ type: 'task-expired', taskTitle: event.taskTitle })
           .catch(() => {})
       }
+    }
+  },
+
+  async applyVerifiedSessionOutcome(taskId, outcome, completionGateResult) {
+    const userId = storageUserIdFromState(get())
+    const before = get().tasks.find((task) => task.id === taskId)
+    if (!before) throw new Error('Tâche liée à la session introuvable')
+
+    const updatedTask = applySessionOutcomeToTask(before, outcome, completionGateResult)
+    if (!updatedTask) return
+
+    const tasks = get().tasks.map((task) => task.id === taskId ? updatedTask : task)
+    set({ tasks })
+    await persistTasks(tasks, userId)
+    if (updatedTask.status === 'completed' && before.status !== 'completed') {
+      void useUserModelStore.getState().recordEvent(createTaskCompletedEvent(updatedTask))
     }
   },
 

@@ -40,6 +40,8 @@ export function unlockPolicyLabel(policy: UnlockPolicy): string {
   switch (policy.type) {
     case 'none':
       return 'Sans justification'
+    case 'deny_during_strict_session':
+      return 'Aucun déblocage pendant la session stricte'
     case 'cooldown':
       return `${policy.minutes} min de cooldown`
     case 'justification':

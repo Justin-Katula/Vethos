@@ -33,7 +33,7 @@ type BlockingStore = {
   load: (userId?: string) => Promise<void>
   saveProfile: (draft: Partial<BlockingProfile> & { name: string }) => Promise<BlockingProfile>
   deleteProfile: (id: string) => Promise<void>
-  startSession: (profileId: string, minutes: number) => Promise<void>
+  startSession: (profileId: string, minutes: number) => Promise<ActiveSession>
   startTest: () => Promise<void>
   requestUnlock: () => Promise<void>
   submitJustification: (text: string) => Promise<{ ok: true } | { ok: false; reason: string }>
@@ -173,6 +173,7 @@ export const useBlockingStore = create<BlockingStore>((set, get) => {
         })
       }
       void get().refreshLayerStatus()
+      return s
     },
 
     async startTest() {

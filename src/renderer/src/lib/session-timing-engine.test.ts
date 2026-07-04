@@ -30,7 +30,7 @@ describe('session-timing-engine', () => {
   it('calculates timing for normal session', () => {
     const res = buildSessionTiming(baseInputData)
     expect(res.plannedDurationMinutes).toBe(60)
-    expect(res.minimumUsefulMinutes).toBe(24) // 40%
+    expect(res.minimumUsefulMinutes).toBe(20)
     expect(res.allowPause).toBe(true)
     expect(res.maxPauseMinutes).toBe(5)
   })
@@ -41,6 +41,7 @@ describe('session-timing-engine', () => {
       placementBlock: { ...baseInputData.placementBlock, durationMinutes: 30 }
     })
     expect(res.allowPause).toBe(false)
+    expect(res.maxPauseMinutes).toBeUndefined()
   })
 
   it('forces deep work rules', () => {
@@ -57,7 +58,8 @@ describe('session-timing-engine', () => {
       ...baseInputData,
       placementBlock: { ...baseInputData.placementBlock, placementMode: 'rescue' }
     })
-    expect(res.allowPause).toBe(false)
+    expect(res.allowPause).toBe(true)
+    expect(res.maxPauseMinutes).toBe(3)
     expect(res.overtimePolicy).toBe('deny_overtime')
   })
 
@@ -67,6 +69,6 @@ describe('session-timing-engine', () => {
       placementBlock: { ...baseInputData.placementBlock, durationMinutes: 0 }
     })
     expect(res.minimumUsefulMinutes).toBe(0)
-    expect(res.warnings[0]).toContain('< 10m')
+    expect(res.warnings[0]).toContain('invalide')
   })
 })

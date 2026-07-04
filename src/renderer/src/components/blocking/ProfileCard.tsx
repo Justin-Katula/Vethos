@@ -90,6 +90,8 @@ function policyLabel(p: BlockingProfile['unlockPolicy']): string {
   switch (p.type) {
     case 'none':
       return 'Sans verrou'
+    case 'deny_during_strict_session':
+      return 'Aucun arrêt anticipé'
     case 'cooldown':
       return `Cooldown ${p.minutes} min`
     case 'justification':

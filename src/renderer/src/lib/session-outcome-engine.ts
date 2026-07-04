@@ -1,148 +1,147 @@
-import type { SessionPlanV2, SessionIntegrityResult, SessionOutcomeV2 } from '@shared/session-model'
+import type { CompletionGateResult } from '@shared/completion-gate'
+import type { SessionIntegrityResult, SessionOutcomeV2, SessionPlanV2 } from '@shared/session-model'
+
+export interface SessionClosureResponse {
+  selectedOutcome?: 'no_progress' | 'partial_progress' | 'confirmed_progress' | 'claimed_completed'
+  answerText?: string
+  specificityScore?: number
+}
 
 export interface SessionOutcomeInput {
   sessionPlan: SessionPlanV2
   integrityResult?: SessionIntegrityResult
-
-  closureResponse?: {
-    selectedOutcome?: 'no_progress' | 'partial_progress' | 'confirmed_progress' | 'claimed_completed'
-    answerText?: string
-    specificityScore?: number
-  }
-
-  completionGateResult?: {
-    approved: boolean
-    reason?: string
-  }
-
+  closureResponse?: SessionClosureResponse
+  completionGateResult?: CompletionGateResult | { approved: boolean; reason?: string }
   userModel?: unknown
+}
+
+function clampScore(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0
+}
+
+function gateApproved(result: SessionOutcomeInput['completionGateResult']): boolean {
+  if (!result) return false
+  return 'approved' in result
+    ? result.approved
+    : result.verifiedCompleted && result.decision === 'accept_completion'
+}
+
+function gateRejected(result: SessionOutcomeInput['completionGateResult']): boolean {
+  if (!result) return false
+  return 'approved' in result ? !result.approved : result.decision === 'reject_completion'
+}
+
+function gateReason(result: SessionOutcomeInput['completionGateResult']): string | undefined {
+  if (!result) return undefined
+  return 'approved' in result ? result.reason : result.reasons[0]
 }
 
 export function buildSessionOutcomeV2(input: SessionOutcomeInput): SessionOutcomeV2 {
   const { sessionPlan, integrityResult, closureResponse, completionGateResult } = input
-
+  const contract = sessionPlan.contract
+  const closure = sessionPlan.closure ?? {
+    required: contract.requiresClosureReview,
+    requiresSpecificAnswer: false,
+    minimumSpecificityScore: 0,
+  }
+  const selected = closureResponse?.selectedOutcome
+  const integrityScore = integrityResult?.integrityScore ?? 0
+  const activeMinutes = Math.max(0, integrityResult?.activeDurationMinutes ?? 0)
+  const specificity = clampScore(closureResponse?.specificityScore ?? 0)
+  const answer = closureResponse?.answerText?.trim() ?? ''
+  const answerIsSpecific =
+    !closure.requiresSpecificAnswer ||
+    (specificity >= closure.minimumSpecificityScore && answer.split(/\s+/u).filter(Boolean).length >= 3)
+  const reasons: string[] = []
+  const warnings: string[] = []
+  const confidence = integrityResult ? Math.min(100, integrityResult.confidence + 10) : 25
   let outcome: SessionOutcomeV2['outcome'] = 'manual_review_required'
   let verifiedProgressMinutes = 0
   let shouldReduceRemainingMinutes = false
   let shouldMarkTaskCompleted = false
   let completionAccepted = false
 
-  const reasons: string[] = []
-  const warnings: string[] = []
-  let confidence = 100
-
-  const contract = sessionPlan.contract
-  const integrityScore = integrityResult?.integrityScore ?? 50
-  const isRescue = sessionPlan.mode === 'rescue'
-
-  if (!integrityResult) {
-    confidence -= 30
-    warnings.push("Résultat d'intégrité manquant. Les conclusions seront extrêmement prudentes.")
-  }
-
+  if (!integrityResult) warnings.push('Aucun résultat d’intégrité: la présence et le progrès ne peuvent pas être confondus.')
   if (contract.requiresClosureReview && !closureResponse) {
-    confidence -= 50
-    outcome = 'manual_review_required'
-    reasons.push("Clôture requise par le contrat mais aucune réponse fournie.")
+    reasons.push('Le contrat exige une clôture, mais aucune réponse n’a été fournie.')
     return {
       sessionId: sessionPlan.id,
-      outcome,
-      verifiedProgressMinutes,
-      shouldReduceRemainingMinutes,
-      shouldMarkTaskCompleted,
-      completionAccepted,
+      outcome: 'manual_review_required',
+      verifiedProgressMinutes: 0,
+      shouldReduceRemainingMinutes: false,
+      shouldMarkTaskCompleted: false,
+      completionAccepted: false,
       reasons,
       warnings,
-      confidence: Math.max(0, confidence)
+      confidence: clampScore(confidence - 30),
     }
-  }
-
-  const selected = closureResponse?.selectedOutcome
-
-  // Base progress minutes
-  const activeMinutes = integrityResult?.activeDurationMinutes ?? 0
-  if (integrityScore > 70) {
-    verifiedProgressMinutes = activeMinutes
-  } else if (integrityScore > 30) {
-    verifiedProgressMinutes = Math.floor(activeMinutes * 0.5)
   }
 
   if (selected === 'no_progress') {
     outcome = 'no_progress_confirmed'
-    verifiedProgressMinutes = 0
-    reasons.push("L'utilisateur a confirmé n'avoir fait aucun progrès.")
-  } else if (selected === 'partial_progress') {
-    if (integrityScore >= 30) {
-      outcome = 'partial_progress'
-      shouldReduceRemainingMinutes = true
-      reasons.push("Progrès partiel accepté basé sur l'intégrité et la déclaration.")
-    } else {
+    reasons.push('La clôture confirme qu’aucun progrès vérifiable n’a été produit.')
+  } else if (selected === 'partial_progress' || selected === 'confirmed_progress') {
+    if (!integrityResult || integrityScore < 30 || !answerIsSpecific) {
       outcome = 'manual_review_required'
-      warnings.push("Progrès partiel réclamé, mais l'intégrité est trop faible pour valider automatiquement.")
-    }
-  } else if (selected === 'confirmed_progress') {
-    if (integrityScore >= 50) {
-      outcome = 'progress_confirmed'
-      shouldReduceRemainingMinutes = true
-      reasons.push("Progrès confirmé accepté.")
-      if (isRescue) {
-        reasons.push("En mode rescue, le progrès est un succès stratégique suffisant.")
-      }
+      warnings.push('Les signaux ou la réponse sont insuffisants pour valider le progrès annoncé.')
     } else {
-      outcome = 'partial_progress' // Downgrade
-      shouldReduceRemainingMinutes = true
-      verifiedProgressMinutes = Math.floor(activeMinutes * 0.25)
-      warnings.push("Progrès confirmé rétrogradé en progrès partiel en raison d'une intégrité faible.")
+      const factor = selected === 'partial_progress' || integrityScore < 60 ? 0.5 : 1
+      verifiedProgressMinutes = Math.floor(activeMinutes * factor)
+      shouldReduceRemainingMinutes = verifiedProgressMinutes > 0
+      outcome = selected === 'confirmed_progress' && integrityScore >= 60
+        ? 'progress_confirmed'
+        : 'partial_progress'
+      reasons.push(outcome === 'progress_confirmed'
+        ? 'Le progrès est confirmé par une clôture spécifique et des signaux d’intégrité suffisants.'
+        : 'Seule une partie prudente du progrès annoncé est retenue.')
     }
   } else if (selected === 'claimed_completed') {
-    if (!contract.allowedToMarkTaskCompleted) {
+    if (!contract.allowedToMarkTaskCompleted || contract.targetType !== 'task') {
       outcome = 'completion_rejected'
-      reasons.push("La tâche ne peut pas être marquée terminée depuis cette session (contrat strict ou strategy_block).")
-    } else if (contract.completionPolicy === 'completion_gate') {
-      if (completionGateResult?.approved) {
-        outcome = 'completion_verified'
-        shouldReduceRemainingMinutes = true
-        shouldMarkTaskCompleted = true
-        completionAccepted = true
-        reasons.push("Complétion vérifiée et acceptée par le Completion Gate.")
-      } else if (completionGateResult && !completionGateResult.approved) {
-        outcome = 'completion_rejected'
-        reasons.push(`Complétion rejetée par le Gate : ${completionGateResult.reason}`)
-      } else {
-        outcome = 'manual_review_required'
-        reasons.push("Completion Gate requis mais aucun résultat fourni. Revue manuelle requise.")
-      }
-    } else {
-      // Un integrity score élevé seul ne suffit jamais pour la complétion.
+      reasons.push('Le contrat de cette session interdit la complétion d’une tâche.')
+    } else if (contract.completionPolicy !== 'completion_gate') {
       outcome = 'manual_review_required'
-      warnings.push("L'intégrité seule ne permet pas de vérifier la complétion. Revue manuelle requise.")
+      warnings.push('Une déclaration de complétion sans completion gate reste une revendication non vérifiée.')
+    } else if (!answerIsSpecific || integrityScore < 60) {
+      outcome = 'completion_rejected'
+      warnings.push('L’intégrité ou la précision de la clôture est trop faible pour accepter la complétion.')
+    } else if (gateRejected(completionGateResult)) {
+      outcome = 'completion_rejected'
+      reasons.push(`Le completion gate a rejeté la demande${gateReason(completionGateResult) ? ` : ${gateReason(completionGateResult)}` : '.'}`)
+    } else if (!completionGateResult) {
+      outcome = 'manual_review_required'
+      reasons.push('Le completion gate requis n’a produit aucun résultat.')
+    } else if (gateApproved(completionGateResult)) {
+      outcome = 'completion_verified'
+      verifiedProgressMinutes = Math.min(activeMinutes, Math.max(activeMinutes, sessionPlan.minimumUsefulMinutes))
+      shouldReduceRemainingMinutes = true
+      shouldMarkTaskCompleted = true
+      completionAccepted = true
+      reasons.push('La clôture spécifique, l’intégrité et le completion gate valident ensemble la complétion.')
     }
   } else if (!selected) {
-    // Session without closure required
-    if (!contract.requiresClosureReview && integrityScore >= 50) {
-      outcome = 'progress_confirmed'
-      shouldReduceRemainingMinutes = true
-      reasons.push("Session terminée sans revue requise, intégrité suffisante pour confirmer le progrès.")
-    } else {
-      outcome = 'manual_review_required'
+    outcome = integrityResult && !contract.requiresClosureReview && integrityScore >= 60
+      ? 'progress_confirmed'
+      : integrityResult && activeMinutes === 0
+        ? 'no_progress_confirmed'
+        : 'manual_review_required'
+    if (outcome === 'progress_confirmed') {
+      verifiedProgressMinutes = activeMinutes
+      shouldReduceRemainingMinutes = verifiedProgressMinutes > 0
+      reasons.push('La session légère confirme du progrès, jamais la complétion de la tâche.')
     }
   }
 
-  // Adjust remaining minutes logically, though it's shadow
-  // If we should MarkTaskCompleted, we definitely reduce remaining minutes
-  if (shouldMarkTaskCompleted) {
-    verifiedProgressMinutes = Math.max(verifiedProgressMinutes, sessionPlan.plannedDurationMinutes) // ensure we credit it
-  }
-
+  if (!Number.isFinite(verifiedProgressMinutes)) verifiedProgressMinutes = 0
   return {
     sessionId: sessionPlan.id,
     outcome,
-    verifiedProgressMinutes,
+    verifiedProgressMinutes: Math.max(0, Math.round(verifiedProgressMinutes)),
     shouldReduceRemainingMinutes,
     shouldMarkTaskCompleted,
     completionAccepted,
     reasons,
     warnings,
-    confidence: Math.max(0, confidence)
+    confidence: clampScore(confidence),
   }
 }

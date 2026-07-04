@@ -16,7 +16,8 @@ describe('session-interruption-policy', () => {
     })
     expect(res.earlyStopPolicy).toBe('deny_if_strict')
     expect(res.interruptionSeverity).toBe('critical')
-    expect(res.allowPause).toBe(false)
+    expect(res.allowPause).toBe(true)
+    expect(res.maxPauseMinutes).toBe(2)
   })
 
   it('hardens policy for high risk users', () => {

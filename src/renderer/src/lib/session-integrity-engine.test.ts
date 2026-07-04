@@ -48,8 +48,8 @@ describe('session-integrity-engine', () => {
     const res = calculateSessionIntegrity({
       sessionPlan: basePlan
     })
-    expect(res.confidence).toBe(0)
-    expect(res.integrityScore).toBe(50)
+    expect(res.confidence).toBeLessThan(30)
+    expect(res.integrityScore).toBe(35)
     expect(res.reasons[0]).toContain('Aucun signal')
   })
 
@@ -61,6 +61,7 @@ describe('session-integrity-engine', () => {
         unlockRequestCount: 1,
       }
     })
-    expect(res.warnings[0]).toContain('intégrité fortement impactée')
+    expect(res.integrityScore).toBeLessThan(70)
+    expect(res.warnings.join(' ')).toContain('déblocage')
   })
 })

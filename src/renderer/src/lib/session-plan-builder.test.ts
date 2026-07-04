@@ -1,83 +1,56 @@
 import { describe, expect, it } from 'vitest'
-import { buildSessionPlanV2 } from './session-plan-builder'
 import type { ProposedPlacementBlock } from '@shared/placement-model'
+import { buildSessionPlanV2 } from './session-plan-builder'
+
+const block: ProposedPlacementBlock = {
+  id: 'block-1', targetType: 'task', targetId: 'task-1', kind: 'work', title: 'Generic work',
+  date: '2026-06-26', start: '10:00', end: '11:00', durationMinutes: 60,
+  sourceWindowId: 'window-1', placementMode: 'normal', confidence: 90, locked: false,
+  reasons: [], warnings: [],
+}
 
 describe('session-plan-builder', () => {
-  const baseBlock: ProposedPlacementBlock = {
-    id: 'block1',
-    targetType: 'task',
-    targetId: 't1',
-    kind: 'work',
-    title: 'Work Block',
-    date: '2026-06-26',
-    start: '10:00',
-    end: '11:00',
-    durationMinutes: 60,
-    sourceWindowId: 'win1',
-    placementMode: 'normal',
-    confidence: 100,
-    locked: false,
-    reasons: [],
-    warnings: [],
-  }
-
-  it('builds a full valid session plan', () => {
-    const res = buildSessionPlanV2({
-      userId: 'user1',
-      placementBlock: baseBlock,
-      taskModelsV2: [{ id: 't1', title: 'A task' }],
-      now: '2026-06-26T09:00:00.000Z',
-      idFactory: () => 'sess-1'
+  const duringSession = new Date('2026-06-26T10:05:00').toISOString()
+  it('runs the complete pure pipeline with deterministic now and id', () => {
+    const result = buildSessionPlanV2({
+      userId: 'user-1', placementBlock: block,
+      taskModelsV2: [{ id: 'task-1', title: 'Generic target' }],
+      now: duringSession, idFactory: () => 'session-1',
     })
-
-    expect(res.id).toBe('sess-1')
-    expect(res.userId).toBe('user1')
-    expect(res.targetType).toBe('task')
-    expect(res.contract.purpose).toContain('A task')
-    expect(res.preflight.canStart).toBe(true)
-    expect(res.diagnostics?.status).toBe('healthy')
-    expect(res.metadata.source).toBe('session_engine')
+    expect(result.id).toBe('session-1')
+    expect(result.metadata.createdAt).toBe(duringSession)
+    expect(result.linkedTaskId).toBe('task-1')
+    expect(result.lifecycle.initialState).toBe('ready')
+    expect(result.explanation.summary).toContain('60 min')
+    expect(result.diagnostics?.status).toBe('healthy')
+    expect(JSON.stringify(result)).not.toMatch(/NaN|Infinity/u)
   })
 
-  it('handles missing task and outputs manual_review readiness', () => {
-    const res = buildSessionPlanV2({
-      userId: 'user1',
-      placementBlock: baseBlock,
-      taskModelsV2: [], // Missing task
-      now: '2026-06-26T09:00:00.000Z',
-      idFactory: () => 'sess-1'
+  it('returns an invalid/manual plan instead of throwing for a missing target', () => {
+    const result = buildSessionPlanV2({
+      userId: 'user-1', placementBlock: block, taskModelsV2: [],
+      now: duringSession, idFactory: () => 'session-2',
     })
-
-    expect(res.preflight.readiness).toBe('blocked_by_missing_data')
-    expect(res.confidence).toBeLessThanOrEqual(10)
-    // Diagnostics should ideally pick this up if we configured it, but preflight does
+    expect(result.preflight.canStart).toBe(false)
+    expect(result.lifecycle.initialState).toBe('invalid')
+    expect(result.confidence).toBeLessThanOrEqual(40)
   })
 
-  it('correctly maps strategy block without inventing a real task', () => {
-    const res = buildSessionPlanV2({
-      userId: 'user1',
-      placementBlock: { ...baseBlock, targetType: 'strategy_block', targetId: 'strat' },
-      taskModelsV2: [{ id: 'strat' }],
-      now: '2026-06-26T09:00:00.000Z',
-      idFactory: () => 'sess-1'
+  it('never invents a task for a strategy block', () => {
+    const result = buildSessionPlanV2({
+      userId: 'user-1',
+      placementBlock: { ...block, targetType: 'strategy_block', targetId: 'strategy-1' },
+      taskModelsV2: [{ id: 'strategy-1', title: 'Coincidental id' }],
+      now: duringSession, idFactory: () => 'session-3',
     })
-
-    expect(res.targetType).toBe('strategy_block')
-    expect(res.contract.allowedToMarkTaskCompleted).toBe(false)
+    expect(result.linkedTaskId).toBeUndefined()
+    expect(result.contract.allowedToMarkTaskCompleted).toBe(false)
   })
 
-  it('does not mutate stores (only pure function output)', () => {
-    const taskModels = [{ id: 't1', title: 'Task' }]
-    const originalLength = taskModels.length
-
-    buildSessionPlanV2({
-      userId: 'user1',
-      placementBlock: baseBlock,
-      taskModelsV2: taskModels,
-      now: '2026-06-26T09:00:00.000Z'
-    })
-
-    // No mutation
-    expect(taskModels.length).toBe(originalLength)
+  it('does not mutate supplied models or the placement block', () => {
+    const tasks = [{ id: 'task-1', title: 'Immutable target' }]
+    const before = JSON.stringify({ tasks, block })
+    buildSessionPlanV2({ userId: 'user-1', placementBlock: block, taskModelsV2: tasks, now: duringSession })
+    expect(JSON.stringify({ tasks, block })).toBe(before)
   })
 })

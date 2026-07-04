@@ -1,9 +1,11 @@
 import type { SessionPlanV2 } from '@shared/session-model'
+import type { DeadlineCrisisContext } from '@shared/planning-time-model'
+import type { UserModel } from '@shared/user-model'
 
 export interface SessionInterruptionPolicyInput {
   sessionPlan: Pick<SessionPlanV2, 'mode' | 'plannedDurationMinutes' | 'targetType' | 'protection' | 'contract'>
-  userModel?: unknown
-  deadlineCrisisContext?: unknown
+  userModel?: UserModel | { disciplineRiskLevel?: 'low' | 'medium' | 'high' | 'critical' } | null
+  deadlineCrisisContext?: DeadlineCrisisContext
 }
 
 export interface SessionInterruptionPolicyResult {
@@ -27,13 +29,16 @@ export function buildSessionInterruptionPolicy(input: SessionInterruptionPolicyI
   let interruptionSeverity: SessionInterruptionPolicyResult['interruptionSeverity'] = 'low'
   const reasons: string[] = []
   const warnings: string[] = []
-  let confidence = 100
+  const confidence = 100
 
-  const isRescue = sessionPlan.mode === 'rescue' || (deadlineCrisisContext as any)?.recommendedMode === 'rescue_plan'
+  const isRescue = sessionPlan.mode === 'rescue' || deadlineCrisisContext?.recommendedMode === 'rescue_plan'
+  const isCritical = deadlineCrisisContext?.crisisLevel === 'critical' || deadlineCrisisContext?.crisisLevel === 'rescue_required'
   const isDeepWork = sessionPlan.mode === 'deep_work'
   const isReview = sessionPlan.mode === 'review' || sessionPlan.mode === 'manual_review'
   const duration = sessionPlan.plannedDurationMinutes
-  const risk = (userModel as any)?.disciplineRiskLevel
+  const risk = userModel && 'disciplineModel' in userModel
+    ? userModel.disciplineModel.globalDistractionRisk
+    : userModel?.disciplineRiskLevel === 'critical' ? 90 : userModel?.disciplineRiskLevel === 'high' ? 70 : 0
   
   if (isReview) {
     allowEarlyStop = true
@@ -41,10 +46,11 @@ export function buildSessionInterruptionPolicy(input: SessionInterruptionPolicyI
     allowPause = true
     interruptionSeverity = 'low'
     reasons.push("Session légère. Interruption autorisée avec faible sévérité.")
-  } else if (isRescue) {
+  } else if (isRescue || isCritical) {
     allowEarlyStop = false
     earlyStopPolicy = 'deny_if_strict'
-    allowPause = false
+    allowPause = duration >= 25
+    maxPauseMinutes = allowPause ? Math.min(3, Math.max(1, Math.floor(duration / 20))) : undefined
     interruptionSeverity = 'critical'
     reasons.push("Session de sauvetage. Les interruptions sont critiques et découragées.")
   } else if (isDeepWork) {
@@ -64,7 +70,7 @@ export function buildSessionInterruptionPolicy(input: SessionInterruptionPolicyI
   }
 
   // Adjust for user model
-  if (risk === 'high' || risk === 'critical') {
+  if (risk >= 60) {
     if (earlyStopPolicy === 'allow') earlyStopPolicy = 'justification'
     if (earlyStopPolicy === 'justification') earlyStopPolicy = 'cooldown_and_justification'
     if (interruptionSeverity === 'low') interruptionSeverity = 'medium'

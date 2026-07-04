@@ -24,6 +24,8 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/lib/use-toast'
 import { estimateMinutesForLevel } from '@/lib/free-time-calculator'
 import type { BlockingProfile, WorkBlockingConfig } from '@shared/schemas'
+import { useSessionV2Store } from '@/store/session-v2.store'
+import { buildSessionUiData } from '@/lib/session-ui-data-adapter'
 
 const AUTO_PROFILE_ID = '00000000-0000-4000-8000-000000000042'
 
@@ -56,6 +58,8 @@ export default function BlockingPage() {
     saveObjective,
   } = useLevelsStore()
   const toast = useToast()
+  const latestSessionRecord = useSessionV2Store((state) => state.records.at(-1))
+  const latestSessionUi = latestSessionRecord ? buildSessionUiData(latestSessionRecord.plan) : null
 
   const [unlockOpen, setUnlockOpen] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
@@ -171,9 +175,15 @@ export default function BlockingPage() {
               className="info-panel flex items-center gap-3 rounded-lg px-5 py-4 text-sm text-text-secondary"
             >
               <ShieldCheck size={18} className="text-emerald-400" />
-              <span>
-                Aucune session active. Le blocage démarrera automatiquement selon ton planning.
-              </span>
+              <div>
+                <span>Aucune session active. Le blocage démarrera automatiquement selon ton planning.</span>
+                {latestSessionUi && !latestSessionRecord?.outcome && (
+                  <div className="mt-2 text-xs text-text-muted">
+                    Prochain contrat : {latestSessionUi.title} · {latestSessionUi.duration} · protection {latestSessionUi.protectionLevel}/100
+                    {latestSessionUi.warnings[0] ? <div className="mt-1 text-orange">{latestSessionUi.warnings[0]}</div> : null}
+                  </div>
+                )}
+              </div>
               {blockState.nextSessionPenaltyMinutes > 0 && (
                 <span className="ml-auto rounded-md border border-orange/30 bg-orange/10 px-2 py-1 text-xs font-medium text-orange">
                   +{blockState.nextSessionPenaltyMinutes} min prochaine session

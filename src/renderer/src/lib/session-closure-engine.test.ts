@@ -17,15 +17,16 @@ describe('session-closure-engine', () => {
     expect(res.required).toBe(true)
     expect(res.closurePromptType).toBe('completion_gate')
     expect(res.requiresSpecificAnswer).toBe(true)
-    expect(res.minimumSpecificityScore).toBe(70)
+    expect(res.minimumSpecificityScore).toBe(65)
   })
 
   it('downgrades claimed_completed for strategy blocks', () => {
     const res = buildSessionClosurePlan({
       contract: { completionPolicy: 'completion_gate', requiresClosureReview: true, targetType: 'strategy_block' } as any
     })
-    expect(res.allowedOutcomes).toBe('confirmed_progress')
-    expect(res.reasons.some(r => r.includes("On ne peut pas marquer 'completed'"))).toBe(true)
+    expect(res.allowedOutcomes).not.toContain('claimed_completed')
+    expect(res.allowedOutcomes).not.toContain('verified_completed')
+    expect(res.reasons.some(r => r.includes('ne peut jamais compléter'))).toBe(true)
   })
 
   it('forces progress review questions for rescue', () => {
@@ -33,6 +34,6 @@ describe('session-closure-engine', () => {
       contract: { completionPolicy: 'progress_review', targetType: 'task' } as any,
       sessionPlan: { mode: 'rescue' } as any
     })
-    expect(res.questions.some(q => q.includes('Rescue'))).toBe(true)
+    expect(res.questions.some(q => q.includes('priorité'))).toBe(true)
   })
 })

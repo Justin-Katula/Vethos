@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { SLEEP_LOCKDOWN_PROCESS_MARKER, SLEEP_LOCKDOWN_PROFILE_ID } from '@shared/blocking'
 import type {
   ActiveSession,
-  DiscoveredSite,
-  Objective,
-  Task,
-  WorkBlockingConfig,
+  Settings,
   UnlockPolicy,
 } from '@shared/schemas'
+import type { ProposedPlacementBlock } from '@shared/placement-model'
+import type { SessionPlanV2 } from '@shared/session-model'
+import { sessionFlags } from '@shared/session-flags'
 import type { PlacedBlock } from './placement-engine'
 import { minuteToClockLabel } from './format-time'
 import { vethos } from './ipc'
@@ -25,9 +25,15 @@ import { getEngineFlags, withV1FallbackSync } from './engine-activation'
 import { buildSessionPlanFromBlock } from './session-plan-engine'
 import type { SessionPlan } from '@shared/engine-results'
 import { useDecisionLogStore } from '@/store/decision-log.store'
+import { useSessionV2Store } from '@/store/session-v2.store'
+import { buildPlanningContextV2 } from './planning-context-snapshot'
+import { buildLiveSessionPlan } from './live-session-plan-builder'
+import { buildRuntimeCoordinatorPlanV2 } from './runtime-coordinator-plan-builder'
+import { runtimeCoordinatorV2Enabled } from '@shared/runtime-coordinator-flags'
+import { useRuntimeCoordinatorStore } from '@/store/runtime-coordinator.store'
+import { buildSessionInterruptionPolicy, type SessionInterruptionPolicyResult } from './session-interruption-policy'
 
 const AUTO_PROFILE_ID = '00000000-0000-4000-8000-000000000042'
-const DOMAIN_RE = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z]{2,})+$/
 const SLEEP_LOCKDOWN_SITES = [
   'youtube.com',
   'tiktok.com',
@@ -44,38 +50,11 @@ const SLEEP_LOCKDOWN_SITES = [
   'spotify.com',
 ]
 
-const SAFE_PROCESS_NAMES = new Set([
-  'applicationframehost.exe',
-  'audiodg.exe',
-  'conhost.exe',
-  'csrss.exe',
-  'ctfmon.exe',
-  'dwm.exe',
-  'electron.exe',
-  'explorer.exe',
-  'vethos.exe',
-  'runtimebroker.exe',
-  'searchhost.exe',
-  'shellexperiencehost.exe',
-  'sihost.exe',
-  'startmenuexperiencehost.exe',
-  'svchost.exe',
-  'systemsettings.exe',
-  'taskhostw.exe',
-  'taskkill.exe',
-  'tasklist.exe',
-  'textinputhost.exe',
-  'vethosblockingservice.exe',
-  'nexus.exe',
-  'nexusblockingservice.exe',
-  'wininit.exe',
-  'winlogon.exe',
-  'node.exe',
-])
-
-type CurrentWorkBlock = PlacedBlock & {
+type CurrentWorkBlock = PlacedBlock & ({
   kind: 'task' | 'objective'
-}
+} | {
+  sourcePlacementBlock: ProposedPlacementBlock & { targetType: 'strategy_block' }
+})
 
 export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
   const tasks = useTasksStore((s) => s.tasks)
@@ -113,6 +92,7 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
   const startedRuleRef = useRef<string | null>(null)
   const startedSleepRef = useRef<string | null>(null)
   const autoStartInFlightRef = useRef(false)
+  const blockedPlanSignatureRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!tasksUserId) return
@@ -121,6 +101,9 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
     if (!levelsLoaded) void loadLevels(tasksUserId)
     if (!blockingLoaded) void loadBlocking(tasksUserId)
     if (!registryLoaded) void loadRegistry(tasksUserId)
+    const sessionStore = useSessionV2Store.getState()
+    if (sessionStore.userId !== tasksUserId) sessionStore.setUserId(tasksUserId)
+    if (!sessionStore.loaded) void sessionStore.load(tasksUserId)
   }, [
     blockingLoaded,
     levelsLoaded,
@@ -135,17 +118,12 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
     loadRegistry,
   ])
 
-  const objectiveById = useMemo(
-    () => new Map(objectives.map((objective) => [objective.id, objective])),
-    [objectives],
-  )
-  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const ruleById = useMemo(() => new Map(rules.map((rule) => [rule.id, rule])), [rules])
   const currentBlock = useMemo<CurrentWorkBlock | null>(() => {
     return (
       blocks.find(
         (block): block is CurrentWorkBlock =>
-          (block.kind === 'task' || block.kind === 'objective') &&
+          (block.kind === 'task' || block.kind === 'objective' || block.sourcePlacementBlock?.targetType === 'strategy_block') &&
           block.date === todayStr &&
           block.startMinute <= currentMinute &&
           currentMinute < block.endMinute,
@@ -255,6 +233,11 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
   useEffect(() => {
     if (!currentBlock) return
 
+    if (!tasksUserId) return
+    if (!sessionFlags.sessionControlsAutoStart) return
+    if (startedBlockRef.current === currentBlock.id) return
+    if (active || serviceStatus !== 'ok' || autoStartInFlightRef.current) return
+
     const flags = getEngineFlags({
       engineV2Placement,
       engineV2Blocking,
@@ -272,8 +255,66 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
       mode?: 'blocklist' | 'allowlist'
     } | null = null
     let decisionSessionPlan: SessionPlan | null = null
+    let sessionPlanV2: SessionPlanV2 | null = null
 
-    if (flags.newSessionPlanControlsBlocking) {
+    if (sessionFlags.sessionPlanV2Enabled && sessionFlags.sessionControlsBlocking) {
+      const settings = useSettingsStore.getState()
+      const sessionSettings = settingsForSession(settings)
+      const placementBlock = currentBlock.sourcePlacementBlock ?? proposedBlockFromRuntime(currentBlock)
+      const planningContext = buildPlanningContextV2({
+        userId: tasksUserId,
+        dateRange: { startDate: todayStr, endDate: todayStr },
+        schedule: { rules, entries },
+        settings: sessionSettings,
+        now,
+      })
+      sessionPlanV2 = buildLiveSessionPlan({
+        userId: tasksUserId,
+        placementBlock,
+        placementPlanV2: currentBlock.sourcePlacementPlanV2,
+        tasks,
+        objectives,
+        registry,
+        userModel,
+        planningContext,
+        now,
+      })
+      void useSessionV2Store.getState().upsertPlan(sessionPlanV2)
+
+      // Point 9 — Coordination runtime V2 : on construit le plan de protection
+      // runtime (consultatif) depuis le SessionPlanV2 actif et on l'expose au
+      // panneau debug dev. Aucune opération système réelle n'est déclenchée ici
+      // (les runtimeCoordinatorControls* restent false). Le flag permet un rollback.
+      if (runtimeCoordinatorV2Enabled) {
+        try {
+          const coordinatorPlan = buildRuntimeCoordinatorPlanV2({
+            userId: tasksUserId,
+            sessionPlan: sessionPlanV2,
+            now: now.toISOString(),
+          })
+          useRuntimeCoordinatorStore.getState().setPlan(coordinatorPlan)
+        } catch (err) {
+          // Le coordinator reste consultatif : une erreur ne doit jamais bloquer
+          // le démarrage de session réel (géré par le pipeline V1 ci-dessous).
+          console.error('[RuntimeCoordinatorV2] erreur de construction du plan :', err)
+        }
+      }
+
+      if (!sessionPlanV2.preflight.canStart || sessionPlanV2.lifecycle.initialState === 'invalid') {
+        const description = sessionPlanV2.preflight.blockers[0] ?? 'Le contrat de session exige une revue manuelle.'
+        const signature = `${currentBlock.id}:${description}`
+        if (blockedPlanSignatureRef.current !== signature) {
+          blockedPlanSignatureRef.current = signature
+          useToastStore.getState().push({ variant: 'error', title: 'Session non démarrée', description })
+        }
+        return
+      }
+      blockedPlanSignatureRef.current = null
+      const interruptionPolicy = buildSessionInterruptionPolicy({ sessionPlan: sessionPlanV2, userModel })
+      payload = mapSessionPlanV2ToSessionPayload(sessionPlanV2, currentBlock.label, sessionSettings, interruptionPolicy)
+    }
+
+    if (!payload && flags.newSessionPlanControlsBlocking) {
       payload = withV1FallbackSync({
         v2: () => {
           const currentTask = currentBlock.refId && currentBlock.kind === 'task'
@@ -293,7 +334,7 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
             currentTask,
             currentObjective,
             registry,
-            settings as any,
+            settingsForSession(settings),
             { activeTask: activeObjectiveTask, userModel },
           )
           decisionSessionPlan = sessionPlan
@@ -309,7 +350,7 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
         },
         label: 'use-work-block-automation-v2',
       })
-    } else {
+    } else if (!payload) {
       const payloadV1 = resolveBlockingForBlock(currentBlock, registry, objectives, tasks)
       payload = payloadV1 ? { ...payloadV1, mode: 'blocklist' as const } : null
     }
@@ -327,7 +368,10 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
       saveProfile,
       startSession,
     })
-      .then(() => {
+      .then((runtimeSession) => {
+        if (sessionPlanV2) {
+          void useSessionV2Store.getState().activate(sessionPlanV2, runtimeSession)
+        }
         if (!decisionSessionPlan) return
         void useDecisionLogStore.getState().record({
           type: 'session_plan',
@@ -337,6 +381,7 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
         })
       })
       .catch((err) => {
+        startedBlockRef.current = null
         useToastStore.getState().push({
           variant: 'error',
           title: 'Blocage non démarré',
@@ -363,6 +408,10 @@ export function useWorkBlockAutomation(now: Date, blocks: PlacedBlock[]): void {
     engineV2Completion,
     engineV2Execution,
     userModel,
+    rules,
+    entries,
+    now,
+    todayStr,
   ])
 
   useEffect(() => {
@@ -412,7 +461,7 @@ async function startRegistryBlockingSession(args: {
   remainingMinutes: number
   saveProfile: ReturnType<typeof useBlockingStore.getState>['saveProfile']
   startSession: ReturnType<typeof useBlockingStore.getState>['startSession']
-}): Promise<void> {
+}): Promise<ActiveSession> {
   const profile = await args.saveProfile({
     id: AUTO_PROFILE_ID,
     name: truncateProfileName(`Vethos auto - ${args.payload.label}`),
@@ -423,7 +472,7 @@ async function startRegistryBlockingSession(args: {
     unlockPolicy: args.payload.unlockPolicy,
     createdAt: new Date().toISOString(),
   })
-  await args.startSession(profile.id, args.remainingMinutes)
+  return args.startSession(profile.id, args.remainingMinutes)
 }
 
 async function startSleepLockdownSession(args: {
@@ -456,6 +505,38 @@ function truncateProfileName(name: string): string {
   return `${name.slice(0, 57).trimEnd()}...`
 }
 
+function settingsForSession(settings: ReturnType<typeof useSettingsStore.getState>): Settings {
+  return {
+    username: settings.username || undefined,
+    savedAt: settings.savedAt ?? undefined,
+    onboardingCompleted: settings.onboardingCompleted,
+    userProfile: settings.userProfile,
+    sleepStart: settings.sleepStart,
+    sleepEnd: settings.sleepEnd,
+    sleepLockdownSkippedDate: settings.sleepLockdownSkippedDate ?? undefined,
+    chronotype: settings.chronotype,
+    detectedPeakHour: settings.detectedPeakHour ?? undefined,
+    detectedWakeMinute: settings.detectedWakeMinute ?? undefined,
+    detectedSleepMinute: settings.detectedSleepMinute ?? undefined,
+    detectedChronotype: settings.detectedChronotype ?? undefined,
+    circadianMetricsUpdatedAt: settings.circadianMetricsUpdatedAt ?? undefined,
+    sessionRulesEnabled: settings.sessionRulesEnabled,
+    autoSave: settings.autoSave,
+    browserHistoryScanEnabled: settings.browserHistoryScanEnabled,
+    defaultUnlockCooldownMinutes: settings.defaultUnlockCooldownMinutes,
+    defaultUnlockJustificationWords: settings.defaultUnlockJustificationWords,
+    firstLaunchDate: settings.firstLaunchDate ?? undefined,
+    staticTomorrowPlanningEnabled: settings.staticTomorrowPlanningEnabled,
+    closureRitualCompletedAt: settings.closureRitualCompletedAt ?? undefined,
+    classificationMode: settings.classificationMode,
+    engineV2Placement: settings.engineV2Placement,
+    engineV2Blocking: settings.engineV2Blocking,
+    engineV2Priority: settings.engineV2Priority,
+    engineV2Completion: settings.engineV2Completion,
+    engineV2Execution: settings.engineV2Execution,
+  }
+}
+
 export function mapSessionPlanToSessionPayload(
   plan: SessionPlan,
   label: string
@@ -485,5 +566,65 @@ export function mapSessionPlanToSessionPayload(
       label,
       mode: 'blocklist',
     }
+  }
+}
+
+function proposedBlockFromRuntime(block: CurrentWorkBlock): ProposedPlacementBlock {
+  const targetType = block.kind === 'task' || block.kind === 'objective' ? block.kind : 'strategy_block'
+  return {
+    id: block.id,
+    targetType,
+    targetId: block.refId ?? block.linkedTaskId ?? block.id,
+    kind: 'work',
+    title: block.label,
+    date: block.date,
+    start: minuteToClockLabel(block.startMinute),
+    end: minuteToClockLabel(block.endMinute),
+    durationMinutes: Math.max(0, block.endMinute - block.startMinute),
+    sourceWindowId: `runtime-${block.id}`,
+    ...(block.linkedTaskId ? { linkedTaskId: block.linkedTaskId } : {}),
+    placementMode: 'normal',
+    confidence: 60,
+    locked: false,
+    reasons: ['Bloc runtime adapté au contrat de session.'],
+    warnings: ['Le contrat provient d’un bloc legacy; une confiance prudente est appliquée.'],
+  }
+}
+
+export function mapSessionPlanV2ToSessionPayload(
+  plan: SessionPlanV2,
+  label: string,
+  settings: { defaultUnlockCooldownMinutes?: number; defaultUnlockJustificationWords?: number },
+  interruptionPolicy?: SessionInterruptionPolicyResult,
+): {
+  blockedSites: string[]
+  blockedProcesses: string[]
+  blockedNetworkApps: string[]
+  unlockPolicy: UnlockPolicy
+  label: string
+  mode: 'blocklist' | 'allowlist'
+} {
+  const cooldown = settings.defaultUnlockCooldownMinutes ?? 5
+  const words = settings.defaultUnlockJustificationWords ?? 80
+  const effectivePolicy = interruptionPolicy?.earlyStopPolicy === 'deny_if_strict'
+    ? 'deny_during_strict_session'
+    : interruptionPolicy?.earlyStopPolicy ?? plan.protection.unlockPolicy
+  const unlockPolicy: UnlockPolicy = effectivePolicy === 'none' || effectivePolicy === 'allow'
+    ? { type: 'none' }
+    : effectivePolicy === 'cooldown'
+      ? { type: 'cooldown', minutes: cooldown }
+      : effectivePolicy === 'justification'
+        ? { type: 'justification', minWords: words }
+        : effectivePolicy === 'deny_during_strict_session'
+          ? { type: 'deny_during_strict_session' }
+          : { type: 'cooldown_and_justification', minutes: cooldown, minWords: words }
+  const allowlist = plan.protection.mode === 'allowlist' || plan.protection.mode === 'strict_allowlist'
+  return {
+    blockedSites: allowlist ? plan.protection.usefulSites : plan.protection.blockedSites,
+    blockedProcesses: allowlist ? plan.protection.usefulApps : plan.protection.blockedApps,
+    blockedNetworkApps: [],
+    unlockPolicy,
+    label,
+    mode: allowlist ? 'allowlist' : 'blocklist',
   }
 }

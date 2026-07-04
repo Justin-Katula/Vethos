@@ -1,132 +1,122 @@
-import type { SessionPlanV2, SessionIntegrityResult } from '@shared/session-model'
+import type { SessionIntegrityResult, SessionPlanV2 } from '@shared/session-model'
+
+export interface SessionRuntimeSignals {
+  activeDurationMinutes?: number
+  usefulActivityMinutes?: number
+  distractionAttemptCount?: number
+  unlockRequestCount?: number
+  idleMinutes?: number
+  earlyStopped?: boolean
+  completedNormally?: boolean
+}
 
 export interface SessionIntegrityInput {
   sessionPlan: Pick<SessionPlanV2, 'id' | 'plannedDurationMinutes' | 'mode' | 'protection'>
-  runtimeSignals?: {
-    activeDurationMinutes?: number
-    usefulActivityMinutes?: number
-    distractionAttemptCount?: number
-    unlockRequestCount?: number
-    idleMinutes?: number
-    earlyStopped?: boolean
-    completedNormally?: boolean
-  }
+  runtimeSignals?: SessionRuntimeSignals
   now?: string
+}
+
+function safeNumber(value: number | undefined): number | undefined {
+  return value === undefined ? undefined : Number.isFinite(value) ? Math.max(0, value) : 0
+}
+
+function clampScore(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0
 }
 
 export function calculateSessionIntegrity(input: SessionIntegrityInput): SessionIntegrityResult {
   const { sessionPlan, runtimeSignals } = input
-
-  const sessionId = sessionPlan.id
-  const plannedDurationMinutes = sessionPlan.plannedDurationMinutes
-  const activeDurationMinutes = runtimeSignals?.activeDurationMinutes ?? 0
-  const usefulActivityMinutes = runtimeSignals?.usefulActivityMinutes
-  const distractionAttemptCount = runtimeSignals?.distractionAttemptCount ?? 0
-  const unlockRequestCount = runtimeSignals?.unlockRequestCount ?? 0
-  const idleMinutes = runtimeSignals?.idleMinutes ?? 0
-  const earlyStopped = runtimeSignals?.earlyStopped ?? false
-  const completedNormally = runtimeSignals?.completedNormally ?? false
-
-  let integrityScore = 100
-  let suspiciousBehaviorScore = 0
+  const plannedDurationMinutes = safeNumber(sessionPlan.plannedDurationMinutes) ?? 0
+  const activeDurationMinutes = safeNumber(runtimeSignals?.activeDurationMinutes) ?? 0
+  const usefulActivityMinutes = safeNumber(runtimeSignals?.usefulActivityMinutes)
+  const distractionAttemptCount = safeNumber(runtimeSignals?.distractionAttemptCount) ?? 0
+  const unlockRequestCount = safeNumber(runtimeSignals?.unlockRequestCount) ?? 0
+  const idleMinutes = safeNumber(runtimeSignals?.idleMinutes) ?? 0
   const reasons: string[] = []
   const warnings: string[] = []
-  let confidence = 100
-  let sessionCompleted = false
 
   if (!runtimeSignals) {
-    confidence = 0
-    integrityScore = 50 // Unknown, default safe middle
-    reasons.push("Aucun signal d'exécution fourni. L'intégrité ne peut pas être mesurée avec certitude.")
     return {
-      sessionId,
+      sessionId: sessionPlan.id,
       sessionCompleted: false,
       plannedDurationMinutes,
       activeDurationMinutes: 0,
-      integrityScore,
-      suspiciousBehaviorScore,
-      reasons,
-      warnings,
-      confidence
+      integrityScore: 35,
+      suspiciousBehaviorScore: 0,
+      reasons: ['Aucun signal runtime n’est disponible; le score reste prudent et ne prouve aucun travail.'],
+      warnings: ['Une clôture manuelle est nécessaire faute de signaux d’exécution.'],
+      confidence: 15,
     }
   }
 
-  sessionCompleted = completedNormally
-
-  // Base on time
-  if (activeDurationMinutes < plannedDurationMinutes * 0.5) {
-    integrityScore -= 30
-    reasons.push(`Durée active (${activeDurationMinutes}m) très inférieure à la durée prévue (${plannedDurationMinutes}m).`)
-  } else if (activeDurationMinutes >= plannedDurationMinutes * 0.9) {
+  let integrityScore = 50
+  let suspiciousBehaviorScore = 0
+  let confidence = 80
+  const ratio = plannedDurationMinutes > 0 ? activeDurationMinutes / plannedDurationMinutes : 0
+  if (ratio >= 0.9) {
+    integrityScore += 25
+    reasons.push('La durée active est proche de la durée planifiée.')
+  } else if (ratio >= 0.6) {
     integrityScore += 10
-    reasons.push("La session a presque atteint ou dépassé la durée prévue.")
+    reasons.push('La durée active couvre une part substantielle de la session.')
+  } else {
+    integrityScore -= 25
+    warnings.push('La durée active est nettement inférieure à la durée planifiée.')
   }
 
-  // Early stop
-  if (earlyStopped && !completedNormally) {
-    integrityScore -= 20
-    reasons.push("La session a été interrompue prématurément.")
-  }
-
-  // Distractions
-  if (distractionAttemptCount > 0) {
-    suspiciousBehaviorScore += distractionAttemptCount * 5
-    integrityScore -= distractionAttemptCount * 2
-    reasons.push(`${distractionAttemptCount} tentative(s) de distraction détectée(s).`)
-  }
-
-  // Unlocks
-  if (unlockRequestCount > 0) {
-    suspiciousBehaviorScore += unlockRequestCount * 10
-    integrityScore -= unlockRequestCount * 5
-    reasons.push(`${unlockRequestCount} demande(s) de déblocage effectuée(s).`)
-    
-    if (sessionPlan.protection?.mode === 'strict_allowlist') {
-      integrityScore -= 20
-      warnings.push("Demande de déblocage pendant une session stricte : intégrité fortement impactée.")
-    }
-  }
-
-  // Idle
-  if (idleMinutes > plannedDurationMinutes * 0.3) {
-    suspiciousBehaviorScore += 20
-    integrityScore -= 30
-    warnings.push(`Temps d'inactivité très élevé (${idleMinutes}m).`)
-  }
-
-  // Useful activity if we have it
   if (usefulActivityMinutes !== undefined) {
-    if (usefulActivityMinutes > activeDurationMinutes * 0.8) {
+    const usefulRatio = activeDurationMinutes > 0 ? usefulActivityMinutes / activeDurationMinutes : 0
+    if (usefulRatio >= 0.75) {
       integrityScore += 20
-      suspiciousBehaviorScore = Math.max(0, suspiciousBehaviorScore - 10)
-      reasons.push("L'activité utile confirmée est très élevée.")
-    } else if (usefulActivityMinutes < activeDurationMinutes * 0.3) {
-      integrityScore -= 40
-      suspiciousBehaviorScore += 30
-      warnings.push("Très peu d'activité utile détectée par rapport au temps actif.")
+      reasons.push('Une part élevée du temps actif est classée utile.')
+    } else if (usefulRatio < 0.3) {
+      integrityScore -= 25
+      suspiciousBehaviorScore += 20
+      warnings.push('La part d’activité utile est faible.')
     }
   } else {
-    confidence -= 20
-    reasons.push("Mesure de l'activité utile manquante (baisse de confiance).")
+    confidence -= 25
+    reasons.push('L’activité utile n’a pas été mesurée; elle n’est pas supposée.')
   }
 
-  // Normalize
-  integrityScore = Math.max(0, Math.min(100, integrityScore))
-  suspiciousBehaviorScore = Math.max(0, Math.min(100, suspiciousBehaviorScore))
+  if (distractionAttemptCount > 0) {
+    integrityScore -= Math.min(30, distractionAttemptCount * 3)
+    suspiciousBehaviorScore += Math.min(35, distractionAttemptCount * 6)
+    warnings.push(`${distractionAttemptCount} tentative(s) de distraction ont été signalées.`)
+  }
+  if (unlockRequestCount > 0) {
+    integrityScore -= Math.min(35, unlockRequestCount * 7)
+    suspiciousBehaviorScore += Math.min(45, unlockRequestCount * 12)
+    warnings.push(`${unlockRequestCount} demande(s) de déblocage ont été signalées.`)
+    if (sessionPlan.protection.mode === 'strict_allowlist') integrityScore -= 10
+  }
+  if (plannedDurationMinutes > 0 && idleMinutes / plannedDurationMinutes >= 0.3) {
+    integrityScore -= 25
+    suspiciousBehaviorScore += 20
+    warnings.push('Le temps d’inactivité représente une part importante de la session.')
+  }
+  if (runtimeSignals.earlyStopped) {
+    integrityScore -= 20
+    warnings.push('La session a été arrêtée avant son terme.')
+  }
+  if (runtimeSignals.completedNormally) {
+    integrityScore += 10
+    reasons.push('Le timer s’est terminé normalement.')
+  }
 
   return {
-    sessionId,
-    sessionCompleted,
+    sessionId: sessionPlan.id,
+    sessionCompleted: runtimeSignals.completedNormally === true,
     plannedDurationMinutes,
     activeDurationMinutes,
-    usefulActivityMinutes,
+    ...(usefulActivityMinutes !== undefined ? { usefulActivityMinutes } : {}),
     distractionAttemptCount,
     unlockRequestCount,
     idleMinutes,
-    integrityScore,
-    suspiciousBehaviorScore,
+    integrityScore: clampScore(integrityScore),
+    suspiciousBehaviorScore: clampScore(suspiciousBehaviorScore),
     reasons,
     warnings,
-    confidence
+    confidence: clampScore(confidence),
   }
 }
