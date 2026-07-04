@@ -52,6 +52,8 @@ export function ObjectiveCard({
   const userModel = useUserModelStore((s) => s.model)
   const tasks = useTasksStore((s) => s.tasks)
   const engineV2Priority = useSettingsStore((s) => s.engineV2Priority)
+  const engineV2Placement = useSettingsStore((s) => s.engineV2Placement)
+  const engineV2Blocking = useSettingsStore((s) => s.engineV2Blocking)
   const objectives = useLevelsStore((s) => s.objectives)
 
   const uiData = useMemo(() => {
@@ -78,6 +80,7 @@ export function ObjectiveCard({
           completionGateResult: null,
           oldScore: undefined,
           now,
+          engineActivation: { engineV2Priority, engineV2Placement, engineV2Blocking },
         })
       })
 
@@ -89,6 +92,7 @@ export function ObjectiveCard({
         cognitiveModel: null,
         oldScore: undefined,
         now,
+        engineActivation: { engineV2Priority, engineV2Placement, engineV2Blocking },
       })
 
       return buildPriorityUiData(scoreV2)

@@ -7,7 +7,19 @@ import type { UserCognitiveModel, UserModel } from '@shared/user-model'
 import { buildPriorityScoreDimensions, type PriorityPlanningContext } from './priority-dimension-builder'
 import { explainPriorityScore } from './priority-explanation-engine'
 import { buildPriorityRecommendation } from './priority-recommendation-engine'
-import { useSettingsStore } from '../store/settings.store'
+
+/**
+ * Flags d'activation V2 injectés en entrée (Point 5 amendment).
+ * Les scoreurs ne lisent plus le SettingsStore directement : les appelants
+ * (TodoPage, ObjectiveCard, live-session-plan-builder, etc.) passent ces flags
+ * explicitement. Si absents, on suppose l'activation par défaut (true), ce qui
+ * correspond au comportement historique quand les flags store étaient unset.
+ */
+export type PriorityEngineActivation = {
+  engineV2Priority?: boolean
+  engineV2Placement?: boolean
+  engineV2Blocking?: boolean
+}
 
 export type ScoreTaskPriorityV2Input = {
   taskModelV2: TaskModelV2
@@ -18,6 +30,7 @@ export type ScoreTaskPriorityV2Input = {
   completionGateResult?: CompletionGateResult | null
   oldScore?: number
   now?: Date
+  engineActivation?: PriorityEngineActivation
 }
 
 function clampScore(value: number): number {
@@ -40,9 +53,28 @@ function confidenceFrom(task: TaskModelV2, oldScore?: number): number {
   return clampScore(signals.reduce((sum, score) => sum + score, 0) / signals.length)
 }
 
+/**
+ * Résout les flags d'activation V2 depuis l'input, avec défaut `true` (comportement
+ * historique) si l'appelant n'en fournit pas. Centralise la logique pour que les
+ * scoreurs ne dépendent plus du store.
+ */
+function resolveActivation(input: { engineActivation?: PriorityEngineActivation }): {
+  priority: boolean
+  placement: boolean
+  blocking: boolean
+} {
+  const a = input.engineActivation ?? {}
+  return {
+    priority: a.engineV2Priority ?? true,
+    placement: a.engineV2Placement ?? true,
+    blocking: a.engineV2Blocking ?? true,
+  }
+}
+
 export function scoreTaskPriorityV2(input: ScoreTaskPriorityV2Input): PriorityScoreV2 {
   const now = input.now ?? new Date()
   const task = input.taskModelV2
+  const activation = resolveActivation(input)
   const completion = input.completionGateResult ?? task.completionVerification
   const dimensions = buildPriorityScoreDimensions({
     targetType: 'task',
@@ -161,12 +193,12 @@ export function scoreTaskPriorityV2(input: ScoreTaskPriorityV2Input): PrioritySc
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       source: 'task_model_v2',
-      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: !activation.priority,
       debug: {
         oldScore: input.oldScore,
-        priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,
-        priorityV2ControlsRealPlanning: useSettingsStore.getState?.()?.engineV2Placement === true,
-        priorityV2ControlsRealBlocking: useSettingsStore.getState?.()?.engineV2Blocking === true,
+        priorityV2ControlsRealSorting: activation.priority,
+        priorityV2ControlsRealPlanning: activation.placement,
+        priorityV2ControlsRealBlocking: activation.blocking,
       },
     },
   }

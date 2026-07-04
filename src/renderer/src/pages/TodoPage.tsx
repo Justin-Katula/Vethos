@@ -247,7 +247,7 @@ export default function TodoPage() {
     if (flags.newPriorityControlsSorting) {
       return withV1FallbackSync({
         v2: () => {
-          return sortTasksV2(activeList, objectives, registry, { userModel }, new Date())
+          return sortTasksV2(activeList, objectives, registry, { userModel, engineActivation: { engineV2Priority, engineV2Placement, engineV2Blocking } }, new Date())
         },
         v1: () => {
           return [...activeList].sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
@@ -547,6 +547,7 @@ function TaskCard({
         completionGateResult: null,
         oldScore: undefined,
         now,
+        engineActivation: { engineV2Priority, engineV2Placement, engineV2Blocking },
       })
       return buildPriorityUiData(scoreV2)
     } catch (e) {

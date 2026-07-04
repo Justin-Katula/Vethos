@@ -22,6 +22,7 @@ export function buildLiveSessionPlan(input: {
   planningContext?: PlanningContextV2
   now: Date
   idFactory?: () => string
+  engineActivation?: { engineV2Priority?: boolean; engineV2Placement?: boolean; engineV2Blocking?: boolean }
 }) {
   const primaryObjectiveId = selectPrimaryObjectiveId(input.objectives, input.userModel)
   const objectiveModels = input.objectives.map((objective) => buildObjectiveModelV2({
@@ -57,6 +58,7 @@ export function buildLiveSessionPlan(input: {
     cognitiveModel: input.userModel?.cognitiveModel ?? null,
     completionGateResult: taskModel.completionVerification,
     now: input.now,
+    engineActivation: input.engineActivation,
   }))
   const objectiveScores = objectiveModels.map((objectiveModel) => scoreObjectivePriorityV2({
     objectiveModelV2: objectiveModel,
@@ -68,6 +70,7 @@ export function buildLiveSessionPlan(input: {
     planningContext: null,
     cognitiveModel: input.userModel?.cognitiveModel ?? null,
     now: input.now,
+    engineActivation: input.engineActivation,
   }))
 
   const targetTaskId = input.placementBlock.targetType === 'task'

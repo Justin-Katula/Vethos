@@ -9,8 +9,7 @@ import { scoreObjectivePriorityV2 } from './objective-priority-scorer-v2'
 import { compareOldAndNewPriorityScore } from './priority-score-comparison'
 import { rankPriorityItemsV2 } from './priority-ranking-engine-v2'
 import { runPriorityScoreDiagnostics } from './priority-diagnostics'
-import { scoreTaskPriorityV2 } from './task-priority-scorer-v2'
-import { useSettingsStore } from '../store/settings.store'
+import { scoreTaskPriorityV2, type PriorityEngineActivation } from './task-priority-scorer-v2'
 
 export type BuildPriorityScoreSnapshotInput = {
   taskModelsV2: TaskModelV2[]
@@ -21,6 +20,7 @@ export type BuildPriorityScoreSnapshotInput = {
   completionGateResults?: CompletionGateResult[]
   oldScores?: Record<string, number>
   now?: Date
+  engineActivation?: PriorityEngineActivation
 }
 
 export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInput): PriorityScoreSnapshot {
@@ -37,6 +37,7 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
       completionGateResult: completionByTaskId.get(taskModel.identity.id),
       oldScore: input.oldScores?.[taskModel.identity.id],
       now,
+      engineActivation: input.engineActivation,
     })
   })
   const tasksByObjective = new Map<string, typeof taskScores>()
@@ -57,6 +58,7 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
       cognitiveModel: input.cognitiveModel,
       oldScore: input.oldScores?.[objectiveModel.identity.id],
       now,
+      engineActivation: input.engineActivation,
     })
   })
   const comparisons = [...taskScores, ...objectiveScores].map((score) =>
@@ -70,6 +72,10 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
   }
   const diagnostics = runPriorityScoreDiagnostics({ taskScores, objectiveScores, comparisons })
 
+  const a = input.engineActivation ?? {}
+  const priorityActive = a.engineV2Priority ?? true
+  const placementActive = a.engineV2Placement ?? true
+  const blockingActive = a.engineV2Blocking ?? true
   return {
     taskScores,
     objectiveScores,
@@ -77,14 +83,14 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
     comparisons,
     diagnostics,
     metadata: {
-      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: !priorityActive,
       createdAt: now.toISOString(),
       modelVersion: PRIORITY_SCORE_V2_MODEL_VERSION,
       debug: {
-        priorityV2ControlsRealUi: useSettingsStore.getState?.()?.engineV2Priority === true,
-        priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,
-        priorityV2ControlsRealPlanning: useSettingsStore.getState?.()?.engineV2Placement === true,
-        priorityV2ControlsRealBlocking: useSettingsStore.getState?.()?.engineV2Blocking === true,
+        priorityV2ControlsRealUi: priorityActive,
+        priorityV2ControlsRealSorting: priorityActive,
+        priorityV2ControlsRealPlanning: placementActive,
+        priorityV2ControlsRealBlocking: blockingActive,
       },
     },
   }

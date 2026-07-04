@@ -55,6 +55,7 @@ describe('priority-score-snapshot', () => {
       objectiveModelsV2: [objectiveModel],
       oldScores: { [TASK_ID]: 50, [OBJECTIVE_ID]: 60 },
       now: NOW,
+      engineActivation: { engineV2Priority: false },
     })
 
     expect(snapshot.metadata.advisoryOnly).toBe(true)

@@ -5,7 +5,7 @@ import type { UserCognitiveModel, UserModel } from '@shared/user-model'
 import { buildPriorityScoreDimensions, type PriorityPlanningContext } from './priority-dimension-builder'
 import { explainPriorityScore } from './priority-explanation-engine'
 import { buildPriorityRecommendation } from './priority-recommendation-engine'
-import { useSettingsStore } from '../store/settings.store'
+import type { PriorityEngineActivation } from './task-priority-scorer-v2'
 
 export type ScoreObjectivePriorityV2Input = {
   objectiveModelV2: ObjectiveModelV2
@@ -15,6 +15,7 @@ export type ScoreObjectivePriorityV2Input = {
   cognitiveModel?: UserCognitiveModel | null
   oldScore?: number
   now?: Date
+  engineActivation?: PriorityEngineActivation
 }
 
 function clampScore(value: number): number {
@@ -46,6 +47,12 @@ function confidenceFrom(objective: ObjectiveModelV2, taskScores: PriorityScoreV2
 export function scoreObjectivePriorityV2(input: ScoreObjectivePriorityV2Input): PriorityScoreV2 {
   const now = input.now ?? new Date()
   const objective = input.objectiveModelV2
+  const a = input.engineActivation ?? {}
+  const activation = {
+    priority: a.engineV2Priority ?? true,
+    placement: a.engineV2Placement ?? true,
+    blocking: a.engineV2Blocking ?? true,
+  }
   const dimensions = buildPriorityScoreDimensions({
     targetType: 'objective',
     objectiveModelV2: objective,
@@ -147,13 +154,13 @@ export function scoreObjectivePriorityV2(input: ScoreObjectivePriorityV2Input): 
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       source: 'objective_model_v2',
-      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: !activation.priority,
       debug: {
         oldScore: input.oldScore,
         linkedTaskScoreCount: input.linkedTaskScores?.length ?? 0,
-        priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,
-        priorityV2ControlsRealPlanning: useSettingsStore.getState?.()?.engineV2Placement === true,
-        priorityV2ControlsRealBlocking: useSettingsStore.getState?.()?.engineV2Blocking === true,
+        priorityV2ControlsRealSorting: activation.priority,
+        priorityV2ControlsRealPlanning: activation.placement,
+        priorityV2ControlsRealBlocking: activation.blocking,
       },
     },
   }

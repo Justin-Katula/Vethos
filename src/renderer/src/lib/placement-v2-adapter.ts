@@ -146,7 +146,7 @@ export function sortTasksV2(
   tasks: Task[],
   objectives: Objective[],
   registry: RegistryItem[],
-  settings: { userModel?: UserModel | null },
+  settings: { userModel?: UserModel | null; engineActivation?: { engineV2Priority?: boolean; engineV2Placement?: boolean; engineV2Blocking?: boolean } },
   now: Date
 ): Task[] {
   const primaryObjectiveId = selectPrimaryObjectiveId(objectives, settings.userModel)
@@ -190,6 +190,7 @@ export function sortTasksV2(
       completionGateResult: null,
       oldScore: undefined,
       now,
+      engineActivation: settings.engineActivation,
     })
   })
 
@@ -206,6 +207,7 @@ export function sortTasksV2(
       cognitiveModel: null,
       oldScore: undefined,
       now,
+      engineActivation: settings.engineActivation,
     })
   })
 
