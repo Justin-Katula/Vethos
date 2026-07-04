@@ -8,12 +8,19 @@ export function runRuntimeCoordinatorDiagnostics(
 
   const { blockingProfileDraft, closureBridgePlan, signalBridgePlan, safety } = plan
 
-  if (blockingProfileDraft.mode === 'strict_allowlist' && blockingProfileDraft.apps.allow.length === 0) {
+  // CORR 2 — strict_allowlist : vérifier apps OU sites vides.
+  if (
+    blockingProfileDraft.mode === 'strict_allowlist' &&
+    (blockingProfileDraft.apps.allow.length === 0 || blockingProfileDraft.sites.allow.length === 0)
+  ) {
+    const missing = []
+    if (blockingProfileDraft.apps.allow.length === 0) missing.push('applications')
+    if (blockingProfileDraft.sites.allow.length === 0) missing.push('sites')
     issues.push({
       id: 'empty_strict_allowlist',
       severity: 'high',
-      message: 'Strict allowlist mode is enabled but no apps are allowed.',
-      suggestion: 'Add at least one application to the allowlist or change the mode.',
+      message: `Strict allowlist activée mais aucune cible utile connue (${missing.join(' et ')}).`,
+      suggestion: 'Ajoute au moins une application et un site à l\'allowlist, ou change de mode.',
     })
     status = 'warning'
   }

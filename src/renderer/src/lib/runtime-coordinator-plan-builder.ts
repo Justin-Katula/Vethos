@@ -7,6 +7,7 @@ import { buildBlockingProfileDraftFromSessionProtection } from './session-protec
 import { buildRuntimeSignalBridgePlan } from './runtime-signal-bridge-planner'
 import { buildRuntimeClosureBridgePlan } from './runtime-closure-bridge-planner'
 import { runRuntimeCoordinatorSafetyCheck } from './runtime-coordinator-safety-engine'
+import { buildProtectionRecoveryPlan } from './protection-recovery-plan-engine'
 import { buildRuntimeCoordinatorExplanation } from './runtime-coordinator-explanation-engine'
 import { runRuntimeCoordinatorDiagnostics } from './runtime-coordinator-diagnostics'
 
@@ -41,6 +42,13 @@ export function buildRuntimeCoordinatorPlanV2(input: {
     sessionPlan,
     protectionRuntimePlan,
     blockingProfileDraft,
+  })
+
+  // Point 9.10 — Plan de récupération système (consultatif).
+  const recovery = buildProtectionRecoveryPlan({
+    blockingProfileDraft,
+    safety,
+    now,
   })
 
   const explanation = buildRuntimeCoordinatorExplanation({
@@ -79,6 +87,7 @@ export function buildRuntimeCoordinatorPlanV2(input: {
     signalBridgePlan,
     closureBridgePlan,
     safety,
+    recovery,
     explanation,
     confidence,
     metadata: {

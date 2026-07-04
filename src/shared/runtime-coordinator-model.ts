@@ -109,6 +109,24 @@ export type RuntimeCoordinatorExplanation = {
   warnings: string[]
 }
 
+/**
+ * Plan de récupération système (Point 9.10).
+ *
+ * Décrit comment restaurer l'état système si le blocage réel (overlay/hosts/firewall/process)
+ * est appliqué puis doit être annulé. C'est un plan *consultatif* : aucune sauvegarde
+ * système réelle n'est créée ici — seulement la stratégie de rollback pour plus tard,
+ * quand les connexions OS (9.16) seront activées par décision explicite.
+ */
+export type ProtectionRecoveryPlan = {
+  required: boolean
+  rollbackStrategy: 'none' | 'restore_previous_rules' | 'clear_session_rules' | 'manual_recovery'
+  /** Identifiants des règles système concernées par le rollback. */
+  rulesToRestore: string[]
+  reasons: string[]
+  warnings: string[]
+  confidence: number
+}
+
 export type RuntimeCoordinatorDiagnostics = {
   status: 'healthy' | 'warning' | 'critical'
   issues: Array<{
@@ -132,6 +150,7 @@ export type RuntimeCoordinatorPlanV2 = {
   signalBridgePlan: RuntimeSignalBridgePlan
   closureBridgePlan: RuntimeClosureBridgePlan
   safety: RuntimeCoordinatorSafetyReport
+  recovery: ProtectionRecoveryPlan
   explanation: RuntimeCoordinatorExplanation
   diagnostics?: RuntimeCoordinatorDiagnostics
 

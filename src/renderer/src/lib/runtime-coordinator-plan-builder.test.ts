@@ -3,7 +3,7 @@ import { buildRuntimeCoordinatorPlanV2 } from './runtime-coordinator-plan-builde
 import type { SessionPlanV2 } from '@shared/session-model'
 
 describe('runtime-coordinator-plan-builder', () => {
-  it('should build a full shadow plan without invoking any side effects', () => {
+  it('should build a full proposed plan without invoking any side effects', () => {
     const mockSessionPlan: SessionPlanV2 = {
       id: 'test-session',
       userId: 'test-user',
@@ -42,7 +42,7 @@ describe('runtime-coordinator-plan-builder', () => {
         confidence: 1,
       },
       lifecycle: {
-        initialState: 'ready_shadow' as const,
+        initialState: 'ready_proposed' as const,
         allowedTransitions: [],
         lateStartGraceMinutes: 5,
         earlyStopPenaltyMinutes: 10,

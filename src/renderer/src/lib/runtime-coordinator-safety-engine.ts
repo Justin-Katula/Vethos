@@ -42,15 +42,23 @@ export function runRuntimeCoordinatorSafetyCheck(input: {
     }
   }
 
-  if (blockingProfileDraft.mode === 'strict_allowlist' && blockingProfileDraft.apps.allow.length === 0) {
+  // CORR 2 — strict_allowlist : vérifier apps OU sites vides. Une allowlist stricte
+  // sans aucune cible utile connue bloquerait l'utilisateur au lieu de l'aider.
+  if (
+    blockingProfileDraft.mode === 'strict_allowlist' &&
+    (blockingProfileDraft.apps.allow.length === 0 || blockingProfileDraft.sites.allow.length === 0)
+  ) {
     if (status !== 'critical') status = 'warning'
-    warnings.push('Strict allowlist mode enabled but no allowed apps are defined. This could block all applications.')
+    const missing = []
+    if (blockingProfileDraft.apps.allow.length === 0) missing.push('apps')
+    if (blockingProfileDraft.sites.allow.length === 0) missing.push('sites')
+    warnings.push(`Strict allowlist activée mais aucune cible utile connue (${missing.join(' et ')}). Cela pourrait bloquer toutes les applications.`)
     confidence *= 0.8
   }
 
   if (blockingProfileDraft.overlayBehavior.shouldAvoidKillProcess === false) {
     status = 'critical'
-    warnings.push('shouldAvoidKillProcess must be true in Point 9 shadow coordinator.')
+    warnings.push('shouldAvoidKillProcess must be true in Point 9 coordinator (mode consultatif).')
   }
 
   if (blockingProfileDraft.overlayBehavior.preferredMethod !== 'attached_overlay_existing_system') {
