@@ -1,0 +1,45 @@
+appId: com.nexus.blocking
+productName: Nexus
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - 'out/**/*'
+  - 'package.json'
+  - '!**/.vscode/*'
+  - '!**/{.DS_Store,.git,.gitkeep,.gitignore,.npmrc,.eslintrc.cjs,.prettierrc}'
+  - '!**/{README.md,docs}'
+
+asar: true
+asarUnpack:
+  - 'out/service/**'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
+  oneClick: false
+  perMachine: true
+  allowElevation: true
+  allowToChangeInstallationDirectory: false
+  guid: a8e0b9da-61a1-4be1-9c1e-6ad8d7994e0f
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Nexus
+
+portable:
+  artifactName: ${productName}-Portable-${version}.${ext}
+
+publish:
+  provider: github
+  owner: obedi
+  repo: Nexus
