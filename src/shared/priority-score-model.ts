@@ -58,8 +58,8 @@ export type PriorityScoreMetadata = {
   modelVersion: number
   createdAt: string
   updatedAt: string
-  source: 'shadow_priority_engine' | 'task_model_v2' | 'objective_model_v2' | 'user_model' | 'fallback'
-  shadowOnly: boolean
+  source: 'priority_score_engine' | 'task_model_v2' | 'objective_model_v2' | 'user_model' | 'fallback'
+  advisoryOnly: boolean
   debug?: Record<string, unknown>
 }
 
@@ -156,7 +156,7 @@ export type PriorityScoreSnapshot = {
   comparisons: PriorityScoreComparison[]
   diagnostics: PriorityScoreDiagnostics
   metadata: {
-    shadowOnly: boolean
+    advisoryOnly: boolean
     createdAt: string
     modelVersion: number
     debug?: Record<string, unknown>

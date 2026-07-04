@@ -70,7 +70,7 @@ export type WorkEvidence = {
     | 'completion_contract'
   label: string
   score: number
-  source: 'session' | 'user_claim' | 'user_model' | 'contract' | 'shadow_engine'
+  source: 'session' | 'user_claim' | 'user_model' | 'contract' | 'heuristic_engine'
 }
 
 export type WorkPenalty = {
@@ -83,7 +83,7 @@ export type WorkPenalty = {
     | 'too_fast_for_task'
   label: string
   score: number
-  source: 'session' | 'user_claim' | 'shadow_engine'
+  source: 'session' | 'user_claim' | 'heuristic_engine'
 }
 
 export type CompletionGateResult = {
@@ -111,9 +111,9 @@ export type CompletionGateResult = {
   verifiedAt?: string
   metadata: {
     version: typeof COMPLETION_GATE_VERSION
-    shadowOnly: boolean
+    advisoryOnly: boolean
     generatedAt: string
-    source: 'completion_gate_shadow_engine'
+    source: 'completion_gate_engine'
     debug: Record<string, unknown>
   }
 }

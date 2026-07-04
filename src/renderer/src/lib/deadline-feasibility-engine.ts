@@ -108,7 +108,7 @@ export function calculateDeadlinePressure(input: DeadlineFeasibilityInput): Dead
       feasibilityScore: remainingMinutes > 0 && usableFreeMinutes === 0 ? 10 : 70,
       status: 'no_deadline',
       reasons,
-      debug: { shadowOnly: true },
+      debug: { advisoryOnly: true },
     }
   }
 
@@ -179,7 +179,7 @@ export function calculateDeadlinePressure(input: DeadlineFeasibilityInput): Dead
     status,
     reasons,
     debug: {
-      shadowOnly: true,
+      advisoryOnly: true,
       diffDays,
       ratio,
       exactDeadlineTimeUsed: Boolean(input.hasExactDeadlineTime && input.deadlineTime),

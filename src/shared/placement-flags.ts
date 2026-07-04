@@ -12,11 +12,11 @@ export type PlacementPlanV2Flags = {
   placementExplanationsEnabled: true
   placementDiagnosticsEnabled: true
 
-  placementControlsDisplay: false
-  placementControlsPlanningStore: false
-  placementControlsSessions: false
-  placementControlsBlocking: false
-  placementControlsAutoStart: false
+  placementControlsDisplay: boolean
+  placementControlsPlanningStore: boolean
+  placementControlsSessions: boolean
+  placementControlsBlocking: boolean
+  placementControlsAutoStart: boolean
 }
 
 export const DEFAULT_PLACEMENT_PLAN_V2_FLAGS: PlacementPlanV2Flags = {
@@ -33,9 +33,9 @@ export const DEFAULT_PLACEMENT_PLAN_V2_FLAGS: PlacementPlanV2Flags = {
   placementExplanationsEnabled: true,
   placementDiagnosticsEnabled: true,
 
-  placementControlsDisplay: false,
-  placementControlsPlanningStore: false,
-  placementControlsSessions: false,
-  placementControlsBlocking: false,
-  placementControlsAutoStart: false,
+  placementControlsDisplay: true,
+  placementControlsPlanningStore: true,
+  placementControlsSessions: true,
+  placementControlsBlocking: true,
+  placementControlsAutoStart: true,
 }

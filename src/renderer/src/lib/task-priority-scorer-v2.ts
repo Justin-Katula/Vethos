@@ -161,7 +161,7 @@ export function scoreTaskPriorityV2(input: ScoreTaskPriorityV2Input): PrioritySc
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       source: 'task_model_v2',
-      shadowOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
       debug: {
         oldScore: input.oldScore,
         priorityV2ControlsRealSorting: useSettingsStore.getState?.()?.engineV2Priority === true,

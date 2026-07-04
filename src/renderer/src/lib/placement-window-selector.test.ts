@@ -77,4 +77,59 @@ describe('placement-window-selector', () => {
     })
     expect(windows).toHaveLength(0)
   })
+
+  it('accepte les fenêtres deep work pour un candidat qui en requiert', () => {
+    // Le sélecteur ne filtre pas strictement par requiresDeepWork (le fit-engine pénalise),
+    // mais il doit au moins retourner les fenêtres compatibles.
+    const deepCandidate = { ...baseCandidate } as PlacementCandidate
+    const windows = selectCandidateWindows({
+      candidate: deepCandidate,
+      planningContext: {
+        usableFreeWindows: [
+          { id: 'w1', start: '10:00', end: '12:00', usableDurationMinutes: 120, canHostTask: true, canHostDeepWork: true, windowType: 'normal' },
+        ],
+      },
+    })
+    expect(windows).toHaveLength(1)
+    expect(windows[0]!.canHostDeepWork).toBe(true)
+  })
+
+  it('retourne [] quand aucune fenêtre n\'est compatible (que des unsafe/preparation)', () => {
+    const windows = selectCandidateWindows({
+      candidate: baseCandidate,
+      planningContext: {
+        usableFreeWindows: [
+          { id: 'w1', start: '08:00', end: '08:30', usableDurationMinutes: 30, canHostTask: true, canHostDeepWork: false, windowType: 'unsafe' },
+          { id: 'w2', start: '09:00', end: '09:30', usableDurationMinutes: 30, canHostTask: true, canHostDeepWork: false, windowType: 'preparation_only' },
+        ],
+      },
+    })
+    expect(windows).toHaveLength(0)
+  })
+
+  it('exclut les short windows quand le candidat ne peut pas utiliser les short gaps', () => {
+    const noShortGap = { ...baseCandidate, canUseShortGap: false } as PlacementCandidate
+    const windows = selectCandidateWindows({
+      candidate: noShortGap,
+      planningContext: {
+        usableFreeWindows: [
+          { id: 'w1', start: '10:00', end: '10:20', usableDurationMinutes: 20, canHostTask: true, canHostDeepWork: false, windowType: 'short' },
+          { id: 'w2', start: '11:00', end: '12:00', usableDurationMinutes: 60, canHostTask: true, canHostDeepWork: true, windowType: 'normal' },
+        ],
+      },
+    })
+    expect(windows).toHaveLength(1)
+    expect(windows[0]!.id).toBe('w2')
+  })
+
+  it('ne mute jamais le planningContext passé en paramètre', () => {
+    const context = {
+      usableFreeWindows: [
+        { id: 'w1', start: '10:00', end: '11:00', usableDurationMinutes: 60, canHostTask: true, canHostDeepWork: true, windowType: 'normal' as const },
+      ],
+    }
+    const original = JSON.parse(JSON.stringify(context))
+    selectCandidateWindows({ candidate: baseCandidate, planningContext: context })
+    expect(context).toEqual(original)
+  })
 })

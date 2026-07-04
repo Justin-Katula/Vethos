@@ -89,12 +89,66 @@ describe('normal-placement-strategy', () => {
       placementModeHint: 'manual_review',
       requiresDeepWork: false
     }
-    
+
     const result = buildNormalPlacementPlan({
       candidates: [vagueCandidate],
       planningContext: context
     })
-    
+
     expect(result.proposedBlocks[0]!.kind).toBe('manual_review')
+  })
+
+  it('place une tâche presque terminée dans un bloc court adapté', () => {
+    const almostDone: PlacementCandidate = {
+      id: 'c3',
+      targetType: 'task',
+      targetId: 't3',
+      title: 'Almost Done',
+      remainingMinutes: 15,
+      minimumUsefulMinutes: 10,
+      recommendedMinutes: 15,
+      maximumSafeMinutes: 30,
+      requiresDeepWork: false,
+      canSplit: true,
+      canUseShortGap: true,
+      shouldAvoidLateNight: false,
+      priorityScore: 70,
+      reasons: [],
+      warnings: [],
+      confidence: 100,
+    }
+
+    const result = buildNormalPlacementPlan({
+      candidates: [almostDone],
+      planningContext: context,
+      idFactory: () => 'fixed-id',
+    })
+
+    expect(result.proposedBlocks).toHaveLength(1)
+    const block = result.proposedBlocks[0]!
+    // Une tâche presque finie reçoit un bloc court : la durée placée ne doit pas
+    // dépasser le minimum utile étendu, et reste bien inférieure à une session longue.
+    expect(block.durationMinutes).toBeLessThanOrEqual(30)
+    // canUseShortGap=true permet à la tâche d'accepter une short window.
+    expect(block.kind === 'short_action' || block.kind === 'work').toBe(true)
+  })
+
+  it('conserve des buffers et ne remplit pas 100% de la journée', () => {
+    const result = buildNormalPlacementPlan({
+      candidates: [c1],
+      planningContext: context,
+      idFactory: () => 'fixed-id',
+    })
+    const totalProposed = result.proposedBlocks.reduce((s, b) => s + b.durationMinutes, 0)
+    const totalUsable = context.usableFreeWindows.reduce((s, w) => s + w.usableDurationMinutes, 0)
+    // On ne doit pas consommer l'intégralité du temps libre disponible.
+    expect(totalProposed).toBeLessThan(totalUsable)
+  })
+
+  it('ne mute jamais les candidates passés en paramètre', () => {
+    const candidates = [c1, c2]
+    const original = JSON.parse(JSON.stringify(candidates))
+    buildNormalPlacementPlan({ candidates, planningContext: context, idFactory: () => 'fixed-id' })
+    expect(candidates).toEqual(original)
   })
 })

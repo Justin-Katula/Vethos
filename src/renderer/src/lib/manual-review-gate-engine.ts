@@ -42,8 +42,8 @@ export function runManualReviewGate(input: RunManualReviewGateInput): ManualRevi
     status = 'review_allowed_with_warnings'
   }
 
-  const isShadow = input.settings?.engineV2Execution !== true
-  const canProceed = !isShadow && draft.status === 'approved_in_principle' && (status === 'review_allowed' || status === 'review_allowed_with_warnings')
+  const isAdvisory = input.settings?.engineV2Execution !== true
+  const canProceed = !isAdvisory && draft.status === 'approved_in_principle' && (status === 'review_allowed' || status === 'review_allowed_with_warnings')
 
   return {
     status,

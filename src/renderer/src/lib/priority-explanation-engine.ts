@@ -51,7 +51,7 @@ export function explainPriorityScore(priorityScore: PriorityScoreV2): PriorityEx
     reasons,
     warnings,
     debug: {
-      shadowOnly: priorityScore.metadata?.shadowOnly ?? false,
+      advisoryOnly: priorityScore.metadata?.advisoryOnly ?? false,
       actionPriorityScore: priorityScore.actionPriorityScore,
       planningPriorityScore: priorityScore.planningPriorityScore,
       protectionPriorityScore: priorityScore.protectionPriorityScore,

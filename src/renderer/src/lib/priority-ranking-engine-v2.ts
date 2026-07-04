@@ -81,7 +81,7 @@ export function rankPriorityItemsV2(
   if (context.mode === 'planning' && rankedItems[0]?.score.dimensions.feasibilityScore !== undefined && rankedItems[0].score.dimensions.feasibilityScore < 35) {
     warnings.push('La meilleure priorité de planning reste peu faisable : elle doit être découpée ou revue.')
   }
-  if (rankedItems.length === 0) warnings.push('Aucune priorité classable en mode shadow.')
+  if (rankedItems.length === 0) warnings.push('Aucune priorité classable en mode consultatif.')
 
   return {
     mode: context.mode,

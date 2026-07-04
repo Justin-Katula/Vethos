@@ -43,6 +43,14 @@ export function runPriorityScoreDiagnostics(snapshot: Pick<PriorityScoreSnapshot
     if (score.protectionPriorityScore >= 75 && score.explanation.reasons.length === 0) {
       issues.push(issue('protection_without_reason', 'Protection haute sans raison lisible.', score))
     }
+    if (
+      score.targetType === 'objective' &&
+      score.dimensions.importanceScore >= 75 &&
+      score.recommendation.recommendedAction !== 'ignore_for_now' &&
+      score.metadata.debug?.linkedTaskScoreCount === 0
+    ) {
+      issues.push(issue('central_objective_no_active_tasks', 'Objectif central actif sans tâche active liée.', score))
+    }
   }
 
   const roundedScores = new Set(all.map((score) => Math.round(score.totalScore / 5) * 5))
@@ -69,7 +77,7 @@ export function runPriorityScoreDiagnostics(snapshot: Pick<PriorityScoreSnapshot
     issues,
     summary:
       status === 'healthy'
-        ? ['Le système de priorité V2 semble sain en mode shadow.']
+        ? ['Le système de priorité V2 semble sain en mode consultatif (aide à la décision).']
         : [`${issues.length} problème(s) détecté(s), dont ${criticalCount} critique(s).`],
   }
 }

@@ -17,7 +17,7 @@ describe('user-model contracts', () => {
     const model = buildEmptyUserModel('user-1', { now: NOW })
 
     expect(model.userId).toBe('user-1')
-    expect('shadowOnly' in model).toBe(false)
+    expect('advisoryOnly' in model).toBe(false)
     expect(model.declaredProfile.userType).toBe('unknown')
     expect(model.declaredProfile.protectionStyle).toBe('firm')
     expect(model.behaviorEvents).toEqual([])
@@ -47,7 +47,7 @@ describe('user-model contracts', () => {
 
     const model = buildUserModelFromOnboarding('user-1', onboarding)
 
-    expect('shadowOnly' in model).toBe(false)
+    expect('advisoryOnly' in model).toBe(false)
     expect(model.declaredProfile.primaryLifeArea).toBe('project')
     expect(model.declaredProfile.protectionStyle).toBe('strict')
     expect(model.disciplineCommitments.some((commitment) => commitment.type === 'sleep')).toBe(true)

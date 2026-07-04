@@ -60,6 +60,7 @@ describe('placement-v2-adapter', () => {
       locked: true,
       linkedTaskId: 'task-123',
       linkedTaskIds: ['task-123'],
+      sourcePlacementBlock: proposed[0],
     })
 
     expect(mapped[1]).toEqual({
@@ -74,6 +75,7 @@ describe('placement-v2-adapter', () => {
       locked: true,
       linkedTaskId: null,
       linkedTaskIds: [],
+      sourcePlacementBlock: proposed[1],
     })
   })
 

@@ -17,7 +17,8 @@ function parseClockTimeToMinute(time: string): number {
 }
 
 export function mapProposedPlacementBlocksToPlacedBlocks(
-  blocks: ProposedPlacementBlock[]
+  blocks: ProposedPlacementBlock[],
+  sourcePlan?: PlacementPlanV2,
 ): PlacedBlock[] {
   return blocks.map((block) => {
     // kind mapping: 'break' | 'free' | 'task' | 'objective'
@@ -45,6 +46,8 @@ export function mapProposedPlacementBlocksToPlacedBlocks(
       locked: true,
       linkedTaskId: block.linkedTaskId || null,
       linkedTaskIds,
+      sourcePlacementBlock: block,
+      ...(sourcePlan ? { sourcePlacementPlanV2: sourcePlan } : {}),
     }
   })
 }

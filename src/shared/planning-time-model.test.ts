@@ -3,7 +3,7 @@ import { DEFAULT_PLANNING_CONTEXT_V2_FLAGS } from './planning-flags'
 import { PLANNING_CONTEXT_V2_MODEL_VERSION, type FreeTimeWindow, type PlanningBlockKind } from './planning-time-model'
 
 describe('planning-time-model contracts', () => {
-  it('garde le modèle planning en shadow avec les contrôles dangereux désactivés', () => {
+  it('garde le modèle planning en mode consultatif avec les contrôles dangereux désactivés', () => {
     expect(PLANNING_CONTEXT_V2_MODEL_VERSION).toBe(2)
     expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.planningContextV2Enabled).toBe(true)
     expect(DEFAULT_PLANNING_CONTEXT_V2_FLAGS.scheduleNormalizerEnabled).toBe(true)

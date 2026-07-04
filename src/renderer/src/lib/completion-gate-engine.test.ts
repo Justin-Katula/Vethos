@@ -44,7 +44,7 @@ function contract(over: Partial<CompletionContract> = {}): CompletionContract {
     taskId: TASK_ID,
     outcomeKind: 'code',
     expectedOutcome: 'Le moteur de validation existe avec ses tests.',
-    acceptanceCriteria: ['moteur de validation', 'tests ajoutés', 'mode shadow'],
+    acceptanceCriteria: ['moteur de validation', 'tests ajoutés', 'mode consultatif'],
     createdAt: NOW.toISOString(),
     ...over,
   }
@@ -67,7 +67,7 @@ function cleanSession(over: Partial<CompletionSessionEvidence> = {}): Completion
   }
 }
 
-describe('completion-gate-engine shadow mode', () => {
+describe('completion-gate-engine advisory mode', () => {
   it('refuse une complétion vague pendant une session suspecte', () => {
     const result = buildCompletionGateResult({
       task: task(),
@@ -108,7 +108,7 @@ describe('completion-gate-engine shadow mode', () => {
       claim: {
         userClaimedCompleted: true,
         progressClaim: 'completed',
-        summary: 'J’ai créé le moteur de validation, ajouté les tests et gardé le mode shadow.',
+        summary: 'J’ai créé le moteur de validation, ajouté les tests et gardé le mode consultatif.',
         claimedAt: NOW.toISOString(),
       },
       session: cleanSession(),
@@ -188,7 +188,7 @@ describe('completion-gate-engine shadow mode', () => {
       now: NOW,
     })
 
-    expect(result.metadata.shadowOnly).toBe(true)
+    expect(result.metadata.advisoryOnly).toBe(true)
     expect(result.metadata.debug.contentInspectionEnabled).toBe(false)
     expect(result.metadata.debug.fileReadingEnabled).toBe(false)
     expect(result.metadata.debug.pdfReadingEnabled).toBe(false)

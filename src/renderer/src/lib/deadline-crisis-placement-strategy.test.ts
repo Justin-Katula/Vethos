@@ -104,4 +104,75 @@ describe('deadline-crisis-placement-strategy', () => {
     expect(result.unplacedItems).toHaveLength(1)
     expect(result.unplacedItems[0]!.reason).toBe('low_confidence')
   })
+
+  it('propose un plan rescue quand le temps est insuffisant', () => {
+    const crisis: AnyDeadlineCrisisContext = {
+      targetId: 't1',
+      crisisLevel: 'rescue_required',
+      recommendedMode: 'rescue_plan',
+    }
+
+    const result = buildDeadlineCrisisPlacementPlan({
+      candidates: [baseCandidate],
+      deadlineCrisisContexts: [crisis],
+      planningContext: context,
+      idFactory: () => 'fixed-id',
+    })
+
+    expect(result.proposedBlocks).toHaveLength(1)
+    expect(result.proposedBlocks[0]!.placementMode).toBe('rescue')
+  })
+
+  it('ne sauvegarde jamais les strategy_blocks comme des tâches réelles', () => {
+    // Un strategy_block (practice/high_yield/diagnostic...) est un bloc PROPOSÉ de type
+    // stratégie, pas une tâche enregistrée. On vérifie qu'il reste targetType 'task'
+    // lié au targetId, et qu'aucune mutation de tâche n'est effectuée par la stratégie.
+    const crisis: AnyDeadlineCrisisContext = {
+      targetId: 't1',
+      crisisLevel: 'rescue_required',
+      recommendedMode: 'rescue_plan',
+      recommendedStrategy: { strategyType: 'diagnostic' },
+    }
+
+    const result = buildDeadlineCrisisPlacementPlan({
+      candidates: [{ ...baseCandidate }],
+      deadlineCrisisContexts: [crisis],
+      planningContext: context,
+      idFactory: () => 'fixed-id',
+    })
+
+    const block = result.proposedBlocks[0]!
+    expect(block.kind).toBe('diagnostic')
+    // Le bloc reste un ProposedPlacementBlock (locked false), pas une tâche enregistrée.
+    expect(block.locked).toBe(false)
+    expect(block.targetType).toBe('task')
+    expect(block.targetId).toBe('t1')
+  })
+
+  it('protège le sommeil : ne place rien si la seule fenêtre est trop tardive', () => {
+    const lateNightContext: AnyPlanningContextV2 = {
+      usableFreeWindows: [
+        { id: 'w-late', start: '2026-06-25T23:00:00Z', end: '2026-06-26T01:00:00Z', usableDurationMinutes: 120, canHostTask: true, canHostDeepWork: true, windowType: 'normal', isLateNight: true },
+      ],
+    }
+    const crisis: AnyDeadlineCrisisContext = {
+      targetId: 't1',
+      crisisLevel: 'rescue_required',
+      recommendedMode: 'rescue_plan',
+    }
+    // Candidat qui doit éviter les créneaux tardifs.
+    const avoidLateCandidate = { ...baseCandidate, shouldAvoidLateNight: true }
+
+    const result = buildDeadlineCrisisPlacementPlan({
+      candidates: [avoidLateCandidate],
+      deadlineCrisisContexts: [crisis],
+      planningContext: lateNightContext,
+      idFactory: () => 'fixed-id',
+    })
+
+    // La seule fenêtre étant tardive et protégée, la tâche devient unplaced plutôt que
+    // de sacrifier le sommeil.
+    expect(result.proposedBlocks).toHaveLength(0)
+    expect(result.unplacedItems.length).toBeGreaterThan(0)
+  })
 })

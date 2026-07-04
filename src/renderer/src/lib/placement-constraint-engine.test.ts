@@ -123,4 +123,63 @@ describe('placement-constraint-engine', () => {
     })
     expect(result.valid).toBe(false)
   })
+
+  it('rejette un bloc placé dans une fenêtre recovery_only (sauf recovery/manual_review)', () => {
+    const recoveryContext: AnyPlanningContextV2 & { lockedBlocks: Array<{ start: string; end: string; type: string }> } = {
+      ...basePlanningContext,
+      usableFreeWindows: [
+        { id: 'w1', start: '09:00', end: '12:00', usableDurationMinutes: 180, windowType: 'recovery_only', canHostTask: true, canHostDeepWork: false }
+      ],
+    }
+    // Un bloc 'work' classique dans une fenêtre recovery_only doit être rejeté.
+    const result = validateProposedBlock({
+      block: baseBlock,
+      planningContext: recoveryContext,
+      existingProposedBlocks: [],
+      candidate: baseCandidate,
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejette un bloc placé dans une fenêtre preparation_only', () => {
+    const prepContext: AnyPlanningContextV2 & { lockedBlocks: Array<{ start: string; end: string; type: string }> } = {
+      ...basePlanningContext,
+      usableFreeWindows: [
+        { id: 'w1', start: '09:00', end: '12:00', usableDurationMinutes: 180, windowType: 'preparation_only', canHostTask: true, canHostDeepWork: false }
+      ],
+    }
+    const result = validateProposedBlock({
+      block: baseBlock,
+      planningContext: prepContext,
+      existingProposedBlocks: [],
+      candidate: baseCandidate,
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejette un bloc placé dans une fenêtre unsafe', () => {
+    const unsafeContext: AnyPlanningContextV2 & { lockedBlocks: Array<{ start: string; end: string; type: string }> } = {
+      ...basePlanningContext,
+      usableFreeWindows: [
+        { id: 'w1', start: '09:00', end: '12:00', usableDurationMinutes: 180, windowType: 'unsafe', canHostTask: true, canHostDeepWork: false }
+      ],
+    }
+    const result = validateProposedBlock({
+      block: baseBlock,
+      planningContext: unsafeContext,
+      existingProposedBlocks: [],
+      candidate: baseCandidate,
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejette un bloc dont le priorityScore est hors bornes (0-100)', () => {
+    const result = validateProposedBlock({
+      block: { ...baseBlock, priorityScore: 150 },
+      planningContext: basePlanningContext,
+      existingProposedBlocks: [],
+      candidate: baseCandidate,
+    })
+    expect(result.valid).toBe(false)
+  })
 })

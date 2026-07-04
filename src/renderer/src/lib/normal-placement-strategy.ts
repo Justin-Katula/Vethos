@@ -116,11 +116,9 @@ export function buildNormalPlacementPlan(input: BuildNormalPlacementPlanInput): 
       continue
     }
 
-    // Calculate a simple start/end string (very naive ISO date manipulation for shadow placement)
-    // Assume window.start is like '2026-06-25T10:00:00Z', we just add minutes.
-    // To keep it pure and simple without complex date libraries, we'll simulate it by returning
-    // start = window.start, and end = window.start + duration (in a pseudo format)
-    // In a real app we'd use date-fns. For the engine rules, we just need start/end to be comparable.
+    // Calculate the proposed block start/end as comparable ISO strings.
+    // start = window.start ; end = start + durationMinutes. Le moteur reste pur :
+    // aucune librairie de date n'est nécessaire, les ISO strings restent triables.
     let start = bestMatch.window.start
     let end = ''
     try {

@@ -50,8 +50,8 @@ function score(id: string, over: Partial<PriorityScoreV2> = {}, dimensions: Part
       modelVersion: 2,
       createdAt: '2026-06-25T12:00:00.000Z',
       updatedAt: '2026-06-25T12:00:00.000Z',
-      source: 'shadow_priority_engine',
-      shadowOnly: true,
+      source: 'priority_score_engine',
+      advisoryOnly: true,
     },
     ...over,
   }

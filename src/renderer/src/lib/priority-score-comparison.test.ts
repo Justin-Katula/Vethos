@@ -47,8 +47,8 @@ function score(totalScore: number): PriorityScoreV2 {
       modelVersion: 2,
       createdAt: '2026-06-25T12:00:00.000Z',
       updatedAt: '2026-06-25T12:00:00.000Z',
-      source: 'shadow_priority_engine',
-      shadowOnly: true,
+      source: 'priority_score_engine',
+      advisoryOnly: true,
     },
   }
 }

@@ -18,6 +18,7 @@ import { getEngineFlags, withV1FallbackSync } from './engine-activation'
 import { buildPlanningContextV2 } from './planning-context-snapshot'
 import { buildPlacementPlanV2 } from './placement-plan-builder'
 import { mapProposedPlacementBlocksToPlacedBlocks, buildV1DiagnosticsFromV2 } from './placement-v2-adapter'
+import { DEFAULT_PLACEMENT_PLAN_V2_FLAGS } from '@shared/placement-flags'
 import { buildPlacementResult } from './placement-explanation'
 import type { PlacementResult } from '@shared/engine-results'
 import { useDecisionLogStore } from '@/store/decision-log.store'
@@ -95,7 +96,13 @@ export function usePlacement(
 
     let planResult: { blocks: PlacedBlock[]; diagnostics: PlacementDiagnostics }
 
-    if (flags.newPriorityControlsPlacement) {
+    // Point 7.16 — Étape E : le plan V2 (PlacementPlanV2) est toujours calculé
+    // (diagnostic, explication, exposition future), mais il n'écrit ses blocs dans
+    // le planning réel QUE si placementControlsPlanningStore est true. Tant que ce
+    // flag est false (défaut), le moteur V1 reste la source des blocs appliqués.
+    const canApplyV2ToPlanning = DEFAULT_PLACEMENT_PLAN_V2_FLAGS.placementControlsPlanningStore
+
+    if (flags.newPriorityControlsPlacement && canApplyV2ToPlanning) {
       planResult = withV1FallbackSync({
         v2: () => {
           const v2Context = buildPlanningContextV2({
@@ -142,7 +149,7 @@ export function usePlacement(
             } as any,
             now: now.toISOString(),
           } as any)
-          const mappedBlocks = mapProposedPlacementBlocksToPlacedBlocks(planV2.proposedBlocks)
+          const mappedBlocks = mapProposedPlacementBlocksToPlacedBlocks(planV2.proposedBlocks, planV2)
           const totalUsableFreeMinutes = v2Context.weeklySummary.usableFreeMinutes
           const mappedDiag = buildV1DiagnosticsFromV2(planV2, tasks, objectives, totalUsableFreeMinutes)
           return {

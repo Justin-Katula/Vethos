@@ -77,7 +77,7 @@ export function buildPriorityScoreSnapshot(input: BuildPriorityScoreSnapshotInpu
     comparisons,
     diagnostics,
     metadata: {
-      shadowOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
       createdAt: now.toISOString(),
       modelVersion: PRIORITY_SCORE_V2_MODEL_VERSION,
       debug: {

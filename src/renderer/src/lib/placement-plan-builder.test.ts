@@ -79,9 +79,86 @@ describe('placement-plan-builder', () => {
       ...baseInput,
       taskModelsV2: [{ id: 't1', status: 'active' }]
     })
-    
+
     expect(plan.metadata.source).toBe('placement_engine')
     // Verification relies on the code having no imports to stores.
     // The architecture strictly uses inputs and pure returns.
+  })
+
+  it('déclenche automatiquement un plan rescue quand un contexte l\'exige', () => {
+    const tasks: AnyTaskModel[] = [
+      { id: 't1', status: 'active', remainingMinutes: 90, requiresDeepWork: false }
+    ]
+    const contexts: AnyDeadlineCrisisContext[] = [
+      { targetId: 't1', crisisLevel: 'rescue_required', recommendedMode: 'rescue_plan' }
+    ]
+
+    const plan = buildPlacementPlanV2({
+      ...baseInput,
+      taskModelsV2: tasks,
+      deadlineCrisisContexts: contexts,
+      mode: 'auto',
+    })
+
+    expect(plan.mode).toBe('rescue')
+    expect(plan.proposedBlocks.length).toBeGreaterThan(0)
+  })
+
+  it('respecte un mode manual_review explicite fourni en entrée', () => {
+    const tasks: AnyTaskModel[] = [
+      { id: 't1', status: 'active', remainingMinutes: 60, isVague: true }
+    ]
+
+    const plan = buildPlacementPlanV2({
+      ...baseInput,
+      taskModelsV2: tasks,
+      mode: 'manual_review',
+    })
+
+    expect(plan.mode).toBe('manual_review')
+    // En mode manual_review, on attend des blocs courts ou des unplaced items, pas du deep work.
+    const hasDeepWork = plan.proposedBlocks.some((b) => b.kind === 'deep_work')
+    expect(hasDeepWork).toBe(false)
+  })
+
+  it('reste stable avec des données manquantes (pas de crash)', () => {
+    // Aucune tâche, aucun objectif, aucun contexte.
+    const plan = buildPlacementPlanV2({
+      ...baseInput,
+      taskModelsV2: undefined,
+      objectiveModelsV2: undefined,
+      priorityScoresV2: undefined,
+      deadlineCrisisContexts: undefined,
+    })
+
+    expect(plan).toBeDefined()
+    expect(plan.proposedBlocks).toHaveLength(0)
+    expect(plan.unplacedItems).toHaveLength(0)
+    expect(plan.confidence).toBeGreaterThanOrEqual(0)
+    expect(plan.confidence).toBeLessThanOrEqual(100)
+  })
+
+  it('accepte un now injectable et l\'utilise dans metadata', () => {
+    const fixedNow = '2026-01-15T08:00:00.000Z'
+    const plan = buildPlacementPlanV2({
+      ...baseInput,
+      taskModelsV2: [{ id: 't1', status: 'active' }],
+      now: fixedNow,
+    })
+
+    expect(plan.metadata.createdAt).toBe(fixedNow)
+    expect(plan.metadata.updatedAt).toBe(fixedNow)
+  })
+
+  it('ne mute jamais les inputs passés en paramètre', () => {
+    const tasks: AnyTaskModel[] = [{ id: 't1', status: 'active', remainingMinutes: 60 }]
+    const originalTasks = JSON.parse(JSON.stringify(tasks))
+
+    buildPlacementPlanV2({
+      ...baseInput,
+      taskModelsV2: tasks,
+    })
+
+    expect(tasks).toEqual(originalTasks)
   })
 })

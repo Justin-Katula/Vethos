@@ -86,13 +86,54 @@ describe('task-fit-engine', () => {
   it('does not exceed remainingMinutes if almost done', () => {
     const almostDoneCandidate = { ...baseCandidate, remainingMinutes: 20, reasons: ['Tâche presque terminée'] }
     const window = { ...baseWindow, usableDurationMinutes: 60 }
-    
+
     const fit = calculateWindowFit({ candidate: almostDoneCandidate, window })
     expect(fit.canFit).toBe(false) // minimumUseful is 30, remaining is 20 -> fails canFit because proposed (20) < min (30).
-    
+
     const validAlmostDone = { ...almostDoneCandidate, minimumUsefulMinutes: 10 }
     const validFit = calculateWindowFit({ candidate: validAlmostDone, window })
     expect(validFit.canFit).toBe(true)
     expect(validFit.proposedDurationMinutes).toBe(20) // Only takes what's needed
+  })
+
+  it('limite une tâche énorme par usableDuration et maximumSafe (le bornage par remaining se fait au sizing)', () => {
+    const hugeTask = {
+      ...baseCandidate,
+      remainingMinutes: 40,
+      recommendedMinutes: 200,
+      maximumSafeMinutes: 90,
+    }
+    const hugeWindow = { ...baseWindow, usableDurationMinutes: 240 }
+
+    const fit = calculateWindowFit({ candidate: hugeTask, window: hugeWindow })
+    expect(fit.canFit).toBe(true)
+    // Le fit-engine borne par recommended/usable/maxSafe. Le bornage final par remaining
+    // est la responsabilité du block-sizing-engine. On vérifie donc le respect maxSafe ici.
+    expect(fit.proposedDurationMinutes).toBeLessThanOrEqual(90)
+    expect(fit.proposedDurationMinutes).toBeLessThanOrEqual(hugeWindow.usableDurationMinutes)
+  })
+
+  it('borne fitScore entre 0 et 100 même avec facteurs extrêmes', () => {
+    // Score maximal : high priority + deep work + bonne durée + deadline.
+    const highPriorityCandidate = {
+      ...baseCandidate,
+      requiresDeepWork: true,
+      priorityScore: 100,
+      deadline: '23:59',
+      recommendedMinutes: 60,
+    }
+    const perfectWindow = { ...baseWindow, usableDurationMinutes: 120, canHostDeepWork: true }
+
+    const fitHigh = calculateWindowFit({ candidate: highPriorityCandidate, window: perfectWindow })
+    expect(fitHigh.fitScore).toBeLessThanOrEqual(100)
+    expect(fitHigh.fitScore).toBeGreaterThanOrEqual(0)
+
+    // Score minimal : canFit=false force fitScore à 0.
+    const fitLow = calculateWindowFit({
+      candidate: baseCandidate,
+      window: { ...baseWindow, usableDurationMinutes: 5 },
+    })
+    expect(fitLow.fitScore).toBe(0)
+    expect(fitLow.fitScore).toBeGreaterThanOrEqual(0)
   })
 })

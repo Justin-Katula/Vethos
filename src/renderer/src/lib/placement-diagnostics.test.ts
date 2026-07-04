@@ -73,4 +73,58 @@ describe('placement-diagnostics', () => {
     expect(diag.issues.some(i => i.message.includes('non-deep_work'))).toBe(true)
     expect(diag.issues.some(i => i.message.includes('interdite'))).toBe(true)
   })
+
+  it('détecte un bloc qui déborde de sa FreeTimeWindow', () => {
+    const plan = {
+      ...basePlan,
+      proposedBlocks: [
+        // w1 = 10:00-12:00 ; le bloc finit à 13:00 => débordement.
+        { id: 'b1', start: '10:00', end: '13:00', durationMinutes: 180, sourceWindowId: 'w1', kind: 'work' }
+      ],
+    } as unknown as PlacementPlanV2
+
+    const diag = runPlacementDiagnostics(plan, context)
+    expect(diag.status).toBe('critical')
+    expect(diag.issues.some((i) => i.message.includes('déborde'))).toBe(true)
+  })
+
+  it('signale un plan rescue sans warning global', () => {
+    const plan = {
+      ...basePlan,
+      mode: 'rescue',
+      warnings: [], // pas de warning alors qu'on est en crise
+      proposedBlocks: [
+        { id: 'b1', start: '10:00', end: '11:00', durationMinutes: 60, sourceWindowId: 'w1', kind: 'high_yield' }
+      ],
+    } as unknown as PlacementPlanV2
+
+    const diag = runPlacementDiagnostics(plan, context)
+    expect(diag.issues.some((i) => i.message.includes('crisis') || i.message.includes('warning'))).toBe(true)
+  })
+
+  it('signale une confidence incohérente (haute malgré low_confidence)', () => {
+    const plan = {
+      ...basePlan,
+      confidence: 95,
+      unplacedItems: [
+        { targetId: 't1', reason: 'low_confidence', confidence: 40 } as never,
+      ],
+    } as unknown as PlacementPlanV2
+
+    const diag = runPlacementDiagnostics(plan, context)
+    expect(diag.issues.some((i) => i.message.includes('Confiance'))).toBe(true)
+  })
+
+  it('ne modifie jamais le plan passé en paramètre', () => {
+    const plan = {
+      ...basePlan,
+      proposedBlocks: [
+        { id: 'b1', start: '10:00', end: '11:00', durationMinutes: 60, sourceWindowId: 'w1', kind: 'work' }
+      ],
+    } as unknown as PlacementPlanV2
+    const original = JSON.parse(JSON.stringify(plan))
+
+    runPlacementDiagnostics(plan, context)
+    expect(plan).toEqual(original)
+  })
 })

@@ -83,9 +83,45 @@ describe('block-sizing-engine', () => {
     const largeCandidate = { ...candidate, recommendedMinutes: 120, remainingMinutes: 120 }
     const largeWindow = { ...window, usableDurationMinutes: 120 }
     const size = calculateProposedBlockSize({ candidate: largeCandidate, window: largeWindow, fit, placementMode: 'normal' })
-    
+
     // Normal mode should leave a buffer if duration > 90 and window is very tight
     expect(size.durationMinutes).toBeLessThan(120)
     expect(size.durationMinutes).toBeGreaterThanOrEqual(90)
+  })
+
+  it('respecte maximumSafeMinutes même en mode intensive', () => {
+    const cappedCandidate = { ...candidate, maximumSafeMinutes: 100, remainingMinutes: 300 }
+    const size = calculateProposedBlockSize({
+      candidate: cappedCandidate,
+      window,
+      fit,
+      placementMode: 'intensive',
+    })
+    expect(size.durationMinutes).toBeLessThanOrEqual(100)
+  })
+
+  it('respecte usableDurationMinutes de la fenêtre', () => {
+    const smallWindow = { ...window, usableDurationMinutes: 50 }
+    const size = calculateProposedBlockSize({
+      candidate,
+      window: smallWindow,
+      fit,
+      placementMode: 'normal',
+    })
+    expect(size.durationMinutes).toBeLessThanOrEqual(50)
+  })
+
+  it('produit des warnings explicites en mode minimum_viable quand la durée est réduite', () => {
+    const bigCandidate = { ...candidate, recommendedMinutes: 120, minimumUsefulMinutes: 30 }
+    const size = calculateProposedBlockSize({
+      candidate: bigCandidate,
+      window,
+      fit,
+      placementMode: 'minimum_viable',
+    })
+    expect(size.durationMinutes).toBeLessThan(120)
+    // En mode survie, un warning doit expliquer la réduction.
+    expect(size.warnings.length).toBeGreaterThan(0)
+    expect(size.reason).toContain('minimum viable')
   })
 })

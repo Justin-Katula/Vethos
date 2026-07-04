@@ -147,7 +147,7 @@ export function scoreObjectivePriorityV2(input: ScoreObjectivePriorityV2Input): 
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       source: 'objective_model_v2',
-      shadowOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
+      advisoryOnly: useSettingsStore.getState?.()?.engineV2Priority !== true,
       debug: {
         oldScore: input.oldScore,
         linkedTaskScoreCount: input.linkedTaskScores?.length ?? 0,

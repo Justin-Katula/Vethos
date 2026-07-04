@@ -25,7 +25,7 @@ describe('onboarding-model', () => {
       protectionStyle: 'firm',
     })
 
-    expect('shadowOnly' in result).toBe(false)
+    expect('advisoryOnly' in result).toBe(false)
     expect(result.sleepCommitment).toEqual({
       sleepAt: '22:30',
       wakeAt: '06:00',
@@ -43,7 +43,7 @@ describe('onboarding-model', () => {
 
     const userModel = buildInitialUserModelFromOnboarding(result)
 
-    expect('shadowOnly' in userModel).toBe(false)
+    expect('advisoryOnly' in userModel).toBe(false)
     expect(userModel.disciplineContract.protectedDecision).toBe('réussir mes examens')
     expect(userModel.riskProfile.distractions.scanLocalAppsLater).toBe(true)
   })
@@ -75,7 +75,7 @@ describe('onboarding-model', () => {
 
     const preview = buildFirstSystemPreview(result)
 
-    expect('shadowOnly' in preview).toBe(false)
+    expect('advisoryOnly' in preview).toBe(false)
     expect(preview.protectedObjective).toBe('apprendre à coder')
     expect(preview.firstBlock.durationMinutes).toBe(60)
     expect(preview.protection).toContain('Verrouillage strict')

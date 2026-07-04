@@ -370,7 +370,7 @@ function buildEvidence(args: {
       kind: 'criteria_match',
       label: 'Correspondance avec le contrat de fin attendu.',
       score: args.criteria,
-      source: args.contract ? 'contract' : 'shadow_engine',
+      source: args.contract ? 'contract' : 'heuristic_engine',
     },
     {
       kind: 'user_history',
@@ -456,7 +456,7 @@ function buildPenalties(args: {
       kind: 'too_fast_for_task',
       label: 'La complétion arrive très vite par rapport au temps estimé.',
       score: 18,
-      source: 'shadow_engine',
+      source: 'heuristic_engine',
     })
   }
   return penalties
@@ -474,7 +474,7 @@ function reasonsForDecision(result: {
   const reasons: string[] = []
   const warnings: string[] = []
   if (result.decision === 'accept_completion') {
-    reasons.push('Les preuves sont suffisantes pour accepter la complétion en mode shadow.')
+    reasons.push('Les preuves sont suffisantes pour accepter la complétion.')
   } else if (result.decision === 'reject_completion') {
     reasons.push('Les preuves ne suffisent pas pour valider cette tâche comme terminée.')
   } else if (result.decision === 'require_review') {
@@ -592,9 +592,9 @@ export function buildCompletionGateResult(input: BuildCompletionGateInput): Comp
     verifiedAt: decision.verifiedCompleted ? now.toISOString() : undefined,
     metadata: {
       version: COMPLETION_GATE_VERSION,
-      shadowOnly: input.settings?.engineV2Completion !== true,
+      advisoryOnly: input.settings?.engineV2Completion !== true,
       generatedAt: now.toISOString(),
-      source: 'completion_gate_shadow_engine',
+      source: 'completion_gate_engine',
       debug: {
         currentTaskStatusStillControlsPersistence: input.settings?.engineV2Completion !== true,
         currentRemainingMinutesStillControlsRealProgress: input.settings?.engineV2Completion !== true,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPlacementCandidates } from './placement-input-adapter'
+import { buildPlacementCandidates, type AnyTaskModel } from './placement-input-adapter'
 
 describe('placement-input-adapter', () => {
   it('excludes completed and completed_verified tasks', () => {
@@ -62,5 +62,48 @@ describe('placement-input-adapter', () => {
       taskModelsV2: [{ id: 'exam', status: 'active' }],
     })
     expect(candidates[0]!.reasons.length).toBe(0)
+  })
+
+  it('crée un candidat pour une tâche active standard', () => {
+    const candidates = buildPlacementCandidates({
+      taskModelsV2: [{ id: '1', status: 'active', title: 'Conception module', remainingMinutes: 90 }],
+    })
+    expect(candidates).toHaveLength(1)
+    const c = candidates[0]!
+    expect(c.targetType).toBe('task')
+    expect(c.targetId).toBe('1')
+    expect(c.title).toBe('Conception module')
+    expect(c.remainingMinutes).toBe(90)
+    expect(c.priorityScore).toBeGreaterThanOrEqual(0)
+    expect(c.priorityScore).toBeLessThanOrEqual(100)
+  })
+
+  it('traduit un contexte minimum_viable_plan en placementModeHint', () => {
+    const candidates = buildPlacementCandidates({
+      taskModelsV2: [{ id: '1', status: 'active' }],
+      deadlineCrisisContexts: [
+        { targetId: '1', crisisLevel: 'impossible_full_completion', recommendedMode: 'minimum_viable_plan' },
+      ],
+    })
+    expect(candidates[0]!.placementModeHint).toBe('minimum_viable')
+  })
+
+  it('transforme une tâche presque terminée (>=90%) en candidate courte', () => {
+    const candidates = buildPlacementCandidates({
+      taskModelsV2: [
+        { id: '1', status: 'active', progressPercent: 95, remainingMinutes: 25 },
+      ],
+    })
+    const c = candidates[0]!
+    expect(c.canUseShortGap).toBe(true)
+    expect(c.recommendedMinutes).toBeLessThanOrEqual(30)
+    expect(c.maximumSafeMinutes).toBeLessThanOrEqual(60)
+  })
+
+  it('ne mute jamais l\'input passé en paramètre', () => {
+    const taskInput: AnyTaskModel = { id: '1', status: 'active', remainingMinutes: 60, title: 'Orig' }
+    const original = JSON.parse(JSON.stringify(taskInput))
+    buildPlacementCandidates({ taskModelsV2: [taskInput] })
+    expect(taskInput).toEqual(original)
   })
 })

@@ -60,4 +60,32 @@ describe('placement-conflict-resolver', () => {
     const result = resolvePlacementConflicts({ proposedBlocks: blocks, planningContext: context })
     expect(result.blocks[0]!.id).toBe('b1') // 10:00 comes before 14:00
   })
+
+  it('garde le bloc à deadline plus critique en cas de conflit', () => {
+    // Les deux blocs ont la même priorité mais l'un a une confidence plus haute
+    // (proxy pour la criticité deadline dans ce resolver). Le gagnant doit être conservé.
+    const blocks = [
+      { ...baseBlock, id: 'loose', targetId: 't1', start: '10:30', end: '11:30', priorityScore: 90, confidence: 70 },
+      { ...baseBlock, id: 'keep', targetId: 't2', start: '10:00', end: '11:00', priorityScore: 90, confidence: 95 },
+    ]
+
+    const result = resolvePlacementConflicts({ proposedBlocks: blocks, planningContext: context })
+    expect(result.blocks).toHaveLength(1)
+    expect(result.blocks[0]!.id).toBe('keep')
+    expect(result.removedBlocks[0]!.id).toBe('loose')
+  })
+
+  it('ne supprime jamais un bloc silencieusement : chaque retrait génère un warning', () => {
+    const blocks = [
+      { ...baseBlock, id: 'win', targetId: 't1', start: '10:00', end: '11:00', priorityScore: 90, confidence: 100 },
+      { ...baseBlock, id: 'lose1', targetId: 't2', start: '10:15', end: '11:15', priorityScore: 40, confidence: 80 },
+      { ...baseBlock, id: 'lose2', targetId: 't3', start: '10:20', end: '11:20', priorityScore: 30, confidence: 70 },
+    ]
+
+    const result = resolvePlacementConflicts({ proposedBlocks: blocks, planningContext: context })
+    expect(result.removedBlocks).toHaveLength(2)
+    // Un warning par bloc retiré, mentionnant l'id du bloc.
+    expect(result.warnings).toHaveLength(2)
+    expect(result.warnings.every((w) => w.includes('retiré'))).toBe(true)
+  })
 })

@@ -1,6 +1,11 @@
 import type { PriorityResult } from '@shared/engine-results'
 import { PRIORITY_SCORE_PERSISTENCE_VERSION, type Objective, type PersistedPriorityScore, type Task } from '@shared/schemas'
 
+/**
+ * WARNING: Maps a PriorityResult (which comes from the V1 engine) to a PersistedPriorityScore.
+ * Despite the task/objective fields being named `priorityScoreV2` in schemas, they hold
+ * this serialized V1 format. Do not mistake this persisted cache for the active V2 scoring structures.
+ */
 export function toPersistedPriorityScore(result: PriorityResult, computedAt = new Date().toISOString()): PersistedPriorityScore {
   return {
     schemaVersion: PRIORITY_SCORE_PERSISTENCE_VERSION,

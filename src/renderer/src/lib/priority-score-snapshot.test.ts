@@ -42,7 +42,7 @@ function task(over: Partial<Task> = {}): Task {
 }
 
 describe('priority-score-snapshot', () => {
-  it('calcule tâches, objectifs, rankings, comparaisons et diagnostics en shadow', () => {
+  it('calcule tâches, objectifs, rankings, comparaisons et diagnostics en mode consultatif', () => {
     const obj = objective()
     const t = task()
     const objectiveModel = buildObjectiveModelV2({ objective: obj, linkedTasks: [t], now: NOW })
@@ -57,7 +57,7 @@ describe('priority-score-snapshot', () => {
       now: NOW,
     })
 
-    expect(snapshot.metadata.shadowOnly).toBe(true)
+    expect(snapshot.metadata.advisoryOnly).toBe(true)
     expect(snapshot.taskScores).toHaveLength(1)
     expect(snapshot.objectiveScores).toHaveLength(1)
     expect(snapshot.rankings.action.rankedItems.length).toBeGreaterThan(0)
