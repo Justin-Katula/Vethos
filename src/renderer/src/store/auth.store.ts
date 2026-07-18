@@ -191,7 +191,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     const account = get().account
     if (!account) {
-      throw new Error("Crée d'abord ton compte Nexus.")
+      throw new Error("Crée d'abord ton compte Vethos.")
     }
     if (account.email !== normalizedEmail) {
       throw new Error('Email ou mot de passe incorrect.')

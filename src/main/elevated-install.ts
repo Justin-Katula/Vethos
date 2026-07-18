@@ -9,7 +9,7 @@ function quoteArg(value: string): string {
 function relaunchElevated(flag: '--install-service' | '--uninstall-service'): Promise<boolean> {
   return new Promise((resolve) => {
     const appArg = process.defaultApp ? ` ${quoteArg(app.getAppPath())}` : ''
-    sudoExec(`${quoteArg(process.execPath)}${appArg} ${flag}`, { name: 'Nexus' }, (err) => {
+    sudoExec(`${quoteArg(process.execPath)}${appArg} ${flag}`, { name: 'Vethos' }, (err) => {
       if (err) {
         log.error('[elevated-install] échec de la relance élevée', err)
         resolve(false)

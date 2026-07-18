@@ -310,7 +310,7 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         </div>
         <h1 className="text-3xl font-bold tracking-tight">Ton emploi du temps</h1>
         <p className="max-w-xl text-sm text-text-secondary">
-          {"Dis-moi tes horaires fixes. Nexus calculera automatiquement ton temps libre et te dira quoi en faire."}
+          {"Dis-moi tes horaires fixes. Vethos calculera automatiquement ton temps libre et te dira quoi en faire."}
         </p>
       </header>
 

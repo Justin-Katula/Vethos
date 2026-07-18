@@ -127,7 +127,7 @@ export default function SettingsPage() {
         <header>
           <h1 className="text-3xl font-semibold tracking-tight">Paramètres</h1>
           <p className="mt-2 text-sm text-text-secondary">
-            Configure Nexus selon tes besoins. Toutes les modifications sont sauvegardées automatiquement.
+            Configure Vethos selon tes besoins. Toutes les modifications sont sauvegardées automatiquement.
           </p>
         </header>
 

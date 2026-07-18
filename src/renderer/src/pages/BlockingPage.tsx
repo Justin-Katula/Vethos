@@ -122,7 +122,7 @@ export default function BlockingPage() {
               <div className="font-medium text-orange">Service de blocage indisponible</div>
               <p className="mt-0.5 text-xs text-orange/80">
                 {
-                  "Les sessions restent verrouillées tant que le service Windows Nexus n'est pas joignable."
+                  "Les sessions restent verrouillées tant que le service Windows Vethos n'est pas joignable."
                 }
               </p>
             </div>

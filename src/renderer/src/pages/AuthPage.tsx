@@ -90,7 +90,7 @@ export default function AuthPage(): JSX.Element {
           </div>
 
           <header className="mb-7">
-            <p className="text-xs font-medium uppercase text-text-muted">Nexus</p>
+            <p className="text-xs font-medium uppercase text-text-muted">Vethos</p>
             <h1 className="mt-2 text-2xl font-semibold">{title}</h1>
             <p className="mt-2 text-sm leading-6 text-text-secondary">
               {mode === 'sign-up'

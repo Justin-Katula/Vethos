@@ -1,5 +1,5 @@
 appId: com.nexus.blocking
-productName: Nexus
+productName: Vethos
 directories:
   output: release
   buildResources: build
@@ -34,7 +34,7 @@ nsis:
   deleteAppDataOnUninstall: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Nexus
+  shortcutName: Vethos
 
 portable:
   artifactName: ${productName}-Portable-${version}.${ext}

@@ -136,7 +136,7 @@ export default function App(): JSX.Element {
       toast.info({
         title: 'Mise à jour prête',
         description: info.version
-          ? `Nexus ${info.version} sera installé au prochain redémarrage.`
+          ? `Vethos ${info.version} sera installé au prochain redémarrage.`
           : 'Elle sera installée au prochain redémarrage.',
       })
     })

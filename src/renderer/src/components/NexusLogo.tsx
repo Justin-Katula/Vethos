@@ -1,6 +1,6 @@
 /**
- * Logo Nexus — wordmark inline SVG.
- * Le N est intégré dans un anneau cyan qui évoque le cercle 24h de l'app.
+ * Logo Vethos — wordmark inline SVG.
+ * Le V est intégré dans un anneau cyan qui évoque le cercle 24h de l'app.
  */
 type Props = {
   size?: number
@@ -38,9 +38,9 @@ export function NexusLogo({ size = 28, className }: Props) {
         />
         {/* point d'accent en bas */}
         <circle cx="9.5" cy="45" r="2.5" fill="#22d3ee" />
-        {/* lettre N stylisée */}
+        {/* lettre V stylisée */}
         <path
-          d="M22 18 V46 M22 18 L42 46 M42 18 V46"
+          d="M22 18 L32 46 L42 18"
           stroke="url(#nx-letter)"
           strokeWidth="3.2"
           strokeLinecap="round"
@@ -51,7 +51,7 @@ export function NexusLogo({ size = 28, className }: Props) {
       <span
         className="text-base font-semibold tracking-tight text-text-primary"
       >
-        Nexus
+        Vethos
       </span>
     </div>
   )

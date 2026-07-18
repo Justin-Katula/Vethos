@@ -38,7 +38,7 @@ function serviceScriptPath(): string {
 function buildService(): Service {
   return new Service({
     name: SERVICE_NAME,
-    description: 'Service de blocage en arrière-plan de Nexus (sous-projet P16).',
+    description: 'Service de blocage en arrière-plan de Vethos (sous-projet P16).',
     script: serviceScriptPath(),
     env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
     wait: 2,

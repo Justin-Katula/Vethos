@@ -55,7 +55,7 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
           Premier lancement
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-text-primary sm:text-5xl">
-          Bienvenue dans Nexus.
+          Bienvenue dans Vethos.
         </h1>
         <p className="mx-auto max-w-xl text-base leading-relaxed text-text-secondary">
           {"Le travail concentré devient progression mesurable. En 3 minutes, on pose ton emploi du temps, tes engagements protégés, et ton premier objectif."}

@@ -110,7 +110,7 @@ export function Sidebar() {
           <LogOut size={14} />
           Déconnexion
         </button>
-        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Nexus'}</div>
+        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Vethos'}</div>
       </div>
     </aside>
   )

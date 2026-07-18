@@ -173,7 +173,7 @@ export function ObjectiveStep({
               Quels engagements sont non-négociables ?
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              Garde visibles les activités que Nexus doit t’aider à préserver avant de remplir ton objectif.
+              Garde visibles les activités que Vethos doit t’aider à préserver avant de remplir ton objectif.
             </p>
           </div>
         </div>

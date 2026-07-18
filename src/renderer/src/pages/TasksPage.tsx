@@ -77,7 +77,7 @@ export default function TasksPage() {
             <h1 className="text-3xl font-semibold tracking-tight">Mes tâches</h1>
             <p className="mt-2 max-w-2xl text-sm text-text-secondary">
               {
-                "Ajoute tes devoirs et petites tâches ponctuelles. L'urgence et le niveau détermineront l'attention que Nexus leur accorde."
+                "Ajoute tes devoirs et petites tâches ponctuelles. L'urgence et le niveau détermineront l'attention que Vethos leur accorde."
               }
             </p>
           </div>
