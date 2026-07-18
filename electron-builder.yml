@@ -3,6 +3,7 @@ productName: Vethos
 directories:
   output: release
   buildResources: build
+icon: build/icon.ico
 
 files:
   - 'out/**/*'
@@ -35,6 +36,9 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Vethos
+  installerIcon: build/installer-icon.png
+  uninstallerIcon: build/installer-icon.png
+  installerHeaderIcon: build/installer-icon.png
 
 portable:
   artifactName: ${productName}-Portable-${version}.${ext}
