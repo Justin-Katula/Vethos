@@ -2,39 +2,18 @@ import log, { setupLogging } from './logging/setup'
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
-import { createStorage } from '@service/storage'
+import { createStorage } from '@shared/storage'
 import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
-import { installService, uninstallService } from './service-install'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
 setupLogging()
 
-// P16 Phase 3 — Lot 1 : si l'app est lancée avec un flag d'install/désinstall
-// du service Windows, on exécute la routine correspondante au lieu d'ouvrir
-// l'UI, puis on quitte. Détecté AVANT le verrou d'instance unique et whenReady.
-const wantsInstallService = process.argv.includes('--install-service')
-const wantsUninstallService = process.argv.includes('--uninstall-service')
-if (wantsInstallService || wantsUninstallService) {
-  const routine = wantsInstallService ? installService : uninstallService
-  routine()
-    .then(() => {
-      log.info('[main] routine service-install terminée', {
-        action: wantsInstallService ? 'install' : 'uninstall',
-      })
-      app.exit(0)
-    })
-    .catch((err) => {
-      log.error('[main] routine service-install échouée', err)
-      app.exit(1)
-    })
-} else {
-  startNexusApp()
-}
+startNexusApp()
 
 const isDev = !app.isPackaged
 
@@ -126,7 +105,7 @@ function startNexusApp(): void {
       await recalculateFreeTimeAtBoot(storage).catch((err) => {
         log.warn('boot free-time recalculation failed', err)
       })
-      const runtime = await registerAllIpcHandlers(storage, () => mainWindow)
+      await registerAllIpcHandlers(storage, () => mainWindow)
 
       mainWindow = createMainWindow()
       mainWindow.on('closed', () => {
@@ -134,7 +113,7 @@ function startNexusApp(): void {
       })
 
       if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
-      startUpdater(() => mainWindow, runtime.isSessionActive)
+      startUpdater(() => mainWindow)
 
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

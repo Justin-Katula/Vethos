@@ -13,8 +13,6 @@ files:
   - '!**/{README.md,docs}'
 
 asar: true
-asarUnpack:
-  - 'out/service/**'
 
 win:
   target:

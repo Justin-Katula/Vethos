@@ -8,22 +8,6 @@ export const IPC_CHANNELS = {
   APP_DISCOVERY_LIST: 'app:discoverInstalledApps',
   UPDATER_EVENT_AVAILABLE: 'updater:event:available',
   UPDATER_EVENT_DOWNLOADED: 'updater:event:downloaded',
-  // Blocking — invoke
-  BLOCKING_GET_INITIAL_STATE: 'blocking:getInitialState',
-  BLOCKING_SAVE_PROFILE: 'blocking:saveProfile',
-  BLOCKING_DELETE_PROFILE: 'blocking:deleteProfile',
-  BLOCKING_START_SESSION: 'blocking:startSession',
-  BLOCKING_REQUEST_UNLOCK: 'blocking:requestUnlock',
-  BLOCKING_SUBMIT_JUSTIFICATION: 'blocking:submitJustification',
-  BLOCKING_GET_LAYER_STATUS: 'blocking:getLayerStatus',
-  BLOCKING_GET_SERVICE_STATUS: 'blocking:getServiceStatus',
-  BLOCKING_REPAIR_SERVICE: 'blocking:repairService',
-  // Blocking — events main → renderer
-  BLOCKING_EVENT_SERVICE_STATUS: 'blocking:event:serviceStatus',
-  BLOCKING_EVENT_SESSION_CHANGED: 'blocking:event:sessionChanged',
-  BLOCKING_EVENT_LAYER_DRIFT: 'blocking:event:layerDrift',
-  BLOCKING_EVENT_CLOCK_TAMPER: 'blocking:event:clockTamper',
-  BLOCKING_EVENT_BREAK_REQUIRED: 'blocking:event:breakRequired',
   // App usage tracker
   APP_USAGE_GET: 'appUsage:get',
   APP_USAGE_EVENT_TICK: 'appUsage:event:tick',

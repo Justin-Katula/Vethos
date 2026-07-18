@@ -7,9 +7,6 @@ import { z } from 'zod'
  */
 export const STORAGE_KEYS = [
   'settings',
-  'blocking',
-  'blocking_history',
-  'blocking_active',
   'schedule',
   'objectives',
   'levels',
@@ -17,7 +14,6 @@ export const STORAGE_KEYS = [
   'declared_apps',
   'declared_app_usage',
   'tasks',
-  'discovered_sites',
   'auth',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
@@ -35,17 +31,8 @@ export const SettingsSchema = z.object({
   sleepStart: z.string().optional(),
   /** Heure de réveil, telle que fournie par le champ horaire natif. */
   sleepEnd: z.string().optional(),
-  /** Règles de session (pauses obligatoires). */
-  sessionRulesEnabled: z.boolean().optional(),
-  /** Blocage strict ON/OFF. */
-  strictBlocking: z.boolean().optional(),
   /** Sauvegarde auto ON/OFF. */
   autoSave: z.boolean().optional(),
-  /** Opt-in explicite pour scanner l'historique navigateur local. */
-  browserHistoryScanEnabled: z.boolean().optional(),
-  /** Valeurs par défaut des verrous adaptatifs pour les nouveaux profils. */
-  defaultUnlockCooldownMinutes: z.number().int().min(1).max(60).optional(),
-  defaultUnlockJustificationWords: z.number().int().min(50).max(500).optional(),
   /** Date du premier lancement (pour la première semaine). */
   firstLaunchDate: z.string().datetime().optional(),
   /** Niveau du temps libre (4–7) : concourt avec les tâches/objectifs pour le temps. */
@@ -80,82 +67,11 @@ export const AuthStateSchema = z.object({
 })
 export type AuthState = z.infer<typeof AuthStateSchema>
 
-// ─── Blocking (sous-projet 2) ──────────────────────────────────────────────
-
-const DOMAIN_REGEX = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z]{2,})+$/
-const EXE_NAME_REGEX = /^[A-Za-z0-9_.\- ]+\.exe$/i
-
-export const BlockingProfileSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1).max(60),
-  blockedSites: z.array(z.string().regex(DOMAIN_REGEX)),
-  blockedProcesses: z.array(z.string().regex(EXE_NAME_REGEX)),
-  blockedNetworkApps: z.array(z.string()),
-  unlockPolicy: z.discriminatedUnion('type', [
-    z.object({ type: z.literal('none') }),
-    z.object({ type: z.literal('cooldown'), minutes: z.number().int().min(1).max(60) }),
-    z.object({ type: z.literal('justification'), minWords: z.number().int().min(50).max(500) }),
-    z.object({
-      type: z.literal('cooldown_and_justification'),
-      minutes: z.number().int().min(1).max(60),
-      minWords: z.number().int().min(50).max(500),
-    }),
-  ]),
-  createdAt: z.string().datetime(),
-})
-export type BlockingProfile = z.infer<typeof BlockingProfileSchema>
-
-export const ActiveSessionSchema = z.object({
-  id: z.string().uuid(),
-  profileId: z.string().uuid(),
-  profileSnapshot: BlockingProfileSchema,
-  startedAt: z.string().datetime(),
-  endsAt: z.string().datetime(),
-  startedAtWall: z.number().int().optional(),
-  startedAtMono: z.number().int().optional(),
-  durationMinutes: z
-    .number()
-    .int()
-    .min(1)
-    .max(24 * 60)
-    .optional(),
-  unlockState: z.discriminatedUnion('phase', [
-    z.object({ phase: z.literal('locked') }),
-    z.object({ phase: z.literal('cooldown'), startedAt: z.string().datetime() }),
-    z.object({ phase: z.literal('awaiting_justification') }),
-    z.object({ phase: z.literal('unlocked'), reason: z.string() }),
-  ]),
-  appliedFirewallRules: z.array(z.string()),
-})
-export type ActiveSession = z.infer<typeof ActiveSessionSchema>
-
-export const BlockingHistoryEntrySchema = z.object({
-  sessionId: z.string().uuid(),
-  profileId: z.string().uuid(),
-  startedAt: z.string().datetime(),
-  endedAt: z.string().datetime(),
-  completedNormally: z.boolean(),
-})
-export type BlockingHistoryEntry = z.infer<typeof BlockingHistoryEntrySchema>
-
-export const BlockingStateSchema = z.object({
-  profiles: z.array(BlockingProfileSchema),
-  /** Legacy compatibility: V2 stores this in nexus_blocking_history.json. */
-  history: z.array(BlockingHistoryEntrySchema).max(500).default([]),
-  /** Pénalité appliquée à la prochaine session après un arrêt anticipé. */
-  nextSessionPenaltyMinutes: z.number().int().min(0).max(240).default(0),
-})
-export type BlockingState = z.infer<typeof BlockingStateSchema>
-
-export const BlockingHistoryStateSchema = z.object({
-  history: z.array(BlockingHistoryEntrySchema).max(500),
-})
-export type BlockingHistoryState = z.infer<typeof BlockingHistoryStateSchema>
-
 // ─── Schedule (sous-projet 3) ──────────────────────────────────────────────
 
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+const EXE_NAME_REGEX = /^[A-Za-z0-9_.\- ]+\.exe$/i
 
 export const TimeRuleSchema = z.object({
   id: z.string().uuid(),
@@ -163,7 +79,6 @@ export const TimeRuleSchema = z.object({
   color: z.string().regex(HEX_COLOR_REGEX),
   icon: z.string().min(1).max(40).optional(),
   categoryType: z.enum(['sleep', 'school', 'work', 'commitment', 'free', 'custom']).optional(),
-  linkedProfileId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
 })
 export type TimeRule = z.infer<typeof TimeRuleSchema>
@@ -248,7 +163,6 @@ export const LevelsStateSchema = z.object({
   calculatedDailyFreeMinutes: z.number().int().min(0).max(1440).default(0),
   calculatedAt: z.string().datetime().nullable().default(null),
   lastCalculatedDate: z.string().regex(DATE_REGEX).nullable().default(null),
-  lastProcessedSessionId: z.string().uuid().nullable().default(null),
   /** Cursor par app déclarée pour idempotence du fold app-usage. Map appId → date YYYY-MM-DD. */
   lastProcessedAppUsageByApp: z.record(z.string(), z.string().nullable()).optional(),
 })
@@ -296,27 +210,8 @@ export const DeclaredAppUsageStateSchema = z.object({
 export type DeclaredAppUsageState = z.infer<typeof DeclaredAppUsageStateSchema>
 
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
-// ─── Discovered sites (auto-capture depuis navigateurs) ────────────────────
-
-export const DiscoveredSiteSchema = z.object({
-  domain: z.string().min(1),
-  firstSeenAt: z.string().datetime(),
-  lastSeenAt: z.string().datetime(),
-  visitCount: z.number().int().min(1),
-  blocked: z.boolean(),
-})
-export type DiscoveredSite = z.infer<typeof DiscoveredSiteSchema>
-
-export const DiscoveredSitesStateSchema = z.object({
-  sites: z.array(DiscoveredSiteSchema).max(2000),
-})
-export type DiscoveredSitesState = z.infer<typeof DiscoveredSitesStateSchema>
-
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
-  blocking: BlockingStateSchema,
-  blocking_history: BlockingHistoryStateSchema,
-  blocking_active: ActiveSessionSchema,
   schedule: ScheduleStateSchema,
   objectives: ObjectivesStateSchema,
   levels: LevelsStateSchema,
@@ -324,6 +219,5 @@ export const STORAGE_SCHEMAS = {
   declared_apps: DeclaredAppsStateSchema,
   declared_app_usage: DeclaredAppUsageStateSchema,
   tasks: TasksStateSchema,
-  discovered_sites: DiscoveredSitesStateSchema,
   auth: AuthStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

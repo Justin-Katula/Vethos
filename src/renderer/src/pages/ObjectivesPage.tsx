@@ -7,7 +7,6 @@ import { ObjectiveEditor } from '@/components/levels/ObjectiveEditor'
 import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
 import { useLevelsStore } from '@/store/levels.store'
 import { useScheduleStore } from '@/store/schedule.store'
-import { useBlockingStore } from '@/store/blocking.store'
 import { useTasksStore } from '@/store/tasks.store'
 import type { Objective } from '@shared/schemas'
 
@@ -35,9 +34,6 @@ export default function ObjectivesPage(): JSX.Element {
   const rules = useScheduleStore((s) => s.rules)
   const loadSchedule = useScheduleStore((s) => s.load)
   const scheduleLoaded = useScheduleStore((s) => s.loaded)
-  const blockingState = useBlockingStore((s) => s.state)
-  const loadBlocking = useBlockingStore((s) => s.load)
-  const blockingLoaded = useBlockingStore((s) => s.loaded)
   const tasks = useTasksStore((s) => s.tasks)
   const loadTasks = useTasksStore((s) => s.load)
   const tasksLoaded = useTasksStore((s) => s.loaded)
@@ -48,9 +44,8 @@ export default function ObjectivesPage(): JSX.Element {
   useEffect(() => {
     void load()
     if (!scheduleLoaded) void loadSchedule()
-    if (!blockingLoaded) void loadBlocking()
     if (!tasksLoaded) void loadTasks()
-  }, [load, loadSchedule, loadBlocking, loadTasks, scheduleLoaded, blockingLoaded, tasksLoaded])
+  }, [load, loadSchedule, loadTasks, scheduleLoaded, tasksLoaded])
 
   const sorted = useMemo(
     () =>
@@ -165,7 +160,6 @@ export default function ObjectivesPage(): JSX.Element {
                 <ObjectiveCard
                   objective={obj}
                   rules={rules}
-                  history={blockingState.history}
                   urgency={urgencyByObjectiveId.get(obj.id)}
                   onClick={() => openEditor(obj)}
                 />

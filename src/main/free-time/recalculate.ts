@@ -1,5 +1,5 @@
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
-import type { Storage } from '@service/storage'
+import type { Storage } from '@shared/storage'
 
 type FreeTimeSlot = {
   startMinute: number
@@ -163,7 +163,6 @@ export async function recalculateFreeTimeAtBoot(
     calculatedDailyFreeMinutes: totalFreeMinutes,
     calculatedAt: now.toISOString(),
     lastCalculatedDate: today,
-    lastProcessedSessionId: levels?.lastProcessedSessionId ?? null,
     lastProcessedAppUsageByApp: levels?.lastProcessedAppUsageByApp ?? {},
   })
 }

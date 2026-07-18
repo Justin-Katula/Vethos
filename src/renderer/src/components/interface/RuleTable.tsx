@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Plus, Lock } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { ScheduleEntry, TimeRule } from '@shared/schemas'
 import { iconByName } from '@/lib/rule-palette'
 import { cn } from '@/lib/cn'
@@ -42,9 +42,6 @@ export function RuleTable({ rules, entries, onCreate, onEdit }: Props) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 truncate text-sm font-medium text-text-primary">
                 {r.name}
-                {r.linkedProfileId && (
-                  <Lock size={11} strokeWidth={2.5} className="text-text-muted" />
-                )}
               </div>
               <div className="text-xs text-text-muted">
                 {count} {count <= 1 ? 'bloc' : 'blocs'}

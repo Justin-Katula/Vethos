@@ -1,69 +1,21 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Save,
   RefreshCw,
   Moon,
-  Clock,
   FileText,
-  History,
   Sparkles,
-  type LucideProps,
 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useSettingsStore } from '@/store/settings.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
-import { useToast } from '@/lib/use-toast'
 import { nexus } from '@/lib/ipc'
 import {
   canChangeFreeTimeLevel,
   daysUntilFreeTimeLevelChange,
 } from '@/lib/placement-engine'
-
-function ToggleRow({
-  label,
-  description,
-  icon: Icon,
-  value,
-  onChange,
-}: {
-  label: string
-  description: string
-  icon: ComponentType<LucideProps>
-  value: boolean
-  onChange: (v: boolean) => void
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border-subtle bg-bg-card px-5 py-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
-          <Icon size={18} />
-        </div>
-        <div>
-          <div className="text-sm font-medium text-text-primary">{label}</div>
-          <div className="text-xs text-text-muted">{description}</div>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        className={cn(
-          'relative h-6 w-11 rounded-2xl transition-colors duration-200',
-          value ? 'bg-accent' : 'bg-border-subtle',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 left-0.5 h-5 w-5 rounded-2xl bg-white shadow transition-transform duration-200',
-            value && 'translate-x-5',
-          )}
-        />
-        <span className="sr-only">{value ? 'Actif' : 'Inactif'}</span>
-      </button>
-    </div>
-  )
-}
 
 export default function SettingsPage() {
   const {
@@ -71,8 +23,6 @@ export default function SettingsPage() {
     savedAt,
     sleepStart,
     sleepEnd,
-    sessionRulesEnabled,
-    browserHistoryScanEnabled,
     freeTimeLevel,
     freeTimeLevelChangedAt,
     loaded,
@@ -85,7 +35,6 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [restarting, setRestarting] = useState(false)
-  const toast = useToast()
 
   useEffect(() => {
     load()
@@ -246,35 +195,6 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
-        </section>
-
-        {/* --- Toggles --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Paramètres clés
-          </h2>
-          <ToggleRow
-            icon={Clock}
-            label="Règles de session"
-            description="Pauses obligatoires après 4h (même projet) ou 6h (total)"
-            value={sessionRulesEnabled}
-            onChange={(v) => {
-              if (!v) {
-                toast.info({
-                  title: 'Règles désactivées',
-                  description: 'Sans ces règles, tu risques l’épuisement. Elles sont là pour que tu tiennes sur la durée.',
-                })
-              }
-              void updateSettings({ sessionRulesEnabled: v })
-            }}
-          />
-          <ToggleRow
-            icon={History}
-            label="Scan historique navigateur"
-            description="Propose des domaines visités à bloquer, en local seulement"
-            value={browserHistoryScanEnabled}
-            onChange={(v) => void updateSettings({ browserHistoryScanEnabled: v })}
-          />
         </section>
 
         {/* --- Diagnostic --- */}

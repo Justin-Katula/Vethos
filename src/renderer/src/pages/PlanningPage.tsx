@@ -7,7 +7,6 @@ import { WeekCalendar } from '@/components/interface/WeekCalendar'
 import { RuleEditor } from '@/components/interface/RuleEditor'
 import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
-import { useBlockingStore } from '@/store/blocking.store'
 import { useToast } from '@/lib/use-toast'
 import { cn } from '@/lib/cn'
 import type { TimeRule } from '@shared/schemas'
@@ -29,9 +28,6 @@ export default function PlanningPage() {
     saveEntry,
     deleteEntry,
   } = useScheduleStore()
-  const blockingState = useBlockingStore((s) => s.state)
-  const loadBlocking = useBlockingStore((s) => s.load)
-  const blockingLoaded = useBlockingStore((s) => s.loaded)
   const toast = useToast()
 
   const [editorOpen, setEditorOpen] = useState(false)
@@ -49,10 +45,9 @@ export default function PlanningPage() {
 
   useEffect(() => {
     void load()
-    if (!blockingLoaded) void loadBlocking()
     if (!tasksLoaded) void loadTasks()
     if (!levelsLoaded) void loadLevels()
-  }, [load, loadBlocking, loadTasks, loadLevels, blockingLoaded, tasksLoaded, levelsLoaded])
+  }, [load, loadTasks, loadLevels, tasksLoaded, levelsLoaded])
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -241,7 +236,6 @@ export default function PlanningPage() {
       <RuleEditor
         open={editorOpen}
         initial={editingRule}
-        profiles={blockingState.profiles}
         onClose={() => setEditorOpen(false)}
         onSave={saveRule}
         onDelete={deleteRule}

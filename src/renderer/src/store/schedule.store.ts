@@ -11,7 +11,6 @@ type SaveRuleDraft = {
   color: string
   icon?: string
   categoryType?: TimeRule['categoryType']
-  linkedProfileId?: string | null
 }
 
 type SaveEntryDraft = {
@@ -126,7 +125,6 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
         color: draft.color,
         icon: draft.icon,
         categoryType: draft.categoryType ?? rules[i]!.categoryType,
-        linkedProfileId: draft.linkedProfileId ?? null,
       }
       rules[i] = saved
     } else {
@@ -136,7 +134,6 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
         color: draft.color,
         icon: draft.icon,
         categoryType: draft.categoryType ?? 'custom',
-        linkedProfileId: draft.linkedProfileId ?? null,
         createdAt: now,
       }
       rules.push(saved)

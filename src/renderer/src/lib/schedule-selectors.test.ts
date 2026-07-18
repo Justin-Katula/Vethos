@@ -14,14 +14,12 @@ const RULE_A: TimeRule = {
   id: '11111111-1111-1111-1111-111111111111',
   name: 'Travail',
   color: '#3b82f6',
-  linkedProfileId: null,
   createdAt: '2026-05-05T00:00:00.000Z',
 }
 const RULE_B: TimeRule = {
   id: '22222222-2222-2222-2222-222222222222',
   name: 'Sport',
   color: '#ef4444',
-  linkedProfileId: null,
   createdAt: '2026-05-05T00:00:00.000Z',
 }
 

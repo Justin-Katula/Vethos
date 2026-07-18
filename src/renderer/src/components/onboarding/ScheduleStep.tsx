@@ -163,7 +163,6 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
       color: COLORS.sleep,
       icon: 'Moon',
       categoryType: 'sleep',
-      linkedProfileId: null,
       createdAt: now,
     }
     rules.push(sleepRule)
@@ -177,7 +176,6 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         color: COLORS.school,
         icon: 'GraduationCap',
         categoryType: 'school',
-        linkedProfileId: null,
         createdAt: now,
       }
       rules.push(schoolRule)
@@ -192,7 +190,6 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         color: COLORS.work,
         icon: 'Briefcase',
         categoryType: 'work',
-        linkedProfileId: null,
         createdAt: now,
       }
       rules.push(workRule)
@@ -278,7 +275,6 @@ export function ScheduleStep({ onTemplateApplied }: Props): JSX.Element {
         color: COMMITMENT_COLORS[index % COMMITMENT_COLORS.length]!,
         icon: 'ShieldCheck',
         categoryType: 'commitment',
-        linkedProfileId: null,
         createdAt: now,
       }
       rules.push(rule)

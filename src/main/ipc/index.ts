@@ -1,17 +1,16 @@
 import { ipcMain, app, shell, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { Storage } from '@service/storage'
+import type { Storage } from '@shared/storage'
 import { getLogFilePath } from '@main/logging/setup'
 import { notifyTaskEvent, type TaskNotifyEvent } from '@main/notifications'
 import { discoverInstalledApps } from '@main/tracking/app-discovery'
 import { registerStorageHandlers } from './storage.handlers'
-import { registerBlockingHandlers } from '../blocking/ipc/blocking.handlers'
 import { registerAppUsageHandlers } from '../tracking/handlers'
 
 export async function registerAllIpcHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
-): Promise<{ isSessionActive: () => boolean }> {
+): Promise<void> {
   registerStorageHandlers(storage)
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, () => app.getVersion())
@@ -27,7 +26,5 @@ export async function registerAllIpcHandlers(
     notifyTaskEvent(event, getMainWindow)
   })
 
-  const blockingRuntime = await registerBlockingHandlers(storage, getMainWindow)
   await registerAppUsageHandlers(storage, getMainWindow)
-  return blockingRuntime
 }

@@ -5,13 +5,11 @@ import { Layout } from './components/Layout'
 import { OnboardingOverlay } from './components/onboarding/OnboardingOverlay'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ToastViewport } from './components/ui/Toast'
-import { ProgressPulse } from './components/levels/ProgressPulse'
 import { NexusLogo } from './components/NexusLogo'
 import { useAuthStore } from './store/auth.store'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
 import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
-import { useBlockingStore } from './store/blocking.store'
 import { useLevelsStore } from './store/levels.store'
 import { useDeclaredAppsStore } from './store/declared-apps.store'
 import { useTasksStore } from './store/tasks.store'
@@ -22,7 +20,6 @@ import { jsDateToDayOfWeek } from './lib/schedule-selectors'
 import HomePage from './pages/HomePage'
 import ObjectivesPage from './pages/ObjectivesPage'
 import PlanningPage from './pages/PlanningPage'
-import BlockingPage from './pages/BlockingPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
 import AuthPage from './pages/AuthPage'
@@ -46,14 +43,10 @@ export default function App(): JSX.Element {
   const scheduleLoaded = useScheduleStore((s) => s.loaded)
   const scheduleRules = useScheduleStore((s) => s.rules)
   const scheduleEntries = useScheduleStore((s) => s.entries)
-  const loadBlocking = useBlockingStore((s) => s.load)
-  const blockingLoaded = useBlockingStore((s) => s.loaded)
-  const blockingHistory = useBlockingStore((s) => s.state.history)
   const loadLevels = useLevelsStore((s) => s.load)
   const levelsLoaded = useLevelsStore((s) => s.loaded)
   const lastCalculatedDate = useLevelsStore((s) => s.lastCalculatedDate)
   const setCalculatedFreeTime = useLevelsStore((s) => s.setCalculatedFreeTime)
-  const reconcileWithHistory = useLevelsStore((s) => s.reconcileWithHistory)
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
   const loadTasks = useTasksStore((s) => s.load)
   const reconcileLevelZero = useTasksStore((s) => s.reconcileLevelZero)
@@ -65,11 +58,10 @@ export default function App(): JSX.Element {
     void loadAuth()
     void loadSettings()
     void loadSchedule()
-    void loadBlocking()
     void loadLevels()
     void loadDeclaredApps()
     void loadTasks()
-  }, [loadAuth, loadSettings, loadSchedule, loadBlocking, loadLevels, loadDeclaredApps, loadTasks])
+  }, [loadAuth, loadSettings, loadSchedule, loadLevels, loadDeclaredApps, loadTasks])
 
   // V2 P9 — Réconciliation niveau-0 au boot (une fois tasks chargées)
   useEffect(() => {
@@ -102,35 +94,9 @@ export default function App(): JSX.Element {
     setCalculatedFreeTime,
   ])
 
-  // Progression des objectifs : traitée au niveau app, pas seulement
-  // quand l'utilisateur visite la page Objectifs.
-  useEffect(() => {
-    if (!scheduleLoaded || !levelsLoaded || !blockingLoaded) return
-    void reconcileWithHistory(blockingHistory, scheduleRules)
-  }, [
-    scheduleLoaded,
-    levelsLoaded,
-    blockingLoaded,
-    blockingHistory,
-    scheduleRules,
-    reconcileWithHistory,
-  ])
-
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {
       void Promise.all([flushSchedulePersist(), flushSettingsPersist()])
-    })
-    const offClock = nexus.blocking.onClockTamper((event) => {
-      toast.error({
-        title: 'Horloge modifiée',
-        description: `Saut détecté : ${Math.round(event.driftMs / 1000)} secondes.`,
-      })
-    })
-    const offBreakRequired = nexus.blocking.onBreakRequired((event) => {
-      toast.error({
-        title: 'Pause obligatoire',
-        description: `${event.reason} Repos requis : ${event.restMinutes} min.`,
-      })
     })
     const offUpdateReady = nexus.app.onUpdateDownloaded((info) => {
       toast.info({
@@ -142,8 +108,6 @@ export default function App(): JSX.Element {
     })
     return () => {
       offFlush()
-      offClock()
-      offBreakRequired()
       offUpdateReady()
     }
   }, [toast])
@@ -183,12 +147,10 @@ export default function App(): JSX.Element {
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/objectives" element={<ObjectivesPage />} />
           <Route path="/planning" element={<PlanningPage />} />
-          <Route path="/blocking" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
       <AnimatePresence>{showOnboarding && <OnboardingOverlay key="onboarding" />}</AnimatePresence>
-      <ProgressPulse />
       <ToastViewport />
     </ErrorBoundary>
   )

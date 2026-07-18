@@ -69,81 +69,12 @@ export function focusWindow(win: BrowserWindow): void {
 
 // ─── Notifications prédéfinies ──────────────────────────────────────────────
 
-export function notifySessionStart(
-  profileName: string,
-  durationMin: number,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Session démarrée',
-      body: `Profil "${profileName}" actif pour ${durationMin} minutes.`,
-      payload: { type: 'session-start', profileName },
-    },
-    getMainWindow,
-  )
-}
-
-export function notifySessionEnd(
-  profileName: string,
-  durationMin: number,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Session terminée',
-      body: `${durationMin} minutes terminées sur "${profileName}".`,
-      payload: { type: 'session-end', profileName, durationMin },
-    },
-    getMainWindow,
-  )
-}
-
-export function notifyBreakRequired(
-  restMinutes: number,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Pause obligatoire',
-      body: `Repos requis : ${restMinutes} minutes.`,
-      payload: { type: 'break-required', restMinutes },
-    },
-    getMainWindow,
-  )
-}
-
-export function notifyClockTamper(
-  driftMs: number,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Horloge modifiée',
-      body: `Vethos a détecté un saut d'horloge de ${Math.round(driftMs / 1000)} secondes.`,
-      payload: { type: 'clock-tamper', driftMs },
-    },
-    getMainWindow,
-  )
-}
-
 export function notifyCrashRecovered(getMainWindow: () => BrowserWindow | null): void {
   sendNativeNotification(
     {
       title: 'Crash récupéré',
       body: 'Vethos a restauré son état après un arrêt inattendu.',
       payload: { type: 'crash-recovered' },
-    },
-    getMainWindow,
-  )
-}
-
-export function notifyServiceDown(getMainWindow: () => BrowserWindow | null): void {
-  sendNativeNotification(
-    {
-      title: 'Service de blocage indisponible',
-      body: "Vethos ne peut pas démarrer de session tant que le service Windows n'est pas joignable.",
-      payload: { type: 'service-down' },
     },
     getMainWindow,
   )

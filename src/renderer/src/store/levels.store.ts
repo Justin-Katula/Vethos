@@ -1,11 +1,9 @@
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type {
-  BlockingHistoryEntry,
   LevelsState,
   Objective,
   ObjectivesState,
-  TimeRule,
 } from '@shared/schemas'
 import { canChangeLevel, clampManualLevelChange } from '@/lib/free-time-calculator'
 import { assertStorageWrite } from '@/lib/storage-write'
@@ -23,27 +21,18 @@ type SaveObjectiveDraft = {
   protectedCommitments?: string[]
 }
 
-export type ProgressEvent = {
-  at: string
-  objectiveDeltas: Array<{ objectiveId: string; minutes: number }>
-}
-
 type LevelsStore = {
   loaded: boolean
   objectives: Objective[]
   calculatedDailyFreeMinutes: number
   calculatedAt: string | null
   lastCalculatedDate: string | null
-  lastProcessedSessionId: string | null
-  lastProgressEvent: ProgressEvent | null
 
   load: () => Promise<void>
   saveObjective: (draft: SaveObjectiveDraft) => Promise<Objective>
   deleteObjective: (id: string) => Promise<void>
   changeObjectiveLevel: (id: string, newLevel: number) => Promise<{ ok: boolean; reason?: string }>
   setCalculatedFreeTime: (minutes: number, date: string) => Promise<void>
-  reconcileWithHistory: (history: BlockingHistoryEntry[], rules: TimeRule[]) => Promise<void>
-  consumeProgressEvent: () => void
 }
 
 function uuid(): string {
@@ -55,7 +44,6 @@ function buildLevelsPayload(state: LevelsStore): LevelsState {
     calculatedDailyFreeMinutes: state.calculatedDailyFreeMinutes,
     calculatedAt: state.calculatedAt,
     lastCalculatedDate: state.lastCalculatedDate,
-    lastProcessedSessionId: state.lastProcessedSessionId,
     lastProcessedAppUsageByApp: {},
   }
 }
@@ -88,20 +76,12 @@ async function persistLevels(state: LevelsStore): Promise<void> {
   }
 }
 
-function durationMinutes(entry: BlockingHistoryEntry): number {
-  const start = new Date(entry.startedAt).getTime()
-  const end = new Date(entry.endedAt).getTime()
-  return Math.max(0, Math.round((end - start) / 60_000))
-}
-
 export const useLevelsStore = create<LevelsStore>((set, get) => ({
   loaded: false,
   objectives: [],
   calculatedDailyFreeMinutes: 0,
   calculatedAt: null,
   lastCalculatedDate: null,
-  lastProcessedSessionId: null,
-  lastProgressEvent: null,
 
   async load() {
     const [objectiveState, levels] = await Promise.all([
@@ -117,7 +97,6 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
       calculatedDailyFreeMinutes: levels?.calculatedDailyFreeMinutes ?? 0,
       calculatedAt: levels?.calculatedAt ?? null,
       lastCalculatedDate: levels?.lastCalculatedDate ?? null,
-      lastProcessedSessionId: levels?.lastProcessedSessionId ?? null,
     })
 
     if (!objectiveState && migratedObjectives.length > 0) {
@@ -199,56 +178,5 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
       lastCalculatedDate: date,
     })
     await persistLevels(get())
-  },
-
-  async reconcileWithHistory(history, rules) {
-    const cursor = get().lastProcessedSessionId
-    const sorted = [...history].sort(
-      (a, b) => new Date(a.endedAt).getTime() - new Date(b.endedAt).getTime(),
-    )
-    const startIndex = cursor ? Math.max(0, sorted.findIndex((h) => h.sessionId === cursor) + 1) : 0
-    const objectiveDeltas = new Map<string, number>()
-    let newCursor = cursor
-
-    for (let i = startIndex; i < sorted.length; i++) {
-      const entry = sorted[i]!
-      newCursor = entry.sessionId
-      if (!entry.completedNormally) continue
-
-      const linkedRuleIds = rules
-        .filter((r) => r.linkedProfileId === entry.profileId)
-        .map((r) => r.id)
-      if (linkedRuleIds.length === 0) continue
-
-      for (const objective of get().objectives) {
-        if (!objective.linkedRuleIds.some((ruleId) => linkedRuleIds.includes(ruleId))) continue
-        objectiveDeltas.set(
-          objective.id,
-          (objectiveDeltas.get(objective.id) ?? 0) + durationMinutes(entry),
-        )
-      }
-    }
-
-    if (newCursor !== cursor) {
-      set({ lastProcessedSessionId: newCursor })
-      await persistLevels(get())
-    }
-
-    const deltas = [...objectiveDeltas.entries()].map(([objectiveId, minutes]) => ({
-      objectiveId,
-      minutes,
-    }))
-    if (deltas.length > 0) {
-      set({
-        lastProgressEvent: {
-          at: new Date().toISOString(),
-          objectiveDeltas: deltas,
-        },
-      })
-    }
-  },
-
-  consumeProgressEvent() {
-    set({ lastProgressEvent: null })
   },
 }))

@@ -11,11 +11,7 @@ type SettingsState = {
   userProfile: 'student' | 'worker' | 'both' | 'other'
   sleepStart: string
   sleepEnd: string
-  sessionRulesEnabled: boolean
   autoSave: boolean
-  browserHistoryScanEnabled: boolean
-  defaultUnlockCooldownMinutes: number
-  defaultUnlockJustificationWords: number
   firstLaunchDate: string | null
   freeTimeLevel: number
   freeTimeLevelChangedAt: string | null
@@ -39,11 +35,7 @@ function buildPayload(state: SettingsState): Settings {
     userProfile: state.userProfile,
     sleepStart: state.sleepStart,
     sleepEnd: state.sleepEnd,
-    sessionRulesEnabled: state.sessionRulesEnabled,
     autoSave: state.autoSave,
-    browserHistoryScanEnabled: state.browserHistoryScanEnabled,
-    defaultUnlockCooldownMinutes: state.defaultUnlockCooldownMinutes,
-    defaultUnlockJustificationWords: state.defaultUnlockJustificationWords,
     firstLaunchDate: state.firstLaunchDate ?? undefined,
     freeTimeLevel: state.freeTimeLevel,
     freeTimeLevelChangedAt: state.freeTimeLevelChangedAt ?? undefined,
@@ -114,11 +106,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   userProfile: 'student',
   sleepStart: '23:30',
   sleepEnd: '07:00',
-  sessionRulesEnabled: true,
   autoSave: true,
-  browserHistoryScanEnabled: false,
-  defaultUnlockCooldownMinutes: 10,
-  defaultUnlockJustificationWords: 50,
   firstLaunchDate: null,
   freeTimeLevel: 5,
   freeTimeLevelChangedAt: null,
@@ -134,11 +122,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       userProfile: data?.userProfile ?? 'student',
       sleepStart: data?.sleepStart ?? '23:30',
       sleepEnd: data?.sleepEnd ?? '07:00',
-      sessionRulesEnabled: data?.sessionRulesEnabled ?? true,
       autoSave: data?.autoSave ?? true,
-      browserHistoryScanEnabled: data?.browserHistoryScanEnabled ?? false,
-      defaultUnlockCooldownMinutes: data?.defaultUnlockCooldownMinutes ?? 10,
-      defaultUnlockJustificationWords: data?.defaultUnlockJustificationWords ?? 50,
       firstLaunchDate: firstLaunch,
       freeTimeLevel: data?.freeTimeLevel ?? 5,
       freeTimeLevelChangedAt: data?.freeTimeLevelChangedAt ?? null,

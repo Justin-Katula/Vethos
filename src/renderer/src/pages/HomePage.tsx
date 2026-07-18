@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, Shield, Clock, Target, BarChart3, Timer } from 'lucide-react'
+import { ArrowRight, Clock, Target, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { TimeCircle } from '@/components/interface/TimeCircle'
 import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
-import { useBlockingStore } from '@/store/blocking.store'
 import { useTasksStore } from '@/store/tasks.store'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
@@ -24,10 +23,6 @@ export default function HomePage() {
   const objectives = useLevelsStore((s) => s.objectives)
   const loadLevels = useLevelsStore((s) => s.load)
   const setCalculatedFreeTime = useLevelsStore((s) => s.setCalculatedFreeTime)
-  const blockingState = useBlockingStore((s) => s.state)
-  const active = useBlockingStore((s) => s.active)
-  const loadBlocking = useBlockingStore((s) => s.load)
-  const blockingLoaded = useBlockingStore((s) => s.loaded)
   const tasks = useTasksStore((s) => s.tasks)
   const loadTasks = useTasksStore((s) => s.load)
   const tasksLoaded = useTasksStore((s) => s.loaded)
@@ -35,9 +30,8 @@ export default function HomePage() {
   useEffect(() => {
     void load()
     if (!levelsLoaded) void loadLevels()
-    if (!blockingLoaded) void loadBlocking()
     if (!tasksLoaded) void loadTasks()
-  }, [load, loadLevels, loadBlocking, loadTasks, levelsLoaded, blockingLoaded, tasksLoaded])
+  }, [load, loadLevels, loadTasks, levelsLoaded, tasksLoaded])
 
   const [now, setNow] = useState(() => new Date())
 
@@ -123,7 +117,6 @@ export default function HomePage() {
   // Tasks accomplished
   const activeTasks = tasks.filter((t) => t.status === 'active')
   const completedToday = tasks.filter((t) => t.status === 'history')
-  const sessionRuleProgress = getSessionRuleProgress(blockingState.history, active, now)
 
   if (!loaded) {
     return (
@@ -338,66 +331,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* ─── E. Bloc règles de session actives ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
-              <div className="flex items-center gap-2">
-                <Clock size={16} />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                  Règles de session actives
-                </h3>
-              </div>
-              <div className="mt-4 space-y-3">
-                <SessionRuleItem
-                  label="Max 4h même projet"
-                  description="Pause 1h obligatoire après"
-                  progress={sessionRuleProgress.sameProject}
-                />
-                <SessionRuleItem
-                  label="Max 6h multi-projets"
-                  description="Pause 2h obligatoire après"
-                  progress={sessionRuleProgress.allProjects}
-                />
-                <div className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-base/50 p-2.5">
-                  <Timer size={14} className="text-orange" />
-                  <div className="text-[10px] text-text-secondary leading-tight">
-                    <strong>Max 2 jours sans temps libre</strong><br/>
-                    3ème jour = temps libre obligatoire
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── F. Bloc blocage ─── */}
-            <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
-              <div className="flex items-center gap-2">
-                <Shield size={16} />
-                <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                  Blocage
-                </h3>
-              </div>
-              {active ? (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 animate-pulse rounded-2xl bg-red-500" />
-                    <span className="text-sm font-semibold text-red-400">BLOCAGE ACTIF</span>
-                  </div>
-                  <div className="text-xs text-text-muted">
-                    Session : {blockingState.profiles.find((p) => p.id === active.profileId)?.name ?? '—'}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-2xl bg-text-muted" />
-                  <span className="text-sm text-text-secondary">Inactif</span>
-                </div>
-              )}
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border-subtle pt-3">
-                <StatMini label="Sites" value={blockingState.profiles.reduce((s, p) => s + p.blockedSites.length, 0)} />
-                <StatMini label="Apps" value={blockingState.profiles.reduce((s, p) => s + p.blockedProcesses.length, 0)} />
-                <StatMini label="Tentatives" value={blockingState.history.length} />
-              </div>
-            </div>
-
             {/* ─── G. Stats rapides ─── */}
             <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
               <div className="flex items-center gap-2">
@@ -407,11 +340,6 @@ export default function HomePage() {
                 </h3>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <StatCard
-                  icon={<Timer size={14} className="text-accent" />}
-                  label="Temps productif"
-                  value={formatProductiveTime(blockingState.history)}
-                />
                 <StatCard
                   icon={<Clock size={14} className="text-yellow" />}
                   label="Temps de travail"
@@ -440,15 +368,6 @@ export default function HomePage() {
 
 // ─── Helper components ──────────────────────────────────────────────────────
 
-function StatMini({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="text-center">
-      <div className="text-lg font-bold tabular-nums text-text-primary">{value}</div>
-      <div className="text-[10px] text-text-muted">{label}</div>
-    </div>
-  )
-}
-
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-2.5 rounded-lg border border-border-subtle bg-bg-base px-3 py-2.5">
@@ -459,82 +378,6 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
       </div>
     </div>
   )
-}
-
-function SessionRuleItem({ label, description, progress }: { label: string; description: string; progress: number }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-medium text-text-primary">{label}</div>
-      </div>
-      <div className="h-1 w-full rounded-2xl bg-bg-base overflow-hidden">
-        <div className="h-full bg-accent" style={{ width: `${progress}%` }} />
-      </div>
-      <div className="text-[10px] text-text-muted">{description}</div>
-    </div>
-  )
-}
-
-function formatProductiveTime(
-  history: Array<{ startedAt: string; endedAt: string; completedNormally: boolean }>,
-): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let totalMin = 0
-  for (const h of history) {
-    if (!h.completedNormally) continue
-    const ended = new Date(h.endedAt)
-    if (ended < today) continue
-    const start = new Date(h.startedAt)
-    totalMin += Math.max(0, Math.round((ended.getTime() - start.getTime()) / 60000))
-  }
-  if (totalMin >= 60) {
-    return `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}`
-  }
-  return `${totalMin}min`
-}
-
-function getSessionRuleProgress(
-  history: Array<{
-    profileId: string
-    startedAt: string
-    endedAt: string
-    completedNormally: boolean
-  }>,
-  active: { profileId: string; startedAt: string } | null,
-  now: Date,
-): { sameProject: number; allProjects: number } {
-  const startOfToday = new Date(now)
-  startOfToday.setHours(0, 0, 0, 0)
-  const byProfile = new Map<string, number>()
-  let allMinutes = 0
-
-  for (const entry of history) {
-    if (!entry.completedNormally) continue
-    const ended = new Date(entry.endedAt)
-    if (ended < startOfToday) continue
-    const minutes = Math.max(
-      0,
-      Math.round((ended.getTime() - new Date(entry.startedAt).getTime()) / 60_000),
-    )
-    allMinutes += minutes
-    byProfile.set(entry.profileId, (byProfile.get(entry.profileId) ?? 0) + minutes)
-  }
-
-  if (active) {
-    const activeMinutes = Math.max(
-      0,
-      Math.round((now.getTime() - new Date(active.startedAt).getTime()) / 60_000),
-    )
-    allMinutes += activeMinutes
-    byProfile.set(active.profileId, (byProfile.get(active.profileId) ?? 0) + activeMinutes)
-  }
-
-  const sameProjectMinutes = Math.max(0, ...byProfile.values())
-  return {
-    sameProject: Math.min(100, Math.round((sameProjectMinutes / 240) * 100)),
-    allProjects: Math.min(100, Math.round((allMinutes / 360) * 100)),
-  }
 }
 
 function displayColorForRule(rule: { color: string; categoryType?: string }) {

@@ -18,7 +18,6 @@ function rule(id: string, categoryType: TimeRule['categoryType']): TimeRule {
     name: categoryType ?? 'custom',
     color: '#3BA3FF',
     categoryType,
-    linkedProfileId: null,
     createdAt: now,
   }
 }

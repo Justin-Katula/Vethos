@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, Check } from 'lucide-react'
-import type { BlockingProfile, TimeRule } from '@shared/schemas'
+import type { TimeRule } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 import { PALETTE, ICON_OPTIONS } from '@/lib/rule-palette'
 import { useShortcut } from '@/lib/use-shortcut'
@@ -12,13 +12,11 @@ type SaveDraft = {
   color: string
   icon?: string
   categoryType?: TimeRule['categoryType']
-  linkedProfileId?: string | null
 }
 
 type Props = {
   open: boolean
   initial: TimeRule | null
-  profiles: BlockingProfile[]
   onClose: () => void
   onSave: (draft: SaveDraft) => Promise<TimeRule>
   onDelete?: (id: string) => Promise<void>
@@ -26,12 +24,11 @@ type Props = {
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
-export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete }: Props) {
+export function RuleEditor({ open, initial, onClose, onSave, onDelete }: Props) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(PALETTE[0]!)
   const [icon, setIcon] = useState<string | undefined>(undefined)
   const [categoryType, setCategoryType] = useState<TimeRule['categoryType']>('custom')
-  const [linkedProfileId, setLinkedProfileId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -45,13 +42,11 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
       setColor(initial.color)
       setIcon(initial.icon)
       setCategoryType(initial.categoryType ?? 'custom')
-      setLinkedProfileId(initial.linkedProfileId)
     } else {
       setName('')
       setColor(PALETTE[0]!)
       setIcon(undefined)
       setCategoryType('custom')
-      setLinkedProfileId(null)
     }
     setError(null)
     setConfirmDelete(false)
@@ -69,7 +64,6 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
         color,
         icon,
         categoryType,
-        linkedProfileId,
       }
       if (initial?.id) draft.id = initial.id
       await onSave(draft)
@@ -219,21 +213,6 @@ export function RuleEditor({ open, initial, profiles, onClose, onSave, onDelete 
                   <option value="work">Travail</option>
                   <option value="commitment">Engagement protégé</option>
                   <option value="free">Temps libre</option>
-                </select>
-              </Field>
-
-              <Field label="Profil de blocage lié" hint="Optionnel — purement informatif (l'auto-déclenchement viendra plus tard)">
-                <select
-                  value={linkedProfileId ?? ''}
-                  onChange={(e) => setLinkedProfileId(e.target.value || null)}
-                  className={inputCls}
-                >
-                  <option value="">Aucun</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
                 </select>
               </Field>
 

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import type { BlockingHistoryEntry, Objective, TimeRule } from '@shared/schemas'
+import type { Objective, TimeRule } from '@shared/schemas'
 import { iconByName } from '@/lib/rule-palette'
 import { daysUntilLevelChange } from '@/lib/free-time-calculator'
 import { cn } from '@/lib/cn'
@@ -8,12 +8,6 @@ import { LevelRing } from './LevelRing'
 type Props = {
   objective: Objective
   rules: TimeRule[]
-  /**
-   * Historique de sessions de blocage. Réservé pour un affichage futur des
-   * minutes effectives sur 7 jours (la fonction `minutesThisWeek` a été
-   * retirée en attendant que la carte affiche cette information).
-   */
-  history: BlockingHistoryEntry[]
   urgency?: 'warning' | 'critical'
   onClick?: () => void
 }
@@ -21,7 +15,6 @@ type Props = {
 export function ObjectiveCard({
   objective,
   rules,
-  history: _history,
   urgency,
   onClick,
 }: Props): JSX.Element {
