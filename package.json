@@ -9,6 +9,8 @@
     "build": "electron-vite build && electron-builder --win --dir && node scripts/build-simple-installer.mjs",
     "build:unpack": "electron-vite build && electron-builder --win --dir",
     "build:portable": "electron-vite build && electron-builder --win portable",
+    "build:sidecar": "node scripts/build-sidecar.mjs",
+    "test:sidecar": "node scripts/build-sidecar.mjs --test",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
