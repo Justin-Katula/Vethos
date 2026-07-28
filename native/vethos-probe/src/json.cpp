@@ -49,6 +49,11 @@ struct Parser {
           case 'u': {
             if (i + 4 > s.size()) return false;
             const std::string hex = s.substr(i, 4);
+            for (const char h : hex) {
+              const bool isHexDigit =
+                  (h >= '0' && h <= '9') || (h >= 'a' && h <= 'f') || (h >= 'A' && h <= 'F');
+              if (!isHexDigit) return false;
+            }
             i += 4;
             const unsigned code = static_cast<unsigned>(std::strtoul(hex.c_str(), nullptr, 16));
             // Encodage UTF-8. Les paires de substitution sont laissees telles

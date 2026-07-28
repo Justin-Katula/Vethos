@@ -49,6 +49,30 @@ static void testParsesEscapes() {
   check(v.stringOr("title", "") == "a\"b\\c\nd", "echappements decodes");
 }
 
+static void testParsesUnicodeEscapes() {
+  vethos::JsonValue v;
+
+  // 1 octet UTF-8 : ASCII pur.
+  check(vethos::parseJson(R"({"t":")" "\x5cu0041" R"("})", v), "echappement unicode 1 octet analyse");
+  check(v.stringOr("t", "") == "A", "echappement unicode 1 octet decode en A");
+
+  // 2 octets UTF-8 : e accent aigu (U+00E9) -> 0xC3 0xA9.
+  check(vethos::parseJson(R"({"t":")" "\x5cu00e9" R"("})", v), "echappement unicode 2 octets analyse");
+  check(v.stringOr("t", "") == std::string("\xC3\xA9"),
+        "echappement unicode 2 octets decode en UTF-8");
+
+  // 3 octets UTF-8 : signe euro (U+20AC) -> 0xE2 0x82 0xAC.
+  check(vethos::parseJson(R"({"t":")" "\x5cu20ac" R"("})", v), "echappement unicode 3 octets analyse");
+  check(v.stringOr("t", "") == std::string("\xE2\x82\xAC"),
+        "echappement unicode 3 octets decode en UTF-8");
+
+  // Chiffres hex invalides : doit etre rejete, pas decode en NUL silencieux.
+  check(!vethos::parseJson(R"({"t":"\uZZZZ"})", v), "echappement unicode invalide (non hex) rejete");
+
+  // Echappement tronque en fin d'entree (moins de 4 chiffres apres \u) : rejete.
+  check(!vethos::parseJson(R"({"t":"\u00)", v), "echappement unicode tronque rejete");
+}
+
 static void testRejectsInvalid() {
   vethos::JsonValue v;
   check(!vethos::parseJson("{\"a\":}", v), "valeur manquante rejetee");
@@ -94,6 +118,7 @@ int main() {
   testParsesStringArray();
   testParsesNestedObject();
   testParsesEscapes();
+  testParsesUnicodeEscapes();
   testRejectsInvalid();
   testEscapesOutput();
   testWritesObject();
