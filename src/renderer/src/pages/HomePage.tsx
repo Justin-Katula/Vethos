@@ -12,10 +12,16 @@ import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import { formatAllocatedTime, computeFreeTimeSlots } from '@/lib/free-time-calculator'
-import { usePlacement, localDateKey } from '@/lib/use-placement'
 import { checkPaletteCollisions } from '@/lib/color-similarity'
 
 const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 export default function HomePage() {
   const { loaded, rules, entries, load } = useScheduleStore()
@@ -55,37 +61,10 @@ export default function HomePage() {
     ? objectives.find((objective) => objective.linkedRuleIds.includes(currentRule.id))
     : undefined
 
-  // ─── CORE: Time distribution via le moteur unifié ───
-  const rangeEnd = useMemo(() => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6)
-    return localDateKey(d)
-  }, [now])
-  const { blocks } = usePlacement(now, rangeEnd)
-
-  const todayMinutesByTask = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const b of blocks) {
-      if (b.date !== todayStr || b.kind !== 'task' || !b.refId) continue
-      m.set(b.refId, (m.get(b.refId) ?? 0) + (b.endMinute - b.startMinute))
-    }
-    return m
-  }, [blocks, todayStr])
-  const todayMinutesByObjective = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const b of blocks) {
-      if (b.date !== todayStr || b.kind !== 'objective' || !b.refId) continue
-      m.set(b.refId, (m.get(b.refId) ?? 0) + (b.endMinute - b.startMinute))
-    }
-    return m
-  }, [blocks, todayStr])
-
-  const totalTodayWorkMinutes = useMemo(
-    () =>
-      blocks
-        .filter((b) => b.date === todayStr && b.kind !== 'free')
-        .reduce((s, b) => s + (b.endMinute - b.startMinute), 0),
-    [blocks, todayStr],
-  )
+  // ─── CORE: Time distribution — moteur de placement supprimé (schema redesign).
+  // Les blocs placés (todayMinutesByTask, todayMinutesByObjective, totalTodayWorkMinutes)
+  // sont retirés tant que le nouveau moteur n'est pas rebâti. On conserve juste
+  // le calcul brut du temps libre pour la persistance des stats.
 
   // Pour la persistance de stats : temps libre brut d'aujourd'hui (somme des
   // créneaux non-préparation), indépendant du nouveau moteur.
@@ -107,12 +86,6 @@ export default function HomePage() {
     if (!loaded || !tasksLoaded) return
     void setCalculatedFreeTime(todayFreeMinutes, todayStr)
   }, [loaded, tasksLoaded, todayFreeMinutes, todayStr, setCalculatedFreeTime])
-
-  // Average level
-  const avgLevel =
-    objectives.length > 0
-      ? objectives.reduce((sum, o) => sum + o.level, 0) / objectives.length
-      : 0
 
   // Tasks accomplished
   const activeTasks = tasks.filter((t) => t.status === 'active')
@@ -173,7 +146,7 @@ export default function HomePage() {
               {currentRule && currentEntry && (
                 <div className="mt-0.5 text-xs text-text-muted">
                   {currentObjective
-                    ? `Niveau ${currentObjective.level.toFixed(1)}${currentObjective.deadline ? ` · ${formatDeadline(currentObjective.deadline)}` : ''}`
+                    ? `${currentObjective.name}`
                     : `${minuteToClockLabel(currentEntry.startMinute)} — ${minuteToClockLabel(currentEntry.endMinute)}`}
                 </div>
               )}
@@ -239,72 +212,9 @@ export default function HomePage() {
               </div>
             )}
 
-            {todayMinutesByObjective.size > 0 && (
-              <div className="mt-8">
-                <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
-                  <Target size={14} />
-                  Répartition par objectif (aujourd&apos;hui)
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {[...todayMinutesByObjective.entries()].map(([objectiveId, minutes]) => {
-                    const obj = objectives.find((o) => o.id === objectiveId)
-                    if (!obj) return null
-                    return (
-                      <div
-                        key={objectiveId}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <span className="h-9 w-1.5 shrink-0 rounded-2xl" style={{ backgroundColor: obj.color }} />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-text-primary">{obj.name}</div>
-                            <div className="mt-0.5 text-[10px] text-text-muted">Niveau {obj.level.toFixed(1)}</div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold tabular-nums text-text-primary">
-                            {formatAllocatedTime(minutes)}
-                          </div>
-                          <div className="text-[10px] text-text-muted">alloué</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {todayMinutesByTask.size > 0 && (
-              <div className="mt-8">
-                <h2 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-text-muted">
-                  <Target size={14} />
-                  Ce que tu dois faire aujourd&apos;hui
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {[...todayMinutesByTask.entries()].map(([taskId, minutes]) => {
-                    const task = tasks.find((t) => t.id === taskId)
-                    if (!task) return null
-                    return (
-                      <div
-                        key={taskId}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-border-subtle bg-bg-card p-4"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-text-primary">{task.title}</div>
-                          <div className="mt-0.5 text-[10px] text-text-muted">Niveau {task.level} · échéance {task.deadline}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold tabular-nums text-text-primary">
-                            {formatAllocatedTime(minutes)}
-                          </div>
-                          <div className="text-[10px] text-text-muted">à travailler</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Sections « répartition par objectif / tâche » retirées :
+                elles dépendaient du moteur de placement (usePlacement) supprimé
+                lors du redesign du schema. Elles seront rebâties plus tard. */}
           </motion.section>
 
           {/* ─── Colonne droite ─── */}
@@ -319,15 +229,14 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-yellow" />
                 <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-                  Temps de travail aujourd&apos;hui
+                  Temps libre aujourd&apos;hui
                 </h3>
               </div>
               <div className="mt-3 text-3xl font-bold tabular-nums text-text-primary">
-                {formatAllocatedTime(totalTodayWorkMinutes)}
+                {formatAllocatedTime(todayFreeMinutes)}
               </div>
               <div className="mt-1 text-xs text-text-muted">
-                Réparti entre {todayMinutesByTask.size + todayMinutesByObjective.size} item
-                {todayMinutesByTask.size + todayMinutesByObjective.size !== 1 ? 's' : ''}
+                Calculé depuis ton emploi du temps.
               </div>
             </div>
 
@@ -342,18 +251,13 @@ export default function HomePage() {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <StatCard
                   icon={<Clock size={14} className="text-yellow" />}
-                  label="Temps de travail"
-                  value={formatAllocatedTime(totalTodayWorkMinutes)}
+                  label="Temps libre"
+                  value={formatAllocatedTime(todayFreeMinutes)}
                 />
                 <StatCard
                   icon={<Target size={14} className="text-cyan" />}
                   label="Tâches"
                   value={`${completedToday.length}/${activeTasks.length + completedToday.length}`}
-                />
-                <StatCard
-                  icon={<BarChart3 size={14} className="text-orange" />}
-                  label="Niveau moyen"
-                  value={avgLevel.toFixed(1)}
                 />
               </div>
             </div>
@@ -386,12 +290,6 @@ function displayColorForRule(rule: { color: string; categoryType?: string }) {
   if (rule.categoryType === 'work') return { color: '#3BA3FF', opacity: 1 }
   if (rule.categoryType === 'free') return { color: 'transparent', opacity: 1 }
   return { color: rule.color, opacity: 1 }
-}
-
-function formatDeadline(deadline: string): string {
-  const [year, month, day] = deadline.split('-')
-  if (!year || !month || !day) return deadline
-  return `${day}/${month}/${year}`
 }
 
 function EmptyHint() {

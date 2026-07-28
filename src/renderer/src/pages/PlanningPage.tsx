@@ -10,12 +10,15 @@ import { useScheduleStore } from '@/store/schedule.store'
 import { useToast } from '@/lib/use-toast'
 import { cn } from '@/lib/cn'
 import type { TimeRule } from '@shared/schemas'
-import { usePlacement, localDateKey } from '@/lib/use-placement'
 import { viewportFromSettings } from '@/lib/calendar-viewport'
 import { useSettingsStore } from '@/store/settings.store'
-import { useLevelsStore } from '@/store/levels.store'
-import { useTasksStore } from '@/store/tasks.store'
-import { loadColor } from '@/lib/load-heatmap'
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 export default function PlanningPage() {
   const {
@@ -36,18 +39,10 @@ export default function PlanningPage() {
 
   const sleepStart = useSettingsStore((s) => s.sleepStart)
   const sleepEnd = useSettingsStore((s) => s.sleepEnd)
-  const tasks = useTasksStore((s) => s.tasks)
-  const objectives = useLevelsStore((s) => s.objectives)
-  const loadTasks = useTasksStore((s) => s.load)
-  const loadLevels = useLevelsStore((s) => s.load)
-  const tasksLoaded = useTasksStore((s) => s.loaded)
-  const levelsLoaded = useLevelsStore((s) => s.loaded)
 
   useEffect(() => {
     void load()
-    if (!tasksLoaded) void loadTasks()
-    if (!levelsLoaded) void loadLevels()
-  }, [load, loadTasks, loadLevels, tasksLoaded, levelsLoaded])
+  }, [load])
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -65,19 +60,6 @@ export default function PlanningPage() {
   }, [now])
 
   const viewport = useMemo(() => viewportFromSettings(sleepStart, sleepEnd), [sleepStart, sleepEnd])
-
-  // Plan opérationnel : aujourd'hui → aujourd'hui + 6.
-  const todayStr = localDateKey(now)
-  const rangeEnd = useMemo(() => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6)
-    return localDateKey(d)
-  }, [now])
-
-  const { blocks: workBlocks } = usePlacement(now, rangeEnd)
-
-  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
-  const objectiveById = useMemo(() => new Map(objectives.map((o) => [o.id, o])), [objectives])
-  void todayStr
 
   const openEditor = (rule: TimeRule | null) => {
     setEditingRule(rule)
@@ -217,10 +199,7 @@ export default function PlanningPage() {
               entries={entries}
               viewport={viewport}
               weekDates={weekDates}
-              workBlocks={workBlocks}
               now={now}
-              taskById={taskById}
-              objectiveById={objectiveById}
               onCreateEntry={handleCreateEntry}
               onUpdateEntry={handleUpdateEntry}
               onChangeRule={handleChangeRule}
@@ -253,22 +232,10 @@ function MonthView({ now }: { now: Date }) {
   const lastDay = new Date(year, month + 1, 0)
   const daysInMonth = lastDay.getDate()
 
-  // Calcul à la demande : tout le mois à partir d'aujourd'hui.
-  const rangeEndStr = localDateKey(lastDay)
-  const { dailyLoad } = usePlacement(now, rangeEndStr)
-
+  // Placement & heatmap supprimés (schema redesign). La vue mois affiche
+  // désormais un simple calendrier sans coloration de charge.
   const todayStr = localDateKey(now)
   const todayDayOfMonth = now.getMonth() === month ? now.getDate() : -1
-  const loadByDate = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const l of dailyLoad) m.set(l.date, l.freeMinutes)
-    return m
-  }, [dailyLoad])
-
-  // Échelle relative sur les jours rendus avec une charge calculée.
-  const futureLoads = dailyLoad.filter((l) => l.date >= todayStr).map((l) => l.freeMinutes)
-  const minFree = futureLoads.length ? Math.min(...futureLoads) : 0
-  const maxFree = futureLoads.length ? Math.max(...futureLoads) : 0
 
   const firstDayOfWeek = (firstDay.getDay() + 6) % 7
 
@@ -307,40 +274,20 @@ function MonthView({ now }: { now: Date }) {
           const isToday = day === todayDayOfMonth
           const dStr = dateStrFor(day)
           const isPast = dStr < todayStr
-          const freeMinutes = loadByDate.get(dStr)
-          const colored = !isPast && freeMinutes !== undefined && futureLoads.length > 0
-          const bgColor = colored ? loadColor(freeMinutes!, minFree, maxFree) + '4D' : undefined
-          const textColor = colored ? loadColor(freeMinutes!, minFree, maxFree) : undefined
           return (
             <motion.div
               key={i}
               whileHover={{ scale: 1.05 }}
               className={cn(
                 'flex h-12 items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                !colored && 'text-text-muted',
+                isPast ? 'text-text-muted' : 'text-text-primary',
                 isToday && 'ring-2 ring-accent ring-offset-1 ring-offset-bg-card',
               )}
-              style={colored ? { backgroundColor: bgColor, color: textColor } : undefined}
             >
               {day}
             </motion.div>
           )
         })}
-      </div>
-
-      <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-text-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#22c55e80' }} /> Peu chargé
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#eab30880' }} /> Moyen
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#f9731680' }} /> Chargé
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-2xl" style={{ backgroundColor: '#ef444480' }} /> Très chargé
-        </span>
       </div>
     </div>
   )

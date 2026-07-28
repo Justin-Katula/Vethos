@@ -112,63 +112,21 @@ export function notifyTaskUrgent(
 }
 
 /**
- * Notifications déclenchées par le système de niveau des tâches (V2 P9).
- * Cinq événements distincts, tous routés via le même IPC `tasks:notify`.
+ * Événements de tâche routés via l'IPC `tasks:notify`.
+ *
+ * Les anciennes variantes liées au système de niveaux (task-hit-zero,
+ * task-forced-three, task-degraded, task-auto-rescued, task-urgent) ont été
+ * supprimées avec le moteur de planification legacy. La notification
+ * d'urgence reste disponible via `notifyTaskUrgent`.
  */
-export type TaskNotifyEvent =
-  | { type: 'task-hit-zero'; taskTitle: string }
-  | { type: 'task-auto-rescued'; taskTitle: string; daysLeft: number }
-  | { type: 'task-forced-three'; taskTitle: string }
-  | { type: 'task-degraded'; taskTitle: string; newLevel: number }
-  | { type: 'task-urgent'; taskTitle: string; daysLeft: number }
+export type TaskNotifyEvent = {
+  type: never
+}
 
 export function notifyTaskEvent(
-  event: TaskNotifyEvent,
-  getMainWindow: () => BrowserWindow | null,
+  _event: TaskNotifyEvent,
+  _getMainWindow: () => BrowserWindow | null,
 ): void {
-  switch (event.type) {
-    case 'task-hit-zero':
-      sendNativeNotification(
-        {
-          title: 'Tâche au niveau zéro',
-          body: `"${event.taskTitle}" est tombée à 0. Reprends-la avant qu'il soit trop tard.`,
-          payload: event as unknown as Record<string, unknown>,
-        },
-        getMainWindow,
-      )
-      return
-    case 'task-auto-rescued':
-      sendNativeNotification(
-        {
-          title: 'Tâche relancée automatiquement',
-          body: `"${event.taskTitle}" a été remontée au niveau 1 (deadline dans ${event.daysLeft} jours).`,
-          payload: event as unknown as Record<string, unknown>,
-        },
-        getMainWindow,
-      )
-      return
-    case 'task-forced-three':
-      sendNativeNotification(
-        {
-          title: 'Tâche urgente forcée au niveau 3',
-          body: `"${event.taskTitle}" est due dans moins d'un jour. Vethos l'a forcée au niveau 3.`,
-          payload: event as unknown as Record<string, unknown>,
-        },
-        getMainWindow,
-      )
-      return
-    case 'task-degraded':
-      sendNativeNotification(
-        {
-          title: 'Tâche dégradée',
-          body: `"${event.taskTitle}" est passée au niveau ${event.newLevel}.`,
-          payload: event as unknown as Record<string, unknown>,
-        },
-        getMainWindow,
-      )
-      return
-    case 'task-urgent':
-      notifyTaskUrgent(event.taskTitle, event.daysLeft, getMainWindow)
-      return
-  }
+  // Plus aucun variant actif. La fonction est conservée pour préserver le
+  // contrat IPC `tasks:notify` ; elle n'émet plus rien.
 }

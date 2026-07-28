@@ -13,8 +13,6 @@ type SettingsState = {
   sleepEnd: string
   autoSave: boolean
   firstLaunchDate: string | null
-  freeTimeLevel: number
-  freeTimeLevelChangedAt: string | null
   loaded: boolean
 
   load: () => Promise<void>
@@ -37,8 +35,6 @@ function buildPayload(state: SettingsState): Settings {
     sleepEnd: state.sleepEnd,
     autoSave: state.autoSave,
     firstLaunchDate: state.firstLaunchDate ?? undefined,
-    freeTimeLevel: state.freeTimeLevel,
-    freeTimeLevelChangedAt: state.freeTimeLevelChangedAt ?? undefined,
   }
 }
 
@@ -108,8 +104,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   sleepEnd: '07:00',
   autoSave: true,
   firstLaunchDate: null,
-  freeTimeLevel: 5,
-  freeTimeLevelChangedAt: null,
   loaded: false,
 
   async load() {
@@ -124,8 +118,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       sleepEnd: data?.sleepEnd ?? '07:00',
       autoSave: data?.autoSave ?? true,
       firstLaunchDate: firstLaunch,
-      freeTimeLevel: data?.freeTimeLevel ?? 5,
-      freeTimeLevelChangedAt: data?.freeTimeLevelChangedAt ?? null,
       loaded: true,
     })
     // Enregistrer la date du premier lancement si pas encore fait

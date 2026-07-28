@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import { Task } from '@shared/schemas'
-import { getDeadlineMultiplier } from '@/lib/free-time-calculator'
 
 type Props = {
   tasks: Task[]
@@ -24,13 +23,12 @@ export function TasksTable({ tasks }: Props) {
         <thead className="bg-bg-base/50 text-[10px] uppercase tracking-widest text-text-muted">
           <tr>
             <th className="px-5 py-3 font-medium">Tâche</th>
-            <th className="px-5 py-3 font-medium text-center">Niveau</th>
+            <th className="px-5 py-3 font-medium text-center">Importance</th>
             <th className="px-5 py-3 font-medium text-right">Deadline</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border-subtle">
           {activeTasks.map((task) => {
-            const multiplier = getDeadlineMultiplier(task.deadline, today)
             const diffDays = Math.ceil(
               (new Date(task.deadline).getTime() - new Date(today).getTime()) /
                 (1000 * 60 * 60 * 24),
@@ -39,6 +37,8 @@ export function TasksTable({ tasks }: Props) {
             let deadlineLabel = `${diffDays} jours`
             if (diffDays <= 0) deadlineLabel = 'En retard'
             if (diffDays === 1) deadlineLabel = 'Demain'
+
+            const urgency = diffDays <= 1 ? 'text-red-500' : diffDays <= 3 ? 'text-orange' : 'text-text-secondary'
 
             return (
               <motion.tr
@@ -56,17 +56,15 @@ export function TasksTable({ tasks }: Props) {
                   <div className="flex flex-col items-center gap-1">
                     <div className="h-1 w-16 rounded-2xl bg-bg-base overflow-hidden">
                       <div
-                        className={`h-full ${task.level >= 6 ? 'bg-red-500' : task.level >= 4 ? 'bg-yellow' : 'bg-emerald-500'}`}
-                        style={{ width: `${(task.level / 10) * 100}%` }}
+                        className={`h-full ${task.importance >= 7 ? 'bg-red-500' : task.importance >= 4 ? 'bg-yellow' : 'bg-emerald-500'}`}
+                        style={{ width: `${(task.importance / 10) * 100}%` }}
                       />
                     </div>
-                    <span className="text-[10px] font-bold text-text-secondary">{task.level}</span>
+                    <span className="text-[10px] font-bold text-text-secondary">{task.importance}</span>
                   </div>
                 </td>
                 <td className="px-5 py-4 text-right">
-                  <span
-                    className={`text-xs font-bold ${multiplier >= 2.0 ? 'text-red-500' : multiplier >= 1.6 ? 'text-orange' : 'text-text-secondary'}`}
-                  >
+                  <span className={`text-xs font-bold ${urgency}`}>
                     {deadlineLabel}
                   </span>
                 </td>

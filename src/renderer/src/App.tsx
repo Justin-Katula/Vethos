@@ -10,26 +10,16 @@ import { useAuthStore } from './store/auth.store'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
 import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
-import { useLevelsStore } from './store/levels.store'
 import { useDeclaredAppsStore } from './store/declared-apps.store'
 import { useTasksStore } from './store/tasks.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
-import { computeFreeTimeSlots } from './lib/free-time-calculator'
-import { jsDateToDayOfWeek } from './lib/schedule-selectors'
 import HomePage from './pages/HomePage'
 import ObjectivesPage from './pages/ObjectivesPage'
 import PlanningPage from './pages/PlanningPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
 import AuthPage from './pages/AuthPage'
-
-function localDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 export default function App(): JSX.Element {
   const authLoaded = useAuthStore((s) => s.loaded)
@@ -40,17 +30,8 @@ export default function App(): JSX.Element {
   const loadSettings = useSettingsStore((s) => s.load)
 
   const loadSchedule = useScheduleStore((s) => s.load)
-  const scheduleLoaded = useScheduleStore((s) => s.loaded)
-  const scheduleRules = useScheduleStore((s) => s.rules)
-  const scheduleEntries = useScheduleStore((s) => s.entries)
-  const loadLevels = useLevelsStore((s) => s.load)
-  const levelsLoaded = useLevelsStore((s) => s.loaded)
-  const lastCalculatedDate = useLevelsStore((s) => s.lastCalculatedDate)
-  const setCalculatedFreeTime = useLevelsStore((s) => s.setCalculatedFreeTime)
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
   const loadTasks = useTasksStore((s) => s.load)
-  const reconcileLevelZero = useTasksStore((s) => s.reconcileLevelZero)
-  const tasksLoaded = useTasksStore((s) => s.loaded)
   const toast = useToast()
 
   // Boot — charge tous les stores au montage
@@ -58,41 +39,9 @@ export default function App(): JSX.Element {
     void loadAuth()
     void loadSettings()
     void loadSchedule()
-    void loadLevels()
     void loadDeclaredApps()
     void loadTasks()
-  }, [loadAuth, loadSettings, loadSchedule, loadLevels, loadDeclaredApps, loadTasks])
-
-  // V2 P9 — Réconciliation niveau-0 au boot (une fois tasks chargées)
-  useEffect(() => {
-    if (!tasksLoaded) return
-    const today = new Date()
-    const y = today.getFullYear()
-    const m = String(today.getMonth() + 1).padStart(2, '0')
-    const d = String(today.getDate()).padStart(2, '0')
-    void reconcileLevelZero(`${y}-${m}-${d}`)
-  }, [tasksLoaded, reconcileLevelZero])
-
-  // V2 P1 — Le temps libre est recalculé au boot si la date locale a changé,
-  // sans dépendre d'une visite de la page d'accueil.
-  useEffect(() => {
-    if (!scheduleLoaded || !levelsLoaded || !tasksLoaded) return
-    const today = new Date()
-    const todayStr = localDateKey(today)
-    if (lastCalculatedDate === todayStr) return
-    const todayDow = jsDateToDayOfWeek(today)
-    const slots = computeFreeTimeSlots(todayDow, scheduleEntries, scheduleRules)
-    const freeMinutes = slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
-    void setCalculatedFreeTime(freeMinutes, todayStr)
-  }, [
-    scheduleLoaded,
-    levelsLoaded,
-    tasksLoaded,
-    lastCalculatedDate,
-    scheduleEntries,
-    scheduleRules,
-    setCalculatedFreeTime,
-  ])
+  }, [loadAuth, loadSettings, loadSchedule, loadDeclaredApps, loadTasks])
 
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {

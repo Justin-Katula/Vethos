@@ -5,7 +5,6 @@ import type {
   Objective,
   ObjectivesState,
 } from '@shared/schemas'
-import { canChangeLevel, clampManualLevelChange } from '@/lib/free-time-calculator'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { useToastStore } from './toast.store'
 
@@ -16,8 +15,7 @@ type SaveObjectiveDraft = {
   color: string
   icon?: string
   linkedRuleIds?: string[]
-  level?: number
-  deadline?: string
+  weeklyTargetMinutes?: number
   protectedCommitments?: string[]
 }
 
@@ -31,7 +29,6 @@ type LevelsStore = {
   load: () => Promise<void>
   saveObjective: (draft: SaveObjectiveDraft) => Promise<Objective>
   deleteObjective: (id: string) => Promise<void>
-  changeObjectiveLevel: (id: string, newLevel: number) => Promise<{ ok: boolean; reason?: string }>
   setCalculatedFreeTime: (minutes: number, date: string) => Promise<void>
 }
 
@@ -118,7 +115,6 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
         description: draft.description,
         color: draft.color,
         icon: draft.icon,
-        deadline: draft.deadline || undefined,
         protectedCommitments: draft.protectedCommitments ?? objectives[i]!.protectedCommitments,
         linkedRuleIds: draft.linkedRuleIds ?? objectives[i]!.linkedRuleIds,
       }
@@ -131,8 +127,7 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
         color: draft.color,
         icon: draft.icon,
         linkedRuleIds: draft.linkedRuleIds ?? [],
-        level: draft.level ?? 5,
-        deadline: draft.deadline || undefined,
+        weeklyTargetMinutes: draft.weeklyTargetMinutes ?? 300,
         protectedCommitments: draft.protectedCommitments,
         createdAt: now,
       }
@@ -147,27 +142,6 @@ export const useLevelsStore = create<LevelsStore>((set, get) => ({
     const objectives = get().objectives.filter((o) => o.id !== id)
     set({ objectives })
     await persistObjectives(objectives)
-  },
-
-  async changeObjectiveLevel(id, newLevel) {
-    const objectives = get().objectives.slice()
-    const i = objectives.findIndex((o) => o.id === id)
-    if (i < 0) return { ok: false, reason: 'Objectif introuvable' }
-
-    const obj = objectives[i]!
-    if (!canChangeLevel(obj.lastLevelChangeAt)) {
-      return { ok: false, reason: 'Tu dois attendre 2 jours entre chaque modification de niveau.' }
-    }
-
-    objectives[i] = {
-      ...obj,
-      level: clampManualLevelChange(obj.level, newLevel),
-      lastLevelChangeAt: new Date().toISOString(),
-    }
-
-    set({ objectives })
-    await persistObjectives(objectives)
-    return { ok: true }
   },
 
   async setCalculatedFreeTime(minutes, date) {

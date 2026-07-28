@@ -50,7 +50,8 @@ export default function ObjectivesPage(): JSX.Element {
   const sorted = useMemo(
     () =>
       [...objectives].sort((a, b) => {
-        if (b.level !== a.level) return b.level - a.level
+        if (b.weeklyTargetMinutes !== a.weeklyTargetMinutes)
+          return b.weeklyTargetMinutes - a.weeklyTargetMinutes
         return a.createdAt.localeCompare(b.createdAt)
       }),
     [objectives],

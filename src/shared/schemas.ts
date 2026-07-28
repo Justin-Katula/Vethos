@@ -15,6 +15,8 @@ export const STORAGE_KEYS = [
   'declared_app_usage',
   'tasks',
   'auth',
+  'ancres',
+  'learning',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -35,10 +37,6 @@ export const SettingsSchema = z.object({
   autoSave: z.boolean().optional(),
   /** Date du premier lancement (pour la première semaine). */
   firstLaunchDate: z.string().datetime().optional(),
-  /** Niveau du temps libre (4–7) : concourt avec les tâches/objectifs pour le temps. */
-  freeTimeLevel: z.number().int().min(4).max(7).optional(),
-  /** Date du dernier changement du niveau de temps libre (cooldown 2 semaines). */
-  freeTimeLevelChangedAt: z.string().datetime().optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -113,20 +111,45 @@ export const ObjectiveSchema = z.object({
   color: z.string().regex(HEX_COLOR_REGEX),
   icon: z.string().min(1).max(40).optional(),
   linkedRuleIds: z.array(z.string().uuid()),
-  /** Niveau manuel (3 à 7 par défaut, jusqu'à 10). */
-  level: z.number().min(0).max(10).default(5),
-  /** Optional ISO date used as context; task deadlines drive the main distribution. */
-  deadline: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+  /** Cible hebdomadaire en minutes, déclarée une fois par l'utilisateur. (D.4)
+   *  Un objectif ne peut JAMAIS avoir de deadline — règle absolue (D.4, critère 5). */
+  weeklyTargetMinutes: z.number().int().min(0).max(6000).default(300),
   /** Activités personnelles que l'utilisateur veut préserver autour de cet objectif. */
   protectedCommitments: z.array(z.string().min(1).max(80)).max(12).optional(),
-  /** Date du dernier changement de niveau (cooldown 2 jours). */
-  lastLevelChangeAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
 })
 export type Objective = z.infer<typeof ObjectiveSchema>
+
+// ─── Ancres (Partie D.3 — heure fixe, ne bouge jamais) ────────────────────
+//
+// Une ancre est une habitude fixe à heure précise (ex: sport à 18h, méditation
+// à 7h). Contrairement aux ScheduleEntry (qui modelisent l'emploi du temps
+// fixe sommeil/école/travail), les ancres sont des engagements personnels avec
+// une version minimale calculée (D.3).
+// Règle absolue : deux ancres ne peuvent jamais occuper le même créneau.
+
+export const AncreSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(60),
+  color: z.string().regex(HEX_COLOR_REGEX),
+  /** Description du déclencheur (ex: "sport", "méditation", "lecture"). */
+  trigger: z.string().min(1).max(80),
+  /** Minute de la journée (0-1439) où l'ancre est placée. Heure fixe, ne bouge jamais. */
+  anchorMinute: z.number().int().min(0).max(1439),
+  /** Jours de la semaine où l'ancre est active (0=lundi ... 6=dimanche). */
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  /** Durée normale maximale en minutes. */
+  normalMaxMinutes: z.number().int().min(15).max(480).default(60),
+  /** Version minimale calculée (D.3) : MAX(20 min, 40% × normalMaxMinutes). */
+  minimumMinutes: z.number().int().min(20).max(480).default(24),
+  createdAt: z.string().datetime(),
+})
+export type Ancre = z.infer<typeof AncreSchema>
+
+export const AncresStateSchema = z.object({
+  ancres: z.array(AncreSchema),
+})
+export type AncresState = z.infer<typeof AncresStateSchema>
 
 export const ObjectivesStateSchema = z.object({
   objectives: z.array(ObjectiveSchema),
@@ -139,15 +162,17 @@ export const TaskSchema = z.object({
   linkedObjectiveId: z.string().uuid().nullable(),
   /** Deadline ISO date string (YYYY-MM-DD) */
   deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  /** Level of the task. Can go down to 0 */
-  level: z.number().min(0).max(10).default(5),
-  /** Automatic degradation buffer: +0.5 per well-worked day, -1 level when >= 1. */
-  degradationPool: z.number().min(0).default(0),
-  /** Total automatic degradation already applied. Hard-capped at 5. */
-  totalDegradation: z.number().min(0).max(5).default(0),
+  /** Importance déclarée UNE SEULE FOIS par l'utilisateur à la création (1-10). Jamais recalculée. (C.1.1) */
+  importance: z.number().int().min(1).max(10).default(5),
+  /** Catégorie de travail (ex: "maths", "codage", "rédaction"). Utilisée pour le facteur de correction (B.1). */
+  category: z.string().max(60).optional(),
+  /** Estimation de durée par l'utilisateur, en minutes. (B.1/B.3) */
+  estimatedMinutes: z.number().int().min(1).max(1440).default(60),
+  /** Travail restant en minutes (diminue au fil des sessions). (C.1) */
+  remainingMinutes: z.number().int().min(0).default(60),
+  /** Facteur de correction calculé (B.1). Défaut selon B.3 tant que <5 tâches complétées. */
+  correctionFactor: z.number().min(0.5).max(3).default(1.4),
   status: z.enum(['active', 'history']),
-  /** Date du dernier changement de niveau (cooldown 2 jours). */
-  lastLevelChangeAt: z.string().datetime().optional(),
   createdAt: z.string().datetime(),
 })
 export type Task = z.infer<typeof TaskSchema>
@@ -209,6 +234,29 @@ export const DeclaredAppUsageStateSchema = z.object({
 })
 export type DeclaredAppUsageState = z.infer<typeof DeclaredAppUsageStateSchema>
 
+// ─── Learning (Partie G — observations pour l'apprentissage) ──────────────
+
+export const LearningObservationSchema = z.object({
+  /** Soit une complétion de tâche (durée estimée vs réelle), soit une observation de bloc. */
+  taskId: z.string().uuid().optional(),
+  category: z.string().max(60).optional(),
+  estimatedMinutes: z.number().int().min(1).optional(),
+  actualMinutes: z.number().int().min(1).optional(),
+  /** Heure de la journée (0-23) où le bloc a commencé. */
+  startHour: z.number().int().min(0).max(23).optional(),
+  /** Le bloc a-t-il été complété (true) ou interrompu (false) ? */
+  completed: z.boolean().optional(),
+  createdAt: z.string().datetime(),
+})
+export type LearningObservation = z.infer<typeof LearningObservationSchema>
+
+export const LearningStateSchema = z.object({
+  observations: z.array(LearningObservationSchema).max(10000).default([]),
+  /** Compteur de ratés par ancre (ancreId → nombre de ratés consécutifs). */
+  anchorMissCounts: z.record(z.string(), z.number().int().min(0)).default({}),
+})
+export type LearningState = z.infer<typeof LearningStateSchema>
+
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
@@ -220,4 +268,6 @@ export const STORAGE_SCHEMAS = {
   declared_app_usage: DeclaredAppUsageStateSchema,
   tasks: TasksStateSchema,
   auth: AuthStateSchema,
+  ancres: AncresStateSchema,
+  learning: LearningStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

@@ -5,7 +5,6 @@ import { PageTransition } from '@/components/PageTransition'
 import { PageSkeleton, SkeletonCard } from '@/components/ui/Skeleton'
 import { useTasksStore } from '@/store/tasks.store'
 import { useLevelsStore } from '@/store/levels.store'
-import { daysUntilLevelChange, getDeadlineMultiplier } from '@/lib/free-time-calculator'
 import type { Objective, Task } from '@shared/schemas'
 import { cn } from '@/lib/cn'
 
@@ -13,7 +12,7 @@ type TaskDraft = {
   id?: string
   title: string
   deadline: string
-  level: number
+  importance: number
   linkedObjectiveId: string | null
 }
 
@@ -170,12 +169,11 @@ function TaskCard({
   const diffDays = Math.ceil(
     (new Date(task.deadline).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24),
   )
-  const multiplier = getDeadlineMultiplier(task.deadline, today)
-  const cooldownDays = daysUntilLevelChange(task.lastLevelChangeAt)
 
   let dlLabel = `${diffDays} jours`
   if (diffDays <= 0) dlLabel = 'En retard'
   else if (diffDays === 1) dlLabel = 'Demain'
+  const urgencyColor = diffDays <= 1 ? '#ef4444' : diffDays <= 3 ? '#FF8A00' : '#8E9BAE'
 
   return (
     <div className="group relative flex flex-col gap-4 rounded-xl border border-border-subtle bg-bg-elevated p-5 shadow-card transition-colors hover:border-border-strong">
@@ -207,35 +205,32 @@ function TaskCard({
 
       <div className="flex items-center gap-4 border-t border-border-subtle pt-4">
         <div className="flex flex-1 items-center gap-3">
-          <div className="text-[10px] uppercase tracking-widest text-text-muted">Niveau</div>
+          <div className="text-[10px] uppercase tracking-widest text-text-muted">Importance</div>
           <div className="flex flex-1 items-center gap-2">
             <div className="h-1.5 w-full rounded-full bg-bg-base overflow-hidden">
               <div
                 className={cn(
                   'h-full',
-                  task.level >= 6 ? 'bg-red-500' : task.level >= 4 ? 'bg-yellow' : 'bg-emerald-500',
+                  task.importance >= 7
+                    ? 'bg-red-500'
+                    : task.importance >= 4
+                      ? 'bg-yellow'
+                      : 'bg-emerald-500',
                 )}
-                style={{ width: `${(task.level / 10) * 100}%` }}
+                style={{ width: `${(task.importance / 10) * 100}%` }}
               />
             </div>
-            <span className="text-xs font-bold text-text-primary tabular-nums">{task.level}</span>
+            <span className="text-xs font-bold text-text-primary tabular-nums">{task.importance}</span>
           </div>
         </div>
         <div
           className="flex items-center gap-1.5 rounded-md bg-bg-base px-2.5 py-1 text-xs font-medium"
-          style={{
-            color: multiplier >= 2.0 ? '#ef4444' : multiplier >= 1.6 ? '#FF8A00' : '#8E9BAE',
-          }}
+          style={{ color: urgencyColor }}
         >
           <Clock size={12} />
           {dlLabel}
         </div>
       </div>
-      {cooldownDays > 0 && (
-        <div className="rounded-md border border-orange/30 bg-orange/10 px-3 py-2 text-[10px] font-medium text-orange">
-          Impossible de redescendre avant {cooldownDays} jour{cooldownDays > 1 ? 's' : ''}.
-        </div>
-      )}
     </div>
   )
 }
@@ -257,7 +252,7 @@ function TaskEditor({
 }) {
   const [title, setTitle] = useState('')
   const [deadline, setDeadline] = useState('')
-  const [level, setLevel] = useState(5)
+  const [importance, setImportance] = useState(5)
   const [linkedObjectiveId, setLinkedObjectiveId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -266,12 +261,12 @@ function TaskEditor({
     if (initial) {
       setTitle(initial.title)
       setDeadline(initial.deadline || '')
-      setLevel(initial.level)
+      setImportance(initial.importance)
       setLinkedObjectiveId(initial.linkedObjectiveId)
     } else {
       setTitle('')
       setDeadline(new Date().toISOString().split('T')[0] || '')
-      setLevel(5)
+      setImportance(5)
       setLinkedObjectiveId(null)
     }
   }, [open, initial])
@@ -285,7 +280,7 @@ function TaskEditor({
         id: initial?.id,
         title: title.trim(),
         deadline,
-        level,
+        importance,
         linkedObjectiveId,
       })
       onClose()
@@ -362,23 +357,23 @@ function TaskEditor({
               </div>
               <div>
                 <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted mb-2">
-                  Niveau (Importance)
+                  Importance
                 </label>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl font-bold text-text-primary">{level}</span>
+                  <span className="text-2xl font-bold text-text-primary">{importance}</span>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${importance === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}
                   >
-                    {level === 5 ? 'Recommandé' : 'Manuel'}
+                    {importance === 5 ? 'Recommandé' : 'Manuel'}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min="0"
+                  min="1"
                   max="10"
                   step="1"
-                  value={level}
-                  onChange={(e) => setLevel(parseInt(e.target.value))}
+                  value={importance}
+                  onChange={(e) => setImportance(parseInt(e.target.value))}
                   className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
                 />
               </div>

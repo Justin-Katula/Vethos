@@ -4,7 +4,6 @@ import {
   RefreshCw,
   Moon,
   FileText,
-  Sparkles,
 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useSettingsStore } from '@/store/settings.store'
@@ -12,10 +11,6 @@ import { useOnboardingStore } from '@/store/onboarding.store'
 import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
 import { nexus } from '@/lib/ipc'
-import {
-  canChangeFreeTimeLevel,
-  daysUntilFreeTimeLevelChange,
-} from '@/lib/placement-engine'
 
 export default function SettingsPage() {
   const {
@@ -23,8 +18,6 @@ export default function SettingsPage() {
     savedAt,
     sleepStart,
     sleepEnd,
-    freeTimeLevel,
-    freeTimeLevelChangedAt,
     loaded,
     load,
     save,
@@ -45,10 +38,6 @@ export default function SettingsPage() {
   }, [loaded, username])
 
   const dirty = draft !== username
-
-  const now = new Date()
-  const canChangeLevel = canChangeFreeTimeLevel(freeTimeLevelChangedAt ?? undefined, now)
-  const daysLeft = daysUntilFreeTimeLevelChange(freeTimeLevelChangedAt ?? undefined, now)
 
   const handleSave = async () => {
     setSaving(true)
@@ -148,52 +137,6 @@ export default function SettingsPage() {
               />
             </div>
             <span className="ml-auto text-xs text-text-muted">{sleepStart} — {sleepEnd}</span>
-          </div>
-        </section>
-
-        {/* --- Niveau de temps libre --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Niveau de temps libre
-          </h2>
-          <div className="rounded-lg border border-border-subtle bg-bg-card px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                <Sparkles size={18} />
-              </div>
-              <p className="text-xs text-text-muted">
-                Détermine la part de temps qui te reste vraiment libre, en concurrence avec tes tâches et objectifs. Plus haut = plus de repos. Modifiable une fois toutes les 2 semaines.
-              </p>
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              {([4, 5, 6, 7] as const).map((lvl) => (
-                <button
-                  key={lvl}
-                  type="button"
-                  disabled={!canChangeLevel}
-                  onClick={() =>
-                    void updateSettings({
-                      freeTimeLevel: lvl,
-                      freeTimeLevelChangedAt: new Date().toISOString(),
-                    })
-                  }
-                  className={cn(
-                    'h-10 w-10 rounded-lg border text-sm font-semibold transition-colors',
-                    freeTimeLevel === lvl
-                      ? 'border-accent bg-accent text-white'
-                      : 'border-border-subtle bg-bg-base text-text-secondary hover:border-border-strong',
-                    !canChangeLevel && 'cursor-not-allowed opacity-50',
-                  )}
-                >
-                  {lvl}
-                </button>
-              ))}
-            </div>
-            {!canChangeLevel && (
-              <p className="mt-3 text-[10px] text-text-muted">
-                Verrouillé. Modifiable dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}.
-              </p>
-            )}
           </div>
         </section>
 

@@ -41,8 +41,7 @@ export function ObjectiveStep({
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(initialColor)
   const [linkedRuleIds, setLinkedRuleIds] = useState<string[]>(preselectedRuleIds)
-  const [level, setLevel] = useState(5)
-  const [deadline, setDeadline] = useState('')
+  const [weeklyTargetMinutes, setWeeklyTargetMinutes] = useState(300)
   const [selectedCommitments, setSelectedCommitments] = useState<string[]>([])
   const [customCommitments, setCustomCommitments] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
@@ -80,8 +79,7 @@ export function ObjectiveStep({
             description: description.trim() || undefined,
             color,
             linkedRuleIds,
-            level,
-            deadline: deadline || undefined,
+            weeklyTargetMinutes,
             protectedCommitments,
           })
         } catch (err) {
@@ -96,8 +94,7 @@ export function ObjectiveStep({
     description,
     color,
     linkedRuleIds,
-    level,
-    deadline,
+    weeklyTargetMinutes,
     protectedCommitments,
     saveObjective,
   ])
@@ -127,8 +124,7 @@ export function ObjectiveStep({
         description: description.trim() || undefined,
         color,
         linkedRuleIds,
-        level,
-        deadline: deadline || undefined,
+        weeklyTargetMinutes,
         protectedCommitments,
       })
       setSavedId(created.id)
@@ -306,40 +302,19 @@ export function ObjectiveStep({
 
         <div className="space-y-4 pt-2">
           <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
-            Intensité (Niveau recommandé: 5)
-          </label>
-          <div className="flex items-center justify-between">
-             <span className="text-3xl font-bold text-text-primary">{level}</span>
-             <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${level === 5 ? 'bg-accent/20 text-accent' : 'bg-bg-base text-text-muted'}`}>
-                {level === 5 ? 'Recommandé' : 'Manuel'}
-             </span>
-          </div>
-          <input
-            type="range"
-            min="3"
-            max="7"
-            step="1"
-            value={level}
-            onChange={(e) => setLevel(parseInt(e.target.value))}
-            className="w-full accent-accent h-1.5 rounded-2xl bg-bg-base appearance-none cursor-pointer"
-          />
-          <div className="flex justify-between text-[10px] text-text-muted font-mono">
-            <span>3</span>
-            <span>4</span>
-            <span className="text-accent font-bold">5</span>
-            <span>6</span>
-            <span>7</span>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
-            Deadline optionnelle
+            Cible hebdomadaire (minutes)
           </label>
           <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
+            type="number"
+            min={0}
+            max={6000}
+            step={15}
+            value={weeklyTargetMinutes}
+            onChange={(e) =>
+              setWeeklyTargetMinutes(
+                Math.max(0, Math.min(6000, parseInt(e.target.value) || 0)),
+              )
+            }
             className="mt-2 w-full rounded-lg border border-border-subtle bg-bg-base px-4 py-3 text-sm text-text-primary outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
           />
         </div>
