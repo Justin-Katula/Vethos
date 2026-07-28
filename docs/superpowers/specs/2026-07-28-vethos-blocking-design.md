@@ -418,13 +418,37 @@ l'overlay reste détruit et la fenêtre redevient normale. Vethos ne force jamai
 
 ### 8.1 Zone de notification
 
-- `✕` sur la fenêtre principale : `event.preventDefault()` puis masquage.
-  `window-all-closed` (aujourd'hui `src/main/index.ts:132` → `app.quit()`) ne
+**« Fermer la fenêtre » et « quitter l'application » sont deux actions
+distinctes.** La confusion entre les deux est le piège de conception de cette
+section.
+
+| Action | Effet visible | Processus | Blocage |
+|---|---|---|---|
+| `✕` sur la fenêtre | La fenêtre disparaît de l'écran, de la barre des tâches et de l'Alt+Tab | continue | continue |
+| « Quitter Vethos » (menu zone de notification) | Idem | s'arrête | s'arrête |
+
+L'utilisateur n'est **jamais** contraint de garder Vethos visible. Le bouton `✕`
+se comporte exactement comme dans n'importe quelle application : il ferme la
+fenêtre. C'est le modèle de Discord, Spotify, Steam ou d'un antivirus.
+
+Pendant une session de blocage, ce que l'utilisateur voit se limite à :
+
+- rien, tant qu'il ne lance pas une application bloquée ;
+- une icône dans la zone de notification, qu'il peut masquer via les réglages
+  Windows ;
+- la page de blocage **uniquement** au lancement d'une application bloquée.
+
+Mise en œuvre :
+
+- `✕` : `event.preventDefault()` sur `close`, puis `win.hide()`. La fenêtre est
+  masquée, pas détruite — sa réouverture est instantanée.
+- `window-all-closed` (aujourd'hui `src/main/index.ts:132` → `app.quit()`) ne
   quitte plus.
 - Menu de la zone de notification : « Ouvrir Vethos », séparateur,
   « Quitter Vethos ».
 - **« Quitter Vethos » est refusé pendant une session active**, avec un message
-  clair. Hors session, il quitte normalement.
+  clair. Hors session, il quitte normalement — via la commande `shutdown` du
+  §5.2, pour ne pas déclencher la relance.
 - Le vidage des écritures différées existant (`before-quit`,
   `src/main/index.ts:147`) est conservé et adapté au cas où aucune fenêtre
   n'existe.
