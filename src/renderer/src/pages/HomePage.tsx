@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, Clock, Target, BarChart3 } from 'lucide-react'
+import { ArrowRight, Clock, Target, BarChart3, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageTransition } from '@/components/PageTransition'
 import { TimeCircle } from '@/components/interface/TimeCircle'
@@ -8,11 +8,14 @@ import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
 import { useLevelsStore } from '@/store/levels.store'
 import { useTasksStore } from '@/store/tasks.store'
+import { usePlanning } from '@/lib/use-planning'
 import { entriesForDay, jsDateToDayOfWeek } from '@/lib/schedule-selectors'
 import { minuteToClockLabel, durationLabel } from '@/lib/format-time'
 import { iconByName } from '@/lib/rule-palette'
 import { formatAllocatedTime, computeFreeTimeSlots } from '@/lib/free-time-calculator'
 import { checkPaletteCollisions } from '@/lib/color-similarity'
+import { cn } from '@/lib/cn'
+import type { FeasibilityResult } from '@/lib/planning/types'
 
 const DAYS_FR_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
@@ -61,18 +64,38 @@ export default function HomePage() {
     ? objectives.find((objective) => objective.linkedRuleIds.includes(currentRule.id))
     : undefined
 
-  // ─── CORE: Time distribution — moteur de placement supprimé (schema redesign).
-  // Les blocs placés (todayMinutesByTask, todayMinutesByObjective, totalTodayWorkMinutes)
-  // sont retirés tant que le nouveau moteur n'est pas rebâti. On conserve juste
-  // le calcul brut du temps libre pour la persistance des stats.
+  // ─── CORE: Nouveau moteur de planification (Parties A-G) ──────────────────
+  // usePlanning() alimente le moteur avec les stores et retourne les blocs
+  // placés, les capacités et le test de faisabilité.
+  const plan = usePlanning(now)
 
   // Pour la persistance de stats : temps libre brut d'aujourd'hui (somme des
-  // créneaux non-préparation), indépendant du nouveau moteur.
+  // créneaux non-préparation), indépendant du moteur.
   const todayDow = (now.getDay() + 6) % 7
   const todayFreeMinutes = useMemo(() => {
     const slots = computeFreeTimeSlots(todayDow, entries, rules)
     return slots.filter((s) => !s.isPreparation).reduce((sum, s) => sum + s.durationMinutes, 0)
   }, [todayDow, entries, rules])
+
+  // Blocs placés aujourd'hui + temps total placé (task + objective seulement).
+  const todayBlocks = useMemo(
+    () => (plan?.blocks ?? []).filter((b) => b.date === todayStr),
+    [plan, todayStr],
+  )
+  const todayWorkBlocks = useMemo(
+    () => todayBlocks.filter((b) => b.kind === 'task' || b.kind === 'objective'),
+    [todayBlocks],
+  )
+  const todayPlacedMinutes = useMemo(
+    () => todayWorkBlocks.reduce((sum, b) => sum + b.durationMinutes, 0),
+    [todayWorkBlocks],
+  )
+  const todayCapacity = useMemo(
+    () => plan?.capacities.find((c) => c.date === todayStr),
+    [plan, todayStr],
+  )
+  const feasibility = plan?.feasibility
+
   const colorCollisions = useMemo(() => {
     const colors = todayEntries
       .map((entry) => ruleById.get(entry.ruleId))
@@ -212,9 +235,58 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Sections « répartition par objectif / tâche » retirées :
-                elles dépendaient du moteur de placement (usePlacement) supprimé
-                lors du redesign du schema. Elles seront rebâties plus tard. */}
+            {/* ─── E. Blocs placés aujourd'hui (moteur de planification) ─── */}
+            <div className="mt-6">
+              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
+                Blocs planifiés ({todayWorkBlocks.length})
+              </h3>
+              {todayWorkBlocks.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border-subtle bg-bg-card p-4 text-center text-xs text-text-muted">
+                  Aucun bloc placé aujourd&apos;hui.
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {todayWorkBlocks.map((b) => (
+                    <motion.li
+                      key={b.id}
+                      whileHover={{ x: 2 }}
+                      className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-card px-4 py-2.5"
+                    >
+                      <div
+                        className={cn(
+                          'h-8 w-1.5 flex-shrink-0 rounded-2xl',
+                          b.kind === 'task' ? 'bg-accent' : 'bg-cyan',
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-text-primary">
+                          {b.label}
+                          {b.includesBreak && b.breakMinutes > 0 && (
+                            <span className="ml-2 text-[10px] uppercase tracking-wider text-text-muted">
+                              +{b.breakMinutes}min repos
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {minuteToClockLabel(b.startMinute)} — {minuteToClockLabel(b.endMinute)} ·{' '}
+                          {durationLabel(b.durationMinutes)} · {b.cognitiveWindow}
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          'rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
+                          b.kind === 'task'
+                            ? 'bg-accent/10 text-accent'
+                            : 'bg-cyan/10 text-cyan',
+                        )}
+                      >
+                        {b.kind === 'task' ? 'Tâche' : 'Objectif'}
+                      </span>
+                    </motion.li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </motion.section>
 
           {/* ─── Colonne droite ─── */}
@@ -224,6 +296,9 @@ export default function HomePage() {
             transition={{ duration: 0.25, delay: 0.2 }}
             className="flex w-full flex-col gap-4"
           >
+            {/* ─── F. Indicateur de faisabilité ─── */}
+            <FeasibilityCard feasibility={feasibility} />
+
             {/* ─── C. Temps libre disponible ─── */}
             <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
               <div className="flex items-center gap-2">
@@ -235,9 +310,16 @@ export default function HomePage() {
               <div className="mt-3 text-3xl font-bold tabular-nums text-text-primary">
                 {formatAllocatedTime(todayFreeMinutes)}
               </div>
-              <div className="mt-1 text-xs text-text-muted">
-                Calculé depuis ton emploi du temps.
-              </div>
+              {todayCapacity && (
+                <div className="mt-1 text-xs text-text-muted">
+                  Capacité utilisable : {formatAllocatedTime(todayCapacity.usableCapacityMinutes)}
+                  {todayCapacity.fatiguePenaltyMinutes > 0 && (
+                    <span className="text-orange">
+                      {' '}(-{todayCapacity.fatiguePenaltyMinutes} fatigue)
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ─── G. Stats rapides ─── */}
@@ -251,8 +333,8 @@ export default function HomePage() {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <StatCard
                   icon={<Clock size={14} className="text-yellow" />}
-                  label="Temps libre"
-                  value={formatAllocatedTime(todayFreeMinutes)}
+                  label="Placé aujourd'hui"
+                  value={formatAllocatedTime(todayPlacedMinutes)}
                 />
                 <StatCard
                   icon={<Target size={14} className="text-cyan" />}
@@ -280,6 +362,61 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
         <div className="text-[10px] uppercase tracking-wider text-text-muted">{label}</div>
         <div className="text-sm font-bold tabular-nums text-text-primary">{value}</div>
       </div>
+    </div>
+  )
+}
+
+function FeasibilityCard({ feasibility }: { feasibility: FeasibilityResult | undefined }) {
+  if (!feasibility) {
+    return (
+      <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+        <div className="flex items-center gap-2 text-text-muted">
+          <BarChart3 size={16} />
+          <h3 className="text-xs font-medium uppercase tracking-wider">Faisabilité</h3>
+        </div>
+        <div className="mt-3 text-sm text-text-muted">Calcul en cours…</div>
+      </div>
+    )
+  }
+
+  const feasible = feasibility.globallyFeasible
+  return (
+    <div
+      className={cn(
+        'rounded-xl border p-5',
+        feasible
+          ? 'border-emerald-500/30 bg-emerald-500/5'
+          : 'border-red-500/40 bg-red-500/5',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {feasible ? (
+          <CheckCircle2 size={16} className="text-emerald-500" />
+        ) : (
+          <AlertTriangle size={16} className="text-red-500" />
+        )}
+        <h3
+          className={cn(
+            'text-xs font-medium uppercase tracking-wider',
+            feasible ? 'text-emerald-500' : 'text-red-500',
+          )}
+        >
+          Faisabilité
+        </h3>
+      </div>
+      <div className="mt-2 text-sm font-medium text-text-primary">
+        {feasible ? 'Plan réaliste' : 'Surcharge détectée'}
+      </div>
+      {feasibility.deficits.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {feasibility.deficits.map((d) => (
+            <li key={d.deadline} className="text-xs text-text-secondary">
+              <span className="text-red-400">{d.severity}</span> · {d.deadline} : −
+              {d.deficitMinutes} min
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

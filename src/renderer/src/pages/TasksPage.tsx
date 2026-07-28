@@ -7,12 +7,15 @@ import { useTasksStore } from '@/store/tasks.store'
 import { useLevelsStore } from '@/store/levels.store'
 import type { Objective, Task } from '@shared/schemas'
 import { cn } from '@/lib/cn'
+import { durationLabel } from '@/lib/format-time'
 
 type TaskDraft = {
   id?: string
   title: string
   deadline: string
   importance: number
+  category?: string
+  estimatedMinutes?: number
   linkedObjectiveId: string | null
 }
 
@@ -76,7 +79,7 @@ export default function TasksPage() {
             <h1 className="text-3xl font-semibold tracking-tight">Mes tâches</h1>
             <p className="mt-2 max-w-2xl text-sm text-text-secondary">
               {
-                "Ajoute tes devoirs et petites tâches ponctuelles. L'urgence et le niveau détermineront l'attention que Vethos leur accorde."
+                "Ajoute tes devoirs et petites tâches ponctuelles. L'urgence et l'importance détermineront l'attention que Vethos leur accorde."
               }
             </p>
           </div>
@@ -189,6 +192,14 @@ function TaskCard({
             ) : (
               <span className="text-text-muted">Aucun objectif lié</span>
             )}
+            {task.category && (
+              <span className="rounded-2xl border border-border-subtle bg-bg-base px-2 py-0.5 text-[10px] text-text-muted">
+                {task.category}
+              </span>
+            )}
+            {task.estimatedMinutes > 0 && (
+              <span className="text-text-muted">≈ {durationLabel(task.estimatedMinutes)}</span>
+            )}
           </div>
         </div>
         <button
@@ -253,6 +264,8 @@ function TaskEditor({
   const [title, setTitle] = useState('')
   const [deadline, setDeadline] = useState('')
   const [importance, setImportance] = useState(5)
+  const [category, setCategory] = useState('')
+  const [estimatedMinutes, setEstimatedMinutes] = useState(60)
   const [linkedObjectiveId, setLinkedObjectiveId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -262,11 +275,15 @@ function TaskEditor({
       setTitle(initial.title)
       setDeadline(initial.deadline || '')
       setImportance(initial.importance)
+      setCategory(initial.category ?? '')
+      setEstimatedMinutes(initial.estimatedMinutes ?? 60)
       setLinkedObjectiveId(initial.linkedObjectiveId)
     } else {
       setTitle('')
       setDeadline(new Date().toISOString().split('T')[0] || '')
       setImportance(5)
+      setCategory('')
+      setEstimatedMinutes(60)
       setLinkedObjectiveId(null)
     }
   }, [open, initial])
@@ -281,6 +298,8 @@ function TaskEditor({
         title: title.trim(),
         deadline,
         importance,
+        category: category.trim() || undefined,
+        estimatedMinutes: Math.max(1, Math.round(estimatedMinutes)),
         linkedObjectiveId,
       })
       onClose()
@@ -376,6 +395,47 @@ function TaskEditor({
                   onChange={(e) => setImportance(parseInt(e.target.value))}
                   className="w-full accent-accent h-1.5 rounded-full bg-bg-base appearance-none cursor-pointer"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
+                  Catégorie
+                </label>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="maths, codage, rédaction..."
+                  className="mt-2 w-full rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
+                />
+                <p className="mt-1.5 text-[10px] text-text-muted">
+                  Sert au facteur de correction (B.1).
+                </p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">
+                  Durée estimée (minutes)
+                </label>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    step="5"
+                    value={estimatedMinutes}
+                    onChange={(e) =>
+                      setEstimatedMinutes(
+                        Math.max(1, Math.min(1440, parseInt(e.target.value) || 0)),
+                      )
+                    }
+                    className="w-28 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
+                  />
+                  <span className="text-xs text-text-muted">
+                    ≈ {durationLabel(estimatedMinutes)}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[10px] text-text-muted">
+                  Estimation utilisateur (B.1). Le moteur appliquera un facteur de correction.
+                </p>
               </div>
               <div>
                 <label className="block text-[10px] font-medium uppercase tracking-widest text-text-muted">

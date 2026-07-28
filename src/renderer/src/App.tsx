@@ -12,6 +12,8 @@ import { flushSettingsPersist } from './store/settings.store'
 import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
 import { useDeclaredAppsStore } from './store/declared-apps.store'
 import { useTasksStore } from './store/tasks.store'
+import { useAncresStore } from './store/ancres.store'
+import { useLearningStore } from './store/learning.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
 import HomePage from './pages/HomePage'
@@ -32,6 +34,8 @@ export default function App(): JSX.Element {
   const loadSchedule = useScheduleStore((s) => s.load)
   const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
   const loadTasks = useTasksStore((s) => s.load)
+  const loadAncres = useAncresStore((s) => s.load)
+  const loadLearning = useLearningStore((s) => s.load)
   const toast = useToast()
 
   // Boot — charge tous les stores au montage
@@ -41,7 +45,9 @@ export default function App(): JSX.Element {
     void loadSchedule()
     void loadDeclaredApps()
     void loadTasks()
-  }, [loadAuth, loadSettings, loadSchedule, loadDeclaredApps, loadTasks])
+    void loadAncres()
+    void loadLearning()
+  }, [loadAuth, loadSettings, loadSchedule, loadDeclaredApps, loadTasks, loadAncres, loadLearning])
 
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {

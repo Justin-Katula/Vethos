@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, Grid3X3 } from 'lucide-react'
+import { Calendar, Grid3X3, CheckCircle2, AlertTriangle, Gauge } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { RuleTable } from '@/components/interface/RuleTable'
 import { WeekCalendar } from '@/components/interface/WeekCalendar'
 import { RuleEditor } from '@/components/interface/RuleEditor'
 import { PageSkeleton, Skeleton, SkeletonRow } from '@/components/ui/Skeleton'
 import { useScheduleStore } from '@/store/schedule.store'
+import { useLevelsStore } from '@/store/levels.store'
+import { usePlanning } from '@/lib/use-planning'
 import { useToast } from '@/lib/use-toast'
 import { cn } from '@/lib/cn'
+import { formatAllocatedTime } from '@/lib/free-time-calculator'
 import type { TimeRule } from '@shared/schemas'
 import { viewportFromSettings } from '@/lib/calendar-viewport'
 import { useSettingsStore } from '@/store/settings.store'
+import type { DayCapacity, FeasibilityResult } from '@/lib/planning/types'
 
 function localDateKey(date: Date): string {
   const year = date.getFullYear()
@@ -39,10 +43,14 @@ export default function PlanningPage() {
 
   const sleepStart = useSettingsStore((s) => s.sleepStart)
   const sleepEnd = useSettingsStore((s) => s.sleepEnd)
+  const objectives = useLevelsStore((s) => s.objectives)
+  const loadLevels = useLevelsStore((s) => s.load)
+  const levelsLoaded = useLevelsStore((s) => s.loaded)
 
   useEffect(() => {
     void load()
-  }, [load])
+    if (!levelsLoaded) void loadLevels()
+  }, [load, loadLevels, levelsLoaded])
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -60,6 +68,20 @@ export default function PlanningPage() {
   }, [now])
 
   const viewport = useMemo(() => viewportFromSettings(sleepStart, sleepEnd), [sleepStart, sleepEnd])
+
+  // ─── Nouveau moteur de planification ──────────────────────────────────────
+  const plan = usePlanning(now)
+  const objectiveColorByRefId = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const o of objectives) map[o.id] = o.color
+    return map
+  }, [objectives])
+  const weekCapacities = useMemo(
+    () =>
+      (plan?.capacities ?? []).filter((c) => weekDates.includes(c.date)),
+    [plan, weekDates],
+  )
+  const feasibility = plan?.feasibility
 
   const openEditor = (rule: TimeRule | null) => {
     setEditingRule(rule)
@@ -200,6 +222,8 @@ export default function PlanningPage() {
               viewport={viewport}
               weekDates={weekDates}
               now={now}
+              blocks={plan?.blocks}
+              objectiveColorByRefId={objectiveColorByRefId}
               onCreateEntry={handleCreateEntry}
               onUpdateEntry={handleUpdateEntry}
               onChangeRule={handleChangeRule}
@@ -209,6 +233,15 @@ export default function PlanningPage() {
           ) : (
             <MonthView now={now} />
           )}
+
+          {/* ─── Capacités & faisabilité (moteur de planification) ─── */}
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <CapacitiesCard
+              capacities={weekCapacities}
+              today={localDateKey(now)}
+            />
+            <FeasibilityCard feasibility={feasibility} />
+          </div>
         </section>
       </div>
 
@@ -289,6 +322,135 @@ function MonthView({ now }: { now: Date }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─── Capacités par jour (A) ────────────────────────────────────────────────
+
+function CapacitiesCard({
+  capacities,
+  today,
+}: {
+  capacities: DayCapacity[]
+  today: string
+}): JSX.Element {
+  const DAYS_FR_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+  return (
+    <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Gauge size={16} className="text-yellow" />
+        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">
+          Capacité utilisable / jour
+        </h3>
+      </div>
+      {capacities.length === 0 ? (
+        <div className="text-xs text-text-muted">Calcul en cours…</div>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {capacities.map((c, i) => {
+            const isToday = c.date === today
+            return (
+              <li
+                key={c.date}
+                className={cn(
+                  'flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs',
+                  isToday ? 'bg-accent/5 ring-1 ring-accent/30' : 'bg-bg-base',
+                )}
+              >
+                <span className="font-medium text-text-secondary">
+                  {DAYS_FR_SHORT[i] ?? c.date}
+                  <span className="ml-1.5 text-text-muted">{c.date.slice(5)}</span>
+                </span>
+                <span className="font-bold tabular-nums text-text-primary">
+                  {formatAllocatedTime(c.usableCapacityMinutes)}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <p className="mt-2 text-[10px] text-text-muted">
+        Capacité brute cumulée sur la semaine :{' '}
+        {formatAllocatedTime(capacities.reduce((s, c) => s + c.rawCapacityMinutes, 0))}
+      </p>
+    </div>
+  )
+}
+
+// ─── Faisabilité (C) ───────────────────────────────────────────────────────
+
+function FeasibilityCard({
+  feasibility,
+}: {
+  feasibility: FeasibilityResult | undefined
+}): JSX.Element {
+  if (!feasibility) {
+    return (
+      <div className="rounded-xl border border-border-subtle bg-bg-card p-5">
+        <div className="mb-3 flex items-center gap-2 text-text-muted">
+          <AlertTriangle size={16} />
+          <h3 className="text-xs font-medium uppercase tracking-wider">Faisabilité</h3>
+        </div>
+        <div className="text-xs text-text-muted">Calcul en cours…</div>
+      </div>
+    )
+  }
+  const feasible = feasibility.globallyFeasible
+  return (
+    <div
+      className={cn(
+        'rounded-xl border p-5',
+        feasible ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5',
+      )}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        {feasible ? (
+          <CheckCircle2 size={16} className="text-emerald-500" />
+        ) : (
+          <AlertTriangle size={16} className="text-red-500" />
+        )}
+        <h3
+          className={cn(
+            'text-xs font-medium uppercase tracking-wider',
+            feasible ? 'text-emerald-500' : 'text-red-500',
+          )}
+        >
+          Faisabilité
+        </h3>
+      </div>
+      <div className="text-sm font-medium text-text-primary">
+        {feasible ? 'Plan réaliste sur la semaine' : 'Surcharge détectée'}
+      </div>
+      {feasibility.densities.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {feasibility.densities.map((d) => (
+            <li key={d.deadline} className="flex items-center justify-between text-xs">
+              <span className="text-text-secondary">
+                {d.deadline} · densité {(d.density * 100).toFixed(0)}%
+              </span>
+              <span
+                className={cn(
+                  'font-medium',
+                  d.feasible ? 'text-emerald-500' : 'text-red-400',
+                )}
+              >
+                {formatAllocatedTime(d.loadMinutes)} / {formatAllocatedTime(d.capacityMinutes)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {feasibility.deficits.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {feasibility.deficits.map((d) => (
+            <li key={d.deadline} className="text-xs text-red-400">
+              <span className="font-bold uppercase">{d.severity}</span> · {d.deadline} : −
+              {d.deficitMinutes} min
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

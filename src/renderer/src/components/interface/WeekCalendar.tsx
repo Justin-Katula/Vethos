@@ -14,6 +14,7 @@ import {
   visibleHoursOfViewport,
   type CalendarViewport,
 } from '@/lib/calendar-viewport'
+import type { PlacedBlock } from '@/lib/planning/types'
 
 type Props = {
   rules: TimeRule[]
@@ -21,6 +22,10 @@ type Props = {
   viewport: CalendarViewport
   weekDates: string[]
   now: Date
+  /** Blocs placés par le moteur de planification (overlay semi-transparent). */
+  blocks?: PlacedBlock[]
+  /** Couleur par refId d'objectif (pour colorer les blocs objectif). */
+  objectiveColorByRefId?: Record<string, string>
   onCreateEntry: (draft: {
     ruleId: string
     dayOfWeek: number
@@ -66,6 +71,8 @@ export function WeekCalendar({
   viewport,
   weekDates,
   now,
+  blocks,
+  objectiveColorByRefId,
   onCreateEntry,
   onUpdateEntry,
   onChangeRule,
@@ -338,8 +345,48 @@ export function WeekCalendar({
     )
   }
 
-  // Blocs de travail (PlacedBlock) retirés : le moteur de placement a été
-  // supprimé (schema redesign). La grille n'affiche plus que les entries.
+  // Blocs de travail placés par le moteur de planification (overlay).
+  const safeBlocks = blocks ?? []
+
+  const renderWorkBlock = (block: PlacedBlock, dayOfWeek: number) => {
+    // Clip aux bornes de la fenêtre visible.
+    const clippedStart = Math.max(block.startMinute, viewport.startMinute)
+    const clippedEnd = Math.min(block.endMinute, viewport.endMinute)
+    if (clippedEnd <= clippedStart) return null
+    const top = minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const height =
+      minuteToYPx(viewport, clippedEnd, HOUR_HEIGHT) -
+      minuteToYPx(viewport, clippedStart, HOUR_HEIGHT)
+    const isTask = block.kind === 'task'
+    const isObjective = block.kind === 'objective'
+    const color = isObjective
+      ? (objectiveColorByRefId?.[block.refId] ?? '#22D3EE')
+      : isTask
+        ? '#6366F1'
+        : '#8B5CF6'
+    return (
+      <div
+        key={`block-${block.id}-${dayOfWeek}`}
+        data-placed-block
+        className="pointer-events-none absolute left-2 right-2 overflow-hidden rounded-md border border-white/20 opacity-80"
+        style={{ top, height, backgroundColor: color + '33' }}
+      >
+        <div
+          className="absolute left-0 top-0 h-full w-1 rounded-l-md"
+          style={{ backgroundColor: color }}
+        />
+        <div className="px-2 py-1 text-[10px] font-medium leading-tight" style={{ color }}>
+          <span className="truncate">{block.label}</span>
+          {height > 24 && (
+            <span className="block opacity-80">
+              {minuteToClockLabel(block.startMinute)} · {durationLabel(block.durationMinutes)}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   void now
 
   return (
@@ -411,9 +458,11 @@ export function WeekCalendar({
                 style={{ top: minuteToYPx(viewport, h * 60 + 30, HOUR_HEIGHT) }}
               />
             ))}
-             {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
-            {/* Blocs de travail (workBlocks) retirés : moteur de placement supprimé.
-                {workBlocks.filter((b) => b.date === weekDates[dayOfWeek]).map((b) => renderWorkBlock(b, dayOfWeek))} */}
+            {entries.filter((e) => e.dayOfWeek === dayOfWeek).map(renderEntryBlock)}
+            {/* Blocs placés par le moteur de planification (overlay) */}
+            {safeBlocks
+              .filter((b) => b.date === weekDates[dayOfWeek])
+              .map((b) => renderWorkBlock(b, dayOfWeek))}
             {drag?.type === 'create' && drag.dayOfWeek === dayOfWeek && (
               <div
                 className="pointer-events-none absolute inset-0"
