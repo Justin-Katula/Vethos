@@ -1,5 +1,5 @@
 import log, { setupLogging } from './logging/setup'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, powerMonitor, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from '@shared/storage'
@@ -16,6 +16,8 @@ import {
   shouldStartHidden,
   type TrayDeps,
 } from './tray'
+import { createReconciliationClock, type ReconciliationClock } from './blocking/clock'
+import type { BlockingRules } from './blocking/schedule'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -130,6 +132,9 @@ let isQuitting = false
  */
 let blockingSessionActive = false
 
+/** Horloge de réconciliation, créée une fois l'application prête. */
+let blockingClock: ReconciliationClock | null = null
+
 function showMainWindow(): void {
   if (mainWindow === null || mainWindow.isDestroyed()) {
     mainWindow = createMainWindow()
@@ -186,6 +191,31 @@ function startNexusApp(): void {
       createVethosTray(trayDeps)
       configureAutoStart(true)
 
+      blockingClock = createReconciliationClock({
+        readRules: async (): Promise<BlockingRules> => {
+          const stored = await storage.read('blocking_rules')
+          return stored ?? { slots: [], manual: null }
+        },
+        now: () => new Date(),
+        onTransition: (transition) => {
+          log.info('[blocage] transition de session', transition)
+          setBlockingSessionActive(transition.kind !== 'ended')
+        },
+        onError: (err) => log.warn('[blocage] lecture des règles impossible', err),
+      })
+      blockingClock.start()
+
+      // Réveils indispensables : une machine en veille pendant tout un créneau
+      // doit bloquer dès son réveil, sans attendre le tic suivant.
+      powerMonitor.on('resume', () => {
+        log.info('[blocage] sortie de veille — réconciliation immédiate')
+        void blockingClock?.tickNow()
+      })
+      powerMonitor.on('unlock-screen', () => {
+        log.info('[blocage] session déverrouillée — réconciliation immédiate')
+        void blockingClock?.tickNow()
+      })
+
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
           mainWindow = createMainWindow()
@@ -220,6 +250,7 @@ function startNexusApp(): void {
   }
 
   app.on('will-quit', () => {
+    blockingClock?.stop()
     destroyVethosTray()
   })
 

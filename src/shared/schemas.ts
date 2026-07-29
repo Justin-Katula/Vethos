@@ -17,6 +17,7 @@ export const STORAGE_KEYS = [
   'auth',
   'ancres',
   'learning',
+  'blocking_rules',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -258,6 +259,45 @@ export const LearningStateSchema = z.object({
 export type LearningState = z.infer<typeof LearningStateSchema>
 
 /** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
+/**
+ * Règles de blocage : créneaux récurrents et session manuelle ponctuelle.
+ *
+ * Les minutes sont bornées à 0..1439 et une durée nulle est refusée : un
+ * créneau `10h00 → 10h00` était interprété comme un franchissement de minuit
+ * et bloquait 24 h/24 en silence. La validation vit ici pour que la donnée
+ * fautive n'atteigne jamais le disque, et dans `blocking/schedule.ts` pour
+ * que le moteur reste sûr même face à un fichier édité à la main.
+ */
+export const RecurringSlotSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().max(120),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7),
+    startMinute: z.number().int().min(0).max(1439),
+    endMinute: z.number().int().min(0).max(1439),
+    appIds: z.array(z.string().min(1)).max(200),
+  })
+  .refine((slot) => slot.startMinute !== slot.endMinute, {
+    message: 'Un créneau de durée nulle bloquerait en permanence.',
+    path: ['endMinute'],
+  })
+
+export const ManualSessionSchema = z
+  .object({
+    startedAt: z.number().int(),
+    endsAt: z.number().int(),
+    appIds: z.array(z.string().min(1)).max(200),
+  })
+  .refine((session) => session.endsAt > session.startedAt, {
+    message: 'La fin doit être postérieure au début.',
+    path: ['endsAt'],
+  })
+
+export const BlockingRulesStateSchema = z.object({
+  slots: z.array(RecurringSlotSchema).max(100).default([]),
+  manual: ManualSessionSchema.nullable().default(null),
+})
+
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
   schedule: ScheduleStateSchema,
@@ -270,4 +310,5 @@ export const STORAGE_SCHEMAS = {
   auth: AuthStateSchema,
   ancres: AncresStateSchema,
   learning: LearningStateSchema,
+  blocking_rules: BlockingRulesStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>
