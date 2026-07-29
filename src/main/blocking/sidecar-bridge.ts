@@ -68,16 +68,54 @@ export class SidecarBridge extends EventEmitter {
 
     child.on('exit', (code, signal) => {
       log.info('[sidecar] processus sorti', { code, signal, voulu: this.stopped })
-      for (const [, pending] of this.pending) {
-        clearTimeout(pending.timer)
-        pending.reject(new Error('sidecar sorti avant la réponse'))
-      }
-      this.pending.clear()
-      this.child = null
-      this.reader?.close()
-      this.reader = null
-      this.emit('exit', { code, signal, intentional: this.stopped })
+      this.onChildDeath(
+        child,
+        { code, signal, intentional: this.stopped },
+        new Error('sidecar sorti avant la réponse'),
+      )
     })
+
+    child.on('error', (err) => {
+      // Node émet 'error' quand le spawn lui-même échoue (chemin invalide,
+      // EACCES/EPERM, antivirus qui met en quarantaine un .exe fraîchement
+      // compilé — routine sous Windows). Sans ce gestionnaire, Node relance
+      // l'erreur comme exception non interceptée et tue tout le processus
+      // principal d'Electron, pas seulement la fonctionnalité de blocage.
+      log.error('[sidecar] erreur du processus', err)
+      this.onChildDeath(
+        child,
+        { code: null, signal: null, intentional: this.stopped },
+        new Error(`sidecar en erreur avant la réponse : ${err.message}`),
+      )
+    })
+  }
+
+  /**
+   * Nettoyage commun à `exit` et `error` : rejette les requêtes en attente
+   * (et leurs timers), vide la map, abandonne les références au processus
+   * mort et émet `exit` sur le pont pour que les consommateurs voient un
+   * signal unique et cohérent « le sidecar a disparu ».
+   *
+   * Idempotent via `this.child === child` : Node documente que `exit` peut
+   * se déclencher après `error` pour le même échec de spawn, donc les deux
+   * gestionnaires peuvent appeler cette méthode pour la même mort de
+   * processus — le second appel ne fait rien.
+   */
+  private onChildDeath(
+    child: ChildProcessWithoutNullStreams,
+    exitPayload: { code: number | null; signal: NodeJS.Signals | null; intentional: boolean },
+    rejection: Error,
+  ): void {
+    if (this.child !== child) return
+    for (const [, pending] of this.pending) {
+      clearTimeout(pending.timer)
+      pending.reject(rejection)
+    }
+    this.pending.clear()
+    this.child = null
+    this.reader?.close()
+    this.reader = null
+    this.emit('exit', exitPayload)
   }
 
   private onLine(line: string): void {

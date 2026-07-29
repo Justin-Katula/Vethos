@@ -63,7 +63,17 @@ const stillAlive = await send({ cmd: 'ping' })
 say(stillAlive.ok ? 'PASS toujours vivant apres commande inconnue' : 'ECHEC processus mort')
 
 say('=== PREUVE 3 : arret voulu, sortie propre ===')
-await send({ cmd: 'shutdown' })
+const shutdownReply = await send({ cmd: 'shutdown' })
+say(
+  shutdownReply.ok === true
+    ? 'PASS shutdown accepte (ok: true)'
+    : `ECHEC shutdown refuse : ${JSON.stringify(shutdownReply)}`,
+)
 child.stdin.end()
-await new Promise((res) => child.on('exit', res))
-say(`PASS sidecar sorti avec le code ${child.exitCode}`)
+const { code, signal } = await new Promise((res) => child.on('exit', (code, signal) => res({ code, signal })))
+const cleanExit = code === 0 && signal === null
+say(
+  cleanExit
+    ? `PASS sidecar sorti proprement (code ${code}, signal ${signal})`
+    : `ECHEC sortie non propre (code ${code}, signal ${signal})`,
+)
