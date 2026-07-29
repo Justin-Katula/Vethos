@@ -8,6 +8,14 @@ import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
+import {
+  configureAutoStart,
+  createVethosTray,
+  destroyVethosTray,
+  refreshTrayMenu,
+  shouldStartHidden,
+  type TrayDeps,
+} from './tray'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
@@ -73,7 +81,20 @@ function createMainWindow(): BrowserWindow {
   })
 
   win.once('ready-to-show', () => {
-    win.show()
+    // `--hidden` : lancement automatique à l'ouverture de session Windows. On
+    // démarre directement dans la zone de notification, sans surgir devant
+    // l'utilisateur à chaque démarrage.
+    if (!shouldStartHidden(process.argv)) win.show()
+  })
+
+  // Fermer la fenêtre ne quitte PAS l'application : le processus continue et
+  // le blocage avec lui. Une application de blocage qui ne tourne pas ne
+  // bloque rien. Seul « Quitter Vethos » depuis la zone de notification
+  // arrête réellement le processus.
+  win.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    win.hide()
   })
 
   // Liens externes : ouvrir dans le navigateur, pas dans Electron
@@ -93,6 +114,53 @@ function createMainWindow(): BrowserWindow {
 
 let mainWindow: BrowserWindow | null = null
 let quitAfterDebounceFlush = false
+
+/**
+ * Vrai uniquement quand un arrêt réel a été demandé. Distingue « fermer la
+ * fenêtre » (masquage) de « quitter Vethos » (arrêt du processus).
+ */
+let isQuitting = false
+
+/**
+ * Une session de blocage est-elle en cours ?
+ *
+ * Reste `false` tant que le contrôleur de blocage n'est pas branché — aucune
+ * session ne peut être active sans lui. Le menu de la zone de notification
+ * s'appuie dessus pour refuser « Quitter Vethos » pendant un blocage.
+ */
+let blockingSessionActive = false
+
+function showMainWindow(): void {
+  if (mainWindow === null || mainWindow.isDestroyed()) {
+    mainWindow = createMainWindow()
+    mainWindow.on('closed', () => {
+      mainWindow = null
+    })
+    return
+  }
+  if (!mainWindow.isVisible()) mainWindow.show()
+  focusWindow(mainWindow)
+}
+
+const trayDeps: TrayDeps = {
+  showMainWindow,
+  isSessionActive: () => blockingSessionActive,
+  requestQuit: () => {
+    if (blockingSessionActive) {
+      log.warn('[tray] arrêt refusé : une session de blocage est active')
+      return
+    }
+    isQuitting = true
+    app.quit()
+  },
+}
+
+/** Appelé par le contrôleur de blocage à chaque changement d'état de session. */
+export function setBlockingSessionActive(active: boolean): void {
+  if (blockingSessionActive === active) return
+  blockingSessionActive = active
+  refreshTrayMenu(trayDeps)
+}
 
 function startNexusApp(): void {
   app
@@ -115,6 +183,9 @@ function startNexusApp(): void {
       if (recoveredFromCrash) notifyCrashRecovered(() => mainWindow)
       startUpdater(() => mainWindow)
 
+      createVethosTray(trayDeps)
+      configureAutoStart(true)
+
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
           mainWindow = createMainWindow()
@@ -129,8 +200,12 @@ function startNexusApp(): void {
       app.quit()
     })
 
+  // Ne quitte PAS quand la dernière fenêtre disparaît : Vethos vit dans la
+  // zone de notification et continue de bloquer. C'est ce qui lui permet de
+  // se comporter comme une alarme — il sait qu'il est l'heure même si
+  // l'utilisateur a fermé la fenêtre il y a trois heures.
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+    log.info('[app] fenêtre fermée — Vethos continue en zone de notification')
   })
 
   const gotLock = app.requestSingleInstanceLock()
@@ -138,11 +213,15 @@ function startNexusApp(): void {
     app.quit()
   } else {
     app.on('second-instance', () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        focusWindow(mainWindow)
-      }
+      // Relancer Vethos alors qu'il tourne déjà rouvre la fenêtre au lieu de
+      // démarrer un second processus — y compris quand il était masqué.
+      showMainWindow()
     })
   }
+
+  app.on('will-quit', () => {
+    destroyVethosTray()
+  })
 
   app.on('before-quit', (event) => {
     if (quitAfterDebounceFlush) {
