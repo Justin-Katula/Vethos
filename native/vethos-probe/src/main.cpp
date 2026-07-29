@@ -9,6 +9,7 @@
 #include <io.h>
 #include <windows.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -24,6 +25,19 @@ vethos::UndoLog g_undoLog;
 bool g_shuttingDown = false;
 std::string g_relaunchExePath;  // vide = relance desarmee
 HANDLE g_parentProcess = nullptr;
+// Garde one-shot : watchParent (mort du parent) et le thread principal (EOF
+// stdin) peuvent tous deux atteindre restoreAndMaybeRelaunch pour la meme
+// mort du parent.
+//   - g_relaunchClaimed : echange atomique qui elit un unique gagnant, AVANT
+//     tout travail (restauration ou relance).
+//   - g_relaunchFinished : signale que le travail du gagnant est termine. Le
+//     perdant l'attend avant de rendre la main a son appelant : sans cette
+//     attente, cet appelant (watchParent, qui enchaine sur ExitProcess ; ou
+//     main, qui enchaine sur son "return 0") pourrait terminer tout le
+//     processus pendant que le gagnant est encore en plein CreateProcessA sur
+//     l'autre thread — coupant la relance avant qu'elle ne parte reellement.
+std::atomic<bool> g_relaunchClaimed{false};
+std::atomic<bool> g_relaunchFinished{false};
 
 void emit(const std::string& line) {
   std::fwrite(line.data(), 1, line.size(), stdout);
@@ -36,19 +50,54 @@ void trace(const std::string& message) {
   std::fflush(stderr);
 }
 
+// Reveille l'eventuel perdant bloque dans restoreAndMaybeRelaunch (voir plus
+// bas) et rend surs les deux appels a "terminer le processus" qui suivent
+// immediatement restoreAndMaybeRelaunch chez les deux appelants (ExitProcess
+// dans watchParent, "return 0" dans main) : par construction, aucun des deux
+// ne peut plus s'executer avant que ce signal n'ait ete emis.
+void signalRelaunchFinished() {
+  g_relaunchFinished.store(true);
+  g_relaunchFinished.notify_all();
+}
+
 // Restaure tout, puis relance Vethos si et seulement si la relance est armee
 // ET que l'arret n'a pas ete demande explicitement.
+//
+// Deux chemins independants peuvent appeler cette fonction pour la meme mort
+// du parent : le thread watchParent (WaitForSingleObject) et le thread
+// principal (EOF sur stdin). g_relaunchClaimed.exchange(true) revendique le
+// droit d'executer le corps AVANT tout travail (restauration ou relance) : le
+// premier thread a passer par l'echange recoit false et continue ; l'echange
+// etant une seule instruction atomique, il n'existe aucun entrelacement ou
+// les deux threads recoivent false.
+//
+// Le perdant (tout appel suivant, recevant true) n'attaque ni restauration ni
+// relance, mais il ne peut pas non plus se contenter de "return" tout de
+// suite : son appelant enchaine sur du code qui termine le processus entier
+// (ExitProcess ou "return 0" depuis main), sans savoir si l'AUTRE thread — le
+// gagnant — a fini son propre CreateProcessA. Le perdant attend donc
+// g_relaunchFinished avant de rendre la main, pour que la relance du gagnant
+// ait toujours le temps de partir avant que quiconque ne coupe le processus.
 void restoreAndMaybeRelaunch(const char* cause) {
+  if (g_relaunchClaimed.exchange(true)) {
+    trace(std::string("annulation (") + cause +
+          ") : deja prise en charge par un autre chemin, on attend sa fin");
+    g_relaunchFinished.wait(false);
+    return;
+  }
+
   const std::vector<std::string> restored = g_undoLog.restoreAll();
   trace(std::string("annulation (") + cause + ") : " + std::to_string(restored.size()) +
         " fenetre(s) restauree(s)");
 
   if (g_shuttingDown) {
     trace("arret voulu : aucune relance");
+    signalRelaunchFinished();
     return;
   }
   if (g_relaunchExePath.empty()) {
     trace("relance desarmee : aucune relance");
+    signalRelaunchFinished();
     return;
   }
 
@@ -67,6 +116,7 @@ void restoreAndMaybeRelaunch(const char* cause) {
   } else {
     trace("echec de la relance, code " + std::to_string(GetLastError()));
   }
+  signalRelaunchFinished();
 }
 
 // Attend la mort du parent dans un thread dedie. Le flux stdin peut rester
