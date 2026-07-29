@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Target, Calendar, Settings, LogOut, type LucideIcon } from 'lucide-react'
+import { Home, Target, Calendar, Settings, Shield, LogOut, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NexusLogo } from '@/components/NexusLogo'
 import { nexus } from '@/lib/ipc'
@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/tasks', label: 'Mes tâches', Icon: Target },
   { to: '/objectives', label: 'Mes objectifs', Icon: Target },
   { to: '/planning', label: 'Mon planning', Icon: Calendar },
+  { to: '/blocage', label: 'Blocage', Icon: Shield },
   { to: '/settings', label: 'Paramètres', Icon: Settings },
 ]
 

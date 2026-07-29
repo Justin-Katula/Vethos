@@ -13,6 +13,11 @@ export const IPC_CHANNELS = {
   APP_USAGE_EVENT_TICK: 'appUsage:event:tick',
   // Tasks (renderer → main : déclencher notification native)
   TASKS_NOTIFY: 'tasks:notify',
+  // Blocage — les règles passent par les canaux de stockage génériques avec la
+  // clé `blocking_rules`. Seul l'état de session a besoin de son propre canal :
+  // il est décidé par l'horloge du processus principal, pas par l'interface.
+  BLOCKING_GET_SESSION: 'blocking:getSession',
+  BLOCKING_EVENT_SESSION: 'blocking:event:session',
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

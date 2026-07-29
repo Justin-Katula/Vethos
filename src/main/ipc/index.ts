@@ -7,11 +7,22 @@ import { discoverInstalledApps } from '@main/tracking/app-discovery'
 import { registerStorageHandlers } from './storage.handlers'
 import { registerAppUsageHandlers } from '../tracking/handlers'
 
+export type BlockingSessionState = {
+  active: boolean
+  blockedAppIds: string[]
+  endsAt: number | null
+}
+
 export async function registerAllIpcHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
+  getBlockingSession: () => BlockingSessionState,
 ): Promise<void> {
   registerStorageHandlers(storage)
+
+  // L'état de session est décidé par l'horloge du processus principal. Le
+  // renderer le lit, il ne le recalcule jamais — une seule source de vérité.
+  ipcMain.handle(IPC_CHANNELS.BLOCKING_GET_SESSION, () => getBlockingSession())
 
   ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, () => app.getVersion())
   ipcMain.handle(IPC_CHANNELS.APP_OPEN_LOGS, async () => {

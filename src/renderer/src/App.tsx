@@ -21,6 +21,7 @@ import ObjectivesPage from './pages/ObjectivesPage'
 import PlanningPage from './pages/PlanningPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
+import BlockingPage from './pages/BlockingPage'
 import AuthPage from './pages/AuthPage'
 
 export default function App(): JSX.Element {
@@ -102,6 +103,7 @@ export default function App(): JSX.Element {
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/objectives" element={<ObjectivesPage />} />
           <Route path="/planning" element={<PlanningPage />} />
+          <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

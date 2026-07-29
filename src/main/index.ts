@@ -178,7 +178,11 @@ function startNexusApp(): void {
       await recalculateFreeTimeAtBoot(storage).catch((err) => {
         log.warn('boot free-time recalculation failed', err)
       })
-      await registerAllIpcHandlers(storage, () => mainWindow)
+      await registerAllIpcHandlers(
+        storage,
+        () => mainWindow,
+        () => blockingClock?.current() ?? { active: false, blockedAppIds: [], endsAt: null },
+      )
 
       mainWindow = createMainWindow()
       mainWindow.on('closed', () => {
@@ -197,9 +201,13 @@ function startNexusApp(): void {
           return stored ?? { slots: [], manual: null }
         },
         now: () => new Date(),
-        onTransition: (transition) => {
+        onTransition: (transition, snapshot) => {
           log.info('[blocage] transition de session', transition)
           setBlockingSessionActive(transition.kind !== 'ended')
+          const win = mainWindow
+          if (win && !win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION, snapshot)
+          }
         },
         onError: (err) => log.warn('[blocage] lecture des règles impossible', err),
       })

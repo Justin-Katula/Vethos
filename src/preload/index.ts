@@ -63,6 +63,25 @@ const api = {
         | { type: 'task-urgent'; taskTitle: string; daysLeft: number },
     ): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.TASKS_NOTIFY, event),
   },
+  blocking: {
+    /**
+     * État courant de la session, décidé par l'horloge du processus principal.
+     * L'interface ne le calcule jamais elle-même : une seule source de vérité.
+     */
+    getSession: (): Promise<BlockingSessionState> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_SESSION),
+    onSessionChange: (cb: (state: BlockingSessionState) => void): (() => void) => {
+      const listener = (_: unknown, payload: BlockingSessionState) => cb(payload)
+      ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SESSION, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BLOCKING_EVENT_SESSION, listener)
+    },
+  },
+}
+
+export type BlockingSessionState = {
+  active: boolean
+  blockedAppIds: string[]
+  endsAt: number | null
 }
 
 contextBridge.exposeInMainWorld('nexus', api)

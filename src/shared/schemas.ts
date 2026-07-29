@@ -298,6 +298,10 @@ export const BlockingRulesStateSchema = z.object({
   manual: ManualSessionSchema.nullable().default(null),
 })
 
+export type RecurringSlot = z.infer<typeof RecurringSlotSchema>
+export type ManualSession = z.infer<typeof ManualSessionSchema>
+export type BlockingRulesState = z.infer<typeof BlockingRulesStateSchema>
+
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
   schedule: ScheduleStateSchema,
