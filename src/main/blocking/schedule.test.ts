@@ -65,6 +65,56 @@ describe('slotIsActiveAt', () => {
   })
 })
 
+describe('créneaux mal formés — échec du côté sûr', () => {
+  // Deux bugs trouves par sondage : ils produisaient un blocage silencieux
+  // qu'aucun element d'interface n'aurait permis de relier a sa cause.
+  const dixHeures = new Date(2026, 6, 29, 10, 0, 0, 0)
+
+  it('durée nulle (10h00 → 10h00) ne bloque PAS en permanence', () => {
+    // Avant correction : traite comme un franchissement de minuit, donc
+    // `minute >= 600 || minute < 600` toujours vrai — bloque 24 h/24.
+    const nul = makeSlot({ startMinute: 600, endMinute: 600 })
+    expect(slotIsActiveAt(nul, dixHeures)).toBe(false)
+    expect(slotIsActiveAt(nul, new Date(2026, 6, 29, 3, 0, 0, 0))).toBe(false)
+    expect(slotIsActiveAt(nul, new Date(2026, 6, 29, 23, 0, 0, 0))).toBe(false)
+    expect(activeSessionAt({ slots: [nul], manual: null }, dixHeures)).toBeNull()
+  })
+
+  it('minute de fin hors bornes ne crée PAS une session de plusieurs jours', () => {
+    // Avant correction : endMinute=5000 debordait dans setMinutes et donnait
+    // une echeance trois jours plus tard.
+    const debordant = makeSlot({ startMinute: 100, endMinute: 5000 })
+    expect(slotIsActiveAt(debordant, dixHeures)).toBe(false)
+    expect(activeSessionAt({ slots: [debordant], manual: null }, dixHeures)).toBeNull()
+  })
+
+  it('minute de début négative est rejetée', () => {
+    expect(slotIsActiveAt(makeSlot({ startMinute: -60, endMinute: 120 }), dixHeures)).toBe(false)
+  })
+
+  it('minute non entière est rejetée', () => {
+    expect(slotIsActiveAt(makeSlot({ startMinute: 9.5 * 60 + 0.5 }), dixHeures)).toBe(false)
+  })
+
+  it('jour de semaine hors 0..6 est rejeté', () => {
+    expect(slotIsActiveAt(makeSlot({ daysOfWeek: [3, 9] }), dixHeures)).toBe(false)
+  })
+
+  it('un créneau valide couvrant la journée entière reste possible', () => {
+    // La façon correcte d'exprimer « toute la journée » : 0 -> 1439.
+    const journee = makeSlot({ startMinute: 0, endMinute: 1439 })
+    expect(slotIsActiveAt(journee, dixHeures)).toBe(true)
+  })
+
+  it('un créneau invalide n’empêche pas les créneaux valides voisins', () => {
+    const rules: BlockingRules = {
+      slots: [makeSlot({ id: 'nul', startMinute: 600, endMinute: 600 }), makeSlot()],
+      manual: null,
+    }
+    expect(activeSessionAt(rules, dixHeures)?.blockedAppIds).toEqual(['blender.exe'])
+  })
+})
+
 describe('échéance absolue d’un créneau franchissant minuit', () => {
   // Ces cas ne sont couverts par aucun autre test et l'arithmetique de date
   // est le point le plus fragile du module : une echeance calculee le mauvais

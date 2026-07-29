@@ -46,12 +46,44 @@ export function minutesSinceMidnight(now: Date): number {
   return now.getHours() * 60 + now.getMinutes()
 }
 
-/** Un créneau dont la fin est antérieure ou égale au début franchit minuit. */
+const MINUTES_PAR_JOUR = 24 * 60
+
+function estMinuteValide(valeur: number): boolean {
+  return Number.isInteger(valeur) && valeur >= 0 && valeur < MINUTES_PAR_JOUR
+}
+
+/**
+ * Un créneau mal formé n'est jamais actif.
+ *
+ * Deux formes invalides produisaient un blocage silencieux et intraçable :
+ *
+ * - `startMinute === endMinute` (ex. 10h00 → 10h00, faute de saisie banale)
+ *   était interprété comme un franchissement de minuit, donc la condition
+ *   `minute >= start || minute < end` devenait toujours vraie : **blocage
+ *   permanent 24 h/24**, sans rien dans l'interface pour l'expliquer.
+ * - une minute hors de 0..1439 (ex. `endMinute = 5000`) débordait dans
+ *   `setMinutes` et produisait une **session de plusieurs jours**.
+ *
+ * On échoue du côté sûr : un créneau invalide ne bloque rien, plutôt que de
+ * bloquer pour toujours. Exposé pour que l'interface puisse le signaler à la
+ * saisie au lieu de laisser passer une règle qui ne se déclenchera jamais.
+ */
+export function isValidSlot(slot: RecurringSlot): boolean {
+  if (!estMinuteValide(slot.startMinute)) return false
+  if (!estMinuteValide(slot.endMinute)) return false
+  // Durée nulle : rien à bloquer. Pour couvrir la journée entière, utiliser
+  // 0 → 1439.
+  if (slot.startMinute === slot.endMinute) return false
+  return slot.daysOfWeek.every((jour) => Number.isInteger(jour) && jour >= 0 && jour <= 6)
+}
+
+/** Un créneau dont la fin est antérieure au début franchit minuit. */
 function crossesMidnight(slot: RecurringSlot): boolean {
-  return slot.endMinute <= slot.startMinute
+  return slot.endMinute < slot.startMinute
 }
 
 export function slotIsActiveAt(slot: RecurringSlot, now: Date): boolean {
+  if (!isValidSlot(slot)) return false
   if (!slot.daysOfWeek.includes(now.getDay())) return false
 
   const minute = minutesSinceMidnight(now)
