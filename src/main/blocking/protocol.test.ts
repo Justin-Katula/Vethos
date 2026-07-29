@@ -16,6 +16,16 @@ describe('encodeCommand', () => {
       exeNames: ['blender.exe', 'chrome.exe'],
     })
   })
+
+  it('sérialise l’armement de la relance', () => {
+    const line = encodeCommand({ id: 9, cmd: 'arm-relaunch', exePath: 'C:\\App\\Vethos.exe' })
+    expect(JSON.parse(line)).toEqual({ id: 9, cmd: 'arm-relaunch', exePath: 'C:\\App\\Vethos.exe' })
+  })
+
+  it('sérialise le désarmement de la relance', () => {
+    const line = encodeCommand({ id: 10, cmd: 'arm-relaunch', exePath: null })
+    expect(JSON.parse(line)).toEqual({ id: 10, cmd: 'arm-relaunch', exePath: null })
+  })
 })
 
 describe('decodeLine', () => {

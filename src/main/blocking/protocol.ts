@@ -16,6 +16,7 @@ export type SidecarCommand =
   | { id: number; cmd: 'watch'; exeNames: string[] }
   | { id: number; cmd: 'release'; hwnd: string }
   | { id: number; cmd: 'release-all' }
+  | { id: number; cmd: 'arm-relaunch'; exePath: string | null }
 
 export type SidecarReply = {
   kind: 'reply'

@@ -22,6 +22,8 @@ namespace {
 
 vethos::UndoLog g_undoLog;
 bool g_shuttingDown = false;
+std::string g_relaunchExePath;  // vide = relance desarmee
+HANDLE g_parentProcess = nullptr;
 
 void emit(const std::string& line) {
   std::fwrite(line.data(), 1, line.size(), stdout);
@@ -32,6 +34,51 @@ void emit(const std::string& line) {
 void trace(const std::string& message) {
   std::fprintf(stderr, "[probe] %s\n", message.c_str());
   std::fflush(stderr);
+}
+
+// Restaure tout, puis relance Vethos si et seulement si la relance est armee
+// ET que l'arret n'a pas ete demande explicitement.
+void restoreAndMaybeRelaunch(const char* cause) {
+  const std::vector<std::string> restored = g_undoLog.restoreAll();
+  trace(std::string("annulation (") + cause + ") : " + std::to_string(restored.size()) +
+        " fenetre(s) restauree(s)");
+
+  if (g_shuttingDown) {
+    trace("arret voulu : aucune relance");
+    return;
+  }
+  if (g_relaunchExePath.empty()) {
+    trace("relance desarmee : aucune relance");
+    return;
+  }
+
+  trace("relance de " + g_relaunchExePath);
+  STARTUPINFOA startup = {};
+  startup.cb = sizeof(startup);
+  PROCESS_INFORMATION info = {};
+  std::string commandLine = "\"" + g_relaunchExePath + "\"";
+  const BOOL ok = CreateProcessA(nullptr, commandLine.data(), nullptr, nullptr, FALSE,
+                                 CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, nullptr, &startup,
+                                 &info);
+  if (ok) {
+    CloseHandle(info.hProcess);
+    CloseHandle(info.hThread);
+    trace("relance lancee");
+  } else {
+    trace("echec de la relance, code " + std::to_string(GetLastError()));
+  }
+}
+
+// Attend la mort du parent dans un thread dedie. Le flux stdin peut rester
+// ouvert alors que le parent est deja mort : les deux signaux sont necessaires.
+DWORD WINAPI watchParent(LPVOID) {
+  if (g_parentProcess == nullptr) return 0;
+  WaitForSingleObject(g_parentProcess, INFINITE);
+  if (g_shuttingDown) return 0;  // le shutdown a gagne la course
+  trace("parent disparu sans prevenir");
+  restoreAndMaybeRelaunch("mort du parent");
+  // On sort du processus : plus personne pour nous piloter.
+  ExitProcess(0);
 }
 
 std::string replyError(double id, const std::string& message) {
@@ -107,6 +154,22 @@ std::string handleCommand(const vethos::JsonValue& command) {
         .done();
   }
 
+  if (cmd == "arm-relaunch") {
+    const vethos::JsonValue* pathValue = command.find("exePath");
+    if (pathValue != nullptr && pathValue->type == vethos::JsonType::String) {
+      g_relaunchExePath = pathValue->str;
+      trace("relance armee sur " + g_relaunchExePath);
+    } else {
+      g_relaunchExePath.clear();
+      trace("relance desarmee");
+    }
+    return vethos::JsonOut()
+        .num("id", id)
+        .boolean("ok", true)
+        .boolean("armed", !g_relaunchExePath.empty())
+        .done();
+  }
+
   return replyError(id, "commande inconnue : " + cmd);
 }
 
@@ -127,6 +190,15 @@ int main(int argc, char** argv) {
   trace("demarre pid=" + std::to_string(GetCurrentProcessId()) +
         " parent=" + std::to_string(parentPid));
 
+  if (parentPid != 0) {
+    g_parentProcess = OpenProcess(SYNCHRONIZE, FALSE, parentPid);
+    if (g_parentProcess != nullptr) {
+      CloseHandle(CreateThread(nullptr, 0, watchParent, nullptr, 0, nullptr));
+    } else {
+      trace("impossible de surveiller le parent, code " + std::to_string(GetLastError()));
+    }
+  }
+
   std::string line;
   while (!g_shuttingDown && std::getline(std::cin, line)) {
     if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -140,10 +212,8 @@ int main(int argc, char** argv) {
     emit(handleCommand(command));
   }
 
-  // Sortie par EOF de stdin (parent disparu) ou par shutdown explicite.
-  // Dans les deux cas on annule tout avant de mourir : aucune fenetre piegee.
-  const std::vector<std::string> restored = g_undoLog.restoreAll();
-  trace("sortie, " + std::to_string(restored.size()) + " fenetre(s) restauree(s)" +
-        (g_shuttingDown ? " (arret voulu)" : " (eof)"));
+  // Sortie par EOF de stdin ou par shutdown explicite.
+  restoreAndMaybeRelaunch(g_shuttingDown ? "shutdown" : "eof stdin");
+  if (g_parentProcess != nullptr) CloseHandle(g_parentProcess);
   return 0;
 }
