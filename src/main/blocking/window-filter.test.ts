@@ -88,3 +88,53 @@ describe('isBlockingTarget', () => {
     expect(isBlockingTarget(makeWindow({ className: 'ime' }))).toBe(false)
   })
 })
+
+describe('scénario réel — Blender ne doit plus laisser de fenêtres fantômes dans la barre des tâches', () => {
+  // Symptôme rapporté par le proprietaire du dépôt : une application bloquée
+  // réapparaissait avec des entrées fantômes dans la barre des tâches —
+  // fenêtres internes type BlenderGLEW, écrans de démarrage, boîtes de
+  // dialogue. Ce bloc épingle le scénario nommé pour ne plus jamais le
+  // régresser, et prouve en retour que la vraie fenêtre de Blender passe
+  // toujours le filtre.
+
+  it('rejette une fenêtre interne BlenderGLEW non visible', () => {
+    const w = makeWindow({ className: 'BlenderGLEW', visible: false })
+    expect(isBlockingTarget(w)).toBe(false)
+    expect(rejectionReason(w)).toBe('invisible')
+  })
+
+  it('rejette une fenêtre interne BlenderGLEW visible mais sans titre', () => {
+    const w = makeWindow({ className: 'BlenderGLEW', title: '' })
+    expect(isBlockingTarget(w)).toBe(false)
+    expect(rejectionReason(w)).toBe('titre vide')
+  })
+
+  it('rejette un écran de démarrage visible et titré mais possédé', () => {
+    const w = makeWindow({ className: 'SplashScreenClass', title: 'Blender', hasOwner: true })
+    expect(isBlockingTarget(w)).toBe(false)
+    expect(rejectionReason(w)).toBe('fenêtre possédée')
+  })
+
+  it('rejette une boîte de dialogue possédée qui porte WS_EX_TOOLWINDOW', () => {
+    const w = makeWindow({
+      className: 'DialogClass',
+      title: 'Enregistrer sous',
+      hasOwner: true,
+      exStyle: WS_EX_TOOLWINDOW,
+    })
+    expect(isBlockingTarget(w)).toBe(false)
+    expect(rejectionReason(w)).toBe('fenêtre outil')
+  })
+
+  it('accepte la vraie fenêtre principale de Blender — le prédicat ne sur-rejette pas', () => {
+    const w = makeWindow({
+      className: 'GHOST_WindowClass',
+      visible: true,
+      title: 'Blender',
+      hasOwner: false,
+      exStyle: 0,
+    })
+    expect(isBlockingTarget(w)).toBe(true)
+    expect(rejectionReason(w)).toBeNull()
+  })
+})

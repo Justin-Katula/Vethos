@@ -29,14 +29,28 @@ describe('computeOverlayPlacement', () => {
     expect(placement).toEqual({ kind: 'placed', x: 0, y: 0, width: 2560, height: 1392 })
   })
 
-  it("masque au lieu de placer a -32000 — le bug 5", () => {
+  it("masque au lieu de placer à -32000 — le bug 5", () => {
     const placement = computeOverlayPlacement(
       makeTarget({ bounds: { left: -32000, top: -32000, right: -31840, bottom: -31972 } }),
     )
     expect(placement).toEqual({ kind: 'hidden', reason: 'bounds hors écran (-32000)' })
   })
 
-  it("masque quand la cible est minimisee", () => {
+  it('masque quand bounds.left touche exactement la sentinelle à -30000', () => {
+    const placement = computeOverlayPlacement(
+      makeTarget({ bounds: { left: -30000, top: 0, right: -29200, bottom: 600 } }),
+    )
+    expect(placement).toEqual({ kind: 'hidden', reason: 'bounds hors écran (-32000)' })
+  })
+
+  it('place la fenêtre à -29999, juste avant la sentinelle', () => {
+    const placement = computeOverlayPlacement(
+      makeTarget({ bounds: { left: -29999, top: 0, right: -29199, bottom: 600 } }),
+    )
+    expect(placement).toEqual({ kind: 'placed', x: -29999, y: 0, width: 800, height: 600 })
+  })
+
+  it("masque quand la cible est minimisée", () => {
     expect(computeOverlayPlacement(makeTarget({ showState: 'minimized' }))).toEqual({
       kind: 'hidden',
       reason: 'cible minimisée',
@@ -50,14 +64,14 @@ describe('computeOverlayPlacement', () => {
     })
   })
 
-  it("masque quand la cible est masquee par DWM", () => {
+  it("masque quand la cible est masquée par DWM", () => {
     expect(computeOverlayPlacement(makeTarget({ cloaked: true }))).toEqual({
       kind: 'hidden',
       reason: 'cible masquée par DWM',
     })
   })
 
-  it("masque sur des bounds degenerees plutot que de placer une fenetre nulle", () => {
+  it("masque sur des bounds dégénérées plutôt que de placer une fenêtre nulle", () => {
     const zeroWidth = makeTarget({ bounds: { left: 50, top: 50, right: 50, bottom: 400 } })
     expect(computeOverlayPlacement(zeroWidth)).toEqual({
       kind: 'hidden',
@@ -70,14 +84,14 @@ describe('computeOverlayPlacement', () => {
     })
   })
 
-  it("accepte des coordonnees negatives legitimes — ecran secondaire a gauche", () => {
+  it("accepte des coordonnées négatives légitimes — écran secondaire à gauche", () => {
     const placement = computeOverlayPlacement(
       makeTarget({ bounds: { left: -1920, top: 0, right: -1120, bottom: 600 } }),
     )
     expect(placement).toEqual({ kind: 'placed', x: -1920, y: 0, width: 800, height: 600 })
   })
 
-  it("ne place jamais a 0,0 par defaut quand l'etat est douteux", () => {
+  it("ne place jamais à 0,0 par défaut quand l'état est douteux", () => {
     // Garde-fou explicite du bug 5 : aucune combinaison douteuse ne doit
     // produire un placement, encore moins un placement au coin de l'ecran
     const suspects: TargetGeometry[] = [

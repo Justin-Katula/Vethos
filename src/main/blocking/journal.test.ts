@@ -118,4 +118,26 @@ describe('upsertEntry / removeEntry', () => {
     const journal = upsertEntry(emptyJournal('x'), makeEntry())
     expect(removeEntry(journal, 'inconnu').entries).toHaveLength(1)
   })
+
+  it('upsertEntry ne modifie pas le journal reçu en entrée', () => {
+    const original: Journal = { version: 1, sessionStartedAt: 'x', entries: [makeEntry()] }
+    const updated = upsertEntry(original, makeEntry({ hwnd: '2000' }))
+    expect(original.entries).toHaveLength(1)
+    expect(original.entries.map((e) => e.hwnd)).toEqual(['1000'])
+    expect(updated.entries).toHaveLength(2)
+    expect(updated.entries.map((e) => e.hwnd)).toEqual(['1000', '2000'])
+  })
+
+  it('removeEntry ne modifie pas le journal reçu en entrée', () => {
+    const original: Journal = {
+      version: 1,
+      sessionStartedAt: 'x',
+      entries: [makeEntry(), makeEntry({ hwnd: '2000' })],
+    }
+    const updated = removeEntry(original, '1000')
+    expect(original.entries).toHaveLength(2)
+    expect(original.entries.map((e) => e.hwnd)).toEqual(['1000', '2000'])
+    expect(updated.entries).toHaveLength(1)
+    expect(updated.entries.map((e) => e.hwnd)).toEqual(['2000'])
+  })
 })
