@@ -62,7 +62,46 @@ say(!bad.ok && typeof bad.error === 'string' ? 'PASS commande inconnue' : 'ECHEC
 const stillAlive = await send({ cmd: 'ping' })
 say(stillAlive.ok ? 'PASS toujours vivant apres commande inconnue' : 'ECHEC processus mort')
 
-say('=== PREUVE 3 : arret voulu, sortie propre ===')
+say('=== PREUVE 3 : enumeration reelle des fenetres ===')
+const snap = await send({ cmd: 'snapshot' })
+const windows = snap.windows ?? []
+say(`${windows.length} fenetre(s) de premier niveau enumerees`)
+
+// window-filter.ts n'est pas importable depuis un .mjs sans transpilation, et
+// il est deja couvert par vitest. Ce qu'on prouve ici est complementaire : que
+// le sidecar fournit reellement TOUS les attributs dont le filtre a besoin.
+const REQUIRED = [
+  'hwnd', 'pid', 'exeName', 'title', 'className', 'exStyle', 'style',
+  'hasOwner', 'cloaked', 'visible', 'elevated', 'processCreatedAt',
+  'showState', 'bounds',
+]
+const first = windows[0]
+const missing = first ? REQUIRED.filter((k) => !(k in first)) : REQUIRED
+say(missing.length === 0 ? 'PASS tous les attributs presents' : `ECHEC champs manquants : ${missing}`)
+
+const withTitle = windows.filter((w) => w.title.trim().length > 0)
+say(`${withTitle.length} fenetre(s) avec un titre`)
+for (const w of withTitle.slice(0, 5)) {
+  say(`   ${w.exeName} | "${w.title}" | ${w.className} | ${w.showState} | ` +
+      `${w.bounds.left},${w.bounds.top} ${w.bounds.right - w.bounds.left}x${w.bounds.bottom - w.bounds.top}` +
+      `${w.elevated ? ' | ELEVEE' : ''}`)
+}
+
+// Preuve du bug 5 : aucune fenetre non minimisee ne doit rapporter -32000.
+const sentinels = withTitle.filter(
+  (w) => w.showState !== 'minimized' && (w.bounds.left <= -30000 || w.bounds.top <= -30000),
+)
+say(sentinels.length === 0
+  ? 'PASS aucune bounds sentinelle sur une fenetre non minimisee'
+  : `ATTENTION ${sentinels.length} fenetre(s) suspecte(s)`)
+
+// Preuve du hwnd en chaine : une valeur numerique perdrait de la precision.
+say(typeof first?.hwnd === 'string' ? 'PASS hwnd transporte en chaine' : 'ECHEC hwnd numerique')
+say(typeof first?.processCreatedAt === 'string'
+  ? 'PASS processCreatedAt transporte en chaine'
+  : 'ECHEC processCreatedAt numerique')
+
+say('=== PREUVE 4 : arret voulu, sortie propre ===')
 const shutdownReply = await send({ cmd: 'shutdown' })
 say(
   shutdownReply.ok === true
