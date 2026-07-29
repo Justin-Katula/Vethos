@@ -65,6 +65,37 @@ describe('slotIsActiveAt', () => {
   })
 })
 
+describe('échéance absolue d’un créneau franchissant minuit', () => {
+  // Ces cas ne sont couverts par aucun autre test et l'arithmetique de date
+  // est le point le plus fragile du module : une echeance calculee le mauvais
+  // jour ferait terminer la session 24 h trop tot ou trop tard.
+  const nuit = makeSlot({ startMinute: 22 * 60, endMinute: 2 * 60, daysOfWeek: [3] })
+  const rules: BlockingRules = { slots: [nuit], manual: null }
+
+  it('portion du soir : la fin tombe le LENDEMAIN', () => {
+    const session = activeSessionAt(rules, mercredi(23, 0))
+    expect(session).not.toBeNull()
+    // Mercredi 29/07 23h00 -> fin jeudi 30/07 02h00.
+    expect(session?.endsAt).toBe(new Date(2026, 6, 30, 2, 0, 0, 0).getTime())
+  })
+
+  it('portion du petit matin : la fin tombe le JOUR MEME', () => {
+    const session = activeSessionAt(rules, mercredi(1, 0))
+    expect(session).not.toBeNull()
+    // Mercredi 29/07 01h00 -> fin mercredi 29/07 02h00.
+    expect(session?.endsAt).toBe(new Date(2026, 6, 29, 2, 0, 0, 0).getTime())
+  })
+
+  it("l'échéance est toujours dans le futur par rapport à maintenant", () => {
+    for (const heure of [22, 23, 0, 1]) {
+      const now = new Date(2026, 6, 29, heure, 30, 0, 0)
+      if (!slotIsActiveAt(nuit, now)) continue
+      const session = activeSessionAt(rules, now)
+      expect(session?.endsAt).toBeGreaterThan(now.getTime())
+    }
+  })
+})
+
 describe('activeSessionAt', () => {
   it('renvoie null quand aucune règle ne s’applique', () => {
     const rules: BlockingRules = { slots: [makeSlot()], manual: null }

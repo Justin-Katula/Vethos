@@ -85,8 +85,9 @@ export function deriveAppState(args: {
   minimized: boolean
   now: number
 }): AppState {
-  if (isUnlocked(args.unlock, args.now) && args.unlock !== undefined) {
-    return { kind: 'unlocked', until: args.unlock.until }
+  const unlock = args.unlock
+  if (unlock !== undefined && isUnlocked(unlock, args.now)) {
+    return { kind: 'unlocked', until: unlock.until }
   }
   if (args.minimized) return { kind: 'minimized' }
   return { kind: 'blocked' }
