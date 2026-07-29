@@ -22,7 +22,12 @@
 namespace {
 
 vethos::UndoLog g_undoLog;
-bool g_shuttingDown = false;
+// atomic : ecrit par le thread principal (branche shutdown de handleCommand),
+// lu par watchParent sur un autre thread. Un bool brut serait une donnee
+// partagee sans synchronisation — comportement indefini, et sous /O2 le
+// compilateur peut legitimement garder la valeur en registre et ne jamais
+// publier l'ecriture vers l'autre thread (finding 1 de la revue).
+std::atomic<bool> g_shuttingDown{false};
 std::string g_relaunchExePath;  // vide = relance desarmee
 HANDLE g_parentProcess = nullptr;
 // Garde one-shot : watchParent (mort du parent) et le thread principal (EOF
@@ -34,7 +39,7 @@ HANDLE g_parentProcess = nullptr;
 //     perdant l'attend avant de rendre la main a son appelant : sans cette
 //     attente, cet appelant (watchParent, qui enchaine sur ExitProcess ; ou
 //     main, qui enchaine sur son "return 0") pourrait terminer tout le
-//     processus pendant que le gagnant est encore en plein CreateProcessA sur
+//     processus pendant que le gagnant est encore en plein CreateProcessW sur
 //     l'autre thread — coupant la relance avant qu'elle ne parte reellement.
 std::atomic<bool> g_relaunchClaimed{false};
 std::atomic<bool> g_relaunchFinished{false};
@@ -50,6 +55,22 @@ void trace(const std::string& message) {
   std::fflush(stderr);
 }
 
+// Convertit de l'UTF-8 vers l'UTF-16. g_relaunchExePath contient de l'UTF-8
+// (decode depuis la ligne JSONL), et CreateProcessW — seule a interpreter
+// correctement un chemin hors CP1252, voir restoreAndMaybeRelaunch plus bas
+// (finding 4 de la revue) — attend de l'UTF-16. MultiByteToWideChar refuse
+// une longueur nulle (cbMultiByte == 0) : on court-circuite donc la chaine
+// vide plutot que de la lui soumettre.
+std::wstring toWide(const std::string& utf8) {
+  if (utf8.empty()) return {};
+  const int needed =
+      MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+  if (needed <= 0) return {};
+  std::wstring wide(static_cast<size_t>(needed), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), wide.data(), needed);
+  return wide;
+}
+
 // Reveille l'eventuel perdant bloque dans restoreAndMaybeRelaunch (voir plus
 // bas) et rend surs les deux appels a "terminer le processus" qui suivent
 // immediatement restoreAndMaybeRelaunch chez les deux appelants (ExitProcess
@@ -59,6 +80,25 @@ void signalRelaunchFinished() {
   g_relaunchFinished.store(true);
   g_relaunchFinished.notify_all();
 }
+
+// Garde RAII pour g_relaunchFinished : le destructeur signale la fin du
+// travail du gagnant dans restoreAndMaybeRelaunch (plus bas), sur TOUTE
+// sortie de la fonction — return normal ou deroulement de pile provoque par
+// une exception sous /EHsc (par exemple une bad_alloc pendant restoreAll()
+// ou pendant la construction de commandLine). Avant cette garde, la
+// signalisation etait positionnelle : elle ne tenait que parce que chaque
+// chemin de sortie pensait a appeler signalRelaunchFinished() explicitement,
+// et une exception levee entre deux aurait saute l'appel, laissant le
+// perdant bloque indefiniment dans g_relaunchFinished.wait(false)
+// (amelioration mineure de la revue). Non copiable : une seule instance vit
+// sur la pile de restoreAndMaybeRelaunch.
+class RelaunchFinishedGuard {
+ public:
+  RelaunchFinishedGuard() = default;
+  ~RelaunchFinishedGuard() { signalRelaunchFinished(); }
+  RelaunchFinishedGuard(const RelaunchFinishedGuard&) = delete;
+  RelaunchFinishedGuard& operator=(const RelaunchFinishedGuard&) = delete;
+};
 
 // Restaure tout, puis relance Vethos si et seulement si la relance est armee
 // ET que l'arret n'a pas ete demande explicitement.
@@ -75,7 +115,7 @@ void signalRelaunchFinished() {
 // relance, mais il ne peut pas non plus se contenter de "return" tout de
 // suite : son appelant enchaine sur du code qui termine le processus entier
 // (ExitProcess ou "return 0" depuis main), sans savoir si l'AUTRE thread — le
-// gagnant — a fini son propre CreateProcessA. Le perdant attend donc
+// gagnant — a fini son propre CreateProcessW. Le perdant attend donc
 // g_relaunchFinished avant de rendre la main, pour que la relance du gagnant
 // ait toujours le temps de partir avant que quiconque ne coupe le processus.
 void restoreAndMaybeRelaunch(const char* cause) {
@@ -86,27 +126,33 @@ void restoreAndMaybeRelaunch(const char* cause) {
     return;
   }
 
+  const RelaunchFinishedGuard finishedGuard;
+
   const std::vector<std::string> restored = g_undoLog.restoreAll();
   trace(std::string("annulation (") + cause + ") : " + std::to_string(restored.size()) +
         " fenetre(s) restauree(s)");
 
   if (g_shuttingDown) {
     trace("arret voulu : aucune relance");
-    signalRelaunchFinished();
     return;
   }
   if (g_relaunchExePath.empty()) {
     trace("relance desarmee : aucune relance");
-    signalRelaunchFinished();
     return;
   }
 
   trace("relance de " + g_relaunchExePath);
-  STARTUPINFOA startup = {};
+  STARTUPINFOW startup = {};
   startup.cb = sizeof(startup);
   PROCESS_INFORMATION info = {};
-  std::string commandLine = "\"" + g_relaunchExePath + "\"";
-  const BOOL ok = CreateProcessA(nullptr, commandLine.data(), nullptr, nullptr, FALSE,
+  // g_relaunchExePath est de l'UTF-8 (decode depuis la ligne JSONL) : on le
+  // convertit en UTF-16 via toWide() pour CreateProcessW, seule a
+  // interpreter correctement un chemin hors CP1252 — la page de code ANSI
+  // active n'a pas de manifeste UTF-8 (finding 4 de la revue).
+  // CreateProcessW exige un buffer de ligne de commande mutable, d'ou
+  // l'appel a .data() non-const plutot qu'a .c_str().
+  std::wstring commandLine = L"\"" + toWide(g_relaunchExePath) + L"\"";
+  const BOOL ok = CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, FALSE,
                                  CREATE_NO_WINDOW | DETACHED_PROCESS, nullptr, nullptr, &startup,
                                  &info);
   if (ok) {
@@ -116,7 +162,6 @@ void restoreAndMaybeRelaunch(const char* cause) {
   } else {
     trace("echec de la relance, code " + std::to_string(GetLastError()));
   }
-  signalRelaunchFinished();
 }
 
 // Attend la mort du parent dans un thread dedie. Le flux stdin peut rester
@@ -149,9 +194,14 @@ std::string handleCommand(const vethos::JsonValue& command) {
   }
 
   if (cmd == "shutdown") {
-    // Arret VOULU : on annule tout et on sort sans demander de relance.
-    const std::vector<std::string> restored = g_undoLog.restoreAll();
+    // Arret VOULU : le drapeau est leve AVANT toute restauration. Si on
+    // restaurait d'abord, une fenetre entre la fin de restoreAll() et la
+    // levee du drapeau permettrait a watchParent de lire g_shuttingDown a
+    // false si Vethos est tue de force a cet instant precis, et de relancer
+    // a tort (finding 1 de la revue) : l'intention doit etre publiee avant
+    // que le moindre travail ne commence, jamais apres.
     g_shuttingDown = true;
+    const std::vector<std::string> restored = g_undoLog.restoreAll();
     return vethos::JsonOut()
         .num("id", id)
         .boolean("ok", true)

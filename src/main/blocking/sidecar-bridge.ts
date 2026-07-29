@@ -27,6 +27,24 @@ type Pending = {
  *
  * Le sidecar est lancé avec `windowsHide: true` et sans shell : c'est ce qui
  * empêche l'apparition d'une console noire (bug 3 des notes de reprise).
+ *
+ * Il est aussi lancé avec `detached: true`, ce qui n'est pas optionnel : sans
+ * ce réglage, libuv rattache l'enfant au Job Object global du processus avec
+ * `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, et Windows tue le sidecar en cascade
+ * dès que Vethos est terminé de force (Gestionnaire des tâches) — avant même
+ * que son thread de death-watch ait pu restaurer quoi que ce soit ou relancer
+ * Vethos. Toute l'architecture de sécurité du sidecar est inerte sans ça,
+ * précisément sur le cas qu'elle existe pour couvrir.
+ *
+ * `detached: true` ne fait PAS réapparaître de console (vérifié : aucun
+ * nouveau processus conhost.exe et aucune fenêtre de premier niveau au pid du
+ * sidecar après spawn) et ne fait pas non plus attendre indéfiniment la fin
+ * du sidecar avant que Vethos puisse sortir (vérifié : un script reproduisant
+ * exactement la séquence de `shutdown()` ci-dessous se termine seul en
+ * quelques millisecondes, sans `process.exit()`). Pas de `child.unref()` ici :
+ * aucun blocage constaté qui le justifierait, et le garder rattaché garantit
+ * que Node n'interrompt pas les échanges stdin/stdout en cours (la plomberie
+ * requête/réponse) en sortant au milieu d'une requête en attente.
  */
 export class SidecarBridge extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | null = null
@@ -56,6 +74,7 @@ export class SidecarBridge extends EventEmitter {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: false,
+      detached: true,
     })
     this.child = child
 

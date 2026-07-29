@@ -22,7 +22,12 @@ const say = (m) => console.log(`+${String(Date.now() - t0).padStart(5, ' ')}ms  
 const work = mkdtempSync(join(tmpdir(), 'vethos-dw-'))
 const witness = join(work, 'temoin.txt')
 const fakeApp = join(work, 'fausse-vethos.bat')
-writeFileSync(fakeApp, `@echo off\r\necho relance>"${witness}"\r\n`, 'utf8')
+// >> (append), pas > (ecrase) : une DEUXIEME relance doit ajouter une ligne
+// au temoin, pas remplacer la premiere. C'est cette distinction qui rend
+// PREUVE C capable de detecter une relance en double (finding 3 de la
+// revue) — avec >, ce script passait meme sur un build qui relancait deux
+// fois.
+writeFileSync(fakeApp, `@echo off\r\necho relance>>"${witness}"\r\n`, 'utf8')
 
 function launchProbe(label) {
   const child = spawn(EXE, ['--parent-pid', String(process.pid)], {
@@ -47,7 +52,25 @@ function launchProbe(label) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const witnessExists = () => existsSync(witness)
+
+// Nombre de lignes non vides dans le temoin : 0 = jamais relance, 1 = relance
+// une fois, 2+ = relance en double (le bug que existsSync seul ne peut pas
+// distinguer d'une relance unique).
+function witnessLineCount() {
+  if (!existsSync(witness)) return 0
+  return readFileSync(witness, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0).length
+}
+
+// Rapporte PASS/ECHEC dans le style existant et fait en sorte que le script
+// puisse gater quelque chose automatiquement : au moins une ECHEC => code de
+// sortie non nul (finding 3 de la revue, le script rendait toujours 0).
+let echecs = 0
+function report(ok, passMessage, echecMessage) {
+  say(ok ? `PASS ${passMessage}` : `ECHEC ${echecMessage}`)
+  if (!ok) echecs += 1
+}
 
 say('=== PREUVE A : shutdown => restauration, PAS de relance ===')
 {
@@ -58,7 +81,12 @@ say('=== PREUVE A : shutdown => restauration, PAS de relance ===')
   child.stdin.end()
   await new Promise((r) => child.on('exit', r))
   await sleep(700)
-  say(witnessExists() ? 'ECHEC relance declenchee sur un arret voulu' : 'PASS aucune relance sur shutdown')
+  const count = witnessLineCount()
+  report(
+    count === 0,
+    'aucune relance sur shutdown',
+    `relance declenchee sur un arret voulu (${count} ligne(s) dans le temoin, attendu 0)`,
+  )
 }
 
 say('=== PREUVE B : relance desarmee => EOF ne relance rien ===')
@@ -69,7 +97,12 @@ say('=== PREUVE B : relance desarmee => EOF ne relance rien ===')
   child.stdin.end()
   await new Promise((r) => child.on('exit', r))
   await sleep(700)
-  say(witnessExists() ? 'ECHEC relance sur desarme' : 'PASS aucune relance quand desarme')
+  const count = witnessLineCount()
+  report(
+    count === 0,
+    'aucune relance quand desarme',
+    `relance sur desarme (${count} ligne(s) dans le temoin, attendu 0)`,
+  )
 }
 
 say('=== PREUVE C : mort subie du parent => restauration ET relance ===')
@@ -110,7 +143,17 @@ setTimeout(() => {}, 60000)
   say(`parent intermediaire pid=${parent.pid}, on le tue brutalement (sans /T : seul le parent direct)`)
   spawn('taskkill', ['/PID', String(parent.pid), '/F'], { windowsHide: true })
   await sleep(2500)
-  say(witnessExists() ? 'PASS relance declenchee sur mort subie' : 'ECHEC aucune relance sur mort subie')
+  const count = witnessLineCount()
+  // Exactement 1, pas juste "au moins 1" : c'est cette assertion qui aurait
+  // detecte le build defectueux qui relancait deux fois. existsSync seul
+  // (l'ancienne assertion) ne peut pas distinguer une relance d'une double
+  // relance — c'est precisement ce que ce script a laisse passer une fois
+  // (finding 3 de la revue).
+  report(
+    count === 1,
+    'relance declenchee exactement une fois sur mort subie',
+    `${count} ligne(s) dans le temoin (attendu exactement 1) sur mort subie`,
+  )
   if (existsSync(probeErr)) {
     for (const l of readFileSync(probeErr, 'utf8').split('\n').filter((l) => l.trim().length > 0)) {
       say(`   [C] ${l}`)
@@ -119,3 +162,8 @@ setTimeout(() => {}, 60000)
 }
 
 say(`dossier de travail : ${work}`)
+
+if (echecs > 0) {
+  say(`${echecs} preuve(s) en ECHEC`)
+  process.exitCode = 1
+}
