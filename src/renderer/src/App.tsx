@@ -22,6 +22,7 @@ import PlanningPage from './pages/PlanningPage'
 import SettingsPage from './pages/SettingsPage'
 import TasksPage from './pages/TasksPage'
 import BlockingPage from './pages/BlockingPage'
+import BlockOverlay from './pages/BlockOverlay'
 import AuthPage from './pages/AuthPage'
 
 export default function App(): JSX.Element {
@@ -106,6 +107,8 @@ export default function App(): JSX.Element {
           <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
+        {/* Hors Layout : l'overlay est une fenetre nue, sans barre laterale. */}
+        <Route path="/block-overlay" element={<BlockOverlay />} />
       </Routes>
       <AnimatePresence>{showOnboarding && <OnboardingOverlay key="onboarding" />}</AnimatePresence>
       <ToastViewport />

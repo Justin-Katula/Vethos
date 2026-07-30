@@ -73,6 +73,12 @@ const api = {
      */
     getSession: (): Promise<BlockingSessionState> =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_GET_SESSION),
+    /** Minimise la PAIRE overlay + fenêtre cible. Rend false si Windows refuse. */
+    minimizeAppWindow: (args: { token: string; windowId: string }): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_MINIMIZE_APP_WINDOW, args),
+    /** Demande la fermeture propre de la fenêtre cible. Jamais un kill. */
+    closeAppWindow: (args: { token: string; windowId: string }): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BLOCKING_CLOSE_APP_WINDOW, args),
     onSessionChange: (cb: (state: BlockingSessionState) => void): (() => void) => {
       const listener = (_: unknown, payload: BlockingSessionState) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.BLOCKING_EVENT_SESSION, listener)
