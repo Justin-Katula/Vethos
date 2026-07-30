@@ -17,6 +17,7 @@ import {
   type TrayDeps,
 } from './tray'
 import { createReconciliationClock, type ReconciliationClock } from './blocking/clock'
+import { createEnforcer } from './blocking/enforcer'
 import type { BlockingRules } from './blocking/schedule'
 
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
@@ -135,6 +136,13 @@ let blockingSessionActive = false
 /** Horloge de réconciliation, créée une fois l'application prête. */
 let blockingClock: ReconciliationClock | null = null
 
+/**
+ * Exécuteur du blocage : traduit les décisions de l'horloge en actions réelles
+ * sur les fenêtres. Créé au chargement du module pour qu'un arrêt précoce
+ * puisse déjà lui demander de tout restaurer.
+ */
+const enforcer = createEnforcer()
+
 function showMainWindow(): void {
   if (mainWindow === null || mainWindow.isDestroyed()) {
     mainWindow = createMainWindow()
@@ -204,6 +212,14 @@ function startNexusApp(): void {
         onTransition: (transition, snapshot) => {
           log.info('[blocage] transition de session', transition)
           setBlockingSessionActive(transition.kind !== 'ended')
+
+          // C'est ici que la décision devient action : l'horloge dit qu'il
+          // faut bloquer, l'exécuteur bloque. Une erreur d'application ne doit
+          // jamais faire tomber l'horloge — elle réessaiera au tic suivant.
+          void enforcer.apply(snapshot).catch((err) => {
+            log.error('[blocage] application de la session impossible', err)
+          })
+
           const win = mainWindow
           if (win && !win.isDestroyed()) {
             win.webContents.send(IPC_CHANNELS.BLOCKING_EVENT_SESSION, snapshot)
@@ -259,6 +275,10 @@ function startNexusApp(): void {
 
   app.on('will-quit', () => {
     blockingClock?.stop()
+    // Restaure barre des tâches et son de toutes les applications touchées.
+    // Quitter Vethos ne doit jamais laisser une application muette ou absente
+    // de la barre des tâches.
+    void enforcer.stop()
     destroyVethosTray()
   })
 
