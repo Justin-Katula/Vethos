@@ -62,7 +62,24 @@ describe('app-discovery', () => {
         exeName: 'Antigravity.exe',
         exePath: 'C:\\Users\\obed\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe',
         publisher: '',
+        // La fusion classe l'entrée retenue. « Antigravity » n'est reconnu par
+        // aucun signal, d'où « autres » — le repli assumé.
+        category: 'others',
+        logoPath: undefined,
       },
+    ])
+  })
+
+  it('classe chaque application fusionnée', () => {
+    const merged = mergeCandidates(
+      buildShortcutCandidates([
+        { Name: 'Discord', TargetPath: 'C:\\Users\\o\\AppData\\Local\\Discord\\discord.exe' },
+        { Name: 'Blender', TargetPath: 'C:\\Program Files\\Blender\\blender.exe' },
+      ]),
+    )
+    expect(merged.map((a) => [a.name, a.category])).toEqual([
+      ['Blender', 'creativity'],
+      ['Discord', 'social'],
     ])
   })
 

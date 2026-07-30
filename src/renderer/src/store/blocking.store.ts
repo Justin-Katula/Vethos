@@ -1,19 +1,20 @@
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
-import type { BlockingRulesState, RecurringSlot } from '@shared/schemas'
+import type { BlockingRulesState } from '@shared/schemas'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { useToastStore } from './toast.store'
 
 /**
- * Règles de blocage et état de session.
+ * Sessions de blocage.
+ *
+ * Une session est **ponctuelle** : elle se lance une fois, elle se termine, et
+ * c'est tout. La récurrence hebdomadaire n'appartient pas à cette page — elle
+ * relève d'un autre mécanisme, et le moteur (`main/blocking/schedule.ts`) la
+ * gère déjà côté modèle pour quand ce mécanisme arrivera.
  *
  * L'état de session n'est jamais calculé ici : il est décidé par l'horloge du
- * processus principal, qui continue de tourner fenêtre fermée. L'interface se
- * contente de le lire et de l'afficher — une seule source de vérité.
- *
- * Les modifications de règles ne raccourcissent jamais une session en cours.
- * Sans cette règle, éditer un créneau deviendrait un bouton « Arrêter »
- * déguisé, et tout le mécanisme s'effondrerait.
+ * processus principal, qui continue de tourner fenêtre fermée. L'interface le
+ * lit et l'affiche — une seule source de vérité.
  */
 
 export type SessionState = {
@@ -28,75 +29,54 @@ const SESSION_INACTIVE: SessionState = { active: false, blockedAppIds: [], endsA
 export const MIN_DURATION_MINUTES = 30
 /** Pas de réglage, pour la durée comme pour l'heure de départ différée. */
 export const DURATION_STEP_MINUTES = 15
-/** Plafond : 12 h. Au-delà on approcherait d'une journée entière, où début et fin se rejoignent. */
+/** Plafond : 12 h. */
 export const MAX_DURATION_MINUTES = 12 * 60
 
-export type SlotDraft = {
-  id?: string
-  label: string
-  daysOfWeek: number[]
-  startMinute: number
-  endMinute: number
-  appIds: string[]
-}
+export type SaveResult = { ok: true } | { ok: false; field: 'apps' | 'duration'; message: string }
 
-/**
- * Résultat d'un enregistrement.
- *
- * Le champ `field` permet à l'interface d'afficher l'erreur À CÔTÉ de ce qui
- * cloche plutôt que dans un message flottant : l'ancienne version fermait le
- * formulaire et affichait l'erreur après coup, ce qui obligeait à tout
- * ressaisir.
- */
-export type SaveResult =
-  | { ok: true }
-  | { ok: false; field: 'label' | 'apps' | 'days' | 'duration'; message: string }
+export type SessionDraft = {
+  appIds: string[]
+  durationMinutes: number
+  /** Minutes depuis minuit, ou `null` pour démarrer immédiatement. */
+  startMinute: number | null
+}
 
 type BlockingStore = {
   loaded: boolean
-  slots: RecurringSlot[]
   session: SessionState
+  /** Session programmée mais pas encore commencée, s'il y en a une. */
+  pending: { startedAt: number; endsAt: number; appIds: string[] } | null
   load: () => Promise<void>
-  saveSlot: (draft: SlotDraft) => Promise<SaveResult>
-  deleteSlot: (id: string) => Promise<void>
-  startManualSession: (appIds: string[], durationMinutes: number) => Promise<SaveResult>
+  startSession: (draft: SessionDraft) => Promise<SaveResult>
+  cancelPending: () => Promise<void>
   setSession: (session: SessionState) => void
 }
 
-function uuid(): string {
-  return crypto.randomUUID()
+/**
+ * Instant de départ absolu à partir d'une heure de la journée.
+ *
+ * Si l'heure choisie est déjà passée aujourd'hui, on vise demain : c'est la
+ * seule lecture qui ne surprenne pas. Choisir 8 h à 14 h ne peut pas vouloir
+ * dire « il y a six heures ».
+ */
+export function resolveStartAt(startMinute: number | null, now: Date): number {
+  if (startMinute === null) return now.getTime()
+  const cible = new Date(now)
+  cible.setHours(Math.floor(startMinute / 60), startMinute % 60, 0, 0)
+  if (cible.getTime() <= now.getTime()) cible.setDate(cible.getDate() + 1)
+  return cible.getTime()
 }
 
-/** Validation miroir de celle du schéma — attrape la saisie avant le disque. */
-function slotError(draft: SlotDraft): SaveResult {
-  if (draft.label.trim().length === 0) {
-    return { ok: false, field: 'label', message: 'Donne un nom à ce créneau.' }
-  }
-  if (draft.appIds.length === 0) {
-    return { ok: false, field: 'apps', message: 'Choisis au moins une application à bloquer.' }
-  }
-  if (draft.daysOfWeek.length === 0) {
-    return { ok: false, field: 'days', message: 'Choisis au moins un jour.' }
-  }
-  if (draft.startMinute === draft.endMinute) {
-    return {
-      ok: false,
-      field: 'duration',
-      message: 'Une durée nulle bloquerait en permanence. Allonge la durée.',
-    }
-  }
-  return { ok: true }
-}
-
-async function persist(slots: RecurringSlot[], manual: BlockingRulesState['manual']): Promise<void> {
-  const state: BlockingRulesState = { slots, manual }
+async function persist(manual: BlockingRulesState['manual']): Promise<void> {
+  // `slots` reste vide : la récurrence n'est pas pilotée depuis cette page.
+  const state: BlockingRulesState = { slots: [], manual }
   try {
     const result = await nexus.storage.write('blocking_rules', state)
     assertStorageWrite(result, 'blocking_rules')
   } catch (err) {
     useToastStore.getState().push({
       variant: 'error',
-      title: 'Sauvegarde des règles échouée',
+      title: 'Sauvegarde du blocage échouée',
       description: err instanceof Error ? err.message : String(err),
     })
     throw err
@@ -105,81 +85,54 @@ async function persist(slots: RecurringSlot[], manual: BlockingRulesState['manua
 
 export const useBlockingStore = create<BlockingStore>((set, get) => ({
   loaded: false,
-  slots: [],
   session: SESSION_INACTIVE,
+  pending: null,
 
   async load() {
     const [stored, session] = await Promise.all([
       nexus.storage.read<BlockingRulesState>('blocking_rules'),
       nexus.blocking.getSession(),
     ])
-    set({ loaded: true, slots: stored?.slots ?? [], session: session ?? SESSION_INACTIVE })
+    const manual = stored?.manual ?? null
+    const pasEncoreCommencee = manual !== null && manual.startedAt > Date.now()
+    set({
+      loaded: true,
+      session: session ?? SESSION_INACTIVE,
+      pending: pasEncoreCommencee ? manual : null,
+    })
   },
 
-  async saveSlot(draft) {
+  async startSession(draft) {
     // On rend l'erreur au lieu de la crier : l'appelant garde le formulaire
     // ouvert et l'affiche à côté du champ fautif.
-    const validation = slotError(draft)
-    if (!validation.ok) return validation
-
-    const slot: RecurringSlot = {
-      id: draft.id ?? uuid(),
-      label: draft.label.trim(),
-      daysOfWeek: [...draft.daysOfWeek].sort((a, b) => a - b),
-      startMinute: draft.startMinute,
-      endMinute: draft.endMinute,
-      appIds: draft.appIds,
-    }
-
-    const existing = get().slots
-    const slots = existing.some((s) => s.id === slot.id)
-      ? existing.map((s) => (s.id === slot.id ? slot : s))
-      : [...existing, slot]
-
-    await persist(slots, null)
-    set({ slots })
-
-    if (get().session.active) {
-      useToastStore.getState().push({
-        variant: 'info',
-        title: 'Enregistré — effet à la prochaine session',
-        description: 'Une session est en cours : elle ne peut pas être raccourcie.',
-      })
-    }
-    return { ok: true }
-  },
-
-  async deleteSlot(id) {
-    const slots = get().slots.filter((s) => s.id !== id)
-    await persist(slots, null)
-    set({ slots })
-    if (get().session.active) {
-      useToastStore.getState().push({
-        variant: 'info',
-        title: 'Supprimé — la session en cours continue',
-        description: 'Retirer un créneau ne lève pas un blocage déjà commencé.',
-      })
-    }
-  },
-
-  async startManualSession(appIds, durationMinutes) {
-    if (appIds.length === 0) {
+    if (draft.appIds.length === 0) {
       return { ok: false, field: 'apps', message: 'Choisis au moins une application à bloquer.' }
     }
-    if (durationMinutes < MIN_DURATION_MINUTES) {
+    if (draft.durationMinutes < MIN_DURATION_MINUTES) {
       return {
         ok: false,
         field: 'duration',
         message: `La durée minimale est de ${MIN_DURATION_MINUTES} minutes.`,
       }
     }
-    const startedAt = Date.now()
-    await persist(get().slots, {
+
+    const startedAt = resolveStartAt(draft.startMinute, new Date())
+    const manual = {
       startedAt,
-      endsAt: startedAt + durationMinutes * 60_000,
-      appIds,
-    })
+      endsAt: startedAt + draft.durationMinutes * 60_000,
+      appIds: draft.appIds,
+    }
+    await persist(manual)
+    set({ pending: startedAt > Date.now() ? manual : null })
     return { ok: true }
+  },
+
+  async cancelPending() {
+    // Annuler une session PAS ENCORE commencée est légitime : rien ne bloque
+    // encore. Une session en cours, elle, ne s'annule pas depuis ici.
+    if (get().session.active) return
+    await persist(null)
+    set({ pending: null })
   },
 
   setSession(session) {

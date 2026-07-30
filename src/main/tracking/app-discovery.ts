@@ -7,10 +7,11 @@
  */
 
 import { execFile as execFileCallback } from 'node:child_process'
-import { app as electronApp } from 'electron'
+import { app as electronApp, nativeImage } from 'electron'
 import { promisify } from 'node:util'
 import * as path from 'node:path'
 import log from '@main/logging/setup'
+import { categorizeApp, type AppCategory } from './app-category'
 
 const execFile = promisify(execFileCallback)
 
@@ -19,7 +20,10 @@ export type DiscoveredApp = {
   exeName: string
   exePath: string
   publisher: string
+  category: AppCategory
   iconDataUrl?: string
+  /** Logo déclaré par un paquet Store. Interne : remplacé par iconDataUrl. */
+  logoPath?: string
 }
 
 type ShortcutRecord = {
@@ -41,9 +45,16 @@ type RegistryRecord = {
   WindowsInstaller?: unknown
 }
 
-type AppCandidate = DiscoveredApp & {
-  source: 'shortcut' | 'registry'
+/**
+ * Candidat avant fusion. La catégorie est délibérément absente : elle est
+ * calculée une seule fois au moment de la fusion, sur l'entrée retenue, plutôt
+ * que sur chaque doublon écarté.
+ */
+type AppCandidate = Omit<DiscoveredApp, 'category'> & {
+  source: 'shortcut' | 'registry' | 'store'
   score: number
+  /** Logo fourni par le manifeste d'un paquet Store, meilleur que l'icône de l'exe. */
+  logoPath?: string
 }
 
 const NON_USER_APP_RE =
@@ -73,6 +84,16 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
     log.warn('[app-discovery] registry scan failed', err)
   }
 
+  // Troisième source, indispensable : les applications du Microsoft Store.
+  // Elles n'ont ni raccourci .lnk ni entrée de désinstallation classique, donc
+  // les deux scans précédents les manquent entièrement — Spotify, WhatsApp,
+  // Instagram, Netflix… C'est là que se cachaient les applications absentes.
+  try {
+    candidates.push(...buildStoreCandidates(await readStoreApps()))
+  } catch (err) {
+    log.warn('[app-discovery] Store scan failed', err)
+  }
+
   const apps = await attachAppIcons(mergeCandidates(candidates))
   log.info(`[app-discovery] count=${apps.length}`)
   return apps
@@ -83,12 +104,37 @@ const iconCache = new Map<string, string | null>()
 async function attachAppIcons(apps: DiscoveredApp[]): Promise<DiscoveredApp[]> {
   if (process.platform !== 'win32') return apps
 
-  return Promise.all(
+  const resultats = await Promise.all(
     apps.map(async (app) => {
-      const iconDataUrl = await getIconDataUrl(app.exePath)
-      return iconDataUrl ? { ...app, iconDataUrl } : app
+      // Le logo du manifeste Store est un PNG net et transparent ; l'icône
+      // extraite d'un .exe est une ressource ICO souvent basse définition.
+      // Quand les deux existent, le manifeste gagne.
+      const depuisManifeste =
+        app.logoPath === undefined ? null : await readLogoFile(app.logoPath)
+      const iconDataUrl = depuisManifeste ?? (await getIconDataUrl(app.exePath))
+      const { logoPath: _ignore, ...reste } = app
+      return iconDataUrl ? { ...reste, iconDataUrl } : reste
     }),
   )
+
+  const avecIcone = resultats.filter((a) => a.iconDataUrl !== undefined).length
+  log.info(`[app-discovery] icônes : ${avecIcone}/${resultats.length}`)
+  return resultats
+}
+
+/** Lit un PNG de logo Store et le rend en data URL. */
+async function readLogoFile(logoPath: string): Promise<string | null> {
+  const key = `logo:${logoPath.toLowerCase()}`
+  if (iconCache.has(key)) return iconCache.get(key) ?? null
+  try {
+    const image = nativeImage.createFromPath(logoPath)
+    const dataUrl = image.isEmpty() ? null : image.toDataURL()
+    iconCache.set(key, dataUrl)
+    return dataUrl
+  } catch {
+    iconCache.set(key, null)
+    return null
+  }
 }
 
 async function getIconDataUrl(exePath: string): Promise<string | null> {
@@ -100,7 +146,9 @@ async function getIconDataUrl(exePath: string): Promise<string | null> {
       iconCache.set(key, null)
       return null
     }
-    const image = await electronApp.getFileIcon(exePath, { size: 'normal' })
+    // 'large' plutôt que 'normal' : 32 px devenait flou dès que la liste
+    // s'affichait sur un écran à forte densité.
+    const image = await electronApp.getFileIcon(exePath, { size: 'large' })
     const dataUrl = image.isEmpty() ? null : image.toDataURL()
     iconCache.set(key, dataUrl)
     return dataUrl
@@ -109,6 +157,93 @@ async function getIconDataUrl(exePath: string): Promise<string | null> {
     log.warn('[app-discovery] icon read failed', { exePath, err })
     return null
   }
+}
+
+type StoreRecord = {
+  Name?: unknown
+  Executable?: unknown
+  InstallLocation?: unknown
+  LogoPath?: unknown
+  Publisher?: unknown
+}
+
+/**
+ * Applications du Microsoft Store, via `Get-StartApps` croisé avec
+ * `Get-AppxPackage`.
+ *
+ * `Get-StartApps` est la source d'autorité de « ce que l'utilisateur voit dans
+ * le menu Démarrer » : par construction elle exclut les composants système,
+ * les runtimes et les paquets de dépendance, sans qu'on ait à deviner. On la
+ * croise avec `Get-AppxPackage` pour obtenir le dossier d'installation, puis
+ * on lit le manifeste pour l'exécutable réel et le logo.
+ *
+ * Le logo est cherché en plusieurs variantes : Windows ne stocke pas le
+ * fichier déclaré dans le manifeste, mais des déclinaisons par échelle
+ * (`.scale-200`, `.targetsize-48`…). On prend la plus grande disponible.
+ */
+async function readStoreApps(): Promise<StoreRecord[]> {
+  const script = `
+    $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $packages = @{}
+    foreach ($p in Get-AppxPackage -ErrorAction SilentlyContinue) {
+      if ($p.PackageFamilyName) { $packages[$p.PackageFamilyName] = $p }
+    }
+
+    function Get-BestLogo([string]$root, [string]$declared) {
+      if (-not $declared) { return $null }
+      $full = Join-Path $root $declared
+      $dir = Split-Path $full -Parent
+      $base = [IO.Path]::GetFileNameWithoutExtension($full)
+      $ext = [IO.Path]::GetExtension($full)
+      if (-not (Test-Path -LiteralPath $dir)) { return $null }
+      # Les variantes d'echelle donnent une bien meilleure definition que le
+      # fichier nominal, qui est souvent absent du disque.
+      $variants = Get-ChildItem -LiteralPath $dir -Filter "$base*$ext" -ErrorAction SilentlyContinue |
+        Sort-Object Length -Descending
+      if ($variants) { return $variants[0].FullName }
+      if (Test-Path -LiteralPath $full) { return $full }
+      return $null
+    }
+
+    $items = foreach ($entry in (Get-StartApps -ErrorAction SilentlyContinue)) {
+      $appId = [string]$entry.AppID
+      if ($appId -notmatch '^(?<pfn>[^!]+)!(?<app>.+)$') { continue }
+      $pkg = $packages[$Matches['pfn']]
+      if (-not $pkg -or -not $pkg.InstallLocation) { continue }
+      $manifestPath = Join-Path $pkg.InstallLocation 'AppxManifest.xml'
+      if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
+      try {
+        [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop
+        $apps = @($manifest.Package.Applications.Application)
+        $target = $apps | Where-Object { $_.Id -eq $Matches['app'] } | Select-Object -First 1
+        if (-not $target) { $target = $apps | Select-Object -First 1 }
+        if (-not $target) { continue }
+        $visual = $target.VisualElements
+        if (-not $visual) { $visual = $target.'uap:VisualElements' }
+        $declaredLogo = $null
+        if ($visual) {
+          $declaredLogo = $visual.Square44x44Logo
+          if (-not $declaredLogo) { $declaredLogo = $visual.Square150x150Logo }
+          if (-not $declaredLogo) { $declaredLogo = $visual.Logo }
+        }
+        [pscustomobject]@{
+          Name = [string]$entry.Name
+          Executable = [string]$target.Executable
+          InstallLocation = [string]$pkg.InstallLocation
+          LogoPath = Get-BestLogo $pkg.InstallLocation $declaredLogo
+          Publisher = [string]$pkg.Publisher
+        }
+      } catch {}
+    }
+    @($items) | ConvertTo-Json -Depth 3
+  `
+
+  const { stdout } = await execFile(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+    { windowsHide: true, maxBuffer: 20 * 1024 * 1024, timeout: 30000 },
+  )
+  return parseJsonArray<StoreRecord>(stdout)
 }
 
 async function readStartMenuShortcuts(): Promise<ShortcutRecord[]> {
@@ -179,6 +314,42 @@ function buildShortcutCandidates(items: ShortcutRecord[]): AppCandidate[] {
   })
 }
 
+function buildStoreCandidates(items: StoreRecord[]): AppCandidate[] {
+  return items.flatMap((item) => {
+    const name = normalizeDisplayName(String(item.Name ?? ''))
+    const installLocation = String(item.InstallLocation ?? '')
+    const executable = String(item.Executable ?? '')
+    if (!name || !installLocation || !executable) return []
+
+    const exePath = normalizeExePath(path.join(installLocation, executable))
+    const logoPath = String(item.LogoPath ?? '')
+
+    // Get-StartApps a déjà écarté les composants système : ces entrées sont
+    // par définition ce que l'utilisateur voit dans son menu Démarrer. On ne
+    // repasse donc pas le filtre heuristique, qui rejetterait à tort des noms
+    // légitimes comme « Xbox Game Bar » ou « Paramètres de l'Assistant ».
+    return [
+      {
+        name,
+        exeName: path.basename(exePath),
+        exePath,
+        publisher: extractPublisherCommonName(String(item.Publisher ?? '')),
+        logoPath: logoPath.length > 0 ? logoPath : undefined,
+        source: 'store' as const,
+        // Priorité maximale : c'est la source la plus fidèle à ce que
+        // l'utilisateur voit, logo compris.
+        score: 100,
+      },
+    ]
+  })
+}
+
+/** « CN=Spotify AB, O=… » → « Spotify AB ». */
+function extractPublisherCommonName(subject: string): string {
+  const match = subject.match(/CN=([^,]+)/u)
+  return match?.[1]?.trim() ?? ''
+}
+
 function buildRegistryCandidates(items: RegistryRecord[]): AppCandidate[] {
   return items.flatMap((item) => {
     if (isHiddenRegistryEntry(item)) return []
@@ -232,7 +403,14 @@ function mergeCandidates(candidates: AppCandidate[]): DiscoveredApp[] {
   }
 
   return [...byApp.values()]
-    .map(({ name, exeName, exePath, publisher }) => ({ name, exeName, exePath, publisher }))
+    .map(({ name, exeName, exePath, publisher, logoPath }) => ({
+      name,
+      exeName,
+      exePath,
+      publisher,
+      category: categorizeApp({ name, exeName, publisher }),
+      logoPath,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 }
 

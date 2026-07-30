@@ -4,6 +4,7 @@ import type {
   DeclaredAppUsageState,
   StorageKey,
 } from '@shared/schemas'
+import type { AppCategory } from '@shared/app-categories'
 
 export type StorageWriteResult = { ok: true } | { ok: false; error: string }
 
@@ -25,6 +26,7 @@ const api = {
         exeName: string
         exePath: string
         publisher: string
+        category: AppCategory
         iconDataUrl?: string
       }>
     > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),
