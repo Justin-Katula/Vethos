@@ -6,6 +6,8 @@ export const IPC_CHANNELS = {
   APP_OPEN_LOGS: 'app:openLogs',
   APP_FLUSH_DEBOUNCES: 'app:flushDebounces',
   APP_DISCOVERY_LIST: 'app:discoverInstalledApps',
+  /** Relance un scan complet. Ne rappelle jamais l'IA pour ce qui est déjà jugé. */
+  APP_DISCOVERY_REFRESH: 'app:refreshInstalledApps',
   UPDATER_EVENT_AVAILABLE: 'updater:event:available',
   UPDATER_EVENT_DOWNLOADED: 'updater:event:downloaded',
   // App usage tracker

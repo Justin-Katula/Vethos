@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { Storage } from '@shared/storage'
 import { getLogFilePath } from '@main/logging/setup'
 import { notifyTaskEvent, type TaskNotifyEvent } from '@main/notifications'
-import { discoverInstalledApps } from '@main/tracking/app-discovery'
+import { getAppCatalog } from '@main/tracking/app-catalog'
 import { registerStorageHandlers } from './storage.handlers'
 import { registerAppUsageHandlers } from '../tracking/handlers'
 
@@ -28,7 +28,10 @@ export async function registerAllIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.APP_OPEN_LOGS, async () => {
     await shell.openPath(getLogFilePath())
   })
-  ipcMain.handle(IPC_CHANNELS.APP_DISCOVERY_LIST, () => discoverInstalledApps())
+  // Par défaut on sert le catalogue en cache : le scan complet est trop lourd
+  // pour être refait à chaque ouverture de la page.
+  ipcMain.handle(IPC_CHANNELS.APP_DISCOVERY_LIST, () => getAppCatalog())
+  ipcMain.handle(IPC_CHANNELS.APP_DISCOVERY_REFRESH, () => getAppCatalog({ force: true }))
 
   // V2 P9 — Notifications de niveau des tâches déclenchées depuis le
   // renderer (tasks.store). Le main reçoit l'event et déclenche la notif

@@ -31,6 +31,18 @@ const api = {
         iconDataUrl?: string
       }>
     > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),
+    /** Relance un scan complet des applications installées. */
+    refreshInstalledApps: (): Promise<
+      Array<{
+        name: string
+        exeName: string
+        exePath: string
+        publisher: string
+        category: AppCategory
+        description?: string
+        iconDataUrl?: string
+      }>
+    > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_REFRESH),
     onFlushDebounces: (cb: () => void): (() => void) => {
       const listener = () => cb()
       ipcRenderer.on(IPC_CHANNELS.APP_FLUSH_DEBOUNCES, listener)

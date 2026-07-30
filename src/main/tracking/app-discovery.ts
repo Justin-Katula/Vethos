@@ -430,16 +430,32 @@ async function lireCacheIA(): Promise<AiCache> {
 }
 
 /**
- * Classe les applications : d'abord localement par mots-clés, puis par IA pour
- * le seul reliquat tombé dans « Autres ».
+ * Seuil de déclenchement de l'IA.
  *
- * Le classement local ne connaît que ce qu'on a pensé à lister ; l'IA sait ce
- * qu'est « eFootball » ou « Antigravity » sans qu'on l'écrive. Son verdict est
- * mis en cache sur disque, donc elle ne repasse jamais deux fois sur la même
- * application.
+ * En dessous, on ne l'appelle pas : classer trois applications ne vaut pas un
+ * appel réseau, et surtout pas de l'argent. Au-dessus — typiquement le tout
+ * premier scan, ou une grosse fournée d'installations — l'appel se justifie.
+ * Le résultat est ensuite mis en cache pour toujours.
+ */
+export const AI_TRIGGER_THRESHOLD = 10
+
+/**
+ * Classe les applications : localement d'abord, puis par IA.
  *
- * Sans clé d'API ou hors ligne, tout continue : les applications restent dans
- * « Autres ». Aucune découverte ne dépend de la disponibilité de l'IA.
+ * Le classement local par mots-clés ne connaît que ce qu'on a pensé à lister.
+ * L'IA complète — catégorie **et** description — pour tout ce qu'elle sait
+ * reconnaître, et ne dit rien de ce qu'elle ignore.
+ *
+ * Trois garde-fous contre la facture :
+ *
+ * - **Cache disque définitif.** Une application déjà jugée ne repart jamais,
+ *   y compris lors d'un rafraîchissement manuel.
+ * - **Seuil de déclenchement.** L'IA n'est sollicitée qu'à partir de
+ *   `AI_TRIGGER_THRESHOLD` applications inconnues. En dessous, on attend.
+ * - **Par lots de 30**, jamais une par une.
+ *
+ * Sans clé d'API ou hors ligne, tout continue : les applications gardent leur
+ * classement local. Aucune découverte ne dépend de la disponibilité de l'IA.
  */
 async function classerApplications(apps: DiscoveredApp[]): Promise<DiscoveredApp[]> {
   const classees = apps.map((app) => ({
@@ -447,29 +463,42 @@ async function classerApplications(apps: DiscoveredApp[]): Promise<DiscoveredApp
     category: categorizeApp({ name: app.name, exeName: app.exeName, publisher: app.publisher }),
   }))
 
-  const inclassees = classees.filter((a) => a.category === 'others')
-  if (inclassees.length === 0) return classees
-
+  let cache: AiCache
   try {
-    const cache = await classerParIA(
-      inclassees.map((a) => ({
-        exeName: a.exeName || a.name,
-        name: a.name,
-        publisher: a.publisher,
-      })),
-      await lireCacheIA(),
-    )
-    await writeFile(cheminCacheIA(), JSON.stringify(cache, null, 2), 'utf8')
-    return classees.map((app) => {
-      const verdict = cache[(app.exeName || app.name).toLowerCase()]
-      return verdict === undefined
-        ? app
-        : { ...app, category: verdict.category, description: verdict.description }
-    })
-  } catch (err) {
-    log.warn('[app-discovery] classement IA indisponible', err)
-    return classees
+    cache = await lireCacheIA()
+  } catch {
+    cache = {}
   }
+
+  const cle = (app: DiscoveredApp): string => (app.exeName || app.name).toLowerCase()
+  const inconnues = classees.filter((app) => cache[cle(app)] === undefined)
+
+  if (inconnues.length > AI_TRIGGER_THRESHOLD) {
+    log.info(
+      `[app-discovery] ${inconnues.length} application(s) inconnue(s) — appel IA (seuil ${AI_TRIGGER_THRESHOLD})`,
+    )
+    try {
+      cache = await classerParIA(
+        inconnues.map((a) => ({ exeName: cle(a), name: a.name, publisher: a.publisher })),
+        cache,
+      )
+      await writeFile(cheminCacheIA(), JSON.stringify(cache, null, 2), 'utf8')
+    } catch (err) {
+      log.warn('[app-discovery] classement IA indisponible', err)
+    }
+  } else if (inconnues.length > 0) {
+    log.info(
+      `[app-discovery] ${inconnues.length} inconnue(s), sous le seuil de ${AI_TRIGGER_THRESHOLD} — pas d'appel IA`,
+    )
+  }
+
+  // Le verdict de l'IA prime sur le classement local : elle sait ce qu'est
+  // « eFootball », les mots-clés non.
+  return classees.map((app) => {
+    const verdict = cache[cle(app)]
+    if (verdict === undefined) return app
+    return { ...app, category: verdict.category, description: verdict.description }
+  })
 }
 
 const iconCache = new Map<string, string | null>()

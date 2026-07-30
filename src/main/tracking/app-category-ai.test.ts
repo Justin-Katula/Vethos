@@ -86,9 +86,15 @@ describe('parseAiResponse', () => {
     expect(parseAiResponse(brut, demandees)).toEqual({})
   })
 
-  it('écarte une description vide', () => {
-    const brut = { resultats: [{ exe: 'antigravity.exe', categorie: 'games', description: '  ' }] }
-    expect(parseAiResponse(brut, demandees)).toEqual({})
+  it('garde le verdict sans description quand l’IA ne connaît pas l’application', () => {
+    // Une description vide est legitime : l'IA ne reconnait pas l'application
+    // et on ne veut pas qu'elle invente. Le verdict est quand meme mis en
+    // cache, sinon l'application serait redemandee — et refacturee — a chaque
+    // scan.
+    const brut = { resultats: [{ exe: 'antigravity.exe', categorie: 'others', description: '  ' }] }
+    expect(parseAiResponse(brut, demandees)).toEqual({
+      'antigravity.exe': { category: 'others' },
+    })
   })
 
   it('tronque une description trop longue', () => {

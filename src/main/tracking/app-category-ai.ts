@@ -6,27 +6,35 @@ import log from '@main/logging/setup'
  * Classement des applications par IA, en renfort du classement local.
  *
  * Le classement par mots-clés (`app-category.ts`) reconnaît ce qu'on a pensé à
- * lister ; tout le reste tombe dans « Autres ». L'IA reprend uniquement ce
- * reliquat : elle sait ce qu'est « Antigravity » ou « eFootball » sans qu'on
- * ait à l'écrire.
+ * lister. L'IA complète — catégorie **et** description — pour tout ce qu'elle
+ * reconnaît réellement, et ne dit rien de ce qu'elle ignore.
  *
- * Trois garde-fous, parce qu'un appel réseau par application serait
- * intenable :
+ * Trois garde-fous, parce qu'un appel réseau par application serait intenable
+ * et coûteux :
  *
- * - **On n'envoie que les « Autres »** — jamais les applications déjà classées.
- * - **Par lots**, pas une par une.
- * - **Mis en cache sur disque** : une application déjà jugée ne repart jamais.
+ * - **Mis en cache sur disque définitivement.** Une application déjà jugée ne
+ *   repart jamais, y compris quand elle n'a pas reçu de description : sinon
+ *   elle serait redemandée, et refacturée, à chaque scan.
+ * - **Seuil de déclenchement** côté appelant : en dessous d'une poignée
+ *   d'inconnues, on n'appelle pas.
+ * - **Par lots**, jamais une par une.
  *
  * Échec silencieux et sans conséquence : sans clé d'API, hors ligne ou sur
- * réponse illisible, les applications restent simplement dans « Autres ».
+ * réponse illisible, les applications gardent leur classement local.
  */
 
 export const AI_BATCH_SIZE = 30
 
 export type AiVerdict = {
   category: AppCategory
-  /** Une phrase, affichable telle quelle sous le nom de l'application. */
-  description: string
+  /**
+   * Une phrase, affichable telle quelle sous le nom de l'application.
+   *
+   * Absente quand l'IA ne connaît pas l'application : mieux vaut ne rien dire
+   * qu'inventer. Le verdict est mis en cache **même sans description**, sinon
+   * l'application serait redemandée à chaque scan et coûterait à chaque fois.
+   */
+  description?: string
 }
 
 export type AiCache = Record<string, AiVerdict>
@@ -36,7 +44,8 @@ const SYSTEM_PROMPT = [
   `Catégories autorisées, exactement ces identifiants : ${APP_CATEGORIES.join(', ')}.`,
   'Réponds UNIQUEMENT par un objet JSON de la forme :',
   '{"resultats":[{"exe":"<nom exact reçu>","categorie":"<identifiant>","description":"<une phrase>"}]}',
-  "Si tu ne connais pas une application, mets \"others\" et décris ce que son nom suggère.",
+  'Décris UNIQUEMENT les applications que tu reconnais réellement.',
+  "Si tu ne connais pas une application, mets \"others\" et laisse la description VIDE — n'invente jamais.",
   'Ne renvoie aucune application qui ne figure pas dans la liste reçue.',
 ].join(' ')
 
@@ -88,8 +97,12 @@ export function parseAiResponse(
     const categorie = obj['categorie']
     if (!estCategorieValide(categorie)) continue
     const description = typeof obj['description'] === 'string' ? obj['description'].trim() : ''
-    if (description.length === 0) continue
-    verdicts[exe] = { category: categorie, description: description.slice(0, 200) }
+    // Une description vide est légitime : l'IA ne connaît pas l'application.
+    // On enregistre quand même le verdict pour ne plus jamais la redemander.
+    verdicts[exe] =
+      description.length === 0
+        ? { category: categorie }
+        : { category: categorie, description: description.slice(0, 200) }
   }
   return verdicts
 }

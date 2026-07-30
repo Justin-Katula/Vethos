@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronRight, Globe, Minus, Plus, Search, Shield, ShieldOff, X } from 'lucide-react'
+import {
+  Check,
+  ChevronRight,
+  Globe,
+  Minus,
+  Plus,
+  RefreshCw,
+  Search,
+  Shield,
+  ShieldOff,
+  X,
+} from 'lucide-react'
 import { nexus } from '@/lib/ipc'
 import { normaliserDomaine } from '@/lib/domain'
 import {
@@ -231,6 +242,7 @@ export default function BlockingPage(): JSX.Element {
   const { session, pending, load, startSession, cancelPending, setSession } = useBlockingStore()
   const [apps, setApps] = useState<AppInstallee[]>([])
   const [chargementApps, setChargementApps] = useState(true)
+  const [rafraichissement, setRafraichissement] = useState(false)
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null)
   const [erreur, setErreur] = useState<Extract<SaveResult, { ok: false }> | null>(null)
   const [deployees, setDeployees] = useState<Set<AppCategory>>(new Set())
@@ -267,6 +279,15 @@ export default function BlockingPage(): JSX.Element {
         .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
     })).filter((groupe) => groupe.apps.length > 0)
   }, [apps, recherche])
+
+  async function rafraichir(): Promise<void> {
+    setRafraichissement(true)
+    try {
+      setApps(await nexus.app.refreshInstalledApps())
+    } finally {
+      setRafraichissement(false)
+    }
+  }
 
   function basculerCategorie(cat: AppCategory): void {
     setDeployees((precedent) => {
@@ -520,7 +541,18 @@ export default function BlockingPage(): JSX.Element {
               </span>
             )}
           </h2>
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void rafraichir()}
+              disabled={rafraichissement || chargementApps}
+              title="Relancer le scan des applications installées"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-2 text-xs text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100 disabled:opacity-40"
+            >
+              <RefreshCw size={13} className={rafraichissement ? 'animate-spin' : ''} />
+              {rafraichissement ? 'Scan…' : 'Rafraîchir'}
+            </button>
+            <div className="relative">
             <Search
               size={13}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600"
@@ -532,12 +564,15 @@ export default function BlockingPage(): JSX.Element {
               placeholder="Rechercher une application…"
               className="w-64 rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-8 pr-3 text-xs text-zinc-100 outline-none transition focus:border-zinc-600"
             />
+            </div>
           </div>
         </div>
 
-        {chargementApps && (
+        {(chargementApps || rafraichissement) && (
           <p className="rounded-xl border border-zinc-800/70 bg-zinc-900/30 p-6 text-center text-sm text-zinc-500">
-            Lecture du menu Démarrer, du registre et du Microsoft Store…
+            {rafraichissement
+              ? 'Scan complet : menu Démarrer, registre, App Paths, Program Files, winget, Store…'
+              : 'Chargement du catalogue…'}
           </p>
         )}
 
