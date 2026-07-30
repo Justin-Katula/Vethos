@@ -17,6 +17,9 @@ export const IPC_CHANNELS = {
   // clé `blocking_rules`. Seul l'état de session a besoin de son propre canal :
   // il est décidé par l'horloge du processus principal, pas par l'interface.
   BLOCKING_GET_SESSION: 'blocking:getSession',
+  // Boutons de l'overlay : minimiser ou fermer la PAIRE overlay + fenetre cible.
+  BLOCKING_MINIMIZE_APP_WINDOW: 'blocking:minimizeAppWindow',
+  BLOCKING_CLOSE_APP_WINDOW: 'blocking:closeAppWindow',
   BLOCKING_EVENT_SESSION: 'blocking:event:session',
 } as const
 
