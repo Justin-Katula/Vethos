@@ -27,6 +27,7 @@ const api = {
         exePath: string
         publisher: string
         category: AppCategory
+        description?: string
         iconDataUrl?: string
       }>
     > => ipcRenderer.invoke(IPC_CHANNELS.APP_DISCOVERY_LIST),

@@ -7,11 +7,13 @@
  */
 
 import { execFile as execFileCallback } from 'node:child_process'
+import { readFile, writeFile } from 'node:fs/promises'
 import { app as electronApp, nativeImage } from 'electron'
 import { promisify } from 'node:util'
 import * as path from 'node:path'
 import log from '@main/logging/setup'
 import { categorizeApp, type AppCategory } from './app-category'
+import { classerParIA, type AiCache } from './app-category-ai'
 
 const execFile = promisify(execFileCallback)
 
@@ -21,6 +23,8 @@ export type DiscoveredApp = {
   exePath: string
   publisher: string
   category: AppCategory
+  /** Phrase descriptive fournie par l'IA, absente pour les apps classées localement. */
+  description?: string
   iconDataUrl?: string
   /** Logo déclaré par un paquet Store. Interne : remplacé par iconDataUrl. */
   logoPath?: string
@@ -38,6 +42,8 @@ type ShortcutRecord = {
 type RegistryRecord = {
   DisplayName?: unknown
   DisplayIcon?: unknown
+  /** Exécutable principal déduit du dossier d'installation, si DisplayIcon manque. */
+  ResolvedExe?: unknown
   InstallLocation?: unknown
   Publisher?: unknown
   SystemComponent?: unknown
@@ -118,9 +124,60 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
     log.warn('[app-discovery] Store scan failed', err)
   }
 
-  const apps = await attachAppIcons(mergeCandidates(candidates))
+  const apps = await appliquerClassementIA(await attachAppIcons(mergeCandidates(candidates)))
   log.info(`[app-discovery] count=${apps.length}`)
   return apps
+}
+
+/** Cache des verdicts IA, à côté des données de l'application. */
+function cheminCacheIA(): string {
+  return path.join(electronApp.getPath('userData'), 'nexus_app_categories_ai.json')
+}
+
+async function lireCacheIA(): Promise<AiCache> {
+  try {
+    const brut = await readFile(cheminCacheIA(), 'utf8')
+    const parsed: unknown = JSON.parse(brut)
+    return typeof parsed === 'object' && parsed !== null ? (parsed as AiCache) : {}
+  } catch {
+    // Absent ou illisible : on repart d'un cache vide, sans bruit.
+    return {}
+  }
+}
+
+/**
+ * Complète le classement local par l'IA, sur les seules applications tombées
+ * dans « Autres ».
+ *
+ * Le classement par mots-clés ne connaît que ce qu'on a pensé à lister ; l'IA
+ * sait ce qu'est « eFootball » ou « Antigravity » sans qu'on l'écrive. Elle
+ * n'est sollicitée que pour le reliquat, par lots, et son verdict est mis en
+ * cache définitivement — au deuxième lancement, plus aucun appel réseau.
+ *
+ * Sans clé d'API ou hors ligne, tout continue : les applications restent dans
+ * « Autres ». Aucune découverte ne dépend de la disponibilité de l'IA.
+ */
+async function appliquerClassementIA(apps: DiscoveredApp[]): Promise<DiscoveredApp[]> {
+  const inclassees = apps.filter((a) => a.category === 'others')
+  if (inclassees.length === 0) return apps
+
+  let cache: AiCache
+  try {
+    cache = await classerParIA(
+      inclassees.map((a) => ({ exeName: a.exeName, name: a.name, publisher: a.publisher })),
+      await lireCacheIA(),
+    )
+    await writeFile(cheminCacheIA(), JSON.stringify(cache, null, 2), 'utf8')
+  } catch (err) {
+    log.warn('[app-discovery] classement IA indisponible', err)
+    return apps
+  }
+
+  return apps.map((app) => {
+    const verdict = cache[app.exeName.toLowerCase()]
+    if (verdict === undefined) return app
+    return { ...app, category: verdict.category, description: verdict.description }
+  })
 }
 
 const iconCache = new Map<string, string | null>()
@@ -337,10 +394,47 @@ async function readRegistryApps(): Promise<RegistryRecord[]> {
       'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
       'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
     )
+    # Executable principal d'un dossier d'installation, quand DisplayIcon est
+    # absent. Windows lui-meme liste ces applications sans chemin d'icone —
+    # Blender, Node.js, GitHub CLI, Epic Games Launcher — et les ecarter
+    # faisait perdre une vingtaine d'applications bien reelles.
+    function Get-MainExecutable([string]$root, [string]$displayName) {
+      if (-not $root -or -not (Test-Path -LiteralPath $root)) { return $null }
+      $exes = Get-ChildItem -LiteralPath $root -Filter *.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '(?i)(unins|setup|installer|update|crash|helper|service|daemon|report)' }
+      if (-not $exes) { return $null }
+      # On prefere l'executable dont le nom ressemble au nom affiche ; a defaut
+      # le plus volumineux, qui est presque toujours le binaire principal.
+      $cle = ($displayName -replace '[^a-zA-Z0-9]','').ToLower()
+      $exact = $exes | Where-Object { ($_.BaseName -replace '[^a-zA-Z0-9]','').ToLower() -eq $cle } | Select-Object -First 1
+      if ($exact) { return $exact.FullName }
+      $partiel = $exes | Where-Object { $cle -and ($cle.StartsWith((($_.BaseName -replace '[^a-zA-Z0-9]','').ToLower()))) } |
+        Sort-Object Length -Descending | Select-Object -First 1
+      if ($partiel) { return $partiel.FullName }
+      return ($exes | Sort-Object Length -Descending | Select-Object -First 1).FullName
+    }
+
     $apps = foreach ($p in $paths) {
       Get-ItemProperty $p -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -and ($_.InstallLocation -or $_.DisplayIcon) } |
-        Select-Object DisplayName, InstallLocation, DisplayIcon, Publisher, SystemComponent, NoDisplay, ReleaseType, ParentDisplayName, WindowsInstaller
+        Where-Object { $_.DisplayName } |
+        ForEach-Object {
+          $resolu = $null
+          if (-not $_.DisplayIcon -and $_.InstallLocation) {
+            $resolu = Get-MainExecutable $_.InstallLocation $_.DisplayName
+          }
+          [pscustomobject]@{
+            DisplayName = $_.DisplayName
+            InstallLocation = $_.InstallLocation
+            DisplayIcon = $_.DisplayIcon
+            ResolvedExe = $resolu
+            Publisher = $_.Publisher
+            SystemComponent = $_.SystemComponent
+            NoDisplay = $_.NoDisplay
+            ReleaseType = $_.ReleaseType
+            ParentDisplayName = $_.ParentDisplayName
+            WindowsInstaller = $_.WindowsInstaller
+          }
+        }
     }
     @($apps) | ConvertTo-Json -Depth 2
   `
@@ -348,7 +442,8 @@ async function readRegistryApps(): Promise<RegistryRecord[]> {
   const { stdout } = await execFile(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
-    { windowsHide: true, maxBuffer: 10 * 1024 * 1024, timeout: 15000 },
+    // Le balayage des dossiers d'installation prend du temps : 60 s, pas 15.
+    { windowsHide: true, maxBuffer: 20 * 1024 * 1024, timeout: 60000 },
   )
   return parseJsonArray<RegistryRecord>(stdout)
 }
@@ -408,7 +503,12 @@ function buildRegistryCandidates(items: RegistryRecord[]): AppCandidate[] {
   return items.flatMap((item) => {
     if (isHiddenRegistryEntry(item)) return []
     const name = normalizeDisplayName(String(item.DisplayName ?? ''))
-    const exePath = extractExePathFromDisplayIcon(String(item.DisplayIcon ?? ''))
+    // Repli sur l'exécutable résolu depuis le dossier d'installation quand
+    // DisplayIcon manque : c'était la perte la plus grosse, une vingtaine
+    // d'applications réelles dont Blender et Epic Games Launcher.
+    const exePath =
+      extractExePathFromDisplayIcon(String(item.DisplayIcon ?? '')) ||
+      normalizeExePath(String(item.ResolvedExe ?? ''))
     if (!name || !exePath) return []
     return toCandidate({
       name,

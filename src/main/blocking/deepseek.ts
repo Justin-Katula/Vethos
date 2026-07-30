@@ -21,6 +21,58 @@ function getModelName(): string {
   return readEnvValue('DEEPSEEK_MODEL') ?? DEFAULT_DEEPSEEK_MODEL
 }
 
+/**
+ * Appel générique attendant une réponse JSON.
+ *
+ * Exposé pour que les autres usages de l'IA — le classement des applications,
+ * par exemple — passent par le même accès plutôt que d'en recréer un. La clé,
+ * le modèle et la gestion du délai restent définis à un seul endroit.
+ *
+ * Renvoie `null` sur clé absente, erreur HTTP, délai dépassé ou corps
+ * illisible : l'appelant décide quoi faire d'une absence de réponse, il n'a
+ * jamais à distinguer les causes d'échec.
+ */
+export async function askDeepSeekJson(args: {
+  system: string
+  user: string
+  maxTokens: number
+  timeoutMs?: number
+}): Promise<Record<string, unknown> | null> {
+  const apiKey = getApiKey()
+  if (!apiKey) return null
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? REQUEST_TIMEOUT_MS)
+  try {
+    const response = await fetch(DEEPSEEK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: getModelName(),
+        messages: [
+          { role: 'system', content: args.system },
+          { role: 'user', content: args.user },
+        ],
+        temperature: 0,
+        max_tokens: args.maxTokens,
+        response_format: { type: 'json_object' },
+      }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      log.warn('[deepseek] réponse HTTP non-OK', { status: response.status })
+      return null
+    }
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    return extractJsonObject(data.choices?.[0]?.message?.content ?? '')
+  } catch (err) {
+    log.warn('[deepseek] appel échoué', err)
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export type JustificationVerdict = {
   valid: boolean
   reason: string

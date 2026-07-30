@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Minus, Plus, Search, Shield, ShieldOff, X } from 'lucide-react'
+import { Check, ChevronRight, Minus, Plus, Search, Shield, ShieldOff } from 'lucide-react'
 import { nexus } from '@/lib/ipc'
 import {
   DURATION_STEP_MINUTES,
@@ -9,7 +9,12 @@ import {
   useBlockingStore,
   type SaveResult,
 } from '@/store/blocking.store'
-import { APP_CATEGORIES, CATEGORY_LABELS, type AppCategory } from '@shared/app-categories'
+import {
+  APP_CATEGORIES,
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  type AppCategory,
+} from '@shared/app-categories'
 
 const MINUTES_PAR_JOUR = 24 * 60
 
@@ -17,6 +22,7 @@ type AppInstallee = {
   name: string
   exeName: string
   category: AppCategory
+  description?: string
   iconDataUrl?: string
 }
 
@@ -126,7 +132,7 @@ export default function BlockingPage(): JSX.Element {
   const [chargementApps, setChargementApps] = useState(true)
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null)
   const [erreur, setErreur] = useState<Extract<SaveResult, { ok: false }> | null>(null)
-  const [categorie, setCategorie] = useState<AppCategory | 'all'>('all')
+  const [deployees, setDeployees] = useState<Set<AppCategory>>(new Set())
   const [recherche, setRecherche] = useState('')
   const [maintenant, setMaintenant] = useState(Date.now())
 
@@ -145,18 +151,47 @@ export default function BlockingPage(): JSX.Element {
     return () => clearInterval(timer)
   }, [session.active, pending])
 
-  const categoriesDisponibles = useMemo(() => {
-    const presentes = new Set(apps.map((a) => a.category))
-    return APP_CATEGORIES.filter((c) => presentes.has(c))
-  }, [apps])
-
-  const appsAffichees = useMemo(() => {
+  /**
+   * Applications groupées par catégorie, dans l'ordre du catalogue — « Autres »
+   * reste en dernier. Une catégorie vide après filtrage disparaît : mieux vaut
+   * une liste courte qu'une rangée de compteurs à zéro.
+   */
+  const groupes = useMemo(() => {
     const terme = recherche.trim().toLowerCase()
-    return apps
-      .filter((a) => categorie === 'all' || a.category === categorie)
-      .filter((a) => terme === '' || a.name.toLowerCase().includes(terme))
-      .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
-  }, [apps, categorie, recherche])
+    const retenues = apps.filter((a) => terme === '' || a.name.toLowerCase().includes(terme))
+    return APP_CATEGORIES.map((cat) => ({
+      categorie: cat,
+      apps: retenues
+        .filter((a) => a.category === cat)
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    })).filter((groupe) => groupe.apps.length > 0)
+  }, [apps, recherche])
+
+  function basculerCategorie(cat: AppCategory): void {
+    setDeployees((precedent) => {
+      const suivant = new Set(precedent)
+      if (suivant.has(cat)) suivant.delete(cat)
+      else suivant.add(cat)
+      return suivant
+    })
+  }
+
+  function basculerApp(exeName: string): void {
+    setErreur(null)
+    // Cliquer une application sans blocage en cours d'édition en démarre un
+    // directement : pas besoin de passer par « Nouveau blocage » d'abord.
+    if (brouillon === null) {
+      setBrouillon({ ...brouillonVide(), appIds: [exeName] })
+      return
+    }
+    const choisie = brouillon.appIds.includes(exeName)
+    setBrouillon({
+      ...brouillon,
+      appIds: choisie
+        ? brouillon.appIds.filter((id) => id !== exeName)
+        : [...brouillon.appIds, exeName],
+    })
+  }
 
   async function lancer(): Promise<void> {
     if (brouillon === null) return
@@ -363,105 +398,124 @@ export default function BlockingPage(): JSX.Element {
         </section>
       )}
 
-      <section className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-        <div>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Applications
-              <span className="ml-2 normal-case text-zinc-500">
-                {chargementApps ? '…' : apps.length}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+            Applications installées
+            <span className="ml-2 text-zinc-600">{chargementApps ? '…' : apps.length}</span>
+            {brouillon !== null && brouillon.appIds.length > 0 && (
+              <span className="ml-2 text-zinc-300">
+                · {brouillon.appIds.length} choisie{brouillon.appIds.length > 1 ? 's' : ''}
               </span>
-              {brouillon !== null && brouillon.appIds.length > 0 && (
-                <span className="ml-2 normal-case text-zinc-300">
-                  · {brouillon.appIds.length} choisie{brouillon.appIds.length > 1 ? 's' : ''}
-                </span>
-              )}
-            </p>
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600"
-              />
-              <input
-                type="text"
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-                placeholder="Rechercher…"
-                className="w-48 rounded-lg border border-zinc-800 bg-zinc-950 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none focus:border-zinc-600"
-              />
-            </div>
-          </div>
-
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {(['all', ...categoriesDisponibles] as const).map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategorie(c)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  categorie === c
-                    ? 'bg-zinc-100 text-zinc-900'
-                    : 'bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
-                }`}
-              >
-                {c === 'all' ? 'Toutes' : CATEGORY_LABELS[c]}
-              </button>
-            ))}
-          </div>
-
-          <div
-            className={`max-h-64 overflow-y-auto rounded-lg border bg-zinc-950 ${
-              messageDe('apps') !== null ? 'border-red-500/60' : 'border-zinc-800'
-            }`}
-          >
-            {chargementApps && (
-              <p className="p-3 text-sm text-zinc-500">
-                Recherche des applications installées, menu Démarrer, registre et Microsoft Store…
-              </p>
             )}
-            {!chargementApps && appsAffichees.length === 0 && (
-              <p className="p-3 text-sm text-zinc-500">Aucune application dans cette sélection.</p>
-            )}
-            {appsAffichees.map((app) => {
-              const choisie = brouillon?.appIds.includes(app.exeName) ?? false
-              return (
+          </h2>
+          <div className="relative">
+            <Search
+              size={13}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600"
+            />
+            <input
+              type="text"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Rechercher une application…"
+              className="w-64 rounded-lg border border-zinc-800 bg-zinc-950/60 py-2 pl-8 pr-3 text-xs text-zinc-100 outline-none transition focus:border-zinc-600"
+            />
+          </div>
+        </div>
+
+        {chargementApps && (
+          <p className="rounded-xl border border-zinc-800/70 bg-zinc-900/30 p-6 text-center text-sm text-zinc-500">
+            Lecture du menu Démarrer, du registre et du Microsoft Store…
+          </p>
+        )}
+
+        {!chargementApps && groupes.length === 0 && (
+          <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+            Aucune application ne correspond à cette recherche.
+          </p>
+        )}
+
+        <div className="flex flex-col gap-1">
+          {groupes.map(({ categorie: cat, apps: appsDuGroupe }) => {
+            const ouverte = deployees.has(cat)
+            const choisiesIci = appsDuGroupe.filter((a) =>
+              (brouillon?.appIds ?? []).includes(a.exeName),
+            ).length
+            return (
+              <div key={cat} className="overflow-hidden rounded-xl">
                 <button
-                  key={app.exeName}
                   type="button"
-                  disabled={session.active}
-                  onClick={() => {
-                    setErreur(null)
-                    // Cliquer une application sans blocage en cours d'édition
-                    // en démarre un directement : pas besoin de passer par le
-                    // bouton « Nouveau blocage » d'abord.
-                    if (brouillon === null) {
-                      setBrouillon({ ...brouillonVide(), appIds: [app.exeName] })
-                      return
-                    }
-                    setBrouillon({
-                      ...brouillon,
-                      appIds: choisie
-                        ? brouillon.appIds.filter((id) => id !== app.exeName)
-                        : [...brouillon.appIds, app.exeName],
-                    })
-                  }}
-                  className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition ${
-                    choisie ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900'
+                  onClick={() => basculerCategorie(cat)}
+                  aria-expanded={ouverte}
+                  className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition ${
+                    ouverte ? 'bg-zinc-900/70' : 'hover:bg-zinc-900/50'
                   }`}
                 >
-                  <IconeApp app={app} />
-                  <span className="min-w-0 flex-1 truncate">{app.name}</span>
-                  <span className="shrink-0 text-xs text-zinc-600">
-                    {CATEGORY_LABELS[app.category]}
+                  <ChevronRight
+                    size={15}
+                    className={`shrink-0 text-zinc-600 transition-transform ${
+                      ouverte ? 'rotate-90' : ''
+                    }`}
+                  />
+                  <span
+                    className={`shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${CATEGORY_COLORS[cat]}`}
+                  >
+                    {CATEGORY_LABELS[cat]}
                   </span>
-                  {choisie && <X size={14} className="shrink-0 text-zinc-500" />}
+                  <span className="text-xs text-zinc-500">
+                    ({appsDuGroupe.length} élément{appsDuGroupe.length > 1 ? 's' : ''})
+                  </span>
+                  {choisiesIci > 0 && (
+                    <span className="ml-auto shrink-0 text-xs font-medium text-amber-300">
+                      {choisiesIci} choisie{choisiesIci > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </button>
-              )
-            })}
-          </div>
-          {messageDe('apps') !== null && (
-            <p className="mt-1.5 text-xs text-red-400">{messageDe('apps')}</p>
-          )}
+
+                {ouverte && (
+                  <div className="flex flex-col gap-1 pb-2 pl-11 pr-2 pt-1">
+                    {appsDuGroupe.map((app) => {
+                      const choisie = brouillon?.appIds.includes(app.exeName) ?? false
+                      return (
+                        <button
+                          key={app.exeName}
+                          type="button"
+                          disabled={session.active}
+                          onClick={() => basculerApp(app.exeName)}
+                          className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition disabled:opacity-50 ${
+                            choisie
+                              ? 'border-amber-500/40 bg-amber-500/10'
+                              : 'border-transparent hover:border-zinc-800 hover:bg-zinc-900/60'
+                          }`}
+                        >
+                          <IconeApp app={app} />
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate text-sm font-medium ${
+                                choisie ? 'text-amber-100' : 'text-zinc-200'
+                              }`}
+                            >
+                              {app.name}
+                            </span>
+                            <span className="block truncate font-mono text-[11px] text-zinc-600">
+                              {app.exeName}
+                            </span>
+                            {app.description !== undefined && (
+                              <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
+                                {app.description}
+                              </span>
+                            )}
+                          </span>
+                          {choisie && <Check size={16} className="shrink-0 text-amber-400" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </section>
     </div>
