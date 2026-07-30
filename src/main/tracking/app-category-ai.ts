@@ -6,8 +6,13 @@ import log from '@main/logging/setup'
  * Classement des applications par IA, en renfort du classement local.
  *
  * Le classement par mots-clés (`app-category.ts`) reconnaît ce qu'on a pensé à
- * lister. L'IA complète — catégorie **et** description — pour tout ce qu'elle
- * reconnaît réellement, et ne dit rien de ce qu'elle ignore.
+ * lister. L'IA complète le reste, et rien d'autre : une catégorie, pas de
+ * description. Décrire chaque application coûtait cher et prenait un temps
+ * interminable pour un bénéfice nul.
+ *
+ * **Le résultat est constant.** Les applications sont triées avant découpe en
+ * lots, et un verdict déjà en cache n'est jamais écrasé : une application
+ * classée une fois garde sa place définitivement.
  *
  * Trois garde-fous, parce qu'un appel réseau par application serait intenable
  * et coûteux :
@@ -27,26 +32,18 @@ export const AI_BATCH_SIZE = 30
 
 export type AiVerdict = {
   category: AppCategory
-  /**
-   * Une phrase, affichable telle quelle sous le nom de l'application.
-   *
-   * Absente quand l'IA ne connaît pas l'application : mieux vaut ne rien dire
-   * qu'inventer. Le verdict est mis en cache **même sans description**, sinon
-   * l'application serait redemandée à chaque scan et coûterait à chaque fois.
-   */
-  description?: string
 }
 
 export type AiCache = Record<string, AiVerdict>
 
 const SYSTEM_PROMPT = [
-  "Tu classes des applications Windows. Pour chacune, donne sa catégorie et une description d'une phrase en français.",
+  'Tu classes des applications Windows dans des catégories. Rien de plus.',
   `Catégories autorisées, exactement ces identifiants : ${APP_CATEGORIES.join(', ')}.`,
   'Réponds UNIQUEMENT par un objet JSON de la forme :',
-  '{"resultats":[{"exe":"<nom exact reçu>","categorie":"<identifiant>","description":"<une phrase>"}]}',
-  'Décris UNIQUEMENT les applications que tu reconnais réellement.',
-  "Si tu ne connais pas une application, mets \"others\" et laisse la description VIDE — n'invente jamais.",
+  '{"resultats":[{"exe":"<nom exact reçu>","categorie":"<identifiant>"}]}',
+  "Si tu ne reconnais pas une application, mets \"others\" — n'invente jamais une catégorie.",
   'Ne renvoie aucune application qui ne figure pas dans la liste reçue.',
+  'Pour une même application, rends toujours exactement la même catégorie.',
 ].join(' ')
 
 export type AppAClasser = { exeName: string; name: string; publisher?: string }
@@ -96,13 +93,9 @@ export function parseAiResponse(
     if (exe === '' || !attendues.has(exe)) continue
     const categorie = obj['categorie']
     if (!estCategorieValide(categorie)) continue
-    const description = typeof obj['description'] === 'string' ? obj['description'].trim() : ''
-    // Une description vide est légitime : l'IA ne connaît pas l'application.
-    // On enregistre quand même le verdict pour ne plus jamais la redemander.
-    verdicts[exe] =
-      description.length === 0
-        ? { category: categorie }
-        : { category: categorie, description: description.slice(0, 200) }
+    // Même « others » est enregistré : sans ça l'application serait redemandée
+    // — et refacturée — à chaque scan.
+    verdicts[exe] = { category: categorie }
   }
   return verdicts
 }
@@ -135,13 +128,25 @@ export async function classerParIA(
   apps: readonly AppAClasser[],
   cacheExistant: AiCache,
 ): Promise<AiCache> {
-  const aJuger = resteAJuger(apps, cacheExistant)
+  // Tri stable avant découpe : les mêmes applications se retrouvent dans les
+  // mêmes lots d'une exécution à l'autre, donc le modèle voit le même contexte
+  // et rend le même verdict. Sans ça, un ordre de scan différent suffisait à
+  // faire changer un classement.
+  const aJuger = resteAJuger(apps, cacheExistant).sort((a, b) =>
+    a.exeName.localeCompare(b.exeName, 'en'),
+  )
   if (aJuger.length === 0) return cacheExistant
 
   log.info(`[app-category-ai] ${aJuger.length} application(s) à classer`)
   const cache: AiCache = { ...cacheExistant }
   for (const lot of decouperEnLots(aJuger, AI_BATCH_SIZE)) {
-    Object.assign(cache, await classerUnLot(lot))
+    const verdicts = await classerUnLot(lot)
+    // Un verdict déjà en cache n'est JAMAIS écrasé : une application classée
+    // une fois garde sa place pour toujours. C'est ce qui rend le résultat
+    // constant d'un lancement à l'autre.
+    for (const [exe, verdict] of Object.entries(verdicts)) {
+      if (cache[exe] === undefined) cache[exe] = verdict
+    }
   }
   const nouvelles = Object.keys(cache).length - Object.keys(cacheExistant).length
   log.info(`[app-category-ai] ${nouvelles} verdict(s) obtenu(s)`)

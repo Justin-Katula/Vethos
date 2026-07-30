@@ -34,7 +34,6 @@ type AppInstallee = {
   name: string
   exeName: string
   category: AppCategory
-  description?: string
   iconDataUrl?: string
 }
 
@@ -289,6 +288,20 @@ export default function BlockingPage(): JSX.Element {
     }
   }
 
+  /**
+   * Met à jour les sites du brouillon, en l'ouvrant s'il n'existe pas encore.
+   * Même logique que pour les applications : ajouter une cible démarre la
+   * composition d'un blocage, sans passer par un bouton préalable.
+   */
+  function ajouterSites(sites: string[]): void {
+    setErreur(null)
+    if (brouillon === null) {
+      setBrouillon({ ...brouillonVide(), blockedSites: sites })
+      return
+    }
+    setBrouillon({ ...brouillon, blockedSites: sites })
+  }
+
   function basculerCategorie(cat: AppCategory): void {
     setDeployees((precedent) => {
       const suivant = new Set(precedent)
@@ -499,15 +512,6 @@ export default function BlockingPage(): JSX.Element {
                 )}.`}
           </p>
 
-          <ChampSites
-            sites={brouillon.blockedSites}
-            onChange={(sites) => {
-              setErreur(null)
-              setBrouillon({ ...brouillon, blockedSites: sites })
-            }}
-            erreur={messageDe('sites')}
-          />
-
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -529,6 +533,17 @@ export default function BlockingPage(): JSX.Element {
           </div>
         </section>
       )}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-zinc-500">Sites web</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <ChampSites
+            sites={brouillon?.blockedSites ?? []}
+            onChange={ajouterSites}
+            erreur={messageDe('sites')}
+          />
+        </div>
+      </section>
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
@@ -647,11 +662,6 @@ export default function BlockingPage(): JSX.Element {
                             <span className="block truncate font-mono text-[11px] text-zinc-600">
                               {app.exeName}
                             </span>
-                            {app.description !== undefined && (
-                              <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
-                                {app.description}
-                              </span>
-                            )}
                           </span>
                           {choisie && <Check size={16} className="shrink-0 text-amber-400" />}
                         </button>

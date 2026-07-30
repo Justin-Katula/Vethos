@@ -26,8 +26,6 @@ export type DiscoveredApp = {
   publisher: string
   /** Catégorie affichable, calculée après la fusion. */
   category: AppCategory
-  /** Phrase descriptive fournie par l'IA, absente si classée localement. */
-  description?: string
   source?: AppSource
   packageId?: string
   hasExecutablePath?: boolean
@@ -443,8 +441,7 @@ export const AI_TRIGGER_THRESHOLD = 10
  * Classe les applications : localement d'abord, puis par IA.
  *
  * Le classement local par mots-clés ne connaît que ce qu'on a pensé à lister.
- * L'IA complète — catégorie **et** description — pour tout ce qu'elle sait
- * reconnaître, et ne dit rien de ce qu'elle ignore.
+ * L'IA complète le reste : une catégorie, rien d'autre.
  *
  * Trois garde-fous contre la facture :
  *
@@ -497,7 +494,7 @@ async function classerApplications(apps: DiscoveredApp[]): Promise<DiscoveredApp
   return classees.map((app) => {
     const verdict = cache[cle(app)]
     if (verdict === undefined) return app
-    return { ...app, category: verdict.category, description: verdict.description }
+    return { ...app, category: verdict.category }
   })
 }
 

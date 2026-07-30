@@ -32,14 +32,14 @@ describe('decouperEnLots', () => {
 
 describe('resteAJuger', () => {
   it('écarte ce qui est déjà en cache', () => {
-    const cache: AiCache = { 'a.exe': { category: 'games', description: 'x' } }
+    const cache: AiCache = { 'a.exe': { category: 'games' } }
     expect(resteAJuger([app('a.exe'), app('b.exe')], cache).map((a) => a.exeName)).toEqual([
       'b.exe',
     ])
   })
 
   it('compare sans tenir compte de la casse', () => {
-    const cache: AiCache = { 'a.exe': { category: 'games', description: 'x' } }
+    const cache: AiCache = { 'a.exe': { category: 'games' } }
     expect(resteAJuger([app('A.EXE')], cache)).toEqual([])
   })
 
@@ -52,20 +52,9 @@ describe('parseAiResponse', () => {
   const demandees = ['antigravity.exe', 'efootball.exe']
 
   it('retient les verdicts bien formés', () => {
-    const brut = {
-      resultats: [
-        {
-          exe: 'antigravity.exe',
-          categorie: 'productivity',
-          description: 'Éditeur de code assisté par IA.',
-        },
-      ],
-    }
+    const brut = { resultats: [{ exe: 'antigravity.exe', categorie: 'productivity' }] }
     expect(parseAiResponse(brut, demandees)).toEqual({
-      'antigravity.exe': {
-        category: 'productivity',
-        description: 'Éditeur de code assisté par IA.',
-      },
+      'antigravity.exe': { category: 'productivity' },
     })
   })
 
@@ -86,22 +75,19 @@ describe('parseAiResponse', () => {
     expect(parseAiResponse(brut, demandees)).toEqual({})
   })
 
-  it('garde le verdict sans description quand l’IA ne connaît pas l’application', () => {
-    // Une description vide est legitime : l'IA ne reconnait pas l'application
-    // et on ne veut pas qu'elle invente. Le verdict est quand meme mis en
-    // cache, sinon l'application serait redemandee — et refacturee — a chaque
-    // scan.
-    const brut = { resultats: [{ exe: 'antigravity.exe', categorie: 'others', description: '  ' }] }
+  it('enregistre même un verdict « others »', () => {
+    // Sans ca l'application serait redemandee — et refacturee — a chaque scan.
+    const brut = { resultats: [{ exe: 'antigravity.exe', categorie: 'others' }] }
     expect(parseAiResponse(brut, demandees)).toEqual({
       'antigravity.exe': { category: 'others' },
     })
   })
 
-  it('tronque une description trop longue', () => {
+  it('ignore une description que le modèle ajouterait spontanément', () => {
     const brut = {
-      resultats: [{ exe: 'antigravity.exe', categorie: 'games', description: 'a'.repeat(500) }],
+      resultats: [{ exe: 'antigravity.exe', categorie: 'games', description: 'bavardage' }],
     }
-    expect(parseAiResponse(brut, demandees)['antigravity.exe']?.description).toHaveLength(200)
+    expect(parseAiResponse(brut, demandees)).toEqual({ 'antigravity.exe': { category: 'games' } })
   })
 
   it('rend un cache vide sur réponse absente ou malformée', () => {
@@ -115,7 +101,7 @@ describe('parseAiResponse', () => {
     const brut = {
       resultats: [
         { exe: 'inconnue.exe', categorie: 'games', description: 'x' },
-        { exe: 'efootball.exe', categorie: 'games', description: 'Jeu de football.' },
+        { exe: 'efootball.exe', categorie: 'games' },
       ],
     }
     expect(Object.keys(parseAiResponse(brut, demandees))).toEqual(['efootball.exe'])
