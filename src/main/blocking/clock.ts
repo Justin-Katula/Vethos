@@ -20,6 +20,7 @@ import { activeSessionAt, type ActiveSession, type BlockingRules } from './sched
 export type SessionSnapshot = {
   active: boolean
   blockedAppIds: string[]
+  blockedSites: string[]
   endsAt: number | null
 }
 
@@ -29,11 +30,16 @@ export type SessionTransition =
   | { kind: 'ended' }
   | { kind: 'none' }
 
-const INACTIF: SessionSnapshot = { active: false, blockedAppIds: [], endsAt: null }
+const INACTIF: SessionSnapshot = { active: false, blockedAppIds: [], blockedSites: [], endsAt: null }
 
 export function snapshotFrom(session: ActiveSession | null): SessionSnapshot {
-  if (session === null) return { active: false, blockedAppIds: [], endsAt: null }
-  return { active: true, blockedAppIds: session.blockedAppIds, endsAt: session.endsAt }
+  if (session === null) return { active: false, blockedAppIds: [], blockedSites: [], endsAt: null }
+  return {
+    active: true,
+    blockedAppIds: session.blockedAppIds,
+    blockedSites: session.blockedSites,
+    endsAt: session.endsAt,
+  }
 }
 
 function memesApplications(a: readonly string[], b: readonly string[]): boolean {
@@ -53,7 +59,8 @@ export function diffSnapshots(
 
   const identique =
     previous.endsAt === next.endsAt &&
-    memesApplications(previous.blockedAppIds, next.blockedAppIds)
+    memesApplications(previous.blockedAppIds, next.blockedAppIds) &&
+    memesApplications(previous.blockedSites, next.blockedSites)
   if (identique) return { kind: 'none' }
   return { kind: 'changed', blockedAppIds: next.blockedAppIds, endsAt: next.endsAt ?? 0 }
 }

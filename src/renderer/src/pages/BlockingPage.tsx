@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronRight, Minus, Plus, Search, Shield, ShieldOff } from 'lucide-react'
+import { Check, ChevronRight, Globe, Minus, Plus, Search, Shield, ShieldOff, X } from 'lucide-react'
 import { nexus } from '@/lib/ipc'
+import { normaliserDomaine } from '@/lib/domain'
 import {
   DURATION_STEP_MINUTES,
   MAX_DURATION_MINUTES,
@@ -57,6 +58,7 @@ type Brouillon = {
   durationMinutes: number
   startMinute: number
   appIds: string[]
+  blockedSites: string[]
 }
 
 function brouillonVide(): Brouillon {
@@ -65,6 +67,7 @@ function brouillonVide(): Brouillon {
     durationMinutes: MIN_DURATION_MINUTES,
     startMinute: prochainCreneauRond(),
     appIds: [],
+    blockedSites: [],
   }
 }
 
@@ -110,6 +113,104 @@ function Stepper({
       >
         <Plus size={15} />
       </button>
+    </div>
+  )
+}
+
+function ChampSites({
+  sites,
+  onChange,
+  erreur,
+}: {
+  sites: string[]
+  onChange: (sites: string[]) => void
+  erreur: string | null
+}): JSX.Element {
+  const [saisie, setSaisie] = useState('')
+  const [invalide, setInvalide] = useState(false)
+
+  function ajouter(): void {
+    const domaine = normaliserDomaine(saisie)
+    if (domaine === null) {
+      setInvalide(saisie.trim().length > 0)
+      return
+    }
+    setInvalide(false)
+    setSaisie('')
+    if (!sites.includes(domaine)) onChange([...sites, domaine])
+  }
+
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Sites web
+        {sites.length > 0 && (
+          <span className="ml-2 normal-case text-zinc-400">{sites.length} bloqué{sites.length > 1 ? 's' : ''}</span>
+        )}
+      </p>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Globe
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600"
+          />
+          <input
+            type="text"
+            value={saisie}
+            onChange={(e) => {
+              setSaisie(e.target.value)
+              setInvalide(false)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                ajouter()
+              }
+            }}
+            placeholder="youtube.com"
+            className={`w-full rounded-lg border bg-zinc-950 py-2 pl-8 pr-3 text-sm text-zinc-100 outline-none transition focus:border-zinc-600 ${
+              invalide || erreur !== null ? 'border-red-500/60' : 'border-zinc-800'
+            }`}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={ajouter}
+          className="rounded-lg border border-zinc-800 px-3 text-sm text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
+        >
+          Ajouter
+        </button>
+      </div>
+      {invalide && (
+        <p className="mt-1.5 text-xs text-red-400">
+          Entre un domaine, par exemple « youtube.com ».
+        </p>
+      )}
+      {erreur !== null && <p className="mt-1.5 text-xs text-red-400">{erreur}</p>}
+      {sites.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {sites.map((site) => (
+            <span
+              key={site}
+              className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 pl-2.5 pr-1 text-xs text-zinc-300"
+            >
+              {site}
+              <button
+                type="button"
+                onClick={() => onChange(sites.filter((s) => s !== site))}
+                aria-label={`Retirer ${site}`}
+                className="rounded p-0.5 text-zinc-600 transition hover:bg-zinc-800 hover:text-red-400"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-xs text-zinc-600">
+        Seule la page du site est recouverte : tes onglets et ta barre d&apos;adresse restent
+        visibles, et changer d&apos;onglet lève le blocage.
+      </p>
     </div>
   )
 }
@@ -197,6 +298,7 @@ export default function BlockingPage(): JSX.Element {
     if (brouillon === null) return
     const resultat = await startSession({
       appIds: brouillon.appIds,
+      blockedSites: brouillon.blockedSites,
       durationMinutes: brouillon.durationMinutes,
       startMinute: brouillon.mode === 'now' ? null : brouillon.startMinute,
     })
@@ -375,6 +477,15 @@ export default function BlockingPage(): JSX.Element {
                   brouillon.durationMinutes,
                 )}.`}
           </p>
+
+          <ChampSites
+            sites={brouillon.blockedSites}
+            onChange={(sites) => {
+              setErreur(null)
+              setBrouillon({ ...brouillon, blockedSites: sites })
+            }}
+            erreur={messageDe('sites')}
+          />
 
           <div className="flex justify-end gap-2">
             <button

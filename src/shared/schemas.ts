@@ -276,6 +276,8 @@ export const RecurringSlotSchema = z
     startMinute: z.number().int().min(0).max(1439),
     endMinute: z.number().int().min(0).max(1439),
     appIds: z.array(z.string().min(1)).max(200),
+    /** Domaines bloqués, sans schéma ni www. Ex. « youtube.com ». */
+    blockedSites: z.array(z.string().min(1)).max(500).default([]),
   })
   .refine((slot) => slot.startMinute !== slot.endMinute, {
     message: 'Un créneau de durée nulle bloquerait en permanence.',
@@ -287,6 +289,7 @@ export const ManualSessionSchema = z
     startedAt: z.number().int(),
     endsAt: z.number().int(),
     appIds: z.array(z.string().min(1)).max(200),
+    blockedSites: z.array(z.string().min(1)).max(500).default([]),
   })
   .refine((session) => session.endsAt > session.startedAt, {
     message: 'La fin doit être postérieure au début.',

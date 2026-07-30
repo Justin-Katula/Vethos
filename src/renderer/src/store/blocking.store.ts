@@ -32,10 +32,14 @@ export const DURATION_STEP_MINUTES = 15
 /** Plafond : 12 h. */
 export const MAX_DURATION_MINUTES = 12 * 60
 
-export type SaveResult = { ok: true } | { ok: false; field: 'apps' | 'duration'; message: string }
+export type SaveResult =
+  | { ok: true }
+  | { ok: false; field: 'apps' | 'duration' | 'sites'; message: string }
 
 export type SessionDraft = {
   appIds: string[]
+  /** Domaines bloqués, sans schéma ni www. */
+  blockedSites: string[]
   durationMinutes: number
   /** Minutes depuis minuit, ou `null` pour démarrer immédiatement. */
   startMinute: number | null
@@ -105,8 +109,12 @@ export const useBlockingStore = create<BlockingStore>((set, get) => ({
   async startSession(draft) {
     // On rend l'erreur au lieu de la crier : l'appelant garde le formulaire
     // ouvert et l'affiche à côté du champ fautif.
-    if (draft.appIds.length === 0) {
-      return { ok: false, field: 'apps', message: 'Choisis au moins une application à bloquer.' }
+    if (draft.appIds.length === 0 && draft.blockedSites.length === 0) {
+      return {
+        ok: false,
+        field: 'apps',
+        message: 'Choisis au moins une application ou un site à bloquer.',
+      }
     }
     if (draft.durationMinutes < MIN_DURATION_MINUTES) {
       return {
@@ -121,6 +129,7 @@ export const useBlockingStore = create<BlockingStore>((set, get) => ({
       startedAt,
       endsAt: startedAt + draft.durationMinutes * 60_000,
       appIds: draft.appIds,
+      blockedSites: draft.blockedSites,
     }
     await persist(manual)
     set({ pending: startedAt > Date.now() ? manual : null })

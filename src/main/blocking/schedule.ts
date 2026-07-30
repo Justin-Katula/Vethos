@@ -24,12 +24,16 @@ export type RecurringSlot = {
   /** Si `<= startMinute`, le créneau franchit minuit. */
   endMinute: number
   appIds: string[]
+  /** Domaines bloqués pendant ce créneau. */
+  blockedSites?: string[]
 }
 
 export type ManualSession = {
   startedAt: number
   endsAt: number
   appIds: string[]
+  /** Domaines bloqués pendant cette session. */
+  blockedSites?: string[]
 }
 
 export type BlockingRules = {
@@ -39,6 +43,8 @@ export type BlockingRules = {
 
 export type ActiveSession = {
   blockedAppIds: string[]
+  /** Domaines bloqués, union de toutes les sources actives. */
+  blockedSites: string[]
   endsAt: number
 }
 
@@ -128,11 +134,13 @@ function manualIsActiveAt(manual: ManualSession, now: Date): boolean {
  */
 export function activeSessionAt(rules: BlockingRules, now: Date): ActiveSession | null {
   const blockedAppIds = new Set<string>()
+  const blockedSites = new Set<string>()
   let endsAt: number | null = null
 
   for (const slot of rules.slots) {
     if (!slotIsActiveAt(slot, now)) continue
     for (const appId of slot.appIds) blockedAppIds.add(appId)
+    for (const site of slot.blockedSites ?? []) blockedSites.add(site)
     const slotEnd = slotEndTimestamp(slot, now)
     if (endsAt === null || slotEnd > endsAt) endsAt = slotEnd
   }
@@ -140,9 +148,10 @@ export function activeSessionAt(rules: BlockingRules, now: Date): ActiveSession 
   const manual = rules.manual
   if (manual !== null && manualIsActiveAt(manual, now)) {
     for (const appId of manual.appIds) blockedAppIds.add(appId)
+    for (const site of manual.blockedSites ?? []) blockedSites.add(site)
     if (endsAt === null || manual.endsAt > endsAt) endsAt = manual.endsAt
   }
 
   if (endsAt === null) return null
-  return { blockedAppIds: [...blockedAppIds], endsAt }
+  return { blockedAppIds: [...blockedAppIds], blockedSites: [...blockedSites], endsAt }
 }

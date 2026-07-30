@@ -2,9 +2,11 @@ import log from '@main/logging/setup'
 import { listProcesses } from '@main/tracking/enumerator'
 import {
   closeSiteBlockOverlayWindow,
+  closeSiteBlockOverlayWindowsExcept,
   restoreBlockedAppResources,
   showBlockOverlayWindow,
 } from '@main/tracking/strict-block-window'
+import { createSiteTracker, type SiteTracker } from '@main/tracking/site-tracker'
 import { watchProcessWindows } from '@main/tracking/process-window-probe'
 import type { SessionSnapshot } from './clock'
 
@@ -56,6 +58,8 @@ export function createEnforcer(): Enforcer {
   const suivis = new Map<number, Suivi>()
   let scanTimer: NodeJS.Timeout | null = null
   let actif = false
+  let sitesBloques = new Set<string>()
+  let tracker: SiteTracker | null = null
   /** PIDs vivants au démarrage de la session, pour la distinction préexistante. */
   let pidsAuDemarrage = new Set<number>()
   let appsBloquees = new Set<string>()
@@ -133,8 +137,60 @@ export function createEnforcer(): Enforcer {
     }
   }
 
+  /**
+   * Un domaine bloqué correspond-il au site consulté ?
+   *
+   * Comparaison par suffixe de domaine, pas par sous-chaîne : bloquer
+   * « youtube.com » doit attraper « m.youtube.com » sans attraper
+   * « notyoutube.com ».
+   */
+  function siteEstBloque(domaine: string): boolean {
+    const vu = domaine.toLowerCase().replace(/^www\./u, '')
+    for (const brut of sitesBloques) {
+      const cible = brut.toLowerCase().replace(/^www\./u, '')
+      if (vu === cible || vu.endsWith(`.${cible}`)) return true
+    }
+    return false
+  }
+
+  function demarrerTrackerSites(): void {
+    if (tracker !== null) return
+    tracker = createSiteTracker({
+      hasActiveSession: async () => actif && sitesBloques.size > 0,
+      // Le navigateur n'affiche plus de site bloqué dans cette fenêtre : son
+      // overlay disparaît. C'est ce qui fait que changer d'onglet lève le
+      // recouvrement, sans toucher aux autres fenêtres.
+      onVisibleBrowserWindows: (windowIds) => {
+        if (!actif) return
+        closeSiteBlockOverlayWindowsExcept(windowIds)
+      },
+    })
+    tracker.on('site-detected', (event) => {
+      if (!actif || !siteEstBloque(event.domain)) return
+      showBlockOverlayWindow({
+        targetName: event.domain,
+        type: 'site',
+        mode: 'work',
+        ...(event.pid !== undefined ? { pid: event.pid } : {}),
+        ...(event.windowId !== undefined ? { windowId: event.windowId } : {}),
+      })
+    })
+    tracker.start()
+    log.info('[enforcer] surveillance des sites démarrée')
+  }
+
+  function arreterTrackerSites(): void {
+    if (tracker === null) return
+    tracker.stop()
+    tracker = null
+    closeSiteBlockOverlayWindow()
+    log.info('[enforcer] surveillance des sites arrêtée')
+  }
+
   async function stop(): Promise<void> {
     actif = false
+    arreterTrackerSites()
+    sitesBloques = new Set()
     if (scanTimer !== null) {
       clearInterval(scanTimer)
       scanTimer = null
@@ -181,6 +237,9 @@ export function createEnforcer(): Enforcer {
     }
 
     appsBloquees = nouvelleListe
+    sitesBloques = new Set(snapshot.blockedSites)
+    if (sitesBloques.size > 0) demarrerTrackerSites()
+    else arreterTrackerSites()
     await scanner()
 
     if (scanTimer === null) {

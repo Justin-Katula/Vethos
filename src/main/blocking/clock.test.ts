@@ -19,7 +19,7 @@ function makeSlot(o: Partial<RecurringSlot> = {}): RecurringSlot {
   }
 }
 
-const INACTIF: SessionSnapshot = { active: false, blockedAppIds: [], endsAt: null }
+const INACTIF: SessionSnapshot = { active: false, blockedAppIds: [], blockedSites: [], endsAt: null }
 
 describe('snapshotFrom', () => {
   it('rend un instantané inactif quand aucune session ne tourne', () => {
@@ -27,16 +27,22 @@ describe('snapshotFrom', () => {
   })
 
   it('rend un instantané actif avec ses applications et son échéance', () => {
-    expect(snapshotFrom({ blockedAppIds: ['a.exe'], endsAt: 5_000 })).toEqual({
+    expect(snapshotFrom({ blockedAppIds: ['a.exe'], blockedSites: [], endsAt: 5_000 })).toEqual({
       active: true,
       blockedAppIds: ['a.exe'],
+      blockedSites: [],
       endsAt: 5_000,
     })
   })
 })
 
 describe('diffSnapshots', () => {
-  const actif: SessionSnapshot = { active: true, blockedAppIds: ['a.exe'], endsAt: 5_000 }
+  const actif: SessionSnapshot = {
+    active: true,
+    blockedAppIds: ['a.exe'],
+    blockedSites: [],
+    endsAt: 5_000,
+  }
 
   it('détecte un démarrage', () => {
     expect(diffSnapshots(INACTIF, actif)).toEqual({
