@@ -341,95 +341,6 @@ export default function BlockingPage(): JSX.Element {
                 )}.`}
           </p>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Applications
-                {brouillon.appIds.length > 0 && (
-                  <span className="ml-2 normal-case text-zinc-400">
-                    {brouillon.appIds.length} choisie{brouillon.appIds.length > 1 ? 's' : ''}
-                  </span>
-                )}
-              </p>
-              <div className="relative">
-                <Search
-                  size={13}
-                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600"
-                />
-                <input
-                  type="text"
-                  value={recherche}
-                  onChange={(e) => setRecherche(e.target.value)}
-                  placeholder="Rechercher…"
-                  className="w-48 rounded-lg border border-zinc-800 bg-zinc-950 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none focus:border-zinc-600"
-                />
-              </div>
-            </div>
-
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {(['all', ...categoriesDisponibles] as const).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCategorie(c)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    categorie === c
-                      ? 'bg-zinc-100 text-zinc-900'
-                      : 'bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
-                  }`}
-                >
-                  {c === 'all' ? 'Toutes' : CATEGORY_LABELS[c]}
-                </button>
-              ))}
-            </div>
-
-            <div
-              className={`max-h-64 overflow-y-auto rounded-lg border bg-zinc-950 ${
-                messageDe('apps') !== null ? 'border-red-500/60' : 'border-zinc-800'
-              }`}
-            >
-              {chargementApps && (
-                <p className="p-3 text-sm text-zinc-500">
-                  Recherche des applications installées, menu Démarrer, registre et Microsoft
-                  Store…
-                </p>
-              )}
-              {!chargementApps && appsAffichees.length === 0 && (
-                <p className="p-3 text-sm text-zinc-500">Aucune application dans cette sélection.</p>
-              )}
-              {appsAffichees.map((app) => {
-                const choisie = brouillon.appIds.includes(app.exeName)
-                return (
-                  <button
-                    key={app.exeName}
-                    type="button"
-                    onClick={() =>
-                      setBrouillon({
-                        ...brouillon,
-                        appIds: choisie
-                          ? brouillon.appIds.filter((id) => id !== app.exeName)
-                          : [...brouillon.appIds, app.exeName],
-                      })
-                    }
-                    className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition ${
-                      choisie ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900'
-                    }`}
-                  >
-                    <IconeApp app={app} />
-                    <span className="min-w-0 flex-1 truncate">{app.name}</span>
-                    <span className="shrink-0 text-xs text-zinc-600">
-                      {CATEGORY_LABELS[app.category]}
-                    </span>
-                    {choisie && <X size={14} className="shrink-0 text-zinc-500" />}
-                  </button>
-                )
-              })}
-            </div>
-            {messageDe('apps') !== null && (
-              <p className="mt-1.5 text-xs text-red-400">{messageDe('apps')}</p>
-            )}
-          </div>
-
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -451,6 +362,108 @@ export default function BlockingPage(): JSX.Element {
           </div>
         </section>
       )}
+
+      <section className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Applications
+              <span className="ml-2 normal-case text-zinc-500">
+                {chargementApps ? '…' : apps.length}
+              </span>
+              {brouillon !== null && brouillon.appIds.length > 0 && (
+                <span className="ml-2 normal-case text-zinc-300">
+                  · {brouillon.appIds.length} choisie{brouillon.appIds.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </p>
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600"
+              />
+              <input
+                type="text"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Rechercher…"
+                className="w-48 rounded-lg border border-zinc-800 bg-zinc-950 py-1.5 pl-7 pr-2 text-xs text-zinc-100 outline-none focus:border-zinc-600"
+              />
+            </div>
+          </div>
+
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {(['all', ...categoriesDisponibles] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategorie(c)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                  categorie === c
+                    ? 'bg-zinc-100 text-zinc-900'
+                    : 'bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
+                }`}
+              >
+                {c === 'all' ? 'Toutes' : CATEGORY_LABELS[c]}
+              </button>
+            ))}
+          </div>
+
+          <div
+            className={`max-h-64 overflow-y-auto rounded-lg border bg-zinc-950 ${
+              messageDe('apps') !== null ? 'border-red-500/60' : 'border-zinc-800'
+            }`}
+          >
+            {chargementApps && (
+              <p className="p-3 text-sm text-zinc-500">
+                Recherche des applications installées, menu Démarrer, registre et Microsoft Store…
+              </p>
+            )}
+            {!chargementApps && appsAffichees.length === 0 && (
+              <p className="p-3 text-sm text-zinc-500">Aucune application dans cette sélection.</p>
+            )}
+            {appsAffichees.map((app) => {
+              const choisie = brouillon?.appIds.includes(app.exeName) ?? false
+              return (
+                <button
+                  key={app.exeName}
+                  type="button"
+                  disabled={session.active}
+                  onClick={() => {
+                    setErreur(null)
+                    // Cliquer une application sans blocage en cours d'édition
+                    // en démarre un directement : pas besoin de passer par le
+                    // bouton « Nouveau blocage » d'abord.
+                    if (brouillon === null) {
+                      setBrouillon({ ...brouillonVide(), appIds: [app.exeName] })
+                      return
+                    }
+                    setBrouillon({
+                      ...brouillon,
+                      appIds: choisie
+                        ? brouillon.appIds.filter((id) => id !== app.exeName)
+                        : [...brouillon.appIds, app.exeName],
+                    })
+                  }}
+                  className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition ${
+                    choisie ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900'
+                  }`}
+                >
+                  <IconeApp app={app} />
+                  <span className="min-w-0 flex-1 truncate">{app.name}</span>
+                  <span className="shrink-0 text-xs text-zinc-600">
+                    {CATEGORY_LABELS[app.category]}
+                  </span>
+                  {choisie && <X size={14} className="shrink-0 text-zinc-500" />}
+                </button>
+              )
+            })}
+          </div>
+          {messageDe('apps') !== null && (
+            <p className="mt-1.5 text-xs text-red-400">{messageDe('apps')}</p>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

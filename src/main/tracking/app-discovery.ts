@@ -24,6 +24,8 @@ export type DiscoveredApp = {
   iconDataUrl?: string
   /** Logo déclaré par un paquet Store. Interne : remplacé par iconDataUrl. */
   logoPath?: string
+  /** Raccourci d'origine. Interne : sert de repli pour l'icône. */
+  shortcutPath?: string
 }
 
 type ShortcutRecord = {
@@ -55,6 +57,8 @@ type AppCandidate = Omit<DiscoveredApp, 'category'> & {
   score: number
   /** Logo fourni par le manifeste d'un paquet Store, meilleur que l'icône de l'exe. */
   logoPath?: string
+  /** Raccourci d'origine — repli quand l'icône de l'exe est introuvable. */
+  shortcutPath?: string
 }
 
 const NON_USER_APP_RE =
@@ -62,6 +66,26 @@ const NON_USER_APP_RE =
 
 const NON_USER_EXE_RE =
   /(?:^|[\\/])(unins\d*|uninstall|setup|installer|install|update|updater|maintenance|repair|service|daemon|helper|crash|bugreport|bootstrapper)\.exe$/i
+
+/**
+ * Deuxième passe, écrite à partir de ce qui traversait réellement le premier
+ * filtre sur une machine de développement : `Docker Desktop Installer.exe`,
+ * `OneDriveSetup.exe`, `itch-setup.exe`, `ASUS-DriverHub-Installer.exe`,
+ * `denuvo-anti-cheat-update-service.exe`, `chrome_proxy.exe`.
+ *
+ * Le premier filtre exigeait que le mot soit le nom complet du fichier ; ici
+ * on l'accepte n'importe où, ce qui attrape les formes composées.
+ */
+// `setup` sans séparateur : `OneDriveSetup.exe` traversait les variantes
+// `-setup` / `_setup`. Le mot collé au nom du produit est la forme la plus
+// répandue. Testé sur le nom de fichier seul, jamais sur le chemin, pour
+// qu'un dossier « Setup » ne fasse pas disparaître son contenu.
+const NON_USER_EXE_SUBSTRING_RE =
+  /(installer|setup|uninstall|anti-cheat|anticheat|driverhub|_proxy|-proxy|crashpad|crashhandler|elevation|watchdog|telemetry|reporter)/i
+
+/** Noms qui trahissent un composant technique, pas une application ouvrable. */
+const NON_USER_NAME_RE =
+  /\b(anti-cheat|anticheat|driverhub|tray-icon|tray icon|agent settings|overlay host|gpuview|shader|prerequisites|dependencies|vc_redist|web installer|command prompt|developer (command|powershell))\b/i
 
 /**
  * Scanne d'abord les raccourcis du menu Démarrer : c'est la source la plus
@@ -111,8 +135,9 @@ async function attachAppIcons(apps: DiscoveredApp[]): Promise<DiscoveredApp[]> {
       // Quand les deux existent, le manifeste gagne.
       const depuisManifeste =
         app.logoPath === undefined ? null : await readLogoFile(app.logoPath)
-      const iconDataUrl = depuisManifeste ?? (await getIconDataUrl(app.exePath))
-      const { logoPath: _ignore, ...reste } = app
+      const iconDataUrl =
+        depuisManifeste ?? (await getIconDataUrl(app.exePath, app.shortcutPath))
+      const { logoPath: _logo, shortcutPath: _lnk, ...reste } = app
       return iconDataUrl ? { ...reste, iconDataUrl } : reste
     }),
   )
@@ -137,26 +162,49 @@ async function readLogoFile(logoPath: string): Promise<string | null> {
   }
 }
 
-async function getIconDataUrl(exePath: string): Promise<string | null> {
+/**
+ * Icône d'un exécutable, avec replis successifs.
+ *
+ * `getFileIcon` échoue ou rend une image vide plus souvent qu'on ne l'imagine :
+ * exécutable temporairement verrouillé, ressource icône absente du binaire
+ * (fréquent pour les applications Electron dont l'icône vit dans un
+ * `.ico` voisin), ou taille demandée indisponible. On essaie donc plusieurs
+ * tailles, puis le raccourci du menu Démarrer s'il est connu — Windows sait
+ * résoudre l'icône d'un `.lnk` même quand celle de la cible lui résiste.
+ */
+async function getIconDataUrl(exePath: string, shortcutPath?: string): Promise<string | null> {
   const key = exePath.toLowerCase()
   if (iconCache.has(key)) return iconCache.get(key) ?? null
 
-  try {
-    if (!electronApp.isReady()) {
-      iconCache.set(key, null)
-      return null
-    }
-    // 'large' plutôt que 'normal' : 32 px devenait flou dès que la liste
-    // s'affichait sur un écran à forte densité.
-    const image = await electronApp.getFileIcon(exePath, { size: 'large' })
-    const dataUrl = image.isEmpty() ? null : image.toDataURL()
-    iconCache.set(key, dataUrl)
-    return dataUrl
-  } catch (err) {
+  if (!electronApp.isReady()) {
     iconCache.set(key, null)
-    log.warn('[app-discovery] icon read failed', { exePath, err })
     return null
   }
+
+  const tentatives: Array<{ chemin: string; taille: 'large' | 'normal' | 'small' }> = [
+    { chemin: exePath, taille: 'large' },
+    { chemin: exePath, taille: 'normal' },
+  ]
+  if (shortcutPath !== undefined && shortcutPath.length > 0) {
+    tentatives.push({ chemin: shortcutPath, taille: 'large' })
+  }
+
+  for (const tentative of tentatives) {
+    try {
+      const image = await electronApp.getFileIcon(tentative.chemin, { size: tentative.taille })
+      if (!image.isEmpty()) {
+        const dataUrl = image.toDataURL()
+        iconCache.set(key, dataUrl)
+        return dataUrl
+      }
+    } catch {
+      // Tentative suivante.
+    }
+  }
+
+  iconCache.set(key, null)
+  log.warn('[app-discovery] aucune icône trouvée', { exePath, shortcutPath })
+  return null
 }
 
 type StoreRecord = {
@@ -310,7 +358,13 @@ function buildShortcutCandidates(items: ShortcutRecord[]): AppCandidate[] {
     const exePath = normalizeExePath(String(item.TargetPath ?? ''))
     const name = normalizeDisplayName(String(item.Name ?? ''))
     if (!name || !exePath) return []
-    return toCandidate({ name, exePath, publisher: '', source: 'shortcut' })
+    return toCandidate({
+      name,
+      exePath,
+      publisher: '',
+      source: 'shortcut',
+      shortcutPath: String(item.ShortcutPath ?? ''),
+    })
   })
 }
 
@@ -370,6 +424,7 @@ function toCandidate(args: {
   exePath: string
   publisher: string
   source: AppCandidate['source']
+  shortcutPath?: string
 }): AppCandidate[] {
   const exePath = normalizeExePath(args.exePath)
   const exeName = path.basename(exePath)
@@ -381,6 +436,7 @@ function toCandidate(args: {
       exeName,
       exePath,
       publisher: args.publisher,
+      shortcutPath: args.shortcutPath,
       source: args.source,
       score: scoreCandidate(args.source, args.name, exePath),
     },
@@ -402,14 +458,26 @@ function mergeCandidates(candidates: AppCandidate[]): DiscoveredApp[] {
     if (!existing || candidate.score > existing.score) byApp.set(key, candidate)
   }
 
-  return [...byApp.values()]
-    .map(({ name, exeName, exePath, publisher, logoPath }) => ({
+  // Troisième passe, sur le nom seul. Une même application peut exposer
+  // plusieurs exécutables sous un seul nom affiché — « Rockstar Games
+  // Launcher » pointe à la fois sur `Launcher.exe` et `LauncherPatcher.exe`.
+  // Pour l'utilisateur ce sont des doublons, pas deux applications.
+  const byName = new Map<string, AppCandidate>()
+  for (const candidate of byApp.values()) {
+    const key = canonicalNameKey(candidate.name)
+    const existing = byName.get(key)
+    if (!existing || candidate.score > existing.score) byName.set(key, candidate)
+  }
+
+  return [...byName.values()]
+    .map(({ name, exeName, exePath, publisher, logoPath, shortcutPath }) => ({
       name,
       exeName,
       exePath,
       publisher,
       category: categorizeApp({ name, exeName, publisher }),
       logoPath,
+      shortcutPath,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 }
@@ -431,7 +499,9 @@ function isLikelyUserFacingApp(app: {
   if (!app.exeName.toLowerCase().endsWith('.exe')) return false
   if (isWindowsSystemPath(app.exePath)) return false
   if (NON_USER_EXE_RE.test(app.exePath)) return false
+  if (NON_USER_EXE_SUBSTRING_RE.test(app.exeName)) return false
   if (NON_USER_APP_RE.test(app.name)) return false
+  if (NON_USER_NAME_RE.test(app.name)) return false
   return true
 }
 

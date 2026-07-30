@@ -64,10 +64,39 @@ describe('app-discovery', () => {
         publisher: '',
         // La fusion classe l'entrée retenue. « Antigravity » n'est reconnu par
         // aucun signal, d'où « autres » — le repli assumé.
-        category: 'others',
+        // Antigravity est un éditeur reconnu : classé en productivité.
+        category: 'productivity',
         logoPath: undefined,
+        // Le raccourci d'origine est conservé pour servir de repli quand
+        // l'icône de l'exécutable est introuvable.
+        shortcutPath: '',
       },
     ])
+  })
+
+  it('déduplique deux exécutables partageant un seul nom affiché', () => {
+    // « Rockstar Games Launcher » pointait a la fois sur Launcher.exe et
+    // LauncherPatcher.exe : deux lignes pour une seule application.
+    const merged = mergeCandidates(
+      buildShortcutCandidates([
+        { Name: 'Rockstar Games Launcher', TargetPath: 'C:\\RG\\Launcher.exe' },
+        { Name: 'Rockstar Games Launcher', TargetPath: 'C:\\RG\\LauncherPatcher.exe' },
+      ]),
+    )
+    expect(merged).toHaveLength(1)
+  })
+
+  it('écarte les installeurs et composants techniques qui passaient le premier filtre', () => {
+    const candidates = buildShortcutCandidates([
+      { Name: 'Docker Desktop', TargetPath: 'C:\\a\\Docker Desktop Installer.exe' },
+      { Name: 'Microsoft OneDrive', TargetPath: 'C:\\a\\OneDriveSetup.exe' },
+      { Name: 'itch', TargetPath: 'C:\\a\\itch-setup.exe' },
+      { Name: 'Denuvo Anti-Cheat', TargetPath: 'C:\\a\\denuvo-anti-cheat-update-service.exe' },
+      { Name: 'ASUS DriverHub', TargetPath: 'C:\\a\\ASUS-DriverHub-Installer.exe' },
+      { Name: 'IncrediBuild Agent Tray-Icon', TargetPath: 'C:\\a\\BuildTrayIcon.exe' },
+      { Name: 'Blender', TargetPath: 'C:\\a\\blender.exe' },
+    ])
+    expect(candidates.map((c) => c.name)).toEqual(['Blender'])
   })
 
   it('classe chaque application fusionnée', () => {
