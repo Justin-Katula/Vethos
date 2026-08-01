@@ -13,6 +13,8 @@ import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
 import SettingsPage from './pages/SettingsPage'
 import AuthPage from './pages/AuthPage'
+import BlockingPage from './pages/BlockingPage'
+import BlockOverlay from './pages/BlockOverlay'
 
 export default function App(): JSX.Element {
   const authLoaded = useAuthStore((s) => s.loaded)
@@ -78,8 +80,11 @@ export default function App(): JSX.Element {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<div className="p-12 text-text-secondary">En attente de reconstruction.</div>} />
+          <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
+        {/* Hors Layout : l'overlay est une fenetre nue, sans barre laterale. */}
+        <Route path="/block-overlay" element={<BlockOverlay />} />
       </Routes>
       <AnimatePresence>{showOnboarding && <OnboardingOverlay key="onboarding" />}</AnimatePresence>
       <ToastViewport />

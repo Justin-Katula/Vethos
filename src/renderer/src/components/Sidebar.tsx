@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Settings, LogOut, type LucideIcon } from 'lucide-react'
+import { Home, Settings, Shield, LogOut, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NexusLogo } from '@/components/NexusLogo'
 import { nexus } from '@/lib/ipc'
@@ -15,6 +15,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', Icon: Home },
+  { to: '/blocage', label: 'Blocage', Icon: Shield },
   { to: '/settings', label: 'Paramètres', Icon: Settings },
 ]
 
