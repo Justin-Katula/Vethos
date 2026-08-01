@@ -9,12 +9,14 @@ import { NexusLogo } from './components/NexusLogo'
 import { useAuthStore } from './store/auth.store'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
+import { usePlanningStore } from './store/planning.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
 import SettingsPage from './pages/SettingsPage'
 import AuthPage from './pages/AuthPage'
 import BlockingPage from './pages/BlockingPage'
 import BlockOverlay from './pages/BlockOverlay'
+import HomePage from './pages/HomePage'
 
 export default function App(): JSX.Element {
   const authLoaded = useAuthStore((s) => s.loaded)
@@ -23,12 +25,14 @@ export default function App(): JSX.Element {
   const loaded = useSettingsStore((s) => s.loaded)
   const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const loadSettings = useSettingsStore((s) => s.load)
+  const loadPlanning = usePlanningStore((s) => s.load)
   const toast = useToast()
 
   useEffect(() => {
     void loadAuth()
     void loadSettings()
-  }, [loadAuth, loadSettings])
+    void loadPlanning()
+  }, [loadAuth, loadSettings, loadPlanning])
 
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {
@@ -79,7 +83,7 @@ export default function App(): JSX.Element {
     <ErrorBoundary>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<div className="p-12 text-text-secondary">En attente de reconstruction.</div>} />
+          <Route index element={<HomePage />} />
           <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
