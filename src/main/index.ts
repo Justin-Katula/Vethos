@@ -7,7 +7,6 @@ import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import { recalculateFreeTimeAtBoot } from './free-time/recalculate'
 import {
   configureAutoStart,
   createVethosTray,
@@ -183,9 +182,6 @@ function startNexusApp(): void {
       writeCrashMarker()
 
       const storage = createStorage(app.getPath('userData'))
-      await recalculateFreeTimeAtBoot(storage).catch((err) => {
-        log.warn('boot free-time recalculation failed', err)
-      })
       await registerAllIpcHandlers(
         storage,
         () => mainWindow,

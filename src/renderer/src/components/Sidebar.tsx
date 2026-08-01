@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Target, Calendar, Settings, Shield, LogOut, type LucideIcon } from 'lucide-react'
+import { Home, Settings, LogOut, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NexusLogo } from '@/components/NexusLogo'
 import { nexus } from '@/lib/ipc'
@@ -15,10 +15,6 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', Icon: Home },
-  { to: '/tasks', label: 'Mes tâches', Icon: Target },
-  { to: '/objectives', label: 'Mes objectifs', Icon: Target },
-  { to: '/planning', label: 'Mon planning', Icon: Calendar },
-  { to: '/blocage', label: 'Blocage', Icon: Shield },
   { to: '/settings', label: 'Paramètres', Icon: Settings },
 ]
 
@@ -42,7 +38,7 @@ export function Sidebar() {
       style={
         {
           WebkitAppRegion: 'drag',
-          boxShadow: '1px 0 8px rgba(59, 163, 255, 0.15)',
+          boxShadow: '1px 0 8px rgba(62, 207, 142, 0.10)',
         } as React.CSSProperties
       }
     >
@@ -64,7 +60,7 @@ export function Sidebar() {
               end={to === '/'}
               className={cn(
                 'group relative flex items-center gap-3 rounded-md px-3 py-2.5',
-                'text-sm font-medium transition-all duration-200 ease-out hover:shadow-[0_0_8px_rgba(59,163,255,0.3)]',
+                'text-sm font-medium transition-all duration-200 ease-out hover:shadow-[0_0_8px_rgba(62,207,142,0.25)]',
                 isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary',
               )}
             >

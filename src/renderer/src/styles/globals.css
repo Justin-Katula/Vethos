@@ -6,41 +6,41 @@
 
 @layer base {
   :root {
-    /* Backgrounds */
-    --bg-base: #0B0F14;
-    --bg-elevated: #0F141B;
-    --bg-card: #0F141B;
-    --bg-card-hover: #161D26;
+    /* Backgrounds — Opal-style pure black */
+    --bg-base: #000000;
+    --bg-elevated: #0A0A0A;
+    --bg-card: #111111;
+    --bg-card-hover: #191919;
 
     /* Borders */
-    --border-subtle: #1E2530;
-    --border-strong: rgba(255, 255, 255, 0.12);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
 
     /* Text */
     --text-primary: #FFFFFF;
-    --text-secondary: #8E9BAE;
-    --text-muted: #5A6B80;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
 
-    /* Accent (Bleu principal) */
-    --accent: #3BA3FF;
-    --accent-hover: #69BEFF;
-    --accent-soft: rgba(59, 163, 255, 0.2);
+    /* Accent (Vert menthe, à la Opal) */
+    --accent: #3ECF8E;
+    --accent-hover: #5EE6A8;
+    --accent-soft: rgba(62, 207, 142, 0.16);
 
     /* Spec Colors */
     --color-cyan: #00D1FF;
     --color-orange: #FF8A00;
     --color-yellow: #FFD54F;
-    --color-dark-grey: #1E2530;
+    --color-dark-grey: #1A1A1A;
 
     /* Radii */
     --radius-sm: 12px;
-    --radius-md: 12px;
-    --radius-lg: 20px;
-    --radius-xl: 20px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --radius-xl: 28px;
 
     /* Shadows */
-    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.4);
-    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 48px rgba(0, 0, 0, 0.5);
+    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.6);
+    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 24px 48px rgba(0, 0, 0, 0.7);
 
     /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

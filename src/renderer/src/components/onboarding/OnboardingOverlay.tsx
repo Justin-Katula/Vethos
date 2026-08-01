@@ -9,8 +9,6 @@ import {
 } from '@/store/onboarding.store'
 import { WelcomeStep } from './WelcomeStep'
 import { UsernameStep } from './UsernameStep'
-import { ScheduleStep } from './ScheduleStep'
-import { ObjectiveStep } from './ObjectiveStep'
 import { DonePage } from './DonePage'
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
@@ -110,21 +108,6 @@ export function OnboardingOverlay(): JSX.Element {
           >
             {step === 'welcome' && <WelcomeStep onContinue={next} />}
             {step === 'username' && <UsernameStep />}
-            {step === 'schedule' && (
-              <ScheduleStep
-                onTemplateApplied={(ruleIds) =>
-                  setCaptured((c) => ({ ...c, templateRuleIds: ruleIds }))
-                }
-              />
-            )}
-            {step === 'objective' && (
-              <ObjectiveStep
-                preselectedRuleIds={captured.templateRuleIds}
-                onObjectiveCreated={(id, color) =>
-                  setCaptured((c) => ({ ...c, objectiveId: id, objectiveColor: color }))
-                }
-              />
-            )}
             {step === 'done' && <DonePage />}
           </motion.div>
         </AnimatePresence>

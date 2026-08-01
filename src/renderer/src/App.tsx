@@ -9,20 +9,9 @@ import { NexusLogo } from './components/NexusLogo'
 import { useAuthStore } from './store/auth.store'
 import { useSettingsStore } from './store/settings.store'
 import { flushSettingsPersist } from './store/settings.store'
-import { flushSchedulePersist, useScheduleStore } from './store/schedule.store'
-import { useDeclaredAppsStore } from './store/declared-apps.store'
-import { useTasksStore } from './store/tasks.store'
-import { useAncresStore } from './store/ancres.store'
-import { useLearningStore } from './store/learning.store'
 import { nexus } from './lib/ipc'
 import { useToast } from './lib/use-toast'
-import HomePage from './pages/HomePage'
-import ObjectivesPage from './pages/ObjectivesPage'
-import PlanningPage from './pages/PlanningPage'
 import SettingsPage from './pages/SettingsPage'
-import TasksPage from './pages/TasksPage'
-import BlockingPage from './pages/BlockingPage'
-import BlockOverlay from './pages/BlockOverlay'
 import AuthPage from './pages/AuthPage'
 
 export default function App(): JSX.Element {
@@ -32,28 +21,16 @@ export default function App(): JSX.Element {
   const loaded = useSettingsStore((s) => s.loaded)
   const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted)
   const loadSettings = useSettingsStore((s) => s.load)
-
-  const loadSchedule = useScheduleStore((s) => s.load)
-  const loadDeclaredApps = useDeclaredAppsStore((s) => s.load)
-  const loadTasks = useTasksStore((s) => s.load)
-  const loadAncres = useAncresStore((s) => s.load)
-  const loadLearning = useLearningStore((s) => s.load)
   const toast = useToast()
 
-  // Boot — charge tous les stores au montage
   useEffect(() => {
     void loadAuth()
     void loadSettings()
-    void loadSchedule()
-    void loadDeclaredApps()
-    void loadTasks()
-    void loadAncres()
-    void loadLearning()
-  }, [loadAuth, loadSettings, loadSchedule, loadDeclaredApps, loadTasks, loadAncres, loadLearning])
+  }, [loadAuth, loadSettings])
 
   useEffect(() => {
     const offFlush = nexus.app.onFlushDebounces(() => {
-      void Promise.all([flushSchedulePersist(), flushSettingsPersist()])
+      void flushSettingsPersist()
     })
     const offUpdateReady = nexus.app.onUpdateDownloaded((info) => {
       toast.info({
@@ -100,15 +77,9 @@ export default function App(): JSX.Element {
     <ErrorBoundary>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/objectives" element={<ObjectivesPage />} />
-          <Route path="/planning" element={<PlanningPage />} />
-          <Route path="/blocage" element={<BlockingPage />} />
+          <Route index element={<div className="p-12 text-text-secondary">En attente de reconstruction.</div>} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
-        {/* Hors Layout : l'overlay est une fenetre nue, sans barre laterale. */}
-        <Route path="/block-overlay" element={<BlockOverlay />} />
       </Routes>
       <AnimatePresence>{showOnboarding && <OnboardingOverlay key="onboarding" />}</AnimatePresence>
       <ToastViewport />
