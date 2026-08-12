@@ -30,19 +30,36 @@ export type AppCategory = (typeof APP_CATEGORIES)[number]
  * Vit ici avec le libellé : une catégorie est reconnue d'abord à sa couleur,
  * et les séparer inviterait à ce que les deux divergent.
  */
+/**
+ * Douze teintes différentes, c'était un arc-en-ciel : l'œil ne pouvait rien en
+ * tirer. On distingue désormais par la LUMINOSITÉ, et cette luminosité veut
+ * dire quelque chose — plus une catégorie est claire, plus elle demande ton
+ * attention quand tu essaies de travailler.
+ */
+const TIER = {
+  /** Ce contre quoi tu te protèges. */
+  distraction: 'border-grade-1/35 bg-grade-1/10 text-grade-1',
+  /** Neutre : ni aide ni obstacle. */
+  neutral: 'border-grade-2/30 bg-grade-2/8 text-grade-2',
+  /** Ce qui sert ton travail. */
+  productive: 'border-grade-3/35 bg-grade-3/10 text-grade-3',
+  /** Le décor du système : présent, jamais saillant. */
+  system: 'border-grade-4/40 bg-grade-4/10 text-grade-4',
+} as const
+
 export const CATEGORY_COLORS: Record<AppCategory, string> = {
-  social: 'border-violet-500/40 bg-violet-500/10 text-violet-300',
-  games: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
-  entertainment: 'border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300',
-  creativity: 'border-blue-500/40 bg-blue-500/10 text-blue-300',
-  education: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
-  health: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-  reading: 'border-teal-500/40 bg-teal-500/10 text-teal-300',
-  productivity: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
-  shopping: 'border-orange-500/40 bg-orange-500/10 text-orange-300',
-  travel: 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300',
-  utilities: 'border-zinc-600/60 bg-zinc-600/10 text-zinc-300',
-  others: 'border-zinc-700/60 bg-zinc-700/10 text-zinc-400',
+  social: TIER.distraction,
+  games: TIER.distraction,
+  entertainment: TIER.distraction,
+  shopping: TIER.distraction,
+  creativity: TIER.neutral,
+  travel: TIER.neutral,
+  education: TIER.productive,
+  health: TIER.productive,
+  reading: TIER.productive,
+  productivity: TIER.productive,
+  utilities: TIER.system,
+  others: TIER.system,
 }
 
 export const CATEGORY_LABELS: Record<AppCategory, string> = {

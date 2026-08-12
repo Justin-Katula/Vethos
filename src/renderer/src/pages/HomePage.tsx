@@ -1,252 +1,352 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Anchor, CheckCircle2, Plus, Target, Trash2, Zap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Check, Plus, Trash2 } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
+import { TimeCircle } from '@/components/interface/TimeCircle'
+import { Disclosure } from '@/components/ui/Disclosure'
+import { Modal } from '@/components/ui/Modal'
 import { usePlanning } from '@/lib/use-planning'
 import { usePlanningStore } from '@/store/planning.store'
-import { dateKey, addDays } from '@/lib/planning/dates'
+import { useSettingsStore } from '@/store/settings.store'
+import { addDays, dateKey, dayOfWeek } from '@/lib/planning/dates'
+import { sleepScheduleEntries } from '@shared/sleep'
 import { cn } from '@/lib/cn'
 import type { PlacedBlock, TaskItem } from '@/lib/planning/types'
+
+const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+const MONTHS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+]
 
 function hhmm(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
 }
 
-function hours(minutes: number): string {
+function duration(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   if (h === 0) return `${m} min`
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`
 }
 
-const KIND_ICON = {
-  task: <Zap size={13} className="text-accent" />,
-  objective: <Target size={13} className="text-blue-400" />,
-  ancre: <Anchor size={13} className="text-orange-400" />,
-} as const
-
 export default function HomePage() {
-  const [now] = useState(() => new Date())
+  const [now, setNow] = useState(() => new Date())
+  const [adding, setAdding] = useState(false)
+
+  // L'aiguille doit avancer : sans cela, le cercle ment dès la minute suivante.
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   const plan = usePlanning(now)
   const tasks = usePlanningStore((s) => s.tasks)
   const addTask = usePlanningStore((s) => s.addTask)
   const deleteTask = usePlanningStore((s) => s.deleteTask)
   const completeTask = usePlanningStore((s) => s.completeTask)
-  const today = dateKey(now)
+  const schedule = usePlanningStore((s) => s.schedule)
+  const sleepStart = useSettingsStore((s) => s.sleepStart)
+  const sleepEnd = useSettingsStore((s) => s.sleepEnd)
 
-  const todayBlocks = useMemo(() => plan?.blocks.filter((b) => b.date === today) ?? [], [plan, today])
-  const todayCapacity = plan?.capacities.find((c) => c.date === today)
-  const placedToday = todayBlocks.filter((b) => b.kind !== 'ancre').reduce((s, b) => s + b.workMinutes, 0)
+  const today = dateKey(now)
+  const nowMinute = now.getHours() * 60 + now.getMinutes()
+  const dow = dayOfWeek(today)
+
+  const todayEntries = useMemo(
+    () => [...sleepScheduleEntries(sleepStart, sleepEnd), ...schedule].filter((e) => e.dayOfWeek === dow),
+    [schedule, sleepStart, sleepEnd, dow],
+  )
+
+  const todayBlocks = useMemo(
+    () => (plan?.blocks ?? []).filter((b) => b.date === today),
+    [plan, today],
+  )
+
+  const current = todayBlocks.find((b) => b.startMinute <= nowMinute && nowMinute < b.endMinute) ?? null
+  const next = todayBlocks.find((b) => b.startMinute > nowMinute) ?? null
+  const upcoming = todayBlocks.filter((b) => b.endMinute > nowMinute && b !== current)
+  const remainingWork = upcoming.filter((b) => b.kind !== 'ancre').reduce((s, b) => s + b.workMinutes, 0)
+
+  const stuck = plan?.verdicts.filter((v) => v.status !== 'placed') ?? []
+  const activeTasks = tasks.filter((t) => t.status === 'active' && t.remainingMinutes > 0)
+  // Le sommeil a toujours une valeur par défaut : c'est l'absence d'obligations
+  // DÉCLARÉES qui dit que l'application ne connaît pas encore ta vie.
+  const needsSetup = schedule.length === 0
 
   return (
     <PageTransition>
-      <div className="flex h-full flex-col gap-8 overflow-y-auto px-12 pb-20 pt-16">
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Aujourd’hui</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            {todayBlocks.length === 0
-              ? 'Rien de placé pour le moment.'
-              : `${hours(placedToday)} de travail placé sur ${hours(todayCapacity?.effectiveCapacityMinutes ?? 0)} disponibles.`}
-          </p>
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-8 overflow-y-auto px-10 pb-16 pt-14">
+        <header className="flex items-end justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+              {DAYS[dow]!.charAt(0).toUpperCase() + DAYS[dow]!.slice(1)} {now.getDate()} {MONTHS[now.getMonth()]}
+            </h1>
+            <p className="mt-1 text-sm text-text-muted">
+              {todayBlocks.length === 0
+                ? 'Rien de posé aujourd’hui.'
+                : remainingWork === 0
+                  ? 'Ta journée est derrière toi.'
+                  : `${duration(remainingWork)} de travail devant toi.`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-bg-card-hover"
+          >
+            <Plus size={15} /> Ajouter une tâche
+          </button>
         </header>
 
-        {plan && <FeasibilityBanner plan={plan} />}
+        <section className="flex items-center justify-center gap-10 py-2">
+          <TimeCircle entries={todayEntries} blocks={todayBlocks} nowMinute={nowMinute}>
+            <span className="font-mono text-3xl font-semibold tabular-nums text-text-primary">
+              {hhmm(nowMinute)}
+            </span>
+            <span className="mt-1 text-[11px] uppercase tracking-widest text-text-muted">
+              {todayBlocks.length === 0 ? 'libre' : `${todayBlocks.length} blocs`}
+            </span>
+          </TimeCircle>
 
-        <section>
-          <h2 className="mb-3 text-sm font-semibold text-text-primary">Le plan du jour</h2>
-          {todayBlocks.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border-subtle px-5 py-10 text-center text-sm text-text-muted">
-              Rien à placer — ou rien où le placer. Déclare ton temps dans « Mon temps », puis ajoute une tâche.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {todayBlocks.map((block) => (
+          <div className="min-w-0 flex-1 space-y-6">
+            <Focus label="Maintenant" block={current} nowMinute={nowMinute} empty="Rien en cours." />
+            <div className="h-px bg-border-subtle" />
+            <Focus label="Ensuite" block={next} nowMinute={nowMinute} empty="Plus rien aujourd’hui." />
+          </div>
+        </section>
+
+        {needsSetup && <SetupInvitation />}
+
+        {plan && <Status plan={plan} />}
+
+        {upcoming.length > 0 && (
+          <Disclosure title="Le reste de la journée" summary={`${upcoming.length} blocs`}>
+            <div className="space-y-1.5">
+              {upcoming.map((block) => (
                 <BlockRow key={block.id} block={block} />
               ))}
             </div>
-          )}
-        </section>
+          </Disclosure>
+        )}
 
-        {plan && plan.verdicts.length > 0 && <Verdicts plan={plan} />}
+        {activeTasks.length > 0 && (
+          <Disclosure title="Tâches ouvertes" summary={`${activeTasks.length}`}>
+            <div className="space-y-1.5">
+              {activeTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onComplete={() => void completeTask(task.id)}
+                  onDelete={() => void deleteTask(task.id)}
+                />
+              ))}
+            </div>
+            {plan?.wip.overLimit && (
+              <p className="mt-3 text-[11px] text-text-muted">
+                {plan.wip.activeCount} tâches ouvertes pour une limite mesurée à {plan.wip.limit}. Rien n’est
+                bloqué — terminer avant d’ouvrir reste simplement plus rapide.
+              </p>
+            )}
+          </Disclosure>
+        )}
+
+        {stuck.length > 0 && (
+          <Disclosure title="Ce qui ne rentre pas" summary={`${stuck.length}`} tone="danger">
+            <div className="space-y-1.5">
+              {stuck.map((verdict) => (
+                <div key={verdict.taskId} className="flex items-center gap-3 text-xs">
+                  <span className="text-text-primary">{verdict.title}</span>
+                  <span className="ml-auto font-mono text-text-muted">
+                    {duration(verdict.placedMinutes)} / {duration(verdict.neededMinutes)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Disclosure>
+        )}
 
         {plan?.internalError && (
-          <p className="rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-xs text-red-300">
-            Contrôle post-placement : {plan.internalError.actual} min posées pour {plan.internalError.expected} min
-            décidées (écart {plan.internalError.diff}). C’est un bug interne, pas une décision.
+          <p className="rounded-md border border-danger/40 px-4 py-3 text-[11px] text-danger">
+            Contrôle post-placement : {plan.internalError.actual} min posées pour{' '}
+            {plan.internalError.expected} min décidées. C’est un bug interne, pas une décision.
           </p>
         )}
 
-        <TaskList tasks={tasks} onDelete={deleteTask} onComplete={completeTask} />
-
-        {/* B.5 : le plafond d'un jour, mesuré — 40 % du meilleur jour à venir. */}
-        <QuickAddTask
+        <AddTaskModal
+          open={adding}
+          onClose={() => setAdding(false)}
           maxPerDayMinutes={Math.round(
             Math.max(0, ...(plan?.capacities.map((c) => c.effectiveCapacityMinutes) ?? [0])) * 0.4,
           )}
           onAdd={addTask}
         />
-
-        {plan?.wip.overLimit && (
-          <p className="text-xs text-text-muted">
-            {plan.wip.activeCount} tâches ouvertes pour une limite de {plan.wip.limit}. Finis-en une avant d’en
-            ouvrir une autre — rien n’est bloqué, c’est juste plus efficace.
-          </p>
-        )}
       </div>
     </PageTransition>
   )
 }
 
-function BlockRow({ block }: { block: PlacedBlock }) {
+function SetupInvitation() {
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-card px-4 py-3"
-    >
-      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: block.color }} />
-      <span className="font-mono text-xs text-text-muted">
-        {hhmm(block.startMinute)}–{hhmm(block.endMinute)}
-      </span>
-      <span className="text-sm font-medium text-text-primary">{block.label}</span>
-      {block.reducedToMinimum && (
-        <span className="rounded border border-orange-500/40 px-1.5 py-0.5 text-[10px] text-orange-300">
-          version minimale
-        </span>
-      )}
-      {block.capOverride && (
-        <span className="rounded border border-red-500/40 px-1.5 py-0.5 text-[10px] text-red-300">crise</span>
-      )}
-      <span className="ml-auto flex items-center gap-3 text-xs text-text-muted">
-        {block.breakMinutes > 0 && <span>dont {block.breakMinutes} min de pause</span>}
-        <span className="font-mono">{block.workMinutes} min</span>
-        {KIND_ICON[block.kind]}
-      </span>
-    </motion.div>
-  )
-}
-
-function FeasibilityBanner({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
-  const feasible = plan.feasibility.globallyFeasible
-
-  return (
-    <div
-      className={cn(
-        'rounded-lg border px-5 py-4',
-        feasible ? 'border-accent/30 bg-accent/5' : 'border-red-500/30 bg-red-500/5',
-      )}
-    >
-      <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-        {feasible ? (
-          <>
-            <CheckCircle2 size={15} className="text-accent" /> Tout ce que tu as posé tient avant les deadlines.
-          </>
-        ) : (
-          <>
-            <AlertTriangle size={15} className="text-red-400" /> Prouvé impossible dans l’état actuel.
-          </>
-        )}
+    <div className="info-panel flex items-center gap-5 rounded-lg px-6 py-5">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-text-secondary">
+          Pour l’instant, l’application ne connaît que tes heures de sommeil.
+        </p>
+        <p className="mt-1 text-xs text-text-muted">
+          Déclare tes cours, ton travail, tes trajets — une seule fois. Tout le reste s’en déduit.
+        </p>
       </div>
-
-      {plan.feasibility.deficits.map((d) => (
-        <div key={d.deadline} className="mt-3 text-xs">
-          <p className="text-text-secondary">
-            Avant le {d.deadline} : il manque <span className="font-mono text-red-300">{hours(d.deficitMinutes)}</span>{' '}
-            ({Math.round(d.deficitRatio * 100)} % du travail demandé).
-          </p>
-          <ul className="mt-1.5 space-y-1 text-text-muted">
-            {d.options.map((o) => (
-              <li key={o.action}>
-                · {o.action} <span className="font-mono">→ +{hours(o.minutesFreed)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      <Link
+        to="/temps"
+        className="shrink-0 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-bg-card-hover"
+      >
+        Déclarer mon temps
+      </Link>
     </div>
   )
 }
 
-function Verdicts({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
-  const partial = plan.verdicts.filter((v) => v.status !== 'placed')
-  if (partial.length === 0) return null
-
-  return (
-    <section>
-      <h2 className="mb-2 text-sm font-semibold text-text-primary">Ce qui ne rentre pas entièrement</h2>
-      <div className="space-y-1.5">
-        {partial.map((v) => (
-          <div key={v.taskId} className="flex items-center gap-3 rounded-md border border-border-subtle px-3 py-2 text-xs">
-            <span className="text-text-primary">{v.title}</span>
-            <span className="ml-auto font-mono text-text-muted">
-              {hours(v.placedMinutes)} placées / {hours(v.neededMinutes)}
-            </span>
-            <span
-              className={cn(
-                'rounded px-1.5 py-0.5 text-[10px]',
-                v.status === 'partial' ? 'bg-orange-500/15 text-orange-300' : 'bg-red-500/15 text-red-300',
-              )}
-            >
-              {v.status === 'partial' ? 'partielle' : 'non placée'}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function TaskList({
-  tasks,
-  onDelete,
-  onComplete,
+function Focus({
+  label,
+  block,
+  nowMinute,
+  empty,
 }: {
-  tasks: TaskItem[]
-  onDelete: (id: string) => Promise<void>
-  onComplete: (id: string, measured?: number) => Promise<void>
+  label: string
+  block: PlacedBlock | null
+  nowMinute: number
+  empty: string
 }) {
-  const active = tasks.filter((t) => t.status === 'active')
-  if (active.length === 0) return null
-
   return (
-    <section>
-      <h2 className="mb-2 text-sm font-semibold text-text-primary">Tâches ouvertes</h2>
-      <div className="space-y-1.5">
-        {active.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-card px-3 py-2">
-            <button
-              type="button"
-              onClick={() => void onComplete(t.id)}
-              className="text-text-muted transition-colors hover:text-accent"
-              aria-label="Terminer"
-            >
-              <CheckCircle2 size={15} />
-            </button>
-            <span className="text-sm text-text-primary">{t.title}</span>
-            <span className="rounded bg-bg-base px-1.5 py-0.5 text-[10px] text-text-muted">{t.category}</span>
-            <span className="ml-auto font-mono text-xs text-text-muted">
-              {t.deadline} · {hours(t.remainingMinutes)} · imp. {t.importance}
-            </span>
-            <button
-              type="button"
-              onClick={() => void onDelete(t.id)}
-              className="text-text-muted transition-colors hover:text-red-400"
-              aria-label="Supprimer"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div>
+      <p className="text-[11px] uppercase tracking-widest text-text-muted">{label}</p>
+      {block ? (
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-1.5">
+          <p className="truncate text-lg font-medium text-text-primary">{block.label}</p>
+          <p className="mt-0.5 font-mono text-xs text-text-secondary">
+            {hhmm(block.startMinute)} → {hhmm(block.endMinute)}
+            {block.startMinute <= nowMinute && nowMinute < block.endMinute
+              ? ` · encore ${duration(block.endMinute - nowMinute)}`
+              : ` · dans ${duration(block.startMinute - nowMinute)}`}
+          </p>
+          {block.breakMinutes > 0 && (
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              dont {block.breakMinutes} min de pause, incluses dans le bloc
+            </p>
+          )}
+        </motion.div>
+      ) : (
+        <p className="mt-1.5 text-sm text-text-muted">{empty}</p>
+      )}
+    </div>
   )
 }
 
-function QuickAddTask({
+function Status({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
+  const worst = plan.feasibility.deficits[0]
+
+  if (!worst) {
+    if (plan.feasibility.densities.length === 0) return null
+    return (
+      <p className="flex items-center gap-2 text-xs text-text-muted">
+        <Check size={13} className="text-text-secondary" />
+        Tout ce que tu as posé tient avant les deadlines.
+      </p>
+    )
+  }
+
+  return (
+    <Disclosure
+      title="Prouvé impossible dans l’état actuel"
+      summary={`il manque ${duration(worst.deficitMinutes)}`}
+      tone="danger"
+    >
+      <div className="space-y-4">
+        {plan.feasibility.deficits.map((deficit) => (
+          <div key={deficit.deadline}>
+            <p className="text-xs text-text-secondary">
+              Avant le {deficit.deadline} : {duration(deficit.deficitMinutes)} de trop, soit{' '}
+              {Math.round(deficit.deficitRatio * 100)} % du travail demandé.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {deficit.options.map((option) => (
+                <li key={option.action} className="flex items-center gap-3 text-xs text-text-muted">
+                  <span className="truncate">{option.action}</span>
+                  <span className="ml-auto shrink-0 font-mono">+{duration(option.minutesFreed)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Disclosure>
+  )
+}
+
+function BlockRow({ block }: { block: PlacedBlock }) {
+  return (
+    <div className="flex items-center gap-3 py-1 text-xs">
+      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: block.color }} />
+      <span className="w-24 shrink-0 font-mono text-text-muted">
+        {hhmm(block.startMinute)}–{hhmm(block.endMinute)}
+      </span>
+      <span className="truncate text-text-primary">{block.label}</span>
+      {block.reducedToMinimum && <span className="shrink-0 text-[10px] text-warning">réduite</span>}
+      {block.capOverride && <span className="shrink-0 text-[10px] text-danger">crise</span>}
+      <span className="ml-auto shrink-0 font-mono text-text-muted">{block.workMinutes} min</span>
+    </div>
+  )
+}
+
+function TaskRow({
+  task,
+  onComplete,
+  onDelete,
+}: {
+  task: TaskItem
+  onComplete: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="group flex items-center gap-3 py-1 text-xs">
+      <button
+        type="button"
+        onClick={onComplete}
+        className="shrink-0 text-text-muted transition-colors hover:text-text-primary"
+        aria-label="Terminer"
+      >
+        <Check size={14} />
+      </button>
+      <span className="truncate text-text-primary">{task.title}</span>
+      <span className="ml-auto shrink-0 font-mono text-text-muted">
+        {task.deadline.slice(5)} · {duration(task.remainingMinutes)}
+      </span>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+        aria-label="Supprimer"
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  )
+}
+
+function AddTaskModal({
+  open,
+  onClose,
   onAdd,
   maxPerDayMinutes,
 }: {
-  onAdd: (t: Omit<TaskItem, 'id' | 'createdAt' | 'parentTaskId'>, options?: { maxPerDayMinutes?: number }) => Promise<void>
+  open: boolean
+  onClose: () => void
+  onAdd: (
+    t: Omit<TaskItem, 'id' | 'createdAt' | 'parentTaskId'>,
+    options?: { maxPerDayMinutes?: number },
+  ) => Promise<void>
   maxPerDayMinutes: number
 }) {
   const [draft, setDraft] = useState(() => ({
@@ -257,6 +357,7 @@ function QuickAddTask({
     workKind: 'routine' as 'routine' | 'novel',
     minutes: 60,
   }))
+  const [detailed, setDetailed] = useState(false)
 
   const submit = () => {
     if (!draft.title.trim()) return
@@ -277,81 +378,126 @@ function QuickAddTask({
       { maxPerDayMinutes },
     )
     setDraft((d) => ({ ...d, title: '' }))
+    onClose()
   }
 
   return (
-    <section className="rounded-lg border border-border-subtle bg-bg-card p-5 shadow-card">
-      <h2 className="mb-3 text-sm font-semibold text-text-primary">Ajouter une tâche</h2>
-      <div className="flex flex-col gap-3">
-        <input
-          type="text"
-          value={draft.title}
-          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Ce qu'il y a à faire…"
-          className="rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-text-muted">
-            Pour le
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Ajouter une tâche"
+      description="Trois champs suffisent. L’application corrige ton estimation et trouve la place elle-même."
+    >
+      <div className="space-y-4">
+        <Field label="Quoi">
+          <input
+            autoFocus
+            type="text"
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder="Ce qu’il y a à faire…"
+            className={inputClass}
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Pour quand">
             <input
               type="date"
               value={draft.deadline}
               onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
-              className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+              className={inputClass}
             />
-          </label>
-          <input
-            type="text"
-            value={draft.category}
-            onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-            title="Catégorie — porte le facteur de correction appris"
-            className="w-32 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-          <select
-            value={draft.workKind}
-            onChange={(e) => setDraft({ ...draft, workKind: e.target.value as 'routine' | 'novel' })}
-            className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-          >
-            <option value="routine">Travail connu</option>
-            <option value="novel">Nouveau / créatif</option>
-          </select>
-          <label className="flex items-center gap-1.5 text-xs text-text-muted">
-            <input
-              type="number"
-              min={5}
-              max={2400}
-              step={5}
-              value={draft.minutes}
-              onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
-              className="w-20 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-            />
-            min estimées
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-text-muted">
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={draft.importance}
-              onChange={(e) => setDraft({ ...draft, importance: Number(e.target.value) })}
-              className="w-16 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-            />
-            importance
-          </label>
+          </Field>
+          <Field label="Combien de temps">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={5}
+                max={2400}
+                step={5}
+                value={draft.minutes}
+                onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
+                className={inputClass}
+              />
+              <span className="shrink-0 text-xs text-text-muted">min</span>
+            </div>
+          </Field>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setDetailed((v) => !v)}
+          className="text-[11px] text-text-muted underline-offset-2 transition-colors hover:text-text-secondary hover:underline"
+        >
+          {detailed ? 'Masquer les détails' : 'Importance, catégorie, nature du travail'}
+        </button>
+
+        {detailed && (
+          <div className="grid grid-cols-3 gap-3 border-t border-border-subtle pt-4">
+            <Field label="Importance">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={draft.importance}
+                onChange={(e) => setDraft({ ...draft, importance: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Catégorie">
+              <input
+                type="text"
+                value={draft.category}
+                onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Nature">
+              <select
+                value={draft.workKind}
+                onChange={(e) => setDraft({ ...draft, workKind: e.target.value as 'routine' | 'novel' })}
+                className={inputClass}
+              >
+                <option value="routine">Connu</option>
+                <option value="novel">Nouveau</option>
+              </select>
+            </Field>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 border-t border-border-subtle pt-4">
+          <p className="text-[11px] text-text-muted">
+            L’importance se déclare une seule fois. Elle n’est jamais recalculée.
+          </p>
           <button
             type="button"
             disabled={!draft.title.trim()}
             onClick={submit}
-            className="ml-auto inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
+            className={cn(
+              'inline-flex shrink-0 items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+              draft.title.trim()
+                ? 'bg-accent text-black hover:bg-accent-hover'
+                : 'cursor-not-allowed bg-bg-card-hover text-text-muted',
+            )}
           >
-            <Plus size={15} /> Ajouter
+            Ajouter
           </button>
         </div>
-        <p className="text-[11px] text-text-muted">
-          L’importance se déclare une seule fois, à la création. Elle n’est jamais recalculée ni devinée.
-        </p>
       </div>
-    </section>
+    </Modal>
+  )
+}
+
+const inputClass =
+  'w-full rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-border-strong'
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[11px] uppercase tracking-wider text-text-muted">{label}</span>
+      {children}
+    </label>
   )
 }

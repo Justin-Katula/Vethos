@@ -4,43 +4,80 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Panneau de contenu : sobre au repos, il ne s'éclaire qu'au survol. */
+  .info-panel {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-card);
+    background-image: none;
+    box-shadow: var(--shadow-card);
+    transition:
+      border-color var(--duration-slow) var(--ease-out),
+      background-color var(--duration-slow) var(--ease-out),
+      background-image var(--duration-slow) var(--ease-out),
+      box-shadow var(--duration-slow) var(--ease-out),
+      transform var(--duration-slow) var(--ease-out);
+  }
+
+  .info-panel:hover {
+    border-color: var(--border-strong);
+    background-image:
+      radial-gradient(circle at center, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%, transparent);
+    background-size: 6px 6px, auto;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 14px 34px rgba(0, 0, 0, 0.42);
+  }
+}
+
 @layer base {
   :root {
-    /* Backgrounds — Opal-style pure black */
-    --bg-base: #000000;
-    --bg-elevated: #0A0A0A;
-    --bg-card: #111111;
-    --bg-card-hover: #191919;
+    /* Backgrounds — noir profond, jamais pur : les cartes translucides
+       laissent respirer le fond animé au lieu de l'écraser. */
+    --bg-base: #020202;
+    --bg-elevated: rgba(12, 12, 13, 0.94);
+    --bg-card: rgba(20, 20, 22, 0.78);
+    --bg-card-hover: rgba(31, 31, 34, 0.88);
 
     /* Borders */
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
+    --border-subtle: rgba(216, 216, 216, 0.1);
+    --border-strong: rgba(216, 216, 216, 0.22);
 
     /* Text */
-    --text-primary: #FFFFFF;
-    --text-secondary: #9CA3AF;
-    --text-muted: #6B7280;
+    --text-primary: #E8E8E8;
+    --text-secondary: #B4B4B6;
+    --text-muted: #7E7E82;
 
-    /* Accent (Vert menthe, à la Opal) */
-    --accent: #3ECF8E;
-    --accent-hover: #5EE6A8;
-    --accent-soft: rgba(62, 207, 142, 0.16);
+    /* Accent neutre, cohérent avec le fond animé. La couleur est réservée
+       au danger — elle ne sert jamais de décoration. */
+    --accent: #D8D8D8;
+    --accent-hover: #F0F0F0;
+    --accent-soft: rgba(216, 216, 216, 0.16);
 
-    /* Spec Colors */
-    --color-cyan: #00D1FF;
-    --color-orange: #FF8A00;
-    --color-yellow: #FFD54F;
-    --color-dark-grey: #1A1A1A;
+    /* Échelle de gris des catégories : on distingue par la luminosité,
+       jamais par la teinte. */
+    --grade-1: #E2E2E2;
+    --grade-2: #A8A8AC;
+    --grade-3: #737373;
+    --grade-4: #525252;
+    --grade-5: #2A2A2E;
+    --color-dark-grey: #151518;
+
+    /* Les deux seules couleurs de l'application : elles signalent, elles
+       ne décorent pas. */
+    --color-danger: #EF4444;
+    --color-warning: #FF8A00;
 
     /* Radii */
     --radius-sm: 12px;
-    --radius-md: 16px;
-    --radius-lg: 22px;
-    --radius-xl: 28px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 20px;
 
     /* Shadows */
-    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.6);
-    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 24px 48px rgba(0, 0, 0, 0.7);
+    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 28px rgba(0, 0, 0, 0.52);
+    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 56px rgba(0, 0, 0, 0.62);
 
     /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

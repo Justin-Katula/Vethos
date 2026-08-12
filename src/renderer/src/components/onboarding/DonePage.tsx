@@ -72,7 +72,7 @@ export function DonePage(): JSX.Element {
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400"
+        className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-accent/12 text-text-primary"
       >
         <CheckCircle2 size={48} strokeWidth={2.4} />
       </motion.div>

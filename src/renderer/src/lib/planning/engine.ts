@@ -335,7 +335,9 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
           kind: 'task',
           refId: task.id,
           label: task.title,
-          color: '#3ECF8E',
+          // Le travail à échéance est ce qu'il y a de plus clair à l'écran :
+          // c'est ce qui t'appartient vraiment.
+          color: '#E8E8E8',
           cognitiveWindow: slot.cognitiveWindow,
           capOverride: capOverride || undefined,
         })

@@ -37,12 +37,7 @@ export function Sidebar() {
         'border-r border-border-subtle',
         'bg-bg-base',
       )}
-      style={
-        {
-          WebkitAppRegion: 'drag',
-          boxShadow: '1px 0 8px rgba(62, 207, 142, 0.10)',
-        } as React.CSSProperties
-      }
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="px-3 pb-6">
         <NexusLogo size={26} />
@@ -62,7 +57,7 @@ export function Sidebar() {
               end={to === '/'}
               className={cn(
                 'group relative flex items-center gap-3 rounded-md px-3 py-2.5',
-                'text-sm font-medium transition-all duration-200 ease-out hover:shadow-[0_0_8px_rgba(62,207,142,0.25)]',
+                'text-sm font-medium transition-colors duration-200 ease-out',
                 isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary',
               )}
             >

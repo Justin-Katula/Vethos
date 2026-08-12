@@ -48,7 +48,10 @@ export function OnboardingOverlay(): JSX.Element {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      // Dès que la sortie commence, le voile cesse d'intercepter les clics.
+      // Sans cela, une animation qui traîne laisse un écran invisible par-dessus
+      // l'application : on voit l'interface, rien ne répond.
+      exit={{ opacity: 0, pointerEvents: 'none' }}
       transition={{ duration: 0.3 }}
       className="fixed inset-0 z-[100] flex flex-col bg-bg-base/95 backdrop-blur-md"
     >

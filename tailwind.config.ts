@@ -16,6 +16,16 @@ export default {
         'text-muted': 'var(--text-muted)',
         accent: 'var(--accent)',
         'accent-hover': 'var(--accent-hover)',
+        'accent-soft': 'var(--accent-soft)',
+        /* Distinguer par la luminosité, jamais par la teinte. */
+        'grade-1': 'var(--grade-1)',
+        'grade-2': 'var(--grade-2)',
+        'grade-3': 'var(--grade-3)',
+        'grade-4': 'var(--grade-4)',
+        'grade-5': 'var(--grade-5)',
+        /* Les deux seules couleurs : elles signalent, elles ne décorent pas. */
+        danger: 'var(--color-danger)',
+        warning: 'var(--color-warning)',
       },
       borderRadius: {
         sm: 'var(--radius-sm)',

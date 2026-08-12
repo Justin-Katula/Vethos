@@ -12,21 +12,23 @@ const ICON: Record<ToastType['variant'], typeof CheckCircle2> = {
   error: AlertCircle,
 }
 
+// Une réussite n'a pas besoin de couleur : elle n'appelle aucune action.
+// Seule l'erreur en porte une — c'est à cela qu'elle sert.
 const STYLES: Record<ToastType['variant'], { bg: string; ring: string; icon: string }> = {
   success: {
-    bg: 'bg-emerald-500/10',
-    ring: 'ring-emerald-500/30',
-    icon: 'text-emerald-300',
+    bg: 'bg-accent/10',
+    ring: 'ring-accent/25',
+    icon: 'text-text-primary',
   },
   info: {
     bg: 'bg-accent/10',
-    ring: 'ring-accent/30',
+    ring: 'ring-accent/25',
     icon: 'text-accent',
   },
   error: {
-    bg: 'bg-red-500/10',
-    ring: 'ring-red-500/30',
-    icon: 'text-red-300',
+    bg: 'bg-danger/10',
+    ring: 'ring-danger/30',
+    icon: 'text-danger',
   },
 }
 

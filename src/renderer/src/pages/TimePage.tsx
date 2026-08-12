@@ -1,29 +1,23 @@
 import { useMemo, useState } from 'react'
-import { Bed, Clock, Anchor, Target, Plus, Trash2, Copy, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Copy } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
+import { Disclosure } from '@/components/ui/Disclosure'
 import { usePlanning } from '@/lib/use-planning'
 import { usePlanningStore } from '@/store/planning.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { useToast } from '@/lib/use-toast'
-import { cn } from '@/lib/cn'
 import { evaluateRequest, type RequestVerdict } from '@/lib/planning/requests'
 import { dateKey } from '@/lib/planning/dates'
+import { CATEGORY_COLOR, CATEGORY_LABEL, nextShade } from '@/lib/palette'
+import { cn } from '@/lib/cn'
 import { SCHEDULE_CATEGORIES, type ScheduleCategory } from '@shared/schemas'
-import type { ScheduleEntry } from '@/lib/planning/types'
+import type { AncreItem, ObjectiveItem, ScheduleEntry } from '@/lib/planning/types'
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-const CATEGORY_META: Record<ScheduleCategory, { label: string; color: string }> = {
-  sleep: { label: 'Sommeil', color: '#4C566A' },
-  school: { label: 'École', color: '#5E81AC' },
-  work: { label: 'Travail', color: '#B48EAD' },
-  commute: { label: 'Trajet', color: '#8FBCBB' },
-  commitment: { label: 'Obligation', color: '#D08770' },
-  custom: { label: 'Autre', color: '#7B8794' },
-}
-
-const ANCRE_COLORS = ['#3ECF8E', '#EBCB8B', '#88C0D0', '#BF616A', '#B48EAD']
+const inputClass =
+  'rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-border-strong'
 
 function hhmm(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
@@ -34,190 +28,148 @@ function toMinutes(value: string): number | null {
   return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
 
-function hours(minutes: number): string {
+function duration(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
+  if (h === 0) return `${m} min`
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`
 }
 
 export default function TimePage() {
   const [now] = useState(() => new Date())
   const plan = usePlanning(now)
-  const { schedule, ancres, objectives, setSchedule, addAncre, deleteAncre, addObjective, deleteObjective } =
-    usePlanningStore()
+  const {
+    schedule, ancres, objectives,
+    setSchedule, addAncre, deleteAncre, addObjective, deleteObjective,
+  } = usePlanningStore()
   const sleepStart = useSettingsStore((s) => s.sleepStart)
   const sleepEnd = useSettingsStore((s) => s.sleepEnd)
   const updateSettings = useSettingsStore((s) => s.updateSettings)
   const toast = useToast()
 
+  const sleepMinutes = useMemo(() => {
+    const start = toMinutes(sleepStart) ?? 0
+    const end = toMinutes(sleepEnd) ?? 0
+    return start < end ? end - start : 1440 - start + end
+  }, [sleepStart, sleepEnd])
+
+  const weekAvailable = plan?.capacities.reduce((s, c) => s + c.effectiveCapacityMinutes, 0) ?? 0
+
   return (
     <PageTransition>
-      <div className="flex h-full flex-col gap-10 overflow-y-auto px-12 pb-20 pt-16">
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Mon temps</h1>
-          <p className="mt-2 max-w-2xl text-sm text-text-secondary">
-            Ce que tu déclares ici est le seul socle du planning. Tout le reste — ce qu’il te reste
-            vraiment, ce qui tient avant une deadline — s’en déduit.
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 overflow-y-auto px-10 pb-16 pt-14">
+        <header className="mb-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">Mon temps</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-text-muted">
+            Ce que tu déclares ici est le seul socle du planning. Une fois posé, tu n’y reviens
+            presque jamais.
           </p>
         </header>
 
-        <SleepSection
-          sleepStart={sleepStart}
-          sleepEnd={sleepEnd}
-          onChange={(patch) => void updateSettings(patch)}
-        />
+        {plan && (
+          <div className="info-panel mb-2 rounded-lg px-6 py-5">
+            <p className="text-3xl font-semibold tabular-nums text-text-primary">
+              {duration(weekAvailable)}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              réellement disponibles sur les sept prochains jours, sommeil, obligations, fragments
+              trop courts et repos déjà déduits.
+            </p>
+          </div>
+        )}
 
-        <ScheduleSection entries={schedule} onChange={(entries) => void setSchedule(entries)} />
+        <Disclosure title="Sommeil" summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}>
+          <div className="flex flex-wrap items-center gap-5">
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              Coucher
+              <input
+                type="time"
+                value={sleepStart}
+                onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
+                className={inputClass}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              Lever
+              <input
+                type="time"
+                value={sleepEnd}
+                onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
+                className={inputClass}
+              />
+            </label>
+          </div>
+          <p className="mt-3 text-[11px] text-text-muted">
+            Jamais compté comme du travail. Aucune notification n’est émise pendant ces heures.
+          </p>
+        </Disclosure>
 
-        <AncresSection
-          ancres={ancres}
-          onAdd={async (draft) => {
-            try {
-              await addAncre(draft)
-            } catch (err) {
-              // D.3 : la création est refusée, jamais décalée en silence.
-              toast.error({
-                title: 'Ancre refusée',
-                description: err instanceof Error ? err.message : String(err),
-              })
-            }
-          }}
-          onDelete={(id) => void deleteAncre(id)}
-        />
+        <Disclosure
+          title="Obligations fixes"
+          summary={
+            schedule.length === 0
+              ? 'rien de déclaré'
+              : `${schedule.length} créneau${schedule.length > 1 ? 'x' : ''} sur la semaine`
+          }
+        >
+          <ScheduleEditor entries={schedule} onChange={(entries) => void setSchedule(entries)} />
+        </Disclosure>
 
-        <ObjectivesSection
-          objectives={objectives}
-          onAdd={(draft) => void addObjective(draft)}
-          onDelete={(id) => void deleteObjective(id)}
-        />
+        <Disclosure
+          title="Ancres"
+          summary={ancres.length === 0 ? 'aucune' : `${ancres.length} habitude${ancres.length > 1 ? 's' : ''}`}
+        >
+          <AncresEditor
+            ancres={ancres}
+            onAdd={async (draft) => {
+              try {
+                await addAncre(draft)
+              } catch (err) {
+                // D.3 : la création est refusée, jamais décalée en silence.
+                toast.error({
+                  title: 'Ancre refusée',
+                  description: err instanceof Error ? err.message : String(err),
+                })
+              }
+            }}
+            onDelete={(id) => void deleteAncre(id)}
+          />
+        </Disclosure>
 
-        <CapacityReadout plan={plan} />
+        <Disclosure
+          title="Objectifs"
+          summary={
+            objectives.length === 0
+              ? 'aucun'
+              : `${duration(objectives.reduce((s, o) => s + o.weeklyTargetMinutes, 0))} par semaine`
+          }
+        >
+          <ObjectivesEditor
+            objectives={objectives}
+            onAdd={(draft) => void addObjective(draft)}
+            onDelete={(id) => void deleteObjective(id)}
+          />
+        </Disclosure>
 
-        <RequestSection plan={plan} today={dateKey(now)} />
+        {plan && (
+          <Disclosure title="Le détail, jour par jour" summary="capacité brute → disponible">
+            <CapacityTable plan={plan} />
+          </Disclosure>
+        )}
+
+        {plan && (
+          <Disclosure title="Demander du temps libre" summary="l’application répond avec des chiffres">
+            <RequestPanel plan={plan} today={dateKey(now)} />
+          </Disclosure>
+        )}
       </div>
     </PageTransition>
   )
 }
 
-// ─── E.5 — Demander du temps ──────────────────────────────────────────────
-
-function RequestSection({ plan, today }: { plan: ReturnType<typeof usePlanning>; today: string }) {
-  const tasks = usePlanningStore((s) => s.tasks)
-  const [minutes, setMinutes] = useState(120)
-  const [verdict, setVerdict] = useState<RequestVerdict | null>(null)
-
-  if (!plan) return null
-
-  const ask = () => {
-    setVerdict(
-      evaluateRequest({
-        request: { type: 'free_time', minutes, date: today },
-        tasks: tasks
-          .filter((t) => t.status === 'active')
-          .map((t) => ({ deadline: t.deadline, remainingMinutes: t.remainingMinutes })),
-        dailyCapacity: plan.capacities.map((c) => ({ date: c.date, capacityMinutes: c.effectiveCapacityMinutes })),
-        today,
-      }),
-    )
-  }
-
-  return (
-    <Section
-      icon={<Clock size={16} />}
-      title="Demander du temps libre"
-      hint="L'application ne t'interrompt jamais pour te demander quoi que ce soit. C'est toi qui viens demander — et elle répond avec des chiffres."
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-text-secondary">
-          Je veux
-          <input
-            type="number"
-            min={15}
-            max={720}
-            step={15}
-            value={minutes}
-            onChange={(e) => setMinutes(Number(e.target.value))}
-            className="w-24 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-          />
-          min de libre aujourd’hui
-        </label>
-        <button
-          type="button"
-          onClick={ask}
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-        >
-          Demander
-        </button>
-      </div>
-
-      {verdict && (
-        <div
-          className={cn(
-            'mt-4 rounded-md border px-4 py-3 text-xs',
-            verdict.status === 'granted'
-              ? 'border-accent/30 bg-accent/5 text-text-secondary'
-              : 'border-orange-500/30 bg-orange-500/5 text-text-secondary',
-          )}
-        >
-          <p className="font-medium text-text-primary">
-            {verdict.status === 'granted'
-              ? `Accordé — ${verdict.grantedMinutes} min.`
-              : verdict.status === 'partial'
-                ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
-                : 'Refusé.'}
-          </p>
-          <p className="mt-1">{verdict.reason}</p>
-        </div>
-      )}
-    </Section>
-  )
-}
-
-// ─── Sommeil ──────────────────────────────────────────────────────────────
-
-function SleepSection({
-  sleepStart,
-  sleepEnd,
-  onChange,
-}: {
-  sleepStart: string
-  sleepEnd: string
-  onChange: (patch: { sleepStart?: string; sleepEnd?: string }) => void
-}) {
-  const start = toMinutes(sleepStart) ?? 0
-  const end = toMinutes(sleepEnd) ?? 0
-  const duration = start < end ? end - start : 1440 - start + end
-
-  return (
-    <Section icon={<Bed size={16} />} title="Sommeil" hint="Jamais compté comme du travail. Aucune notification n'est émise pendant ces heures.">
-      <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-text-secondary">
-          Coucher
-          <input
-            type="time"
-            value={sleepStart}
-            onChange={(e) => onChange({ sleepStart: e.target.value })}
-            className="rounded-md border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary outline-none focus:border-accent"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-text-secondary">
-          Lever
-          <input
-            type="time"
-            value={sleepEnd}
-            onChange={(e) => onChange({ sleepEnd: e.target.value })}
-            className="rounded-md border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary outline-none focus:border-accent"
-          />
-        </label>
-        <span className="ml-auto font-mono text-sm text-text-muted">{hours(duration)} par nuit</span>
-      </div>
-    </Section>
-  )
-}
-
 // ─── Réalité fixe ─────────────────────────────────────────────────────────
 
-function ScheduleSection({
+function ScheduleEditor({
   entries,
   onChange,
 }: {
@@ -225,7 +177,12 @@ function ScheduleSection({
   onChange: (entries: ScheduleEntry[]) => void
 }) {
   const [day, setDay] = useState(0)
-  const [draft, setDraft] = useState({ label: '', category: 'school' as ScheduleCategory, start: '08:00', end: '16:00' })
+  const [draft, setDraft] = useState({
+    label: '',
+    category: 'school' as ScheduleCategory,
+    start: '08:00',
+    end: '16:00',
+  })
 
   const dayEntries = useMemo(
     () => entries.filter((e) => e.dayOfWeek === day).sort((a, b) => a.startMinute - b.startMinute),
@@ -243,8 +200,8 @@ function ScheduleSection({
         startMinute: start,
         endMinute: end,
         categoryType: draft.category,
-        label: draft.label.trim() || CATEGORY_META[draft.category].label,
-        color: CATEGORY_META[draft.category].color,
+        label: draft.label.trim() || CATEGORY_LABEL[draft.category],
+        color: CATEGORY_COLOR[draft.category],
       },
     ])
     setDraft((d) => ({ ...d, label: '' }))
@@ -252,24 +209,16 @@ function ScheduleSection({
 
   const copyToWeekdays = () => {
     const source = entries.filter((e) => e.dayOfWeek === day)
-    const others = entries.filter((e) => e.dayOfWeek === day || e.dayOfWeek > 4)
+    const kept = entries.filter((e) => e.dayOfWeek === day || e.dayOfWeek > 4)
     const copies = [0, 1, 2, 3, 4]
       .filter((d) => d !== day)
       .flatMap((d) => source.map((e) => ({ ...e, dayOfWeek: d })))
-    onChange([...others, ...copies])
-  }
-
-  const remove = (target: ScheduleEntry) => {
-    onChange(entries.filter((e) => e !== target))
+    onChange([...kept, ...copies])
   }
 
   return (
-    <Section
-      icon={<Clock size={16} />}
-      title="Obligations fixes"
-      hint="École, travail, trajets, engagements. Non négociable : ce temps sort de la capacité avant tout le reste."
-    >
-      <div className="flex gap-1.5">
+    <>
+      <div className="flex gap-1">
         {DAYS_SHORT.map((label, i) => {
           const count = entries.filter((e) => e.dayOfWeek === i).length
           return (
@@ -278,67 +227,64 @@ function ScheduleSection({
               type="button"
               onClick={() => setDay(i)}
               className={cn(
-                'flex-1 rounded-md border px-2 py-2 text-xs font-medium transition-colors',
+                'flex-1 rounded-md border py-2 text-xs font-medium transition-colors',
                 day === i
-                  ? 'border-accent/60 bg-accent/10 text-text-primary'
-                  : 'border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary',
+                  ? 'border-border-strong bg-bg-card-hover text-text-primary'
+                  : 'border-transparent text-text-muted hover:text-text-secondary',
               )}
             >
               {label}
-              {count > 0 && <span className="ml-1 text-[10px] text-text-muted">{count}</span>}
+              {count > 0 && <span className="ml-1 text-[10px] opacity-60">{count}</span>}
             </button>
           )
         })}
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-1">
         {dayEntries.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border-subtle px-4 py-6 text-center text-xs text-text-muted">
-            Rien de fixe le {DAYS[day]?.toLowerCase()}. Toute la journée compte comme disponible.
+          <p className="py-4 text-center text-xs text-text-muted">
+            Rien de fixe le {DAYS[day]?.toLowerCase()} — la journée entière compte comme disponible.
           </p>
         ) : (
           dayEntries.map((entry, i) => (
-            <div
-              key={`${entry.dayOfWeek}-${entry.startMinute}-${i}`}
-              className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-base px-3 py-2"
-            >
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span className="text-sm text-text-primary">{entry.label}</span>
-              <span className="font-mono text-xs text-text-muted">
-                {hhmm(entry.startMinute)} → {hhmm(entry.endMinute)}
+            <div key={`${entry.startMinute}-${i}`} className="group flex items-center gap-3 py-1 text-xs">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
+              <span className="w-24 shrink-0 font-mono text-text-muted">
+                {hhmm(entry.startMinute)}–{hhmm(entry.endMinute)}
               </span>
-              <span className="ml-auto font-mono text-xs text-text-muted">
-                {hours(entry.endMinute - entry.startMinute)}
+              <span className="truncate text-text-primary">{entry.label}</span>
+              <span className="ml-auto shrink-0 font-mono text-text-muted">
+                {duration(entry.endMinute - entry.startMinute)}
               </span>
               <button
                 type="button"
-                onClick={() => remove(entry)}
-                className="text-text-muted transition-colors hover:text-red-400"
+                onClick={() => onChange(entries.filter((e) => e !== entry))}
+                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                 aria-label="Supprimer"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
         <input
           type="text"
           value={draft.label}
           onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-          placeholder={CATEGORY_META[draft.category].label}
-          className="min-w-[10rem] flex-1 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+          placeholder={CATEGORY_LABEL[draft.category]}
+          className={cn(inputClass, 'min-w-[9rem] flex-1')}
         />
         <select
           value={draft.category}
           onChange={(e) => setDraft({ ...draft, category: e.target.value as ScheduleCategory })}
-          className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+          className={inputClass}
         >
           {SCHEDULE_CATEGORIES.filter((c) => c !== 'sleep').map((c) => (
             <option key={c} value={c}>
-              {CATEGORY_META[c].label}
+              {CATEGORY_LABEL[c]}
             </option>
           ))}
         </select>
@@ -346,59 +292,55 @@ function ScheduleSection({
           type="time"
           value={draft.start}
           onChange={(e) => setDraft({ ...draft, start: e.target.value })}
-          className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+          className={inputClass}
         />
         <input
           type="time"
           value={draft.end}
           onChange={(e) => setDraft({ ...draft, end: e.target.value })}
-          className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+          className={inputClass}
         />
         <button
           type="button"
           onClick={add}
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
         >
-          <Plus size={15} /> Ajouter
+          <Plus size={14} /> Ajouter
         </button>
         {dayEntries.length > 0 && day <= 4 && (
           <button
             type="button"
             onClick={copyToWeekdays}
-            className="inline-flex items-center gap-2 rounded-md border border-border-subtle px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            className="inline-flex items-center gap-1.5 text-[11px] text-text-muted transition-colors hover:text-text-secondary"
           >
-            <Copy size={14} /> Copier sur la semaine
+            <Copy size={12} /> copier sur la semaine
           </button>
         )}
       </div>
-    </Section>
+    </>
   )
 }
 
 // ─── Ancres ───────────────────────────────────────────────────────────────
 
-type AncreDraft = {
-  name: string
-  trigger: string
-  color: string
-  anchorMinute: number
-  daysOfWeek: number[]
-  normalMaxMinutes: number
-}
+type AncreDraft = Omit<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>
 
-function AncresSection({
+function AncresEditor({
   ancres,
   onAdd,
   onDelete,
 }: {
-  ancres: ReturnType<typeof usePlanningStore.getState>['ancres']
+  ancres: AncreItem[]
   onAdd: (draft: AncreDraft) => void | Promise<void>
   onDelete: (id: string) => void
 }) {
-  const [draft, setDraft] = useState({ name: '', time: '18:00', minutes: 60, days: [0, 1, 2, 3, 4] as number[] })
+  const [draft, setDraft] = useState({ name: '', time: '18:00', minutes: 60, days: [0, 1, 2, 3, 4] })
 
   const toggleDay = (d: number) =>
-    setDraft((s) => ({ ...s, days: s.days.includes(d) ? s.days.filter((x) => x !== d) : [...s.days, d].sort() }))
+    setDraft((s) => ({
+      ...s,
+      days: s.days.includes(d) ? s.days.filter((x) => x !== d) : [...s.days, d].sort(),
+    }))
 
   const submit = () => {
     const minute = toMinutes(draft.time)
@@ -406,7 +348,7 @@ function AncresSection({
     void onAdd({
       name: draft.name.trim(),
       trigger: draft.name.trim().toLowerCase(),
-      color: ANCRE_COLORS[ancres.length % ANCRE_COLORS.length]!,
+      color: nextShade(ancres.length),
       anchorMinute: minute,
       daysOfWeek: draft.days,
       normalMaxMinutes: draft.minutes,
@@ -415,54 +357,50 @@ function AncresSection({
   }
 
   return (
-    <Section
-      icon={<Anchor size={16} />}
-      title="Ancres"
-      hint="Une habitude à heure fixe. Elle ne bouge jamais d'un jour à l'autre — et deux ancres ne peuvent pas occuper le même créneau."
-    >
-      <div className="space-y-2">
+    <>
+      <div className="space-y-1">
         {ancres.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border-subtle px-4 py-6 text-center text-xs text-text-muted">
-            Aucune ancre. Le sport à 18 h, la lecture à 21 h — ce genre de rendez-vous avec toi-même.
+          <p className="py-4 text-center text-xs text-text-muted">
+            Le sport à 18 h, la lecture à 21 h — un rendez-vous avec toi-même qui ne bouge jamais.
           </p>
         ) : (
           ancres.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-base px-3 py-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: a.color }} />
-              <span className="text-sm text-text-primary">{a.name}</span>
-              <span className="font-mono text-xs text-text-muted">{hhmm(a.anchorMinute)}</span>
-              <span className="text-xs text-text-muted">
-                {a.daysOfWeek.map((d) => DAYS_SHORT[d]).join(' ')}
+            <div key={a.id} className="group flex items-center gap-3 py-1 text-xs">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} />
+              <span className="w-24 shrink-0 font-mono text-text-muted">{hhmm(a.anchorMinute)}</span>
+              <span className="truncate text-text-primary">{a.name}</span>
+              <span className="shrink-0 text-text-muted">
+                {a.daysOfWeek.map((d) => DAYS_SHORT[d]?.charAt(0)).join('')}
               </span>
-              <span className="ml-auto font-mono text-xs text-text-muted">
+              <span className="ml-auto shrink-0 font-mono text-text-muted">
                 {a.normalMaxMinutes} min · min. {a.minimumMinutes}
               </span>
               <button
                 type="button"
                 onClick={() => onDelete(a.id)}
-                className="text-text-muted transition-colors hover:text-red-400"
+                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                 aria-label="Supprimer"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
         <input
           type="text"
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           placeholder="Sport, lecture, méditation…"
-          className="min-w-[10rem] flex-1 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+          className={cn(inputClass, 'min-w-[9rem] flex-1')}
         />
         <input
           type="time"
           value={draft.time}
           onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-          className="rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+          className={inputClass}
         />
         <input
           type="number"
@@ -471,90 +409,90 @@ function AncresSection({
           step={5}
           value={draft.minutes}
           onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
-          title="Durée normale (min)"
-          className="w-20 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+          title="Durée normale, en minutes"
+          className={cn(inputClass, 'w-20')}
         />
-        <div className="flex gap-1">
+        <div className="flex gap-0.5">
           {DAYS_SHORT.map((label, i) => (
             <button
               key={label}
               type="button"
               onClick={() => toggleDay(i)}
               className={cn(
-                'w-9 rounded-md border py-2 text-[11px] font-medium transition-colors',
+                'w-8 rounded-md border py-2 text-[11px] transition-colors',
                 draft.days.includes(i)
-                  ? 'border-accent/60 bg-accent/10 text-text-primary'
-                  : 'border-border-subtle text-text-muted hover:text-text-secondary',
+                  ? 'border-border-strong bg-bg-card-hover text-text-primary'
+                  : 'border-transparent text-text-muted hover:text-text-secondary',
               )}
             >
-              {label.slice(0, 1)}
+              {label.charAt(0)}
             </button>
           ))}
         </div>
         <button
           type="button"
           onClick={submit}
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
         >
-          <Plus size={15} /> Ancrer
+          <Plus size={14} /> Ancrer
         </button>
       </div>
-    </Section>
+      <p className="mt-3 text-[11px] text-text-muted">
+        Deux ancres ne peuvent jamais occuper le même créneau : la seconde est refusée, jamais
+        décalée à ta place.
+      </p>
+    </>
   )
 }
 
 // ─── Objectifs ────────────────────────────────────────────────────────────
 
-function ObjectivesSection({
+function ObjectivesEditor({
   objectives,
   onAdd,
   onDelete,
 }: {
-  objectives: ReturnType<typeof usePlanningStore.getState>['objectives']
-  onAdd: (draft: { name: string; color: string; weeklyTargetMinutes: number }) => void
+  objectives: ObjectiveItem[]
+  onAdd: (draft: Omit<ObjectiveItem, 'id' | 'createdAt'>) => void
   onDelete: (id: string) => void
 }) {
   const [draft, setDraft] = useState({ name: '', hoursPerWeek: 5 })
 
   return (
-    <Section
-      icon={<Target size={16} />}
-      title="Objectifs"
-      hint="Gouvernés par le rythme, pas par une échéance : une cible d'heures par semaine. Un objectif ne peut jamais recevoir de deadline."
-    >
-      <div className="space-y-2">
+    <>
+      <div className="space-y-1">
         {objectives.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border-subtle px-4 py-6 text-center text-xs text-text-muted">
-            Aucun objectif. « Guitare, 4 h par semaine » — ce qui avance sans jamais être en retard.
+          <p className="py-4 text-center text-xs text-text-muted">
+            « Guitare, 4 h par semaine » — ce qui avance sans jamais être en retard.
           </p>
         ) : (
           objectives.map((o) => (
-            <div key={o.id} className="flex items-center gap-3 rounded-md border border-border-subtle bg-bg-base px-3 py-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: o.color }} />
-              <span className="text-sm text-text-primary">{o.name}</span>
-              <span className="ml-auto font-mono text-xs text-text-muted">
-                {hours(o.weeklyTargetMinutes)} / semaine
+            <div key={o.id} className="group flex items-center gap-3 py-1 text-xs">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: o.color }} />
+              <span className="truncate text-text-primary">{o.name}</span>
+              <span className="ml-auto shrink-0 font-mono text-text-muted">
+                {duration(o.weeklyTargetMinutes)} / semaine
               </span>
               <button
                 type="button"
                 onClick={() => onDelete(o.id)}
-                className="text-text-muted transition-colors hover:text-red-400"
+                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                 aria-label="Supprimer"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
               </button>
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
         <input
           type="text"
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           placeholder="Guitare, sport, lecture…"
-          className="min-w-[10rem] flex-1 rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+          className={cn(inputClass, 'min-w-[9rem] flex-1')}
         />
         <label className="flex items-center gap-2 text-xs text-text-muted">
           <input
@@ -563,7 +501,7 @@ function ObjectivesSection({
             max={80}
             value={draft.hoursPerWeek}
             onChange={(e) => setDraft({ ...draft, hoursPerWeek: Number(e.target.value) })}
-            className="w-20 rounded-md border border-border-subtle bg-bg-base px-2 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+            className={cn(inputClass, 'w-20')}
           />
           h / semaine
         </label>
@@ -573,103 +511,127 @@ function ObjectivesSection({
           onClick={() => {
             onAdd({
               name: draft.name.trim(),
-              color: ANCRE_COLORS[objectives.length % ANCRE_COLORS.length]!,
+              color: nextShade(objectives.length),
               weeklyTargetMinutes: Math.round(draft.hoursPerWeek * 60),
             })
             setDraft((s) => ({ ...s, name: '' }))
           }}
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40"
         >
-          <Plus size={15} /> Ajouter
+          <Plus size={14} /> Ajouter
         </button>
       </div>
-    </Section>
+      <p className="mt-3 text-[11px] text-text-muted">
+        Un objectif ne peut jamais recevoir de deadline. Il ne se dégrade pas non plus avec le temps
+        qui passe.
+      </p>
+    </>
   )
 }
 
-// ─── Ce qu'il reste vraiment ──────────────────────────────────────────────
+// ─── Détail par jour ──────────────────────────────────────────────────────
 
-function CapacityReadout({ plan }: { plan: ReturnType<typeof usePlanning> }) {
-  if (!plan) return null
-
+function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
   return (
-    <Section
-      icon={<Clock size={16} />}
-      title="Ce qu'il te reste"
-      hint="Capacité brute moins les fragments trop courts, le repos réservé et la fatigue accumulée. C'est ce chiffre — et lui seul — qui décide de ce qui tient."
-    >
-      <div className="overflow-hidden rounded-md border border-border-subtle">
-        <table className="w-full text-sm">
-          <thead className="bg-bg-base text-left text-[11px] uppercase tracking-wider text-text-muted">
-            <tr>
-              <th className="px-3 py-2 font-medium">Jour</th>
-              <th className="px-3 py-2 text-right font-medium">Brute</th>
-              <th className="px-3 py-2 text-right font-medium">Inutilisable</th>
-              <th className="px-3 py-2 text-right font-medium">Repos</th>
-              <th className="px-3 py-2 text-right font-medium">Fatigue</th>
-              <th className="px-3 py-2 text-right font-medium">Respiration</th>
-              <th className="px-3 py-2 text-right font-medium">Disponible</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plan.capacities.map((c) => (
-              <tr key={c.date} className="border-t border-border-subtle">
-                <td className="px-3 py-2 text-text-secondary">
-                  {DAYS_SHORT[c.dayOfWeek]} <span className="text-text-muted">{c.date.slice(5)}</span>
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-text-muted">{hours(c.rawCapacityMinutes)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-text-muted">−{hours(c.unusableMinutes)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-text-muted">−{hours(c.restReservedMinutes)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-text-muted">
-                  {c.fatiguePenaltyMinutes > 0 ? `−${hours(c.fatiguePenaltyMinutes)}` : '—'}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-text-muted">
-                  {c.breathingReductionMinutes > 0 ? `−${hours(c.breathingReductionMinutes)}` : '—'}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-sm font-semibold text-accent">
-                  {hours(c.effectiveCapacityMinutes)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {plan.breathing.adjustment !== 'none' && (
-        <p className="mt-3 flex items-start gap-2 text-xs text-text-muted">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0 text-orange-400" />
-          Respiration hebdomadaire : il manque {hours(Math.abs(plan.breathing.gapMinutes))} de repos sur la
-          semaine. {plan.breathing.reducedDates.join(', ')} {plan.breathing.reducedDates.length > 1 ? 'sont réduits' : 'est réduit'} à{' '}
-          {plan.breathing.capPercent} % — décidé sans rien te demander.
-        </p>
-      )}
-    </Section>
+    <table className="w-full text-xs">
+      <thead className="text-left text-[10px] uppercase tracking-wider text-text-muted">
+        <tr>
+          <th className="pb-2 font-medium">Jour</th>
+          <th className="pb-2 text-right font-medium">Brute</th>
+          <th className="pb-2 text-right font-medium">Inutilisable</th>
+          <th className="pb-2 text-right font-medium">Repos</th>
+          <th className="pb-2 text-right font-medium">Fatigue</th>
+          <th className="pb-2 text-right font-medium">Disponible</th>
+        </tr>
+      </thead>
+      <tbody className="font-mono text-text-muted">
+        {plan.capacities.map((c) => (
+          <tr key={c.date} className="border-t border-border-subtle">
+            <td className="py-1.5 font-sans text-text-secondary">
+              {DAYS_SHORT[c.dayOfWeek]} <span className="text-text-muted">{c.date.slice(5)}</span>
+            </td>
+            <td className="py-1.5 text-right">{duration(c.rawCapacityMinutes)}</td>
+            <td className="py-1.5 text-right">−{duration(c.unusableMinutes)}</td>
+            <td className="py-1.5 text-right">−{duration(c.restReservedMinutes)}</td>
+            <td className="py-1.5 text-right">
+              {c.fatiguePenaltyMinutes + c.breathingReductionMinutes > 0
+                ? `−${duration(c.fatiguePenaltyMinutes + c.breathingReductionMinutes)}`
+                : '—'}
+            </td>
+            <td className="py-1.5 text-right font-semibold text-text-primary">
+              {duration(c.effectiveCapacityMinutes)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
-// ─── Coque commune ────────────────────────────────────────────────────────
+// ─── E.5 — Demander du temps ──────────────────────────────────────────────
 
-function Section({
-  icon,
-  title,
-  hint,
-  children,
+function RequestPanel({
+  plan,
+  today,
 }: {
-  icon: React.ReactNode
-  title: string
-  hint: string
-  children: React.ReactNode
+  plan: NonNullable<ReturnType<typeof usePlanning>>
+  today: string
 }) {
+  const tasks = usePlanningStore((s) => s.tasks)
+  const [minutes, setMinutes] = useState(120)
+  const [verdict, setVerdict] = useState<RequestVerdict | null>(null)
+
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <span className="text-accent">{icon}</span>
-          {title}
-        </h2>
-        <p className="mt-1 max-w-2xl text-xs text-text-muted">{hint}</p>
+    <>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm text-text-secondary">
+          Je veux
+          <input
+            type="number"
+            min={15}
+            max={720}
+            step={15}
+            value={minutes}
+            onChange={(e) => setMinutes(Number(e.target.value))}
+            className={cn(inputClass, 'w-24')}
+          />
+          min de libre aujourd’hui
+        </label>
+        <button
+          type="button"
+          onClick={() =>
+            setVerdict(
+              evaluateRequest({
+                request: { type: 'free_time', minutes, date: today },
+                tasks: tasks
+                  .filter((t) => t.status === 'active')
+                  .map((t) => ({ deadline: t.deadline, remainingMinutes: t.remainingMinutes })),
+                dailyCapacity: plan.capacities.map((c) => ({
+                  date: c.date,
+                  capacityMinutes: c.effectiveCapacityMinutes,
+                })),
+                today,
+              }),
+            )
+          }
+          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
+        >
+          Demander
+        </button>
       </div>
-      <div className="rounded-lg border border-border-subtle bg-bg-card p-5 shadow-card">{children}</div>
-    </section>
+
+      {verdict && (
+        <div className="mt-4 border-t border-border-subtle pt-4">
+          <p className="text-sm font-medium text-text-primary">
+            {verdict.status === 'granted'
+              ? `Accordé — ${verdict.grantedMinutes} min.`
+              : verdict.status === 'partial'
+                ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
+                : 'Refusé.'}
+          </p>
+          <p className="mt-1 text-xs text-text-muted">{verdict.reason}</p>
+        </div>
+      )}
+    </>
   )
 }
