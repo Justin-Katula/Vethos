@@ -77,10 +77,10 @@ export default function HomePage() {
 
   return (
     <PageTransition>
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-8 overflow-y-auto px-10 pb-16 pt-14">
-        <header className="flex items-end justify-between gap-6">
+      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
+        <header className="mb-10 flex items-end justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+            <h1 className="text-3xl font-semibold tracking-tight text-text-primary">
               {DAYS[dow]!.charAt(0).toUpperCase() + DAYS[dow]!.slice(1)} {now.getDate()} {MONTHS[now.getMonth()]}
             </h1>
             <p className="mt-1 text-sm text-text-muted">
@@ -100,79 +100,89 @@ export default function HomePage() {
           </button>
         </header>
 
-        <section className="flex items-center justify-center gap-10 py-2">
-          <TimeCircle entries={todayEntries} blocks={todayBlocks} nowMinute={nowMinute}>
-            <span className="font-mono text-3xl font-semibold tabular-nums text-text-primary">
+        {/* Trois zones qui occupent la largeur : l'objet, la décision, le détail.
+            `flex-wrap` les empile d'elles-mêmes sur une fenêtre étroite. */}
+        <div className="flex flex-1 flex-wrap items-center gap-x-16 gap-y-12">
+          <TimeCircle entries={todayEntries} blocks={todayBlocks} nowMinute={nowMinute} size={360}>
+            <span className="font-mono text-4xl font-semibold tabular-nums text-text-primary">
               {hhmm(nowMinute)}
             </span>
-            <span className="mt-1 text-[11px] uppercase tracking-widest text-text-muted">
-              {todayBlocks.length === 0 ? 'libre' : `${todayBlocks.length} blocs`}
+            <span className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-text-muted">
+              {todayBlocks.length === 0
+                ? 'libre'
+                : `${todayBlocks.length} bloc${todayBlocks.length > 1 ? 's' : ''}`}
             </span>
           </TimeCircle>
 
-          <div className="min-w-0 flex-1 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.35, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="min-w-[260px] flex-1 space-y-7"
+          >
             <Focus label="Maintenant" block={current} nowMinute={nowMinute} empty="Rien en cours." />
             <div className="h-px bg-border-subtle" />
             <Focus label="Ensuite" block={next} nowMinute={nowMinute} empty="Plus rien aujourd’hui." />
-          </div>
-        </section>
+            {plan && <Status plan={plan} />}
+          </motion.div>
 
-        {needsSetup && <SetupInvitation />}
+          <div className="min-w-[320px] flex-[1.15] space-y-3">
+            {needsSetup && <SetupInvitation />}
 
-        {plan && <Status plan={plan} />}
+            {upcoming.length > 0 && (
+              <Disclosure title="Le reste de la journée" summary={`${upcoming.length} blocs`} index={0}>
+                <div className="space-y-1.5">
+                  {upcoming.map((block) => (
+                    <BlockRow key={block.id} block={block} />
+                  ))}
+                </div>
+              </Disclosure>
+            )}
 
-        {upcoming.length > 0 && (
-          <Disclosure title="Le reste de la journée" summary={`${upcoming.length} blocs`}>
-            <div className="space-y-1.5">
-              {upcoming.map((block) => (
-                <BlockRow key={block.id} block={block} />
-              ))}
-            </div>
-          </Disclosure>
-        )}
+            {activeTasks.length > 0 && (
+              <Disclosure title="Tâches ouvertes" summary={`${activeTasks.length}`} index={1}>
+                <div className="space-y-1.5">
+                  {activeTasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onComplete={() => void completeTask(task.id)}
+                      onDelete={() => void deleteTask(task.id)}
+                    />
+                  ))}
+                </div>
+                {plan?.wip.overLimit && (
+                  <p className="mt-3 text-[11px] text-text-muted">
+                    {plan.wip.activeCount} tâches ouvertes pour une limite mesurée à {plan.wip.limit}. Rien
+                    n’est bloqué — terminer avant d’ouvrir reste simplement plus rapide.
+                  </p>
+                )}
+              </Disclosure>
+            )}
 
-        {activeTasks.length > 0 && (
-          <Disclosure title="Tâches ouvertes" summary={`${activeTasks.length}`}>
-            <div className="space-y-1.5">
-              {activeTasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  onComplete={() => void completeTask(task.id)}
-                  onDelete={() => void deleteTask(task.id)}
-                />
-              ))}
-            </div>
-            {plan?.wip.overLimit && (
-              <p className="mt-3 text-[11px] text-text-muted">
-                {plan.wip.activeCount} tâches ouvertes pour une limite mesurée à {plan.wip.limit}. Rien n’est
-                bloqué — terminer avant d’ouvrir reste simplement plus rapide.
+            {stuck.length > 0 && (
+              <Disclosure title="Ce qui ne rentre pas" summary={`${stuck.length}`} tone="danger" index={2}>
+                <div className="space-y-1.5">
+                  {stuck.map((verdict) => (
+                    <div key={verdict.taskId} className="flex items-center gap-3 text-xs">
+                      <span className="text-text-primary">{verdict.title}</span>
+                      <span className="ml-auto font-mono text-text-muted">
+                        {duration(verdict.placedMinutes)} / {duration(verdict.neededMinutes)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Disclosure>
+            )}
+
+            {plan?.internalError && (
+              <p className="rounded-md border border-danger/40 px-4 py-3 text-[11px] text-danger">
+                Contrôle post-placement : {plan.internalError.actual} min posées pour{' '}
+                {plan.internalError.expected} min décidées. C’est un bug interne, pas une décision.
               </p>
             )}
-          </Disclosure>
-        )}
-
-        {stuck.length > 0 && (
-          <Disclosure title="Ce qui ne rentre pas" summary={`${stuck.length}`} tone="danger">
-            <div className="space-y-1.5">
-              {stuck.map((verdict) => (
-                <div key={verdict.taskId} className="flex items-center gap-3 text-xs">
-                  <span className="text-text-primary">{verdict.title}</span>
-                  <span className="ml-auto font-mono text-text-muted">
-                    {duration(verdict.placedMinutes)} / {duration(verdict.neededMinutes)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Disclosure>
-        )}
-
-        {plan?.internalError && (
-          <p className="rounded-md border border-danger/40 px-4 py-3 text-[11px] text-danger">
-            Contrôle post-placement : {plan.internalError.actual} min posées pour{' '}
-            {plan.internalError.expected} min décidées. C’est un bug interne, pas une décision.
-          </p>
-        )}
+          </div>
+        </div>
 
         <AddTaskModal
           open={adding}

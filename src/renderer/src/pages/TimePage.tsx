@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Trash2, Copy } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { Disclosure } from '@/components/ui/Disclosure'
+import { CountUp } from '@/components/ui/CountUp'
 import { usePlanning } from '@/lib/use-planning'
 import { usePlanningStore } from '@/store/planning.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -57,28 +59,41 @@ export default function TimePage() {
 
   return (
     <PageTransition>
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 overflow-y-auto px-10 pb-16 pt-14">
-        <header className="mb-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">Mon temps</h1>
+      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
+        <header className="mb-10">
+          <h1 className="text-3xl font-semibold tracking-tight text-text-primary">Mon temps</h1>
           <p className="mt-1.5 max-w-xl text-sm text-text-muted">
             Ce que tu déclares ici est le seul socle du planning. Une fois posé, tu n’y reviens
             presque jamais.
           </p>
         </header>
 
-        {plan && (
-          <div className="info-panel mb-2 rounded-lg px-6 py-5">
-            <p className="text-3xl font-semibold tabular-nums text-text-primary">
-              {duration(weekAvailable)}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              réellement disponibles sur les sept prochains jours, sommeil, obligations, fragments
-              trop courts et repos déjà déduits.
-            </p>
-          </div>
-        )}
+        {/* La conséquence à gauche, ce qui la produit à droite : on voit le
+            chiffre bouger en même temps qu'on déclare. */}
+        <div className="flex flex-1 flex-wrap items-start gap-x-16 gap-y-10">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="min-w-[300px] flex-1 space-y-8"
+          >
+            <div>
+              <CountUp
+                value={weekAvailable}
+                format={(n) => duration(Math.round(n))}
+                className="block text-5xl font-semibold tabular-nums tracking-tight text-text-primary"
+              />
+              <p className="mt-2 max-w-sm text-xs leading-relaxed text-text-muted">
+                réellement disponibles sur les sept prochains jours, sommeil, obligations, fragments
+                trop courts et repos déjà déduits.
+              </p>
+            </div>
 
-        <Disclosure title="Sommeil" summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}>
+            {plan && <CapacityTable plan={plan} />}
+          </motion.div>
+
+          <div className="min-w-[380px] flex-[1.15] space-y-3">
+        <Disclosure index={0} title="Sommeil" summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}>
           <div className="flex flex-wrap items-center gap-5">
             <label className="flex items-center gap-2 text-sm text-text-secondary">
               Coucher
@@ -105,6 +120,7 @@ export default function TimePage() {
         </Disclosure>
 
         <Disclosure
+          index={1}
           title="Obligations fixes"
           summary={
             schedule.length === 0
@@ -116,6 +132,7 @@ export default function TimePage() {
         </Disclosure>
 
         <Disclosure
+          index={2}
           title="Ancres"
           summary={ancres.length === 0 ? 'aucune' : `${ancres.length} habitude${ancres.length > 1 ? 's' : ''}`}
         >
@@ -137,6 +154,7 @@ export default function TimePage() {
         </Disclosure>
 
         <Disclosure
+          index={3}
           title="Objectifs"
           summary={
             objectives.length === 0
@@ -151,17 +169,17 @@ export default function TimePage() {
           />
         </Disclosure>
 
-        {plan && (
-          <Disclosure title="Le détail, jour par jour" summary="capacité brute → disponible">
-            <CapacityTable plan={plan} />
-          </Disclosure>
-        )}
-
-        {plan && (
-          <Disclosure title="Demander du temps libre" summary="l’application répond avec des chiffres">
-            <RequestPanel plan={plan} today={dateKey(now)} />
-          </Disclosure>
-        )}
+            {plan && (
+              <Disclosure
+                index={4}
+                title="Demander du temps libre"
+                summary="l’application répond avec des chiffres"
+              >
+                <RequestPanel plan={plan} today={dateKey(now)} />
+              </Disclosure>
+            )}
+          </div>
+        </div>
       </div>
     </PageTransition>
   )

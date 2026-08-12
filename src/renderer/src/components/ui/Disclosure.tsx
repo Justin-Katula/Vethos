@@ -15,18 +15,24 @@ export function Disclosure({
   summary,
   defaultOpen = false,
   tone = 'neutral',
+  /** Rang dans la pile : décale l'entrée pour que les sections arrivent l'une après l'autre. */
+  index = 0,
   children,
 }: {
   title: string
   summary?: string
   defaultOpen?: boolean
   tone?: 'neutral' | 'danger'
+  index?: number
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <section
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 + index * 0.07, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         'info-panel rounded-lg',
         tone === 'danger' && 'border-danger/35',
@@ -68,6 +74,6 @@ export function Disclosure({
           </motion.div>
         )}
       </AnimatePresence>
-    </section>
+    </motion.section>
   )
 }
