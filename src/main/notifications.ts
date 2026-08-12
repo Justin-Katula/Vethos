@@ -8,6 +8,7 @@
  */
 
 import { Notification, BrowserWindow } from 'electron'
+import { isWithinSleep } from '@shared/sleep'
 import log from './logging/setup'
 
 export type NexusNotification = {
@@ -18,6 +19,25 @@ export type NexusNotification = {
 }
 
 /**
+ * Heures de sommeil connues du processus principal.
+ *
+ * Elles sont poussées par le renderer au chargement des paramètres. Tant
+ * qu'elles sont inconnues, aucune plage n'est protégée — mais dès qu'elles le
+ * sont, le garde-fou s'applique à TOUTES les notifications, sans exception
+ * possible pour l'une d'entre elles (critère 3).
+ */
+let sleepWindow: { start?: string; end?: string } = {}
+
+export function setSleepWindow(start: string | undefined, end: string | undefined): void {
+  sleepWindow = { start, end }
+}
+
+/** Critère 3 : aucune notification pendant les heures de sommeil. */
+export function isSleepingNow(now: Date = new Date()): boolean {
+  return isWithinSleep(now, sleepWindow.start, sleepWindow.end)
+}
+
+/**
  * Envoie une notification Windows native.
  * Quand cliquée, focus la fenêtre Nexus et envoie un événement au renderer.
  */
@@ -25,6 +45,12 @@ export function sendNativeNotification(
   notif: NexusNotification,
   getMainWindow: () => BrowserWindow | null,
 ): void {
+  // Critère 3 : aucune exception, à aucun niveau. Le point de passage est
+  // unique pour que personne ne puisse le contourner en appelant plus bas.
+  if (isSleepingNow()) {
+    log.info('notification supprimée — heures de sommeil', notif.title)
+    return
+  }
   if (!Notification.isSupported()) {
     log.warn('native notifications unsupported', notif.title)
     return
@@ -96,37 +122,6 @@ export function notifyUpdateReady(
   )
 }
 
-export function notifyTaskUrgent(
-  taskTitle: string,
-  daysLeft: number,
-  getMainWindow: () => BrowserWindow | null,
-): void {
-  sendNativeNotification(
-    {
-      title: 'Tâche urgente',
-      body: `"${taskTitle}" est due dans ${daysLeft <= 0 ? "aujourd'hui" : daysLeft === 1 ? 'demain' : `${daysLeft} jours`} !`,
-      payload: { type: 'task-urgent', taskTitle, daysLeft },
-    },
-    getMainWindow,
-  )
-}
-
-/**
- * Événements de tâche routés via l'IPC `tasks:notify`.
- *
- * Les anciennes variantes liées au système de niveaux (task-hit-zero,
- * task-forced-three, task-degraded, task-auto-rescued, task-urgent) ont été
- * supprimées avec le moteur de planification legacy. La notification
- * d'urgence reste disponible via `notifyTaskUrgent`.
- */
-export type TaskNotifyEvent = {
-  type: never
-}
-
-export function notifyTaskEvent(
-  _event: TaskNotifyEvent,
-  _getMainWindow: () => BrowserWindow | null,
-): void {
-  // Plus aucun variant actif. La fonction est conservée pour préserver le
-  // contrat IPC `tasks:notify` ; elle n'émet plus rien.
-}
+// Le moteur de planification ne notifie personne : il produit des faits
+// chiffrés (C.3.2, F). La livraison à l'utilisateur appartient au futur point
+// Coach — aucun canal de notification de tâche n'existe donc ici.

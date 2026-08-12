@@ -5,6 +5,8 @@ export const IPC_CHANNELS = {
   APP_GET_VERSION: 'app:getVersion',
   APP_OPEN_LOGS: 'app:openLogs',
   APP_FLUSH_DEBOUNCES: 'app:flushDebounces',
+  /** Heures de sommeil : le main les connaît pour ne jamais notifier dedans. */
+  APP_SET_SLEEP_WINDOW: 'app:setSleepWindow',
   APP_DISCOVERY_LIST: 'app:discoverInstalledApps',
   /** Relance un scan complet. Ne rappelle jamais l'IA pour ce qui est déjà jugé. */
   APP_DISCOVERY_REFRESH: 'app:refreshInstalledApps',
@@ -13,8 +15,6 @@ export const IPC_CHANNELS = {
   // App usage tracker
   APP_USAGE_GET: 'appUsage:get',
   APP_USAGE_EVENT_TICK: 'appUsage:event:tick',
-  // Tasks (renderer → main : déclencher notification native)
-  TASKS_NOTIFY: 'tasks:notify',
   // Blocage — les règles passent par les canaux de stockage génériques avec la
   // clé `blocking_rules`. Seul l'état de session a besoin de son propre canal :
   // il est décidé par l'horloge du processus principal, pas par l'interface.

@@ -2,7 +2,7 @@ import { ipcMain, app, shell, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { Storage } from '@shared/storage'
 import { getLogFilePath } from '@main/logging/setup'
-import { notifyTaskEvent, type TaskNotifyEvent } from '@main/notifications'
+import { setSleepWindow } from '@main/notifications'
 import { getAppCatalog } from '@main/tracking/app-catalog'
 import { registerStorageHandlers } from './storage.handlers'
 import { registerAppUsageHandlers } from '../tracking/handlers'
@@ -33,11 +33,11 @@ export async function registerAllIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.APP_DISCOVERY_LIST, () => getAppCatalog())
   ipcMain.handle(IPC_CHANNELS.APP_DISCOVERY_REFRESH, () => getAppCatalog({ force: true }))
 
-  // V2 P9 — Notifications de niveau des tâches déclenchées depuis le
-  // renderer (tasks.store). Le main reçoit l'event et déclenche la notif
-  // native Windows correspondante.
-  ipcMain.handle(IPC_CHANNELS.TASKS_NOTIFY, (_e, event: TaskNotifyEvent) => {
-    notifyTaskEvent(event, getMainWindow)
+  // Critère 3 : le processus principal doit connaître les heures de sommeil
+  // pour n'émettre aucune notification pendant celles-ci. Le renderer les
+  // pousse dès qu'il charge — ou les modifie — les paramètres.
+  ipcMain.handle(IPC_CHANNELS.APP_SET_SLEEP_WINDOW, (_e, start: unknown, end: unknown) => {
+    setSleepWindow(typeof start === 'string' ? start : undefined, typeof end === 'string' ? end : undefined)
   })
 
   await registerAppUsageHandlers(storage, getMainWindow)

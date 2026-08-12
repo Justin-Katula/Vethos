@@ -1,46 +1,48 @@
 import { useMemo } from 'react'
 import { usePlanningStore } from '@/store/planning.store'
+import { useSettingsStore } from '@/store/settings.store'
 import { computePlan } from './planning/engine'
+import { addDays, dateKey } from './planning/dates'
+import { sleepScheduleEntries } from '@shared/sleep'
 import type { PlanningInput, PlanningResult } from './planning/types'
 
-function localDateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** Horizon du plan : la semaine qui vient, aujourd'hui inclus. */
+export const PLANNING_HORIZON_DAYS = 6
 
 /**
- * Hook qui alimente le moteur avec les données du store et retourne le plan.
- * Recalculé via useMemo à chaque changement.
+ * Alimente le moteur avec ce que le store contient réellement, et rien
+ * d'autre. Le sommeil vient d'une seule source — les heures des paramètres —
+ * transformées en entrées d'emploi du temps pour la capacité brute (A.1).
  */
 export function usePlanning(now: Date = new Date()): PlanningResult | null {
   const tasks = usePlanningStore((s) => s.tasks)
   const objectives = usePlanningStore((s) => s.objectives)
   const ancres = usePlanningStore((s) => s.ancres)
   const schedule = usePlanningStore((s) => s.schedule)
+  const learning = usePlanningStore((s) => s.learning)
+  const sleepStart = useSettingsStore((s) => s.sleepStart)
+  const sleepEnd = useSettingsStore((s) => s.sleepEnd)
+
+  const nowMs = now.getTime()
 
   return useMemo(() => {
-    const today = localDateKey(now)
-    const end = new Date(now)
-    end.setDate(end.getDate() + 6)
-    const rangeEnd = localDateKey(end)
-
+    const today = dateKey(new Date(nowMs))
     const input: PlanningInput = {
       today,
-      rangeEnd,
+      rangeEnd: addDays(today, PLANNING_HORIZON_DAYS),
       tasks,
       objectives,
       ancres,
-      schedule,
-      observations: [],
-      anchorMissCounts: {},
+      schedule: [...sleepScheduleEntries(sleepStart, sleepEnd), ...schedule],
+      observations: learning.observations,
+      anchorMissCounts: learning.anchorMissCounts,
+      dailyUtilization: learning.dailyUtilization,
+      weeklyObjectiveServed: learning.weeklyObjectiveServed,
+      objectiveLastServed: learning.objectiveLastServed,
+      lastSignalAt: learning.lastSignalAt,
+      tasksCreatedPerWeek: learning.tasksCreatedPerWeek,
     }
 
-    try {
-      return computePlan(input)
-    } catch (err) {
-      console.error('[usePlanning] error', err)
-      return null
-    }
-  }, [tasks, objectives, ancres, schedule, now])
+    return computePlan(input, new Date(nowMs))
+  }, [tasks, objectives, ancres, schedule, learning, sleepStart, sleepEnd, nowMs])
 }
-
-export { localDateKey }

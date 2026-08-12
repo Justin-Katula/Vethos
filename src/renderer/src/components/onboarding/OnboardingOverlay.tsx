@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -14,8 +14,6 @@ import { DonePage } from './DonePage'
 const STEP_LABELS: Record<OnboardingStep, string> = {
   welcome: 'Bienvenue',
   username: 'Toi',
-  schedule: 'Programme',
-  objective: 'Objectif',
   done: 'Terminé',
 }
 
@@ -29,13 +27,6 @@ export function OnboardingOverlay(): JSX.Element {
   const prev = useOnboardingStore((s) => s.prev)
   const skip = useOnboardingStore((s) => s.skip)
   const finish = useOnboardingStore((s) => s.finish)
-
-  // Données capturées pendant l'onboarding et utilisées entre étapes
-  const [captured, setCaptured] = useState<{
-    templateRuleIds: string[]
-    objectiveColor: string | null
-    objectiveId: string | null
-  }>({ templateRuleIds: [], objectiveColor: null, objectiveId: null })
 
   const currentIdx = useMemo(() => VISIBLE_STEPS.indexOf(step), [step])
   const isFirstVisible = currentIdx <= 0

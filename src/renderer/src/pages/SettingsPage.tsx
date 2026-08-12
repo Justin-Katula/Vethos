@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Save,
   RefreshCw,
@@ -13,16 +14,7 @@ import { useShortcut } from '@/lib/use-shortcut'
 import { nexus } from '@/lib/ipc'
 
 export default function SettingsPage() {
-  const {
-    username,
-    savedAt,
-    sleepStart,
-    sleepEnd,
-    loaded,
-    load,
-    save,
-    updateSettings,
-  } = useSettingsStore()
+  const { username, savedAt, sleepStart, sleepEnd, loaded, load, save } = useSettingsStore()
 
   const restartOnboarding = useOnboardingStore((s) => s.restart)
   const [draft, setDraft] = useState('')
@@ -112,31 +104,20 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* --- Heures de sommeil --- */}
+        {/* --- Sommeil : une seule source, dans « Mon temps » --- */}
         <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Heures de sommeil
-          </h2>
+          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">Sommeil</h2>
           <div className="flex items-center gap-4 rounded-lg border border-border-subtle bg-bg-card px-5 py-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
               <Moon size={18} />
             </div>
-            <div className="flex items-center gap-2 text-sm text-text-primary">
-              <input
-                type="time"
-                value={sleepStart}
-                onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
-                className="rounded-md border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary outline-none focus:border-accent"
-              />
-              <span className="text-text-muted">→</span>
-              <input
-                type="time"
-                value={sleepEnd}
-                onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
-                className="rounded-md border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary outline-none focus:border-accent"
-              />
-            </div>
-            <span className="ml-auto text-xs text-text-muted">{sleepStart} — {sleepEnd}</span>
+            <p className="text-xs text-text-muted">
+              {sleepStart} — {sleepEnd}. Les heures de sommeil se règlent dans{' '}
+              <Link to="/temps" className="text-accent hover:underline">
+                Mon temps
+              </Link>
+              , avec le reste de ce qui prend ton temps.
+            </p>
           </div>
         </section>
 

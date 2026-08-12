@@ -56,6 +56,9 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_EVENT_DOWNLOADED, listener)
     },
+    /** Critère 3 : le main doit connaître les heures de sommeil pour se taire. */
+    setSleepWindow: (start: string | undefined, end: string | undefined): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SET_SLEEP_WINDOW, start, end),
   },
   appUsage: {
     get: (): Promise<DeclaredAppUsageState> => ipcRenderer.invoke(IPC_CHANNELS.APP_USAGE_GET),
@@ -64,17 +67,6 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_USAGE_EVENT_TICK, listener)
     },
-  },
-  tasks: {
-    /** V2 P9 — Demande au main de fire une notification native pour cet event. */
-    notify: (
-      event:
-        | { type: 'task-hit-zero'; taskTitle: string }
-        | { type: 'task-auto-rescued'; taskTitle: string; daysLeft: number }
-        | { type: 'task-forced-three'; taskTitle: string }
-        | { type: 'task-degraded'; taskTitle: string; newLevel: number }
-        | { type: 'task-urgent'; taskTitle: string; daysLeft: number },
-    ): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.TASKS_NOTIFY, event),
   },
   blocking: {
     /**

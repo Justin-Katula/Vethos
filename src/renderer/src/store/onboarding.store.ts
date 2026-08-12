@@ -1,13 +1,7 @@
 import { create } from 'zustand'
 import { useSettingsStore } from './settings.store'
 
-export const ONBOARDING_STEPS = [
-  'welcome',
-  'username',
-  'schedule',
-  'objective',
-  'done',
-] as const
+export const ONBOARDING_STEPS = ['welcome', 'username', 'done'] as const
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 

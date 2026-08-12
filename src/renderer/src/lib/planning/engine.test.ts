@@ -1,212 +1,412 @@
 import { describe, it, expect } from 'vitest'
 import { computePlan } from './engine'
-import { computeMargin, validateImportance } from './feasibility'
-import { pertEstimate, computeCorrectionFactor, autoSplit, computePlannedDuration, planificationPercentile } from './estimation'
-import { computeRawCapacity, generateFreeSlots, filterUsableSlots } from './capacity'
-import { computeRestFloor, computeBreakMinutes } from './rest'
-import { computeAncreMinimum, sortTasksByCascade, computeTargetBlockSize, computeWIPLimit } from './placement'
-import { evaluateRequest } from './requests'
-import type { PlanningInput, TaskItem, ObjectiveItem, AncreItem, ScheduleEntry } from './types'
+import { TASK_CONSTANTS } from './placement'
+import { sleepScheduleEntries } from '@shared/sleep'
+import type { AncreItem, ObjectiveItem, PlanningInput, ScheduleEntry, TaskItem } from './types'
 
-const sched = (dow: number, s: number, e: number, t: ScheduleEntry['categoryType'], l: string): ScheduleEntry => ({
-  dayOfWeek: dow, startMinute: s, endMinute: e, categoryType: t, label: l, color: '#333',
-})
+// Mardi 11 août 2026, 8 h du matin.
+const NOW = new Date(2026, 7, 11, 8, 0)
+const TODAY = '2026-08-11'
+const RANGE_END = '2026-08-17'
 
-const task = (o: Partial<TaskItem> = {}): TaskItem => ({
-  id: 't1', title: 'Maths', deadline: '2026-08-05', importance: 5, category: 'maths',
-  estimatedMinutes: 60, remainingMinutes: 60, correctionFactor: 1.4, status: 'active',
-  createdAt: '2026-07-31T10:00:00Z', ...o,
-})
+const uuid = (n: number) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`
 
-const obj = (o: Partial<ObjectiveItem> = {}): ObjectiveItem => ({
-  id: 'o1', name: 'Sport', color: '#3BA3FF', weeklyTargetMinutes: 300,
-  createdAt: '2026-07-31T10:00:00Z', ...o,
-})
-
-const baseInput = (over: Partial<PlanningInput> = {}): PlanningInput => ({
-  today: '2026-07-31',
-  rangeEnd: '2026-08-06',
-  tasks: [],
-  objectives: [],
-  ancres: [],
-  schedule: [
-    // Sommeil 23:00-07:00 (tous les jours)
-    sched(0, 0, 420, 'sleep', 'Sommeil'), sched(0, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(1, 0, 420, 'sleep', 'Sommeil'), sched(1, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(2, 0, 420, 'sleep', 'Sommeil'), sched(2, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(3, 0, 420, 'sleep', 'Sommeil'), sched(3, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(4, 0, 420, 'sleep', 'Sommeil'), sched(4, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(5, 0, 420, 'sleep', 'Sommeil'), sched(5, 1380, 1440, 'sleep', 'Sommeil'),
-    sched(6, 0, 420, 'sleep', 'Sommeil'), sched(6, 1380, 1440, 'sleep', 'Sommeil'),
-  ],
-  observations: [],
-  anchorMissCounts: {},
+const task = (over: Partial<TaskItem> = {}): TaskItem => ({
+  id: uuid(1),
+  title: 'Dossier',
+  deadline: '2026-08-15',
+  importance: 5,
+  category: 'général',
+  workKind: 'routine',
+  estimatedMinutes: 120,
+  remainingMinutes: 120,
+  correctionFactor: 1.4,
+  parentTaskId: null,
+  status: 'active',
+  createdAt: '2026-08-01T10:00:00.000Z',
   ...over,
 })
 
-describe('A — capacity', () => {
-  it('A.1 : 1440 - sommeil = capacité brute', () => {
-    const daySched = [sched(0, 0, 420, 'sleep', 'S'), sched(0, 1380, 1440, 'sleep', 'S')]
-    // 420 + 60 = 480 min de sommeil → 1440 - 480 = 960
-    expect(computeRawCapacity(daySched)).toBe(960)
+const objective = (over: Partial<ObjectiveItem> = {}): ObjectiveItem => ({
+  id: uuid(9),
+  name: 'Guitare',
+  color: '#3ECF8E',
+  weeklyTargetMinutes: 420,
+  createdAt: '2026-08-01T10:00:00.000Z',
+  ...over,
+})
+
+const ancre = (over: Partial<AncreItem> = {}): AncreItem => ({
+  id: uuid(7),
+  name: 'Sport',
+  color: '#EBCB8B',
+  trigger: 'sport',
+  anchorMinute: 1080, // 18 h
+  daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  normalMaxMinutes: 60,
+  minimumMinutes: 24,
+  createdAt: '2026-08-01T10:00:00.000Z',
+  ...over,
+})
+
+/** École 8 h → 16 h du lundi au vendredi, sommeil 23 h → 7 h. */
+const school: ScheduleEntry[] = [0, 1, 2, 3, 4].map((dayOfWeek) => ({
+  dayOfWeek,
+  startMinute: 480,
+  endMinute: 960,
+  categoryType: 'school',
+  label: 'Cours',
+  color: '#5E81AC',
+}))
+
+const input = (over: Partial<PlanningInput> = {}): PlanningInput => ({
+  today: TODAY,
+  rangeEnd: RANGE_END,
+  tasks: [],
+  objectives: [],
+  ancres: [],
+  schedule: [...sleepScheduleEntries('23:00', '07:00'), ...school],
+  observations: [],
+  anchorMissCounts: {},
+  dailyUtilization: {},
+  weeklyObjectiveServed: {},
+  objectiveLastServed: {},
+  lastSignalAt: {},
+  tasksCreatedPerWeek: {},
+  ...over,
+})
+
+describe('capacité — le socle', () => {
+  it('sept jours calculés, chacun avec sa capacité effective', () => {
+    const plan = computePlan(input(), NOW)
+    expect(plan.capacities).toHaveLength(7)
+    // Un jour d'école : 1440 − 480 (sommeil) − 480 (cours) = 480 brutes.
+    expect(plan.capacities[0]!.rawCapacityMinutes).toBe(480)
+    // Un samedi : pas de cours.
+    expect(plan.capacities[4]!.rawCapacityMinutes).toBe(960)
+    expect(plan.capacities.every((c) => c.effectiveCapacityMinutes > 0)).toBe(true)
   })
 
-  it('A.2 : filtre les fragments < 25', () => {
-    const slots = generateFreeSlots([sched(0, 0, 420, 'sleep', 'S'), sched(0, 1380, 1440, 'sleep', 'S')])
-    const usable = filterUsableSlots(slots)
-    expect(usable.length).toBeGreaterThanOrEqual(1)
-    expect(usable[0]!.durationMinutes).toBe(960)
-  })
-
-  it('E.2 : repos plancher = max(60, 20% brute)', () => {
-    expect(computeRestFloor(960)).toBe(192) // 20% de 960
-    expect(computeRestFloor(100)).toBe(60) // min 60
+  it('sans emploi du temps déclaré, la journée entière est disponible', () => {
+    const plan = computePlan(input({ schedule: [] }), NOW)
+    expect(plan.capacities[0]!.rawCapacityMinutes).toBe(1440)
   })
 })
 
-describe('B — estimation', () => {
-  it('B.1 : médiane ratios = facteur', () => {
-    const r = computeCorrectionFactor({ observations: [
-      { estimatedMinutes: 100, actualMinutes: 100 },
-      { estimatedMinutes: 100, actualMinutes: 120 },
-      { estimatedMinutes: 100, actualMinutes: 140 },
-      { estimatedMinutes: 100, actualMinutes: 160 },
-      { estimatedMinutes: 100, actualMinutes: 180 },
-    ] })
-    expect(r.factor).toBe(1.4) // médiane = 140/100
-    expect(r.confidence).toBe('medium')
+describe('CRITÈRE 1 — jamais « faisable » avec 0 minute placée', () => {
+  it('une tâche faisable reçoit vraiment des blocs', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 120 })] }), NOW)
+    expect(plan.feasibility.globallyFeasible).toBe(true)
+    expect(plan.totalMinutesPlaced).toBeGreaterThan(0)
+    expect(plan.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)
   })
 
-  it('B.3 : PERT (30 + 4×60 + 120)/6 = 65', () => {
-    expect(pertEstimate(30, 60, 120)).toBe(65)
-  })
-
-  it('B.5 : autoSplit 200 → au moins 2 blocs ≥ 25', () => {
-    const blocks = autoSplit(200)
-    expect(blocks.length).toBeGreaterThanOrEqual(2)
-    expect(blocks.every((b) => b >= 25)).toBe(true)
+  it('un plan déclaré faisable place tout ce qu’il a promis', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 120 })] }), NOW)
+    const verdict = plan.verdicts[0]!
+    expect(verdict.status).toBe('placed')
+    expect(verdict.placedMinutes).toBeGreaterThanOrEqual(verdict.neededMinutes)
   })
 })
 
-describe('C — feasibility', () => {
-  it('C.1 : marge positive → comfortable', () => {
-    const m = computeMargin(300, 120)
-    expect(m.marginStatus).toBe('comfortable')
+describe('CRITÈRE 2 — un déficit partiel ne bloque jamais le reste', () => {
+  it('une tâche impossible est placée autant que possible, pas abandonnée', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
+    expect(plan.feasibility.globallyFeasible).toBe(false)
+    expect(plan.totalMinutesPlaced).toBeGreaterThan(0)
+    expect(plan.verdicts[0]!.status).toBe('partial')
   })
 
-  it('C.1 : marge négative → overdue', () => {
-    expect(computeMargin(60, 120).marginStatus).toBe('overdue')
+  it('une tâche impossible n’empêche pas les autres d’être placées entièrement', () => {
+    const plan = computePlan(
+      input({
+        tasks: [
+          task({ id: uuid(1), title: 'Impossible', remainingMinutes: 5000, deadline: '2026-08-13' }),
+          task({ id: uuid(2), title: 'Faisable', remainingMinutes: 60, deadline: '2026-08-16' }),
+        ],
+      }),
+      NOW,
+    )
+    const faisable = plan.verdicts.find((v) => v.title === 'Faisable')!
+    expect(faisable.status).toBe('placed')
+    expect(plan.verdicts.find((v) => v.title === 'Impossible')!.placedMinutes).toBeGreaterThan(0)
   })
 
-  it('C.1.1 : importance valide 1-10', () => {
-    expect(validateImportance(5)).toBe(true)
-    expect(validateImportance(0)).toBe(false)
-  })
-})
-
-describe('D — placement', () => {
-  it('D.3 : minimum ancre = max(20, 40%×60) = 24', () => {
-    expect(computeAncreMinimum(60)).toBe(24)
-  })
-
-  it('D.5 : bloc cible = min(besoin, 90, 40% cap)', () => {
-    expect(computeTargetBlockSize(200, 500)).toBe(90)
-    expect(computeTargetBlockSize(30, 500)).toBe(30)
-  })
-
-  it('D.6 : WIP limite démarrage = 4', () => {
-    expect(computeWIPLimit(0, 2)).toBe(4)
-  })
-
-  it('D.6 : tâche en crise passe en premier', () => {
-    const tasks = [
-      task({ id: 'a', deadline: '2026-08-01', remainingMinutes: 200, importance: 10, createdAt: '2026-07-20T00:00:00Z' }),
-      task({ id: 'b', deadline: '2026-08-10', remainingMinutes: 30, importance: 1, createdAt: '2026-07-25T00:00:00Z' }),
-    ]
-    const dm = new Map([['a', 1440], ['b', 10000]])
-    const sorted = sortTasksByCascade(tasks, dm)
-    expect(sorted[0]!.id).toBe('a')
+  it('le déficit est chiffré avec ses options, jamais un statut vague', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
+    const deficit = plan.feasibility.deficits[0]!
+    expect(deficit.deficitMinutes).toBeGreaterThan(0)
+    expect(deficit.options.length).toBeGreaterThanOrEqual(2)
+    expect(deficit.options.every((o) => o.minutesFreed > 0)).toBe(true)
   })
 })
 
-describe('E — rest', () => {
-  it('E.1 : bloc 90 → 20 min pause', () => {
-    expect(computeBreakMinutes(90)).toBe(20)
-    expect(computeBreakMinutes(50)).toBe(10)
-    expect(computeBreakMinutes(30)).toBe(5)
+describe('CRITÈRE 5 — un objectif ne peut jamais avoir de deadline', () => {
+  it('la forme d’un objectif ne porte aucune date d’échéance', () => {
+    expect(objective()).not.toHaveProperty('deadline')
+  })
+
+  it('les objectifs ne passent jamais par le test de charge des deadlines', () => {
+    const plan = computePlan(input({ objectives: [objective()] }), NOW)
+    expect(plan.feasibility.densities).toHaveLength(0)
+    expect(plan.blocks.filter((b) => b.kind === 'objective').length).toBeGreaterThan(0)
+  })
+
+  it('un objectif est servi par quota hebdomadaire, jamais par urgence', () => {
+    const plan = computePlan(input({ objectives: [objective({ weeklyTargetMinutes: 420 })] }), NOW)
+    const served = plan.blocks.filter((b) => b.kind === 'objective').reduce((s, b) => s + b.workMinutes, 0)
+    expect(served).toBeGreaterThan(0)
+    expect(served).toBeLessThanOrEqual(420)
   })
 })
 
-describe('E.5 — requests', () => {
-  it('accordée si densité reste ≤ 1', () => {
-    const v = evaluateRequest({
-      request: { type: 'rest', minutes: 30, date: '2026-07-31' },
-      tasks: [{ taskId: 't1', deadline: '2026-08-05', remainingMinutes: 60 }],
-      cumulativeCapacity: [{ date: '2026-07-31', capacityMinutes: 400 }],
-      today: '2026-07-31',
-    })
-    expect(v.status).toBe('granted')
+describe('CRITÈRE 6 — deux ancres ne peuvent pas occuper le même créneau', () => {
+  it('une ancre est posée à son heure exacte, tous les jours concernés', () => {
+    const plan = computePlan(input({ ancres: [ancre()] }), NOW)
+    const blocks = plan.blocks.filter((b) => b.kind === 'ancre')
+    expect(blocks).toHaveLength(7)
+    expect(blocks.every((b) => b.startMinute === 1080 && b.durationMinutes === 60)).toBe(true)
   })
 
-  it('refusée si touche règle absolue', () => {
-    const v = evaluateRequest({
-      request: { type: 'free_time', minutes: 120 },
-      tasks: [], cumulativeCapacity: [{ date: '2026-07-31', capacityMinutes: 500 }],
-      today: '2026-07-31', touchesAbsoluteRule: true,
-    })
-    expect(v.status).toBe('denied')
+  it('rien d’autre ne vient se poser sur le créneau d’une ancre', () => {
+    const plan = computePlan(input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 600 })] }), NOW)
+    const overlaps = plan.blocks.filter(
+      (b) => b.kind !== 'ancre' && b.startMinute < 1140 && b.endMinute > 1080,
+    )
+    expect(overlaps).toEqual([])
   })
 })
 
-describe('engine — computePlan bout en bout', () => {
-  it('CRITÈRE 1 : place des blocs si tâches actives existent', () => {
-    const result = computePlan(baseInput({ tasks: [task({ remainingMinutes: 60 })] }))
-    expect(result.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)
+describe('CRITÈRE 8 — cascade : deadline → importance → SRPT → création', () => {
+  it('la deadline la plus proche est servie en premier, même avec une importance basse', () => {
+    const plan = computePlan(
+      input({
+        tasks: [
+          task({ id: uuid(1), title: 'Urgente', deadline: '2026-08-12', importance: 1, remainingMinutes: 90 }),
+          task({ id: uuid(2), title: 'Importante', deadline: '2026-08-17', importance: 10, remainingMinutes: 90 }),
+        ],
+      }),
+      NOW,
+    )
+    const first = plan.blocks.find((b) => b.kind === 'task')!
+    expect(first.label).toBe('Urgente')
   })
 
-  it('CRITÈRE 2 : déficit ne bloque pas le placement', () => {
-    const result = computePlan(baseInput({ tasks: [task({ remainingMinutes: 2000 })] }))
-    expect(result.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)
+  it('à deadline égale, l’importance déclarée passe devant', () => {
+    const plan = computePlan(
+      input({
+        tasks: [
+          task({ id: uuid(1), title: 'Basse', deadline: '2026-08-15', importance: 2, remainingMinutes: 60 }),
+          task({ id: uuid(2), title: 'Haute', deadline: '2026-08-15', importance: 9, remainingMinutes: 60 }),
+        ],
+      }),
+      NOW,
+    )
+    expect(plan.blocks.find((b) => b.kind === 'task')!.label).toBe('Haute')
+  })
+})
+
+describe('D.5 — forme des blocs', () => {
+  it('aucun bloc sous 25 minutes de travail', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 400 })] }), NOW)
+    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.workMinutes >= TASK_CONSTANTS.minBlockMinutes)).toBe(true)
   })
 
-  it('CRITÈRE 5 : objectif sans deadline', () => {
-    const o: ObjectiveItem = obj()
-    expect(o).not.toHaveProperty('deadline')
+  it('aucun bloc de travail au-delà de 90 minutes', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 900, deadline: '2026-08-17' })] }), NOW)
+    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.workMinutes <= TASK_CONSTANTS.targetBlockMinutes)).toBe(true)
   })
 
-  it('CRITÈRE 7 : aucune question — fonction pure', () => {
-    const result = computePlan(baseInput())
-    expect(result.blocks).toBeDefined()
-  })
-
-  it('CRITÈRE 8 : tâche en crise placée en premier', () => {
-    const result = computePlan(baseInput({
-      tasks: [
-        task({ id: 'urgent', deadline: '2026-08-01', remainingMinutes: 100, importance: 1, createdAt: '2026-07-25T00:00:00Z' }),
-        task({ id: 'cool', deadline: '2026-08-10', remainingMinutes: 100, importance: 10, createdAt: '2026-07-26T00:00:00Z' }),
-      ],
-    }))
-    const firstTaskBlock = result.blocks.find((b) => b.kind === 'task')
-    expect(firstTaskBlock?.refId).toBe('urgent')
-  })
-
-  it('place aussi les objectifs', () => {
-    // Debug : vérifier que les slots existent et que le quota est > 0
-    const result = computePlan(baseInput({ objectives: [obj({ weeklyTargetMinutes: 120 })] }))
-    // Si pas d'objectif placé, vérifier pourquoi
-    const objBlocks = result.blocks.filter((b) => b.kind === 'objective')
-    if (objBlocks.length === 0) {
-      // Le quota peut être 0 si la capacité est saturée par le repos. Pas un bug si
-      // les slots existent mais sont consommés. On vérifie juste que ça ne crash pas.
-      expect(result.blocks).toBeDefined()
-    } else {
-      expect(objBlocks.length).toBeGreaterThan(0)
+  it('la pause est INCLUSE dans l’empreinte du bloc, jamais ajoutée après', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 400 })] }), NOW)
+    for (const b of plan.blocks.filter((b) => b.kind === 'task')) {
+      expect(b.workMinutes + b.breakMinutes).toBe(b.durationMinutes)
+      expect(b.endMinute - b.startMinute).toBe(b.durationMinutes)
     }
   })
 
-  it('capacités calculées pour chaque jour', () => {
-    const result = computePlan(baseInput())
-    expect(result.capacities.length).toBe(7)
-    expect(result.capacities[0]!.usableCapacityMinutes).toBeGreaterThan(0)
+  it('sans crise, une tâche ne dépasse pas 40 % de la capacité d’un jour', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }), NOW)
+    for (const capacity of plan.capacities) {
+      const dayMinutes = plan.blocks
+        .filter((b) => b.kind === 'task' && b.date === capacity.date)
+        .reduce((s, b) => s + b.workMinutes, 0)
+      expect(dayMinutes).toBeLessThanOrEqual(Math.ceil(capacity.effectiveCapacityMinutes * 0.4) + 1)
+    }
+  })
+
+  it('le travail est découpé sur plusieurs jours plutôt qu’entassé', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }), NOW)
+    const days = new Set(plan.blocks.filter((b) => b.kind === 'task').map((b) => b.date))
+    expect(days.size).toBeGreaterThan(1)
+  })
+
+  it('rien n’est jamais placé après la deadline', () => {
+    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
+    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.date <= '2026-08-13')).toBe(true)
+  })
+})
+
+describe('invariants de placement', () => {
+  const busy = input({
+    tasks: [
+      task({ id: uuid(1), title: 'A', remainingMinutes: 300, deadline: '2026-08-14' }),
+      task({ id: uuid(2), title: 'B', remainingMinutes: 240, deadline: '2026-08-16', importance: 8 }),
+      task({ id: uuid(3), title: 'C', remainingMinutes: 120, deadline: '2026-08-17' }),
+    ],
+    objectives: [objective()],
+    ancres: [ancre()],
+  })
+
+  it('aucun bloc ne chevauche un autre, aucun jour confondu', () => {
+    const plan = computePlan(busy, NOW)
+    const byDay = new Map<string, typeof plan.blocks>()
+    for (const b of plan.blocks) byDay.set(b.date, [...(byDay.get(b.date) ?? []), b])
+
+    for (const blocks of byDay.values()) {
+      const sorted = [...blocks].sort((a, b) => a.startMinute - b.startMinute)
+      for (let i = 1; i < sorted.length; i++) {
+        expect(sorted[i]!.startMinute).toBeGreaterThanOrEqual(sorted[i - 1]!.endMinute)
+      }
+    }
+  })
+
+  it('aucun bloc ne tombe dans le sommeil ni dans les cours', () => {
+    const plan = computePlan(busy, NOW)
+    for (const b of plan.blocks) {
+      expect(b.startMinute).toBeGreaterThanOrEqual(420) // après le réveil
+      expect(b.endMinute).toBeLessThanOrEqual(1380) // avant le coucher
+      const isWeekday = b.date <= '2026-08-14'
+      if (isWeekday && b.kind !== 'ancre') {
+        expect(b.startMinute >= 960 || b.endMinute <= 480).toBe(true)
+      }
+    }
+  })
+
+  it('le total placé par jour ne dépasse jamais la capacité effective', () => {
+    const plan = computePlan(busy, NOW)
+    for (const capacity of plan.capacities) {
+      const used = plan.blocks
+        .filter((b) => b.date === capacity.date && b.kind !== 'ancre')
+        .reduce((s, b) => s + b.durationMinutes, 0)
+      expect(used).toBeLessThanOrEqual(capacity.effectiveCapacityMinutes)
+    }
+  })
+
+  it('C.4 : les minutes posées égalent les minutes décidées', () => {
+    const plan = computePlan(busy, NOW)
+    expect(plan.internalError).toBeUndefined()
+    expect(plan.totalMinutesPlaced).toBe(plan.totalMinutesPlanned)
+  })
+
+  it('le plan est déterministe : mêmes entrées, même résultat', () => {
+    const a = computePlan(busy, NOW)
+    const b = computePlan(busy, NOW)
+    expect(b.blocks).toEqual(a.blocks)
+  })
+})
+
+describe('E — repos réservé avant distribution', () => {
+  it('le plancher de repos est retiré de la capacité, pas de ce qui reste', () => {
+    const plan = computePlan(input(), NOW)
+    const day = plan.capacities[0]!
+    // 20 % de 480 = 96, au-dessus du plancher d'une heure.
+    expect(day.restReservedMinutes).toBe(96)
+    expect(day.effectiveCapacityMinutes).toBe(
+      day.rawCapacityMinutes - day.unusableMinutes - day.restReservedMinutes - day.fatiguePenaltyMinutes,
+    )
+  })
+
+  it('E.4 : trois jours mesurés au-dessus de 85 % réduisent la capacité du jour suivant', () => {
+    const withFatigue = computePlan(
+      input({
+        dailyUtilization: { '2026-08-08': 90, '2026-08-09': 92, '2026-08-10': 95 },
+      }),
+      NOW,
+    )
+    const without = computePlan(input(), NOW)
+    expect(withFatigue.capacities[0]!.fatiguePenaltyMinutes).toBeGreaterThan(0)
+    expect(withFatigue.capacities[0]!.effectiveCapacityMinutes).toBeLessThan(
+      without.capacities[0]!.effectiveCapacityMinutes,
+    )
+  })
+
+  it('sans mesure, aucune pénalité inventée', () => {
+    const plan = computePlan(input(), NOW)
+    expect(plan.capacities[0]!.fatiguePenaltyMinutes).toBe(0)
+  })
+})
+
+describe('D.3 — version minimale des ancres', () => {
+  it('journée saturée → l’ancre passe à sa version minimale, sans disparaître', () => {
+    const plan = computePlan(
+      input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }),
+      NOW,
+    )
+    const today = plan.blocks.find((b) => b.kind === 'ancre' && b.date === TODAY)!
+    expect(today.durationMinutes).toBe(24)
+    expect(today.reducedToMinimum).toBe(true)
+  })
+
+  it('journée normale → l’ancre garde sa durée pleine', () => {
+    const plan = computePlan(input({ ancres: [ancre()] }), NOW)
+    expect(plan.blocks.find((b) => b.kind === 'ancre')!.durationMinutes).toBe(60)
+  })
+})
+
+describe('D.2 — préemption', () => {
+  it('une tâche à marge négative décale le quota d’un objectif, sans le supprimer', () => {
+    const crisis = computePlan(
+      input({
+        objectives: [objective()],
+        tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-12' })],
+      }),
+      NOW,
+    )
+    const todayObjective = crisis.blocks.filter((b) => b.kind === 'objective' && b.date === TODAY)
+    expect(todayObjective).toHaveLength(0)
+    // Décalé, pas supprimé : l'objectif est servi une fois la crise passée.
+    expect(crisis.blocks.filter((b) => b.kind === 'objective').length).toBeGreaterThan(0)
+  })
+})
+
+describe('CRITÈRE 7 — aucune question posée', () => {
+  it('computePlan est une fonction pure : elle décide, elle ne demande rien', () => {
+    const plan = computePlan(
+      input({
+        tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-12' }), task({ id: uuid(2), remainingMinutes: 200 })],
+        objectives: [objective()],
+        ancres: [ancre()],
+      }),
+      NOW,
+    )
+    // Tout est décidé : des blocs, des verdicts, des signaux — aucun état
+    // « en attente d'une réponse » n'existe dans le résultat.
+    expect(plan.blocks.length).toBeGreaterThan(0)
+    expect(plan.verdicts.every((v) => ['placed', 'partial', 'unplaced'].includes(v.status))).toBe(true)
+    expect(JSON.stringify(plan)).not.toMatch(/question|confirm|choisis|veux-tu/i)
+  })
+
+  it('les signaux sont des faits, jamais des demandes', () => {
+    const plan = computePlan(
+      input({
+        tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-12' })],
+        anchorMissCounts: { [uuid(7)]: 3 },
+      }),
+      NOW,
+    )
+    expect(plan.signals.every((s) => ['density_deficit', 'anchor_missed_3x', 'objective_stalled'].includes(s.type))).toBe(true)
+  })
+})
+
+describe('D.6 — limite de travail en cours', () => {
+  it('au-delà de la limite, un encouragement — jamais un blocage', () => {
+    const plan = computePlan(
+      input({ tasks: [1, 2, 3, 4, 5].map((n) => task({ id: uuid(n), title: `T${n}`, remainingMinutes: 60 })) }),
+      NOW,
+    )
+    expect(plan.wip).toMatchObject({ activeCount: 5, limit: 4, overLimit: true })
+    // Rien n'est empêché pour autant.
+    expect(plan.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)
   })
 })

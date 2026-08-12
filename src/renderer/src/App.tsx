@@ -17,6 +17,7 @@ import AuthPage from './pages/AuthPage'
 import BlockingPage from './pages/BlockingPage'
 import BlockOverlay from './pages/BlockOverlay'
 import HomePage from './pages/HomePage'
+import TimePage from './pages/TimePage'
 
 export default function App(): JSX.Element {
   const authLoaded = useAuthStore((s) => s.loaded)
@@ -84,6 +85,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="/temps" element={<TimePage />} />
           <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

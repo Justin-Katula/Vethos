@@ -1,90 +1,222 @@
-import type { DurationRealSource } from './types'
+import type { DurationRealSource, LearningObservation, TaskItem } from './types'
 import { STUB_DURATION_SOURCE } from './types'
+import { FRAGMENT_DEFAULTS } from './capacity'
 
 // ═══ PARTIE B — ESTIMATION DE DURÉE (TÂCHES UNIQUEMENT) ═══════════════════
+//
+// Ne s'applique jamais aux objectifs (cible hebdomadaire, D.4) ni aux ancres
+// (durée fixe + minimum, D.3).
 
+/** B.3 — facteurs par défaut tant que <5 tâches complétées dans la catégorie. */
 export const DEFAULT_FACTORS = { routine: 1.4, novel: 1.7 } as const
 
-/** B.1 : facteur de correction = médiane(réelle/estimée) par catégorie. */
+/** B.1 — fenêtre des N dernières tâches complétées prises en compte. */
+export const FACTOR_WINDOW = 20
+
+/** B.4 — les tâches à deadline se planifient au 75e percentile, pas à la médiane. */
+export const PLANNING_PERCENTILE = 0.75
+
+export const MIN_FACTOR = 0.5
+export const MAX_FACTOR = 3
+
+export type FactorConfidence = 'none' | 'low' | 'medium' | 'high'
+
+export type CorrectionFactor = {
+  factor: number
+  confidence: FactorConfidence
+  /** Nombre d'observations réellement utilisées. */
+  sampleSize: number
+  reason: string
+}
+
+type Ratio = { estimatedMinutes: number; actualMinutes: number; createdAt: string }
+
+function ratiosOf(observations: LearningObservation[], category: string): number[] {
+  return (observations.filter(
+    (o) =>
+      o.category === category &&
+      typeof o.estimatedMinutes === 'number' &&
+      typeof o.actualMinutes === 'number' &&
+      o.estimatedMinutes > 0,
+  ) as Ratio[])
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, FACTOR_WINDOW)
+    .map((o) => o.actualMinutes / o.estimatedMinutes)
+}
+
+const clamp = (n: number) => Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, n))
+
+export function median(values: number[]): number {
+  if (values.length === 0) return 0
+  const s = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(s.length / 2)
+  return s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!
+}
+
+/** Percentile par interpolation linéaire. */
+export function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0
+  const s = [...values].sort((a, b) => a - b)
+  const idx = p * (s.length - 1)
+  const lo = Math.floor(idx)
+  const hi = Math.ceil(idx)
+  return s[lo]! + (idx - lo) * (s[hi]! - s[lo]!)
+}
+
+/**
+ * B.1 : facteur_correction(catégorie) = médiane(durée_réelle / durée_estimée)
+ * sur les N dernières tâches complétées de cette catégorie.
+ * B.3 : sous 5 tâches complétées, le défaut tient (1.4 routinier / 1.7 nouveau).
+ *       Dès 5, le facteur mesuré remplace le défaut. Dès 10, confiance haute.
+ */
 export function computeCorrectionFactor(args: {
-  observations: Array<{ estimatedMinutes: number; actualMinutes: number }>
-  defaultFactor?: number
-}): { factor: number; confidence: 'low' | 'medium' | 'high' } {
-  const n = args.observations.length
-  if (n < 5) return { factor: args.defaultFactor ?? DEFAULT_FACTORS.routine, confidence: 'low' }
+  observations: LearningObservation[]
+  category: string
+  workKind: 'routine' | 'novel'
+}): CorrectionFactor {
+  const ratios = ratiosOf(args.observations, args.category)
+  const fallback = DEFAULT_FACTORS[args.workKind]
 
-  const ratios = args.observations
-    .filter((o) => o.estimatedMinutes > 0)
-    .map((o) => o.actualMinutes / o.estimatedMinutes)
-    .sort((a, b) => a - b)
-  if (ratios.length === 0) return { factor: args.defaultFactor ?? DEFAULT_FACTORS.routine, confidence: 'low' }
+  // G.3 : aucune conclusion tirée de moins de 5 observations.
+  if (ratios.length < 5) {
+    return {
+      factor: fallback,
+      confidence: ratios.length === 0 ? 'none' : 'low',
+      sampleSize: ratios.length,
+      reason: `Défaut ${args.workKind === 'novel' ? 'travail nouveau/créatif' : 'travail routinier connu'} — ${ratios.length}/5 tâches mesurées.`,
+    }
+  }
 
-  const mid = Math.floor(ratios.length / 2)
-  const median = ratios.length % 2 === 0 ? (ratios[mid - 1]! + ratios[mid]!) / 2 : ratios[mid]!
-  return { factor: Math.max(0.5, Math.min(3, median)), confidence: n >= 10 ? 'high' : 'medium' }
+  return {
+    factor: clamp(median(ratios)),
+    confidence: ratios.length >= 10 ? 'high' : 'medium',
+    sampleSize: ratios.length,
+    reason: `Médiane mesurée sur ${ratios.length} tâches de « ${args.category} ».`,
+  }
 }
 
-/** B.3 : durée_de_départ = (O + 4×M + P) / 6. */
-export function pertEstimate(O: number, M: number, P: number): number {
-  return Math.round((O + 4 * M + P) / 6)
+/**
+ * B.4 : percentile de planification.
+ * Tâche à deadline → 75e percentile du facteur : on réserve plus que le cas
+ * moyen. Objectif → médiane, il n'y a pas de deadline dure à protéger.
+ */
+export function planningFactor(args: {
+  observations: LearningObservation[]
+  category: string
+  workKind: 'routine' | 'novel'
+  hasDeadline: boolean
+}): CorrectionFactor {
+  const base = computeCorrectionFactor(args)
+  if (!args.hasDeadline || base.sampleSize < 5) return base
+
+  const ratios = ratiosOf(args.observations, args.category)
+  return {
+    ...base,
+    factor: clamp(percentile(ratios, PLANNING_PERCENTILE)),
+    reason: `${base.reason} 75e percentile appliqué (tâche à deadline).`,
+  }
 }
 
-/** B.4 : 75e percentile pour tâches, médiane pour objectifs. */
-export function planificationPercentile(args: {
-  observations: Array<{ estimatedMinutes: number; actualMinutes: number }>
-  percentile: number
-  defaultFactor?: number
-}): number {
-  if (args.observations.length < 5) return args.defaultFactor ?? DEFAULT_FACTORS.routine
-  const ratios = args.observations
-    .filter((o) => o.estimatedMinutes > 0)
-    .map((o) => o.actualMinutes / o.estimatedMinutes)
-    .sort((a, b) => a - b)
-  if (ratios.length === 0) return args.defaultFactor ?? DEFAULT_FACTORS.routine
-  const idx = args.percentile * (ratios.length - 1)
-  const lo = Math.floor(idx), hi = Math.ceil(idx), frac = idx - lo
-  const val = ratios[lo]! + frac * (ratios[hi]! - ratios[lo]!)
-  return Math.max(0.5, Math.min(3, val))
+/** B.3 étape 1 : durée_de_départ = (O + 4×M + P) / 6. */
+export function pertEstimate(optimistic: number, likely: number, pessimistic: number): number {
+  return Math.round((optimistic + 4 * likely + pessimistic) / 6)
 }
 
-/** B.1 : durée_planifiée = estimation × facteur. */
+/** B.1 : durée_planifiée = estimation_utilisateur × facteur_correction. */
 export function computePlannedDuration(userEstimate: number, factor: number): number {
   return Math.max(1, Math.round(userEstimate * factor))
 }
 
-/** B.5 : découpage mécanique en blocs de 90 min max, min 25 min. */
-export function autoSplit(total: number, maxBlock = 90, minBlock = 25): number[] {
-  if (total <= maxBlock) return [total]
-  const blocks: number[] = []
-  let rem = total
-  while (rem > 0) {
-    if (rem <= maxBlock && rem >= minBlock) { blocks.push(rem); break }
-    if (rem < minBlock) { blocks[blocks.length - 1]! += rem; break }
-    blocks.push(maxBlock); rem -= maxBlock
-  }
-  return blocks
+/**
+ * B.2 : la durée réelle est la SOMME des sessions obligatoires mesurées.
+ * Jamais une déclaration de l'utilisateur.
+ */
+export function actualDuration(taskId: string, source: DurationRealSource = STUB_DURATION_SOURCE): number | null {
+  return source.getActualMinutes(taskId)
 }
 
-/** B : assemble l'estimation complète d'une tâche. */
-export function estimateTask(args: {
+// ─── B.5 — Découpage automatique ──────────────────────────────────────────
+
+export type SplitPart = { label: string; minutes: number; order: number }
+
+/**
+ * B.5 : déclenché quand la durée corrigée dépasse ce qui tient dans UN jour
+ * sans violer le plafond de D.5. Toujours automatique, jamais une question.
+ *
+ * `labeller` est le point d'entrée de l'IA (sous-parties nommées, ordre de
+ * dépendance). Absent → découpage mécanique en blocs génériques séquentiels.
+ */
+export function autoSplit(args: {
+  totalMinutes: number
+  maxPerDayMinutes: number
+  minPartMinutes?: number
+  labeller?: (partCount: number) => string[] | null
+}): SplitPart[] {
+  const minPart = args.minPartMinutes ?? FRAGMENT_DEFAULTS.deepWork
+  if (args.maxPerDayMinutes <= 0 || args.totalMinutes <= args.maxPerDayMinutes) return []
+
+  let count = Math.ceil(args.totalMinutes / args.maxPerDayMinutes)
+  // Garde-fou : aucune sous-partie sous le seuil de fragment minimum (A.2).
+  count = Math.max(2, Math.min(count, Math.floor(args.totalMinutes / minPart)))
+  if (count < 2) return []
+
+  const base = Math.floor(args.totalMinutes / count)
+  const remainder = args.totalMinutes - base * count
+
+  const labels = args.labeller?.(count) ?? null
+  return Array.from({ length: count }, (_, i) => ({
+    order: i + 1,
+    label: labels?.[i] ?? `Partie ${i + 1}`,
+    // Le reliquat va sur la première part : aucune part ne descend sous `base`.
+    minutes: base + (i === 0 ? remainder : 0),
+  }))
+}
+
+// ─── Assemblage ───────────────────────────────────────────────────────────
+
+export type TaskEstimate = {
   taskId: string
   userEstimate: number
-  hasDeadline: boolean
-  observations: Array<{ estimatedMinutes: number; actualMinutes: number }>
+  correctionFactor: number
+  plannedDuration: number
+  /** Temps de session déjà mesuré (B.2), ou null si rien n'a encore été mesuré. */
+  measuredMinutes: number | null
+  /** Ce qu'il reste à placer : durée planifiée moins le temps déjà mesuré. */
+  remainingMinutes: number
+  confidence: FactorConfidence
+  /** Fait brut destiné au futur point Coach (B.6) — jamais affiché ici. */
+  reason: string
+}
+
+/**
+ * B : estimation complète d'une tâche.
+ * B.6 : produit le fait brut (facteur, raison, confiance). La livraison à
+ * l'utilisateur est hors périmètre — aucune interface ici.
+ */
+export function estimateTask(args: {
+  task: Pick<TaskItem, 'id' | 'category' | 'workKind' | 'estimatedMinutes'>
+  observations: LearningObservation[]
   durationSource?: DurationRealSource
-}): { taskId: string; userEstimate: number; correctionFactor: number; plannedDuration: number; confidence: 'low' | 'medium' | 'high' } {
-  const source = args.durationSource ?? STUB_DURATION_SOURCE
-  const actual = source.getActualMinutes(args.taskId)
-  const obs = actual != null ? [...args.observations, { estimatedMinutes: args.userEstimate, actualMinutes: actual }] : args.observations
-  const { factor, confidence } = computeCorrectionFactor({ observations: obs })
-  const effectiveFactor = args.hasDeadline
-    ? planificationPercentile({ observations: obs, percentile: 0.75, defaultFactor: factor })
-    : factor
+}): TaskEstimate {
+  const factor = planningFactor({
+    observations: args.observations,
+    category: args.task.category,
+    workKind: args.task.workKind,
+    hasDeadline: true, // Toute tâche a une deadline ; seuls les objectifs n'en ont pas.
+  })
+
+  const planned = computePlannedDuration(args.task.estimatedMinutes, factor.factor)
+  // B.2 : le temps déjà passé est du temps de session MESURÉ, jamais déclaré.
+  const measured = actualDuration(args.task.id, args.durationSource)
+
   return {
-    taskId: args.taskId,
-    userEstimate: args.userEstimate,
-    correctionFactor: effectiveFactor,
-    plannedDuration: computePlannedDuration(args.userEstimate, effectiveFactor),
-    confidence,
+    taskId: args.task.id,
+    userEstimate: args.task.estimatedMinutes,
+    correctionFactor: factor.factor,
+    plannedDuration: planned,
+    measuredMinutes: measured,
+    remainingMinutes: Math.max(0, planned - (measured ?? 0)),
+    confidence: factor.confidence,
+    reason: factor.reason,
   }
 }
