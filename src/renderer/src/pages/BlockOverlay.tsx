@@ -68,7 +68,7 @@ export default function BlockOverlay(): JSX.Element {
   }
 
   return (
-    <div className="flex h-screen w-screen select-none flex-col bg-[#0a0a0c] text-zinc-100">
+    <div className="flex h-[100dvh] w-screen select-none flex-col bg-[#0a0a0c] text-text-primary">
       {/* Barre de contrôles : la seule zone où l'overlay accepte un clic utile. */}
       <div className="flex items-center justify-end gap-1 p-2">
         <button
@@ -76,7 +76,7 @@ export default function BlockOverlay(): JSX.Element {
           onClick={() => void minimiser()}
           disabled={enCours || windowId === ''}
           aria-label="Minimiser"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-30"
         >
           <Minus size={16} />
         </button>
@@ -85,7 +85,7 @@ export default function BlockOverlay(): JSX.Element {
           onClick={() => setFermeture('confirmation')}
           disabled={enCours || windowId === ''}
           aria-label="Fermer"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-500/20 hover:text-red-300 disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition hover:bg-red-500/20 hover:text-red-300 disabled:opacity-30"
         >
           <X size={16} />
         </button>
@@ -97,16 +97,16 @@ export default function BlockOverlay(): JSX.Element {
         </div>
 
         <div className="max-w-md">
-          <h1 className="text-xl font-semibold text-zinc-100">
+          <h1 className="text-xl font-semibold text-text-primary">
             {type === 'site' ? 'Ce site est bloqué' : `${appName} est bloquée`}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+          <p className="mt-2 text-sm leading-relaxed text-text-secondary">
             {focusLabel !== null && focusLabel.length > 0
               ? `Une session « ${focusLabel} » est en cours.`
               : 'Une session de blocage est en cours.'}{' '}
             {type === 'site'
               ? 'Le reste de ton navigateur reste utilisable.'
-              : "L'application tourne toujours — elle n'a pas été fermée de force."}
+              : "L'application tourne toujours. Elle n'a pas été fermée de force."}
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function BlockOverlay(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setFermeture('inactif')}
-                className="rounded-lg px-3 py-1.5 text-xs text-zinc-400 transition hover:text-zinc-200"
+                className="rounded-lg px-3 py-1.5 text-xs text-text-secondary transition hover:text-text-primary"
               >
                 Annuler
               </button>

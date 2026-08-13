@@ -7,7 +7,7 @@ export function Layout() {
   const location = useLocation()
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-bg-base">
+    <div className="relative flex h-[100dvh] w-screen overflow-hidden bg-bg-base">
       {/* Fond animé ambient. Le masque radial l'efface au centre : le motif
           vit sur les bords, le contenu reste parfaitement lisible. */}
       <FallingPattern

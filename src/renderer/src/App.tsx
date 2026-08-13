@@ -58,7 +58,7 @@ export default function App(): JSX.Element {
   if (!authLoaded) {
     return (
       <ErrorBoundary>
-        <div className="flex h-screen w-screen items-center justify-center bg-bg-base text-text-primary">
+        <div className="flex h-[100dvh] w-screen items-center justify-center bg-bg-base text-text-primary">
           <div className="flex flex-col items-center gap-4">
             <NexusLogo size={32} />
             <div className="h-1 w-28 overflow-hidden rounded-full bg-border-subtle">

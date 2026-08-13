@@ -65,7 +65,7 @@ export default function AuthPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-screen w-screen grid-cols-1 overflow-hidden bg-bg-base text-text-primary lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
+    <div className="grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-bg-base text-text-primary lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
       <section className="hidden min-h-0 flex-col justify-between border-r border-border-subtle bg-bg-elevated px-10 py-9 lg:flex">
         <div>
           <NexusLogo size={32} />

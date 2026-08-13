@@ -1,6 +1,12 @@
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/500.css';
+/**
+ * Geist et Geist Mono, en variable.
+ *
+ * Inter était le choix par défaut, et ça se voyait : c'est la police que prend
+ * toute interface qui n'a pas choisi. Geist garde la même neutralité de
+ * travail, avec des chiffres plus fermes et un dessin moins bavard aux grandes
+ * tailles. Ça compte pour une application qui affiche surtout des heures.
+ *
+ * Deux familles en variable : un fichier chacune au lieu de six graisses.
+ */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';

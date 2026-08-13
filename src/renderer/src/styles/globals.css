@@ -50,7 +50,7 @@
     --text-muted: #7E7E82;
 
     /* Accent neutre, cohérent avec le fond animé. La couleur est réservée
-       au danger — elle ne sert jamais de décoration. */
+       au danger : elle ne sert jamais de décoration. */
     --accent: #D8D8D8;
     --accent-hover: #F0F0F0;
     --accent-soft: rgba(216, 216, 216, 0.16);
@@ -84,6 +84,17 @@
     --duration-fast: 200ms;
     --duration-normal: 250ms;
     --duration-slow: 300ms;
+
+    /* Rythme vertical. Une seule échelle, des multiples de 4, pour que deux
+       sections écrites à un mois d'intervalle respirent pareil. */
+    --step-1: 0.25rem;
+    --step-2: 0.5rem;
+    --step-3: 0.75rem;
+    --step-4: 1rem;
+    --step-6: 1.5rem;
+    --step-8: 2rem;
+    --step-12: 3rem;
+    --step-16: 4rem;
   }
 
   html, body, #root {
@@ -96,13 +107,15 @@
     background: var(--bg-base);
     background-attachment: fixed;
     color: var(--text-primary);
-    font-family: 'Inter', system-ui, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-family: 'Geist Variable', system-ui, sans-serif;
+    /* Chiffres à chasse fixe et à hauteur constante : une heure qui change ne
+       doit jamais faire bouger ce qui l'entoure. */
+    font-variant-numeric: tabular-nums lining-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     overflow: hidden;
-    user-select: none;
+    user-select: text;
   }
 
   /* Scrollbar custom */
@@ -135,13 +148,34 @@
     color: var(--text-primary);
   }
 
-  /* Titres : pas de letter-spacing négatif. */
-  h1, h2, h3, h4 {
-    letter-spacing: 0;
+  /* Aux grandes tailles, l'espacement par défaut paraît lâche : on le resserre
+     à mesure que le corps grandit, jamais l'inverse. */
+  h1 { letter-spacing: -0.022em; }
+  h2 { letter-spacing: -0.016em; }
+  h3, h4 { letter-spacing: -0.01em; }
+
+  /* Les chiffres sont la matière première de cette application : ils méritent
+     la fonte à chasse fixe partout où ils s'alignent. */
+  .numeric {
+    font-family: 'Geist Mono Variable', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 
-  /* Texte sélectionnable dans les inputs */
-  input, textarea {
-    user-select: text;
+  /**
+   * Mouvement réduit.
+   *
+   * Une application de concentration qui impose du mouvement à quelqu'un qui a
+   * demandé le contraire au niveau du système se contredit elle-même. Tout
+   * s'arrête ici, y compris le fond animé : la règle vaut pour la décoration
+   * avant de valoir pour l'interface.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

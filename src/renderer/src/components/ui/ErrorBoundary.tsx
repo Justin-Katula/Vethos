@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
               {'Quelque chose a planté.'}
             </h1>
             <p className="mt-2 max-w-md text-sm text-text-secondary">
-              {"L'app a rencontré une erreur inattendue. Tes données sont en sécurité — recharge pour continuer."}
+              {"L'app a rencontré une erreur inattendue. Tes données sont en sécurité. Recharge pour continuer."}
             </p>
           </div>
           <pre className="max-w-lg overflow-auto rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-left font-mono text-xs text-text-muted">

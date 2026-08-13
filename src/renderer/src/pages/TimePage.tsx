@@ -261,14 +261,14 @@ function ScheduleEditor({
       <div className="mt-4 space-y-1">
         {dayEntries.length === 0 ? (
           <p className="py-4 text-center text-xs text-text-muted">
-            Rien de fixe le {DAYS[day]?.toLowerCase()} — la journée entière compte comme disponible.
+            Rien de fixe le {DAYS[day]?.toLowerCase()}. La journée entière compte comme disponible.
           </p>
         ) : (
           dayEntries.map((entry, i) => (
             <div key={`${entry.startMinute}-${i}`} className="group flex items-center gap-3 py-1 text-xs">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
               <span className="w-24 shrink-0 font-mono text-text-muted">
-                {hhmm(entry.startMinute)}–{hhmm(entry.endMinute)}
+                {hhmm(entry.startMinute)} → {hhmm(entry.endMinute)}
               </span>
               <span className="truncate text-text-primary">{entry.label}</span>
               <span className="ml-auto shrink-0 font-mono text-text-muted">
@@ -379,7 +379,7 @@ function AncresEditor({
       <div className="space-y-1">
         {ancres.length === 0 ? (
           <p className="py-4 text-center text-xs text-text-muted">
-            Le sport à 18 h, la lecture à 21 h — un rendez-vous avec toi-même qui ne bouge jamais.
+            Le sport à 18 h, la lecture à 21 h. Un rendez-vous avec toi-même qui ne bouge jamais.
           </p>
         ) : (
           ancres.map((a) => (
@@ -481,7 +481,7 @@ function ObjectivesEditor({
       <div className="space-y-1">
         {objectives.length === 0 ? (
           <p className="py-4 text-center text-xs text-text-muted">
-            « Guitare, 4 h par semaine » — ce qui avance sans jamais être en retard.
+            « Guitare, 4 h par semaine ». Ce qui avance sans jamais être en retard.
           </p>
         ) : (
           objectives.map((o) => (
@@ -574,7 +574,7 @@ function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanni
             <td className="py-1.5 text-right">
               {c.fatiguePenaltyMinutes + c.breathingReductionMinutes > 0
                 ? `−${duration(c.fatiguePenaltyMinutes + c.breathingReductionMinutes)}`
-                : '—'}
+                : '-'}
             </td>
             <td className="py-1.5 text-right font-semibold text-text-primary">
               {duration(c.effectiveCapacityMinutes)}
@@ -642,7 +642,7 @@ function RequestPanel({
         <div className="mt-4 border-t border-border-subtle pt-4">
           <p className="text-sm font-medium text-text-primary">
             {verdict.status === 'granted'
-              ? `Accordé — ${verdict.grantedMinutes} min.`
+              ? `Accordé, ${verdict.grantedMinutes} min.`
               : verdict.status === 'partial'
                 ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
                 : 'Refusé.'}

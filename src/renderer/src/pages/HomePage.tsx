@@ -107,10 +107,10 @@ export default function HomePage() {
             <span className="font-mono text-4xl font-semibold tabular-nums text-text-primary">
               {hhmm(nowMinute)}
             </span>
-            <span className="mt-1.5 text-[11px] uppercase tracking-[0.2em] text-text-muted">
+            <span className="mt-1.5 text-xs text-text-muted">
               {todayBlocks.length === 0
-                ? 'libre'
-                : `${todayBlocks.length} bloc${todayBlocks.length > 1 ? 's' : ''}`}
+                ? 'journée libre'
+                : `${todayBlocks.length} bloc${todayBlocks.length > 1 ? 's' : ''} posé${todayBlocks.length > 1 ? 's' : ''}`}
             </span>
           </TimeCircle>
 
@@ -154,7 +154,7 @@ export default function HomePage() {
                 {plan?.wip.overLimit && (
                   <p className="mt-3 text-[11px] text-text-muted">
                     {plan.wip.activeCount} tâches ouvertes pour une limite mesurée à {plan.wip.limit}. Rien
-                    n’est bloqué — terminer avant d’ouvrir reste simplement plus rapide.
+                    n’est bloqué. Terminer avant d’ouvrir reste simplement plus rapide.
                   </p>
                 )}
               </Disclosure>
@@ -205,7 +205,7 @@ function SetupInvitation() {
           Pour l’instant, l’application ne connaît que tes heures de sommeil.
         </p>
         <p className="mt-1 text-xs text-text-muted">
-          Déclare tes cours, ton travail, tes trajets — une seule fois. Tout le reste s’en déduit.
+          Déclare tes cours, ton travail, tes trajets, une seule fois. Tout le reste s’en déduit.
         </p>
       </div>
       <Link
@@ -300,7 +300,7 @@ function BlockRow({ block }: { block: PlacedBlock }) {
     <div className="flex items-center gap-3 py-1 text-xs">
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: block.color }} />
       <span className="w-24 shrink-0 font-mono text-text-muted">
-        {hhmm(block.startMinute)}–{hhmm(block.endMinute)}
+        {hhmm(block.startMinute)} → {hhmm(block.endMinute)}
       </span>
       <span className="truncate text-text-primary">{block.label}</span>
       {block.reducedToMinimum && <span className="shrink-0 text-[10px] text-warning">réduite</span>}

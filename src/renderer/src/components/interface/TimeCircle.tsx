@@ -108,7 +108,7 @@ export function TimeCircle({ entries, blocks, nowMinute, size = 320, children }:
           strokeWidth={INNER_STROKE}
         />
 
-        {/* Anneau extérieur — ce qui est déjà pris. */}
+        {/* Anneau extérieur : ce qui est déjà pris. */}
         {fixed.map((entry, i) => (
           <motion.path
             key={`fixed-${entry.dayOfWeek}-${entry.startMinute}-${i}`}
@@ -122,7 +122,7 @@ export function TimeCircle({ entries, blocks, nowMinute, size = 320, children }:
           />
         ))}
 
-        {/* Anneau intérieur — ce que l'application a posé. */}
+        {/* Anneau intérieur : ce que l'application a posé. */}
         {planned.map((block, i) => (
           <motion.path
             key={block.id}

@@ -1,28 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Save,
-  RefreshCw,
-  Moon,
-  FileText,
-} from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Check, FileText, RefreshCw } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useSettingsStore } from '@/store/settings.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
+import { useStagger } from '@/lib/motion'
 import { nexus } from '@/lib/ipc'
 
+/**
+ * Les réglages tiennent en trois choses : qui tu es, où se règle le reste, et
+ * comment ouvrir le capot quand ça coince. Chacune est une ligne, pas une carte
+ * dans une colonne étroite : quatre encadrés empilés pour quatre champs, c'était
+ * de l'emballage.
+ */
 export default function SettingsPage() {
   const { username, savedAt, sleepStart, sleepEnd, loaded, load, save } = useSettingsStore()
-
   const restartOnboarding = useOnboardingStore((s) => s.restart)
+  const { container, item } = useStagger()
+
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   useEffect(() => {
@@ -53,125 +57,118 @@ export default function SettingsPage() {
 
   return (
     <PageTransition>
-      <div className="flex h-full flex-col gap-8 overflow-y-auto px-12 pb-16 pt-16">
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Paramètres</h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            Configure Vethos selon tes besoins. Toutes les modifications sont sauvegardées automatiquement.
+      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
+        <header className="mb-12">
+          <h1 className="text-3xl font-semibold text-text-primary">Paramètres</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-text-muted">
+            Tout se sauvegarde en écrivant. Il n{'’'}y a rien à valider.
           </p>
         </header>
 
-        {/* --- Profil --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">Profil</h2>
-          <div className="rounded-lg border border-border-subtle bg-bg-card p-6 shadow-card">
-            <label className="block text-xs font-medium uppercase tracking-wider text-text-muted">
-              {"Nom d'utilisateur"}
-            </label>
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              className={cn(
-                'mt-2 w-full rounded-md border border-border-subtle bg-bg-base px-3 py-2',
-                'text-sm text-text-primary outline-none transition-colors duration-200',
-                'focus:border-accent focus:ring-2 focus:ring-accent/30',
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="grid flex-1 items-start gap-x-20 gap-y-12 lg:grid-cols-2"
+        >
+          <motion.section variants={item} className="space-y-8">
+            <Row label="Nom" hint="Utilisé pour te saluer, nulle part ailleurs.">
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
+                  placeholder="Ton prénom"
+                  className="w-full max-w-xs rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-border-strong"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={!dirty || saving}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                    dirty && !saving
+                      ? 'bg-accent text-bg-base hover:bg-accent-hover'
+                      : 'cursor-not-allowed border border-border-subtle text-text-muted',
+                  )}
+                >
+                  {saving ? 'Sauvegarde' : 'Enregistrer'}
+                </button>
+              </div>
+              {savedAt && !dirty && (
+                <p className="mt-2 flex items-center gap-1.5 text-[11px] text-text-muted">
+                  <Check size={12} />
+                  Enregistré le {new Date(savedAt).toLocaleString('fr-FR')}
+                </p>
               )}
-              placeholder="Ton prénom"
-            />
-            <div className="mt-4 flex items-center gap-3">
+            </Row>
+
+            <Row label="Sommeil" hint="Se règle avec le reste de ce qui prend ton temps.">
+              <p className="text-sm text-text-secondary">
+                <span className="numeric">
+                  {sleepStart} {'→'} {sleepEnd}
+                </span>
+                <Link
+                  to="/temps"
+                  className="ml-3 text-sm text-text-muted underline-offset-4 transition-colors hover:text-text-primary hover:underline"
+                >
+                  Modifier dans Mon temps
+                </Link>
+              </p>
+            </Row>
+          </motion.section>
+
+          <motion.section variants={item} className="space-y-8">
+            <Row label="Journal" hint="Ce que l'application a fait, dans l'ordre, avec l'heure.">
               <button
                 type="button"
-                onClick={handleSave}
-                disabled={!dirty || saving}
+                onClick={() => void nexus.app.openLogs()}
+                className="inline-flex items-center gap-2 rounded-md border border-border-subtle px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <FileText size={14} />
+                Ouvrir le journal
+              </button>
+            </Row>
+
+            <Row label="Introduction" hint="Ne touche ni à tes règles, ni à tes objectifs.">
+              <button
+                type="button"
+                onClick={() => void handleRestart()}
+                disabled={restarting}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-md px-4 py-2',
-                  'text-sm font-medium transition-all duration-200 ease-out',
-                  dirty && !saving
-                    ? 'bg-accent text-white hover:bg-accent-hover'
-                    : 'cursor-not-allowed bg-bg-card-hover text-text-muted',
+                  'inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors',
+                  restarting
+                    ? 'cursor-wait border-border-subtle text-text-muted'
+                    : 'border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary',
                 )}
               >
-                <Save size={16} strokeWidth={2} />
-                {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                <RefreshCw size={14} className={restarting ? 'animate-spin' : ''} />
+                {restarting ? 'Lancement' : 'Revoir l’introduction'}
               </button>
-              {savedAt && (
-                <span className="font-mono text-xs text-text-muted">
-                  Dernière sauvegarde : {new Date(savedAt).toLocaleString('fr-FR')}
-                </span>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* --- Sommeil : une seule source, dans « Mon temps » --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">Sommeil</h2>
-          <div className="flex items-center gap-4 rounded-lg border border-border-subtle bg-bg-card px-5 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              <Moon size={18} />
-            </div>
-            <p className="text-xs text-text-muted">
-              {sleepStart} — {sleepEnd}. Les heures de sommeil se règlent dans{' '}
-              <Link to="/temps" className="text-accent hover:underline">
-                Mon temps
-              </Link>
-              , avec le reste de ce qui prend ton temps.
-            </p>
-          </div>
-        </section>
-
-        {/* --- Diagnostic --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Diagnostic
-          </h2>
-          <div className="rounded-lg border border-border-subtle bg-bg-card p-6 shadow-card">
-            <p className="text-xs text-text-muted">
-              Les logs aident à comprendre un blocage, une session interrompue ou une erreur de sauvegarde.
-            </p>
-            <button
-              type="button"
-              onClick={() => void nexus.app.openLogs()}
-              className={cn(
-                'mt-4 inline-flex items-center gap-2 rounded-md border px-4 py-2',
-                'border-border-subtle text-sm font-medium text-text-secondary transition-colors',
-                'hover:border-border-strong hover:text-text-primary',
-              )}
-            >
-              <FileText size={14} />
-              Ouvrir les logs
-            </button>
-          </div>
-        </section>
-
-        {/* --- Onboarding --- */}
-        <section className="max-w-lg space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-text-muted">
-            Onboarding
-          </h2>
-          <div className="rounded-lg border border-border-subtle bg-bg-card p-6 shadow-card">
-            <p className="text-xs text-text-muted">
-              {"Réafficher le tour d'introduction. Ne supprime ni tes règles, ni tes objectifs."}
-            </p>
-            <button
-              type="button"
-              onClick={() => void handleRestart()}
-              disabled={restarting}
-              className={cn(
-                'mt-4 inline-flex items-center gap-2 rounded-md border px-4 py-2',
-                'text-sm font-medium transition-colors',
-                restarting
-                  ? 'cursor-wait border-border-subtle text-text-muted'
-                  : 'border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary',
-              )}
-            >
-              <RefreshCw size={14} className={restarting ? 'animate-spin' : ''} />
-              {restarting ? 'Lancement…' : "Relancer l'onboarding"}
-            </button>
-          </div>
-        </section>
+            </Row>
+          </motion.section>
+        </motion.div>
       </div>
     </PageTransition>
+  )
+}
+
+/** Un réglage : son nom, ce qu'il fait, et le contrôle. Pas d'encadré. */
+function Row({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="border-t border-border-subtle pt-5">
+      <h2 className="text-sm font-medium text-text-primary">{label}</h2>
+      <p className="mb-4 mt-1 text-xs text-text-muted">{hint}</p>
+      {children}
+    </div>
   )
 }
