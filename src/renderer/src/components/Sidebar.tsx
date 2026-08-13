@@ -19,8 +19,8 @@ import { useAuthStore } from '@/store/auth.store'
 
 const DESTINATIONS = [
   { to: '/', label: 'Aujourd’hui', Icon: Home },
-  { to: '/semaine', label: 'Ma semaine', Icon: CalendarDays },
-  { to: '/temps', label: 'Mon temps', Icon: SlidersHorizontal },
+  { to: '/temps', label: 'Mon temps', Icon: CalendarDays },
+  { to: '/engagements', label: 'Mes engagements', Icon: SlidersHorizontal },
   { to: '/blocage', label: 'Blocage', Icon: Shield },
   { to: '/settings', label: 'Réglages', Icon: Sliders },
 ]

@@ -17,7 +17,7 @@ import AuthPage from './pages/AuthPage'
 import BlockingPage from './pages/BlockingPage'
 import BlockOverlay from './pages/BlockOverlay'
 import HomePage from './pages/HomePage'
-import WeekPage from './pages/WeekPage'
+import CommitmentsPage from './pages/CommitmentsPage'
 import TimePage from './pages/TimePage'
 
 export default function App(): JSX.Element {
@@ -86,7 +86,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="/semaine" element={<WeekPage />} />
+          <Route path="/engagements" element={<CommitmentsPage />} />
           <Route path="/temps" element={<TimePage />} />
           <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
