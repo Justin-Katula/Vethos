@@ -48,12 +48,12 @@ export function OnboardingOverlay(): JSX.Element {
       // l'application : on voit l'interface, rien ne répond.
       exit={{ opacity: 0, pointerEvents: 'none' }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] flex flex-col bg-hall/95 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex flex-col bg-base/95 backdrop-blur-md"
     >
       {!isDone && (
-        <header className="flex items-center justify-between gap-6 border-b border-rail px-10 py-5">
+        <header className="flex items-center justify-between gap-6 border-b border-line px-10 py-5">
           <div className="flex flex-1 items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-ink-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-fg-3">
               Onboarding
             </span>
             <div className="flex flex-1 items-center gap-1.5">
@@ -64,18 +64,18 @@ export function OnboardingOverlay(): JSX.Element {
                     key={s}
                     className={cn(
                       'h-1 flex-1 rounded transition-colors duration-300',
-                      reached ? 'bg-ink' : 'bg-rail',
+                      reached ? 'bg-fg' : 'bg-line',
                     )}
                   />
                 )
               })}
             </div>
-            <span className="tabular-nums text-xs text-ink-3">{Math.round(progress * 100)}%</span>
+            <span className="tabular-nums text-xs text-fg-3">{Math.round(progress * 100)}%</span>
           </div>
           <button
             type="button"
             onClick={() => void skip()}
-            className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-panel hover:text-ink"
+            className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium text-fg-2 hover:bg-surface hover:text-fg"
           >
             <X size={14} />
             Passer
@@ -101,7 +101,7 @@ export function OnboardingOverlay(): JSX.Element {
       </main>
 
       {!isDone && (
-        <footer className="flex items-center justify-between border-t border-rail px-10 py-5">
+        <footer className="flex items-center justify-between border-t border-line px-10 py-5">
           <button
             type="button"
             onClick={prev}
@@ -109,23 +109,23 @@ export function OnboardingOverlay(): JSX.Element {
             className={cn(
               'inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-medium transition-colors',
               isFirstVisible
-                ? 'cursor-not-allowed text-ink-3 opacity-40'
-                : 'text-ink-2 hover:bg-panel hover:text-ink',
+                ? 'cursor-not-allowed text-fg-3 opacity-40'
+                : 'text-fg-2 hover:bg-surface hover:text-fg',
             )}
           >
             <ArrowLeft size={16} />
             Précédent
           </button>
 
-          <span className="text-xs text-ink-3">
+          <span className="text-xs text-fg-3">
             Étape {currentIdx + 1} sur {VISIBLE_STEPS.length} ·{' '}
-            <span className="text-ink-2">{STEP_LABELS[step]}</span>
+            <span className="text-fg-2">{STEP_LABELS[step]}</span>
           </span>
 
           <button
             type="button"
             onClick={() => void handleNext()}
-            className="inline-flex items-center gap-2 rounded bg-ink px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white"
+            className="inline-flex items-center gap-2 rounded bg-fg px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white"
           >
             {isLastVisible ? (
               <>

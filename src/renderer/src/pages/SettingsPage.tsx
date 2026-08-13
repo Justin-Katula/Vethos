@@ -59,8 +59,8 @@ export default function SettingsPage() {
     <PageTransition>
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
         <header className="mb-12">
-          <h1 className="text-3xl font-semibold text-ink">Paramètres</h1>
-          <p className="mt-1.5 max-w-xl text-sm text-ink-3">
+          <h1 className="text-3xl font-semibold text-fg">Paramètres</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-fg-3">
             Tout se sauvegarde en écrivant. Il n{'’'}y a rien à valider.
           </p>
         </header>
@@ -80,7 +80,7 @@ export default function SettingsPage() {
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
                   placeholder="Ton prénom"
-                  className="w-full max-w-xs rounded border border-rail bg-hall px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-rail-strong"
+                  className="w-full max-w-xs rounded border border-line bg-base px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-line-strong"
                 />
                 <button
                   type="button"
@@ -89,15 +89,15 @@ export default function SettingsPage() {
                   className={cn(
                     'inline-flex shrink-0 items-center gap-2 rounded px-4 py-2 text-sm font-medium transition-colors',
                     dirty && !saving
-                      ? 'bg-ink text-hall hover:bg-white'
-                      : 'cursor-not-allowed border border-rail text-ink-3',
+                      ? 'bg-fg text-base hover:bg-white'
+                      : 'cursor-not-allowed border border-line text-fg-3',
                   )}
                 >
                   {saving ? 'Sauvegarde' : 'Enregistrer'}
                 </button>
               </div>
               {savedAt && !dirty && (
-                <p className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-3">
+                <p className="mt-2 flex items-center gap-1.5 text-[11px] text-fg-3">
                   <Check size={12} />
                   Enregistré le {new Date(savedAt).toLocaleString('fr-FR')}
                 </p>
@@ -105,13 +105,13 @@ export default function SettingsPage() {
             </Row>
 
             <Row label="Sommeil" hint="Se règle avec le reste de ce qui prend ton temps.">
-              <p className="text-sm text-ink-2">
+              <p className="text-sm text-fg-2">
                 <span className="numeric">
                   {sleepStart} {'→'} {sleepEnd}
                 </span>
                 <Link
                   to="/temps"
-                  className="ml-3 text-sm text-ink-3 underline-offset-4 transition-colors hover:text-ink hover:underline"
+                  className="ml-3 text-sm text-fg-3 underline-offset-4 transition-colors hover:text-fg hover:underline"
                 >
                   Modifier dans Mon temps
                 </Link>
@@ -124,7 +124,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => void nexus.app.openLogs()}
-                className="inline-flex items-center gap-2 rounded border border-rail px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:border-rail-strong hover:text-ink"
+                className="inline-flex items-center gap-2 rounded border border-line px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
               >
                 <FileText size={14} />
                 Ouvrir le journal
@@ -139,8 +139,8 @@ export default function SettingsPage() {
                 className={cn(
                   'inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-medium transition-colors',
                   restarting
-                    ? 'cursor-wait border-rail text-ink-3'
-                    : 'border-rail text-ink-2 hover:border-rail-strong hover:text-ink',
+                    ? 'cursor-wait border-line text-fg-3'
+                    : 'border-line text-fg-2 hover:border-line-strong hover:text-fg',
                 )}
               >
                 <RefreshCw size={14} className={restarting ? 'animate-spin' : ''} />
@@ -165,9 +165,9 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-t border-rail pt-5">
-      <h2 className="text-sm font-medium text-ink">{label}</h2>
-      <p className="mb-4 mt-1 text-xs text-ink-3">{hint}</p>
+    <div className="border-t border-line pt-5">
+      <h2 className="text-sm font-medium text-fg">{label}</h2>
+      <p className="mb-4 mt-1 text-xs text-fg-3">{hint}</p>
       {children}
     </div>
   )

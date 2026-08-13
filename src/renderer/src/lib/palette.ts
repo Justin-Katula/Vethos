@@ -2,24 +2,24 @@ import type { ScheduleCategory } from '@shared/schemas'
 import type { BlockKind } from '@/lib/planning/types'
 
 /**
- * L'ÉMAIL DU HALL
+ * Noir, gris, blanc.
  *
- * Un tableau de gare n'a qu'une encre et un rouge. Tout le reste se distingue
- * par la luminosité de l'émail : plus une bande est claire, plus le temps
- * qu'elle occupe t'appartient.
+ * Sans teinte, la seule chose qui distingue deux blocs est leur clarté, et
+ * cette clarté doit vouloir dire quelque chose : plus un bloc est clair, plus
+ * le temps qu'il occupe t'appartient.
  *
- * Le rouge n'est pas ici. Il vit dans `--signal`, il dit « maintenant » et
- * « ça a changé », et il n'a le droit de dire rien d'autre.
+ * Ce qui est déjà pris est sombre. Ce que tu as choisi de faire est clair.
+ * Ce que le moteur a placé pour toi est le plus clair de tous.
  */
 
-/** Ce qui est déjà pris. Le sommeil est presque le panneau lui-même. */
+/** Ce qui est déjà pris : quasi indiscernable du fond, par choix. */
 export const CATEGORY_COLOR: Record<ScheduleCategory, string> = {
-  sleep: '#1A1D21',
-  school: '#8C949D',
-  work: '#727A83',
-  commute: '#454C54',
-  commitment: '#5B636C',
-  custom: '#4E555D',
+  sleep: '#0F0F12',
+  school: '#2E2E35',
+  work: '#34343C',
+  commute: '#1E1E23',
+  commitment: '#282830',
+  custom: '#232329',
 }
 
 export const CATEGORY_LABEL: Record<ScheduleCategory, string> = {
@@ -31,15 +31,22 @@ export const CATEGORY_LABEL: Record<ScheduleCategory, string> = {
   custom: 'Autre',
 }
 
-/** Ce que le moteur a posé. Le travail à échéance est le plus clair du cadran. */
+/** Ce que le moteur a placé. Le travail à échéance est le plus clair. */
 export const BLOCK_COLOR: Record<BlockKind, string> = {
-  task: '#F2F5F7',
-  objective: '#A6ADB5',
-  ancre: '#6B737C',
+  task: '#FFFFFF',
+  objective: '#9B9BA4',
+  ancre: '#62626B',
 }
 
-/** Les teintes proposées à la création. Cinq degrés d'émail, aucune couleur. */
-export const CHOOSABLE_SHADES = ['#F2F5F7', '#C3CAD1', '#A6ADB5', '#868E96', '#6B737C'] as const
+/** L'encre à poser SUR un bloc, pour rester lisible sur sa clarté. */
+export const BLOCK_INK: Record<BlockKind, string> = {
+  task: '#08080A',
+  objective: '#08080A',
+  ancre: '#FFFFFF',
+}
+
+/** Les nuances proposées à la création. Cinq degrés de gris, aucune couleur. */
+export const CHOOSABLE_SHADES = ['#FFFFFF', '#C9C9D1', '#9B9BA4', '#7A7A83', '#62626B'] as const
 
 export function nextShade(index: number): string {
   return CHOOSABLE_SHADES[index % CHOOSABLE_SHADES.length]!

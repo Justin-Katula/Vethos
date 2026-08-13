@@ -1,38 +1,50 @@
 import type { Config } from 'tailwindcss'
 
 /**
- * Les tokens du hall des départs. Une seule échelle, un seul rouge.
- * Toute couleur qui n'est pas ici n'a pas sa place sur un panneau émaillé.
+ * Noir, gris, blanc. Aucune autre couleur n'est exposée : ce qui n'est pas
+ * ici ne peut pas apparaître dans l'interface par accident.
  */
 export default {
   content: ['./src/renderer/index.html', './src/renderer/src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        hall: 'var(--hall)',
-        panel: 'var(--panel)',
-        'panel-lit': 'var(--panel-lit)',
-        rail: 'var(--rail)',
-        'rail-strong': 'var(--rail-strong)',
-        ink: 'var(--ink)',
-        'ink-2': 'var(--ink-2)',
-        'ink-3': 'var(--ink-3)',
-        /* Le seul rouge : « maintenant » et « ça a changé ». Jamais décoratif. */
-        signal: 'var(--signal)',
-        'signal-lit': 'var(--signal-lit)',
-        'signal-wash': 'var(--signal-wash)',
+        base: 'var(--bg)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        'surface-3': 'var(--surface-3)',
+        line: 'var(--line)',
+        'line-strong': 'var(--line-strong)',
+        // `fg` plutôt que `text` : sinon chaque couleur de texte s'écrirait
+        // `text-text-2`, et le nom cesse de se lire.
+        fg: 'var(--text)',
+        'fg-2': 'var(--text-2)',
+        'fg-3': 'var(--text-3)',
+        accent: 'var(--accent)',
+        'accent-soft': 'var(--accent-soft)',
+        'accent-glow': 'var(--accent-glow)',
+      },
+      borderColor: {
+        DEFAULT: 'var(--line)',
       },
       borderRadius: {
-        DEFAULT: 'var(--radius)',
-        control: 'var(--radius-control)',
+        sm: 'var(--r-sm)',
+        DEFAULT: 'var(--r-md)',
+        md: 'var(--r-md)',
+        lg: 'var(--r-lg)',
+        xl: 'var(--r-xl)',
+      },
+      boxShadow: {
+        lift: 'var(--lift)',
+        'lift-high': 'var(--lift-high)',
       },
       fontFamily: {
         sans: ['"Geist Variable"', 'system-ui', 'sans-serif'],
         mono: ['"Geist Mono Variable"', 'ui-monospace', 'monospace'],
       },
       transitionTimingFunction: {
-        out: 'var(--ease-out)',
-        sweep: 'var(--ease-sweep)',
+        spring: 'var(--spring)',
+        ease: 'var(--ease)',
       },
     },
   },

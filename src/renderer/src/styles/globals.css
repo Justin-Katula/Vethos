@@ -5,82 +5,75 @@
 @tailwind utilities;
 
 /**
- * LE HALL DES DÉPARTS
+ * VETHOS
  *
- * Un hall de gare suisse contient deux instruments dessinés par le même
- * programme : l'horloge de Hilfiker, et le tableau des départs. L'horloge
- * porte la forme du jour. Le tableau porte le classement de ce qui est dû.
+ * Noir, gris, blanc. Aucune autre couleur, nulle part.
  *
- * Trois lois, tenues partout :
- *   1. Le panneau est plat et carré. L'émail ne s'arrondit pas et ne flotte
- *      pas : l'élévation se déclare une fois, par un filet, jamais par une
- *      ombre en plus du filet.
- *   2. Un seul rouge. C'est l'aiguille de l'horloge et c'est l'alerte du
- *      tableau. Il encode une loi, jamais une catégorie : il dit « maintenant »
- *      et « ça a changé », rien d'autre. Tout le reste se distingue par la
- *      luminosité.
- *   3. Les chiffres sont gravés. Chasse fixe, largeur constante, alignés en
- *      colonne : une minute qui change ne déplace jamais sa voisine.
+ * Sans teinte pour porter la hiérarchie, trois choses la portent à sa place,
+ * et elles doivent être tenues partout :
+ *   1. L'ÉLÉVATION. Une surface plus proche est plus claire. Quatre plans,
+ *      pas plus, et jamais deux plans voisins à la même valeur.
+ *   2. LE BLANC EST L'ACCENT. Ce qui est actif, en cours, ou primaire devient
+ *      blanc. Le blanc ne décore jamais : il désigne.
+ *   3. LE MOUVEMENT. Ce qu'on ne peut pas dire par la couleur se dit par la
+ *      façon dont les choses arrivent, réagissent et se déplacent.
  */
 
 @layer base {
   :root {
-    /* Le hall, puis la face du tableau. Jamais de noir pur : l'émail a du
-       fond, et deux plans distincts font la profondeur sans une seule ombre. */
-    --hall: #0F1113;
-    --panel: #16191D;
-    --panel-lit: #1D2126;
+    /* Quatre plans d'élévation. Le fond n'est jamais noir pur : un noir pur
+       ne laisse aucune place à ce qui doit être plus sombre que lui. */
+    --bg: #08080a;
+    --surface: #121215;
+    --surface-2: #1a1a1e;
+    --surface-3: #242429;
 
-    /* Filets gravés. La seule façon de séparer deux choses. */
-    --rail: #262B31;
-    --rail-strong: #3A4149;
+    /* Séparations. Douces, jamais des traits durs. */
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.14);
 
-    /* Lettrage émaillé, en trois degrés de luminosité. */
-    --ink: #F2F5F7;
-    --ink-2: #A6ADB5;
-    --ink-3: #6B737C;
+    /* Encre. Trois degrés, assez écartés pour se distinguer d'un coup d'œil. */
+    --text: #ffffff;
+    --text-2: #9b9ba4;
+    --text-3: #62626b;
 
-    /* Le seul rouge du hall. Aiguille et alerte, même encre. */
-    --signal: #E4000F;
-    --signal-lit: #FF2A38;
-    --signal-wash: rgba(228, 0, 15, 0.12);
+    /* Le blanc désigne. Il ne décore pas. */
+    --accent: #ffffff;
+    --accent-soft: rgba(255, 255, 255, 0.09);
+    --accent-glow: rgba(255, 255, 255, 0.16);
 
-    /* L'émail ne s'arrondit pas. 2px est le rayon d'un coin fraisé, pas
-       d'une carte. */
-    --radius: 2px;
-    --radius-control: 3px;
+    /* Formes généreuses. Rien d'anguleux : l'application doit paraître
+       douce sous la main, pas gravée dans du métal. */
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 26px;
 
-    /* L'horloge de Hilfiker : l'aiguille file, s'arrête en haut, puis la
-       minute tombe. C'est le seul moment chorégraphié de l'application. */
-    --sweep: 1.6s;
-    --dwell: 320ms;
-    --ease-sweep: cubic-bezier(0.4, 0, 0.1, 1);
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --fast: 140ms;
-    --normal: 220ms;
+    /* Profondeur : une ombre portée réelle, plus un liseré haut qui imite la
+       lumière rasante sur une surface bombée. */
+    --lift: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.5);
+    --lift-high: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 18px 48px rgba(0, 0, 0, 0.6);
 
-    /* Rythme vertical. Multiples de 4, une seule échelle. */
-    --step-1: 0.25rem;
-    --step-2: 0.5rem;
-    --step-3: 0.75rem;
-    --step-4: 1rem;
-    --step-6: 1.5rem;
-    --step-8: 2rem;
-    --step-12: 3rem;
-    --step-16: 4rem;
+    /* Une seule grammaire de mouvement pour toute l'application. */
+    --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --fast: 160ms;
+    --normal: 260ms;
+    --slow: 420ms;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
     margin: 0;
     padding: 0;
   }
 
   body {
-    background: var(--hall);
-    color: var(--ink);
+    background: var(--bg);
+    color: var(--text);
     font-family: 'Geist Variable', system-ui, sans-serif;
-    /* Chiffres gravés : chasse fixe, hauteur constante. */
     font-variant-numeric: tabular-nums lining-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -88,89 +81,123 @@
     overflow: hidden;
   }
 
-  /* La signalétique resserre à mesure qu'elle grandit. Jamais au-delà de
-     -0.03em : au-delà les lettres se touchent et le panneau devient sale. */
-  h1 { letter-spacing: -0.028em; }
-  h2 { letter-spacing: -0.02em; }
-  h3, h4 { letter-spacing: -0.012em; }
-
-  /**
-   * Les surfaces que le navigateur dessine à ma place portent quand même le
-   * hall : le curseur, la sélection, la barre de défilement, l'anneau de
-   * focus, le soulignement. C'est ce qui sépare une page construite d'une
-   * page assemblée.
-   */
-  ::selection {
-    background: var(--signal-wash);
-    color: var(--ink);
+  h1 {
+    letter-spacing: -0.03em;
+  }
+  h2 {
+    letter-spacing: -0.02em;
+  }
+  h3,
+  h4 {
+    letter-spacing: -0.012em;
   }
 
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: var(--hall); }
+  /* Les surfaces que le navigateur dessine à ma place portent le même monde. */
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
   ::-webkit-scrollbar-thumb {
-    background: var(--rail);
-    border: 3px solid var(--hall);
+    background: var(--surface-3);
+    border: 3px solid transparent;
+    background-clip: content-box;
     border-radius: 999px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: var(--rail-strong); }
-
-  :focus-visible {
-    outline: 2px solid var(--signal);
-    outline-offset: 2px;
-    border-radius: var(--radius);
+  ::-webkit-scrollbar-thumb:hover {
+    background: #34343b;
+    background-clip: content-box;
   }
 
-  input, textarea, select {
-    caret-color: var(--signal);
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+
+  input,
+  textarea,
+  select {
+    caret-color: var(--accent);
     font-family: inherit;
   }
 
-  /* Le remplissage automatique du navigateur repeint le champ en clair et
-     rend le hall incohérent d'un écran à l'autre. On lui rend l'émail : la
-     couleur passe par l'ombre interne, seule propriété que ce style respecte. */
+  /* Le remplissage automatique repeint le champ en clair : on lui rend la
+     surface par l'ombre interne, seule propriété que ce style respecte. */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-text-fill-color: var(--ink);
-    -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
-    caret-color: var(--signal);
-    transition: background-color 9999s ease-out 0s;
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
+    caret-color: var(--accent);
   }
 
-  a { text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
+  a {
+    text-underline-offset: 0.25em;
+    text-decoration-thickness: 1px;
+  }
+}
 
-  /* Le champ de saisie est une fente dans le panneau, pas une carte posée
-     dessus : creusé par un filet bas, il s'allume quand on l'occupe. */
-  .slot {
-    background: transparent;
-    border: 0;
-    border-bottom: 1px solid var(--rail-strong);
-    border-radius: 0;
-    color: var(--ink);
-    padding: 0.4rem 0.15rem;
+@layer components {
+  /* Une surface posée : elle a une ombre OU un liseré, jamais un trait dur. */
+  .surface {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--lift);
+  }
+
+  /* Un champ : creusé, pas posé. Il s'éclaire quand on l'occupe. */
+  .field {
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    color: var(--text);
+    padding: 0.55rem 0.75rem;
     outline: none;
-    transition: border-color var(--fast) var(--ease-out);
+    transition:
+      border-color var(--fast) var(--ease),
+      background-color var(--fast) var(--ease);
   }
-  .slot::placeholder { color: var(--ink-3); }
-  .slot:hover { border-bottom-color: var(--ink-3); }
-  .slot:focus { border-bottom-color: var(--signal); }
-
-  /* Un panneau : une face plate, un filet, rien d'autre. L'élévation se
-     déclare une seule fois. */
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--rail);
-    border-radius: var(--radius);
+  .field::placeholder {
+    color: var(--text-3);
+  }
+  .field:hover {
+    background: var(--surface-3);
+  }
+  .field:focus {
+    border-color: var(--line-strong);
+    background: var(--surface-3);
   }
 
+  /* Tout ce qui se presse s'enfonce. C'est le retour tactile le moins cher
+     et le plus reconnaissable. */
+  .pressable {
+    transition:
+      transform var(--fast) var(--spring),
+      background-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
+  }
+  .pressable:active {
+    transform: scale(0.975);
+  }
+}
+
+@layer base {
   /**
-   * Mouvement réduit : le hall s'immobilise. Une application de concentration
-   * ne peut pas imposer ce qu'on lui a refusé au niveau du système, et la
-   * règle vaut pour l'horloge avant de valoir pour l'interface.
+   * Mouvement réduit : tout s'arrête. Une application de concentration ne
+   * peut pas imposer ce qu'on lui a refusé au niveau du système.
    */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

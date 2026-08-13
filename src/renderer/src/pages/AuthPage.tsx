@@ -65,18 +65,18 @@ export default function AuthPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-hall text-ink lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
-      <section className="hidden min-h-0 flex-col justify-between border-r border-rail bg-panel px-10 py-9 lg:flex">
+    <div className="grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-base text-fg lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
+      <section className="hidden min-h-0 flex-col justify-between border-r border-line bg-surface px-10 py-9 lg:flex">
         <div>
           <NexusLogo size={32} />
-          <p className="mt-4 max-w-sm text-sm leading-6 text-ink-2">
+          <p className="mt-4 max-w-sm text-sm leading-6 text-fg-2">
             Ton espace de focus reste lié à ce profil local sur cette machine.
           </p>
         </div>
         <div className="space-y-3">
-          <p className="text-xs font-medium uppercase text-ink-3">Session locale</p>
+          <p className="text-xs font-medium uppercase text-fg-3">Session locale</p>
           <div className="h-px w-full bg-border-subtle" />
-          <p className="max-w-sm text-sm leading-6 text-ink-2">
+          <p className="max-w-sm text-sm leading-6 text-fg-2">
             Connecte-toi pour retrouver tes objectifs, tes tâches, ton planning et tes règles de
             blocage.
           </p>
@@ -84,15 +84,15 @@ export default function AuthPage(): JSX.Element {
       </section>
 
       <main className="flex min-h-0 items-center justify-center px-5 py-8 sm:px-8">
-        <div className="w-full max-w-[430px] rounded border border-rail bg-panel p-6 sm:p-8">
+        <div className="w-full max-w-[430px] rounded border border-line bg-surface p-6 sm:p-8">
           <div className="mb-7 lg:hidden">
             <NexusLogo size={30} />
           </div>
 
           <header className="mb-7">
-            <p className="text-xs font-medium uppercase text-ink-3">Vethos</p>
+            <p className="text-xs font-medium uppercase text-fg-3">Vethos</p>
             <h1 className="mt-2 text-2xl font-semibold">{title}</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-2">
+            <p className="mt-2 text-sm leading-6 text-fg-2">
               {mode === 'sign-up'
                 ? 'Crée un accès pour protéger ton espace local.'
                 : account?.name
@@ -104,15 +104,15 @@ export default function AuthPage(): JSX.Element {
           <form className="space-y-4" onSubmit={handleSubmit}>
             {mode === 'sign-up' && (
               <label className="block">
-                <span className="text-xs font-medium uppercase text-ink-3">Nom</span>
-                <span className="mt-2 flex items-center gap-2 rounded border border-rail bg-hall px-3 py-2.5 focus-within:border-rail-strong focus-within:ring-2 focus-within:ring-signal/40">
-                  <User size={16} className="shrink-0 text-ink-3" />
+                <span className="text-xs font-medium uppercase text-fg-3">Nom</span>
+                <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
+                  <User size={16} className="shrink-0 text-fg-3" />
                   <input
                     type="text"
                     autoComplete="name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
                     placeholder="Ton nom"
                   />
                 </span>
@@ -120,36 +120,36 @@ export default function AuthPage(): JSX.Element {
             )}
 
             <label className="block">
-              <span className="text-xs font-medium uppercase text-ink-3">Email</span>
-              <span className="mt-2 flex items-center gap-2 rounded border border-rail bg-hall px-3 py-2.5 focus-within:border-rail-strong focus-within:ring-2 focus-within:ring-signal/40">
-                <Mail size={16} className="shrink-0 text-ink-3" />
+              <span className="text-xs font-medium uppercase text-fg-3">Email</span>
+              <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
+                <Mail size={16} className="shrink-0 text-fg-3" />
                 <input
                   type="email"
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
                   placeholder="toi@example.com"
                 />
               </span>
             </label>
 
             <label className="block">
-              <span className="text-xs font-medium uppercase text-ink-3">Mot de passe</span>
-              <span className="mt-2 flex items-center gap-2 rounded border border-rail bg-hall px-3 py-2.5 focus-within:border-rail-strong focus-within:ring-2 focus-within:ring-signal/40">
-                <Lock size={16} className="shrink-0 text-ink-3" />
+              <span className="text-xs font-medium uppercase text-fg-3">Mot de passe</span>
+              <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
+                <Lock size={16} className="shrink-0 text-fg-3" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
                   placeholder="8 caractères minimum"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
-                  className="rounded p-1 text-ink-3 transition-colors hover:text-ink"
+                  className="rounded p-1 text-fg-3 transition-colors hover:text-fg"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   <span className="sr-only">
@@ -161,17 +161,17 @@ export default function AuthPage(): JSX.Element {
 
             {mode === 'sign-up' && (
               <label className="block">
-                <span className="text-xs font-medium uppercase text-ink-3">
+                <span className="text-xs font-medium uppercase text-fg-3">
                   Confirmer le mot de passe
                 </span>
-                <span className="mt-2 flex items-center gap-2 rounded border border-rail bg-hall px-3 py-2.5 focus-within:border-rail-strong focus-within:ring-2 focus-within:ring-signal/40">
-                  <Lock size={16} className="shrink-0 text-ink-3" />
+                <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
+                  <Lock size={16} className="shrink-0 text-fg-3" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
                     placeholder="Répète le mot de passe"
                   />
                 </span>
@@ -179,7 +179,7 @@ export default function AuthPage(): JSX.Element {
             )}
 
             {error && (
-              <div className="rounded border border-signal/30 bg-signal/10 px-3 py-2 text-sm text-signal">
+              <div className="rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
                 {error}
               </div>
             )}
@@ -191,8 +191,8 @@ export default function AuthPage(): JSX.Element {
                 'inline-flex h-11 w-full items-center justify-center gap-2 rounded px-4',
                 'text-sm font-medium transition-all duration-200',
                 submitting
-                  ? 'cursor-wait bg-panel-lit text-ink-3'
-                  : 'bg-ink text-white hover:bg-white',
+                  ? 'cursor-wait bg-surface-2 text-fg-3'
+                  : 'bg-fg text-white hover:bg-white',
               )}
             >
               <SubmitIcon size={17} />
@@ -201,7 +201,7 @@ export default function AuthPage(): JSX.Element {
           </form>
 
           <div className="mt-6 flex items-center justify-between gap-3 text-sm">
-            <span className="text-ink-3">
+            <span className="text-fg-3">
               {mode === 'sign-up' ? 'Déjà un compte ?' : 'Pas encore de compte ?'}
             </span>
             <button
@@ -210,7 +210,7 @@ export default function AuthPage(): JSX.Element {
               disabled={!canSwitchMode}
               className={cn(
                 'rounded px-2 py-1 font-medium transition-colors',
-                canSwitchMode ? 'text-ink hover:text-white' : 'cursor-not-allowed text-ink-3',
+                canSwitchMode ? 'text-fg hover:text-white' : 'cursor-not-allowed text-fg-3',
               )}
             >
               {mode === 'sign-up' ? 'Se connecter' : 'Créer un compte'}

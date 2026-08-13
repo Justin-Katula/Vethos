@@ -25,7 +25,7 @@ export function NexusLogo({ size = 28, className, withWordmark = true }: Props) 
         draggable={false}
       />
       {withWordmark ? (
-        <span className="text-base font-semibold tracking-tight text-ink">Vethos</span>
+        <span className="text-base font-semibold tracking-tight text-fg">Vethos</span>
       ) : null}
     </div>
   )

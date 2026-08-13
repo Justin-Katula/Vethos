@@ -50,14 +50,14 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
         transition={{ delay: 0.2, duration: 0.25 }}
         className="flex flex-col gap-3"
       >
-        <div className="inline-flex items-center justify-center gap-1.5 self-center rounded border border-rail bg-panel px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-signal">
+        <div className="inline-flex items-center justify-center gap-1.5 self-center rounded border border-line bg-surface px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-accent">
           <Sparkles size={12} />
           Premier lancement
         </div>
-        <h1 className="text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+        <h1 className="text-4xl font-bold tracking-tight text-fg sm:text-5xl">
           Bienvenue dans Vethos.
         </h1>
-        <p className="mx-auto max-w-xl text-base leading-relaxed text-ink-2">
+        <p className="mx-auto max-w-xl text-base leading-relaxed text-fg-2">
           {
             'Le travail concentré devient progression mesurable. En 3 minutes, on pose ton emploi du temps, tes engagements protégés, et ton premier objectif.'
           }
@@ -71,7 +71,7 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25, duration: 0.25 }}
         whileHover={{ y: -2 }}
-        className="inline-flex items-center gap-2 rounded bg-ink px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white"
+        className="inline-flex items-center gap-2 rounded bg-fg px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white"
       >
         Commencer
         <ArrowRight size={18} />

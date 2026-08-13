@@ -68,7 +68,7 @@ export default function BlockOverlay(): JSX.Element {
   }
 
   return (
-    <div className="flex h-[100dvh] w-screen select-none flex-col bg-[#0a0a0c] text-ink">
+    <div className="flex h-[100dvh] w-screen select-none flex-col bg-[#0a0a0c] text-fg">
       {/* Barre de contrôles : la seule zone où l'overlay accepte un clic utile. */}
       <div className="flex items-center justify-end gap-1 p-2">
         <button
@@ -76,7 +76,7 @@ export default function BlockOverlay(): JSX.Element {
           onClick={() => void minimiser()}
           disabled={enCours || windowId === ''}
           aria-label="Minimiser"
-          className="flex h-8 w-8 items-center justify-center rounded text-ink-3 transition hover:bg-panel-lit hover:text-ink disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded text-fg-3 transition hover:bg-surface-2 hover:text-fg disabled:opacity-30"
         >
           <Minus size={16} />
         </button>
@@ -85,22 +85,22 @@ export default function BlockOverlay(): JSX.Element {
           onClick={() => setFermeture('confirmation')}
           disabled={enCours || windowId === ''}
           aria-label="Fermer"
-          className="flex h-8 w-8 items-center justify-center rounded text-ink-3 transition hover:bg-signal/20 hover:text-signal disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded text-fg-3 transition hover:bg-accent/20 hover:text-accent disabled:opacity-30"
         >
           <X size={16} />
         </button>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-10 pb-16 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded border border-signal/30 bg-signal/10">
-          <Shield size={24} className="text-signal" />
+        <div className="flex h-14 w-14 items-center justify-center rounded border border-accent/30 bg-accent/10">
+          <Shield size={24} className="text-accent" />
         </div>
 
         <div className="max-w-md">
-          <h1 className="text-xl font-semibold text-ink">
+          <h1 className="text-xl font-semibold text-fg">
             {type === 'site' ? 'Ce site est bloqué' : `${appName} est bloquée`}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-ink-2">
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">
             {focusLabel !== null && focusLabel.length > 0
               ? `Une session « ${focusLabel} » est en cours.`
               : 'Une session de blocage est en cours.'}{' '}
@@ -111,9 +111,9 @@ export default function BlockOverlay(): JSX.Element {
         </div>
 
         {fermeture === 'confirmation' && (
-          <div className="w-full max-w-md rounded border border-signal/30 bg-signal/5 p-4 text-left">
-            <p className="text-sm font-medium text-signal">Fermer {appName} ?</p>
-            <p className="mt-1 text-xs leading-relaxed text-signal/70">
+          <div className="w-full max-w-md rounded border border-accent/30 bg-accent/5 p-4 text-left">
+            <p className="text-sm font-medium text-accent">Fermer {appName} ?</p>
+            <p className="mt-1 text-xs leading-relaxed text-accent/70">
               Tu ne vois pas la fenêtre réelle, donc tu ne verrais pas non plus son propre
               avertissement de sauvegarde. Du travail non enregistré pourrait être perdu.
             </p>
@@ -121,7 +121,7 @@ export default function BlockOverlay(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setFermeture('inactif')}
-                className="rounded px-3 py-1.5 text-xs text-ink-2 transition hover:text-ink"
+                className="rounded px-3 py-1.5 text-xs text-fg-2 transition hover:text-fg"
               >
                 Annuler
               </button>
@@ -129,7 +129,7 @@ export default function BlockOverlay(): JSX.Element {
                 type="button"
                 onClick={() => void fermer()}
                 disabled={enCours}
-                className="rounded bg-signal/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-signal disabled:opacity-50"
+                className="rounded bg-accent/80 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent disabled:opacity-50"
               >
                 Fermer quand même
               </button>
@@ -137,7 +137,7 @@ export default function BlockOverlay(): JSX.Element {
           </div>
         )}
 
-        {erreur !== null && <p className="text-xs text-signal">{erreur}</p>}
+        {erreur !== null && <p className="text-xs text-accent">{erreur}</p>}
       </div>
     </div>
   )

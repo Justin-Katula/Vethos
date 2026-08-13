@@ -82,13 +82,13 @@ export default function HomePage() {
   return (
     <PageTransition>
       <div className="mx-auto w-full max-w-[1560px] px-12 pb-12 pt-10">
-        <header className="mb-8 flex items-baseline justify-between gap-6 border-b border-rail pb-5">
+        <header className="mb-8 flex items-baseline justify-between gap-6 border-b border-line pb-5">
           <div className="flex items-baseline gap-4">
-            <h1 className="text-2xl font-medium text-ink">
+            <h1 className="text-2xl font-medium text-fg">
               {DAYS[dow]!.charAt(0).toUpperCase() + DAYS[dow]!.slice(1)} {now.getDate()}{' '}
               {MONTHS[now.getMonth()]}
             </h1>
-            <p className="text-[13px] text-ink-3">
+            <p className="text-[13px] text-fg-3">
               {todayBlocks.length === 0
                 ? 'rien au tableau'
                 : remaining === 0
@@ -99,7 +99,7 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="shrink-0 border border-rail-strong px-4 py-2 text-[13px] text-ink transition-colors hover:bg-panel-lit"
+            className="shrink-0 border border-line-strong px-4 py-2 text-[13px] text-fg transition-colors hover:bg-surface-2"
           >
             Ajouter une tâche
           </button>
@@ -107,7 +107,7 @@ export default function HomePage() {
 
         <div className="flex flex-wrap items-start gap-x-14 gap-y-10">
           <HallClock entries={todayEntries} blocks={todayBlocks} nowMinute={nowMinute} size={340}>
-            <span className="font-mono text-[38px] leading-none text-ink">{hhmm(nowMinute)}</span>
+            <span className="font-mono text-[38px] leading-none text-fg">{hhmm(nowMinute)}</span>
           </HallClock>
 
           <div className="min-w-[420px] flex-1 space-y-5">
@@ -143,11 +143,11 @@ export default function HomePage() {
             </Board>
 
             {schedule.length === 0 && (
-              <p className="text-[13px] text-ink-2">
+              <p className="text-[13px] text-fg-2">
                 L’application ne connaît que tes heures de sommeil.{' '}
                 <Link
                   to="/temps"
-                  className="text-ink underline decoration-rail-strong hover:decoration-ink"
+                  className="text-fg underline decoration-line-strong hover:decoration-fg"
                 >
                   Déclare tes cours, ton travail et tes trajets
                 </Link>{' '}
@@ -156,15 +156,15 @@ export default function HomePage() {
             )}
 
             {worstDeficit && (
-              <div className="border-l-[3px] border-signal bg-signal-wash px-4 py-3">
-                <p className="text-[13px] text-ink">
+              <div className="border-l-[3px] border-accent bg-accent-soft px-4 py-3">
+                <p className="text-[13px] text-fg">
                   Avant le {worstDeficit.deadline}, il manque{' '}
                   <span className="font-mono">{duration(worstDeficit.deficitMinutes)}</span>, soit{' '}
                   {Math.round(worstDeficit.deficitRatio * 100)} % du travail demandé.
                 </p>
                 <ul className="mt-2 space-y-1">
                   {worstDeficit.options.map((o) => (
-                    <li key={o.action} className="flex items-baseline gap-3 text-[12px] text-ink-2">
+                    <li key={o.action} className="flex items-baseline gap-3 text-[12px] text-fg-2">
                       <span className="min-w-0 flex-1 truncate">{o.action}</span>
                       <span className="shrink-0 font-mono">+{duration(o.minutesFreed)}</span>
                     </li>
@@ -248,7 +248,7 @@ function AddTaskModal({
             onChange={(e) => setDraft({ ...draft, title: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
             placeholder="Ce qu’il y a à faire"
-            className="slot w-full text-[15px]"
+            className="field w-full text-[15px]"
           />
         </Field>
 
@@ -258,7 +258,7 @@ function AddTaskModal({
               type="date"
               value={draft.deadline}
               onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
-              className="slot w-full font-mono text-[13px]"
+              className="field w-full font-mono text-[13px]"
             />
           </Field>
           <Field label="Combien de temps">
@@ -270,9 +270,9 @@ function AddTaskModal({
                 step={5}
                 value={draft.minutes}
                 onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
-                className="slot w-24 font-mono text-[13px]"
+                className="field w-24 font-mono text-[13px]"
               />
-              <span className="text-[12px] text-ink-3">minutes</span>
+              <span className="text-[12px] text-fg-3">minutes</span>
             </div>
           </Field>
         </div>
@@ -280,13 +280,13 @@ function AddTaskModal({
         <button
           type="button"
           onClick={() => setDetailed((v) => !v)}
-          className="text-[12px] text-ink-3 underline-offset-4 transition-colors hover:text-ink-2 hover:underline"
+          className="text-[12px] text-fg-3 underline-offset-4 transition-colors hover:text-fg-2 hover:underline"
         >
           {detailed ? 'Masquer' : 'Importance, catégorie, nature du travail'}
         </button>
 
         {detailed && (
-          <div className="grid grid-cols-3 gap-6 border-t border-rail pt-5">
+          <div className="grid grid-cols-3 gap-6 border-t border-line pt-5">
             <Field label="Importance">
               <input
                 type="number"
@@ -294,7 +294,7 @@ function AddTaskModal({
                 max={10}
                 value={draft.importance}
                 onChange={(e) => setDraft({ ...draft, importance: Number(e.target.value) })}
-                className="slot w-full font-mono text-[13px]"
+                className="field w-full font-mono text-[13px]"
               />
             </Field>
             <Field label="Catégorie">
@@ -302,7 +302,7 @@ function AddTaskModal({
                 type="text"
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                className="slot w-full text-[13px]"
+                className="field w-full text-[13px]"
               />
             </Field>
             <Field label="Nature">
@@ -311,7 +311,7 @@ function AddTaskModal({
                 onChange={(e) =>
                   setDraft({ ...draft, workKind: e.target.value as 'routine' | 'novel' })
                 }
-                className="slot w-full bg-panel text-[13px]"
+                className="field w-full bg-surface text-[13px]"
               >
                 <option value="routine">Connu</option>
                 <option value="novel">Nouveau</option>
@@ -320,8 +320,8 @@ function AddTaskModal({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-4 border-t border-rail pt-5">
-          <p className="text-[11px] text-ink-3">
+        <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
+          <p className="text-[11px] text-fg-3">
             L’importance se déclare une seule fois. Elle n’est jamais recalculée.
           </p>
           <button
@@ -331,8 +331,8 @@ function AddTaskModal({
             className={cn(
               'shrink-0 px-5 py-2 text-[13px] transition-colors',
               draft.title.trim()
-                ? 'bg-ink text-hall hover:bg-white'
-                : 'cursor-not-allowed border border-rail text-ink-3',
+                ? 'bg-fg text-base hover:bg-white'
+                : 'cursor-not-allowed border border-line text-fg-3',
             )}
           >
             Ajouter
@@ -346,7 +346,7 @@ function AddTaskModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[11px] text-ink-3">{label}</span>
+      <span className="mb-1.5 block text-[11px] text-fg-3">{label}</span>
       {children}
     </label>
   )

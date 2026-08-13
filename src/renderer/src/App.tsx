@@ -17,6 +17,7 @@ import AuthPage from './pages/AuthPage'
 import BlockingPage from './pages/BlockingPage'
 import BlockOverlay from './pages/BlockOverlay'
 import HomePage from './pages/HomePage'
+import WeekPage from './pages/WeekPage'
 import TimePage from './pages/TimePage'
 
 export default function App(): JSX.Element {
@@ -58,11 +59,11 @@ export default function App(): JSX.Element {
   if (!authLoaded) {
     return (
       <ErrorBoundary>
-        <div className="flex h-[100dvh] w-screen items-center justify-center bg-hall text-ink">
+        <div className="flex h-[100dvh] w-screen items-center justify-center bg-base text-fg">
           <div className="flex flex-col items-center gap-4">
             <NexusLogo size={32} />
-            <div className="h-1 w-28 overflow-hidden rounded-full bg-rail">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-ink" />
+            <div className="h-1 w-28 overflow-hidden rounded-full bg-line">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-fg" />
             </div>
           </div>
         </div>
@@ -85,6 +86,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="/semaine" element={<WeekPage />} />
           <Route path="/temps" element={<TimePage />} />
           <Route path="/blocage" element={<BlockingPage />} />
           <Route path="/settings" element={<SettingsPage />} />

@@ -36,8 +36,8 @@ export function Board({
   // canyon entre le libellé et sa durée : la largeur est plafonnée pour que le
   // regard fasse le trajet.
   return (
-    <div className={cn('panel max-w-[760px] overflow-hidden', className)}>
-      <div className="flex items-baseline gap-4 border-b border-rail px-4 py-2.5 text-[10.5px] font-medium text-ink-3">
+    <div className={cn('surface max-w-[760px] overflow-hidden', className)}>
+      <div className="flex items-baseline gap-4 border-b border-line px-4 py-2.5 text-[10.5px] font-medium text-fg-3">
         <span className="w-[4.5rem] shrink-0">{columns[0]}</span>
         <span className="min-w-0 flex-1">{columns[1]}</span>
         <span className="shrink-0">{columns[2]}</span>
@@ -85,17 +85,17 @@ export function BoardRow({
           : undefined
       }
       className={cn(
-        'group flex items-baseline gap-4 border-b border-rail px-4 py-2.5 text-sm last:border-b-0',
-        state === 'now' && 'bg-ink text-hall',
-        state === 'done' && 'text-ink-3',
-        interactive && state !== 'now' && 'cursor-pointer hover:bg-panel-lit',
+        'group flex items-baseline gap-4 border-b border-line px-4 py-2.5 text-sm last:border-b-0',
+        state === 'now' && 'bg-fg text-base',
+        state === 'done' && 'text-fg-3',
+        interactive && state !== 'now' && 'cursor-pointer hover:bg-surface-2',
         interactive && state === 'now' && 'cursor-pointer',
       )}
     >
       <span
         className={cn(
           'w-[4.5rem] shrink-0 font-mono text-[13px]',
-          state === 'now' ? 'text-hall' : state === 'done' ? 'text-ink-3' : 'text-ink-2',
+          state === 'now' ? 'text-base' : state === 'done' ? 'text-fg-3' : 'text-fg-2',
         )}
       >
         {time}
@@ -109,7 +109,7 @@ export function BoardRow({
           <span
             className={cn(
               'shrink-0 text-[11px]',
-              state === 'changed' ? 'text-signal' : state === 'now' ? 'text-hall/60' : 'text-ink-3',
+              state === 'changed' ? 'text-accent' : state === 'now' ? 'text-base/60' : 'text-fg-3',
             )}
           >
             {note}
@@ -121,7 +121,7 @@ export function BoardRow({
         <span
           className={cn(
             'shrink-0 font-mono text-[13px]',
-            state === 'now' ? 'text-hall' : 'text-ink-2',
+            state === 'now' ? 'text-base' : 'text-fg-2',
           )}
         >
           {value}
@@ -135,5 +135,5 @@ export function BoardRow({
 
 /** Le tableau vide dit quoi faire, il ne dit pas qu'il est vide. */
 export function BoardEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="px-4 py-8 text-center text-[13px] text-ink-3">{children}</p>
+  return <p className="px-4 py-8 text-center text-[13px] text-fg-3">{children}</p>
 }

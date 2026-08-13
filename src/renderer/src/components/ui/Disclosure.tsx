@@ -33,7 +33,7 @@ export function Disclosure({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 + index * 0.07, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className={cn('panel rounded', tone === 'danger' && 'border-signal/35')}
+      className={cn('surface rounded', tone === 'danger' && 'border-accent/35')}
     >
       <button
         type="button"
@@ -43,14 +43,14 @@ export function Disclosure({
         <ChevronRight
           size={15}
           className={cn(
-            'shrink-0 text-ink-3 transition-transform duration-200',
+            'shrink-0 text-fg-3 transition-transform duration-200',
             open && 'rotate-90',
           )}
         />
-        <span className={cn('text-sm font-medium', tone === 'danger' ? 'text-signal' : 'text-ink')}>
+        <span className={cn('text-sm font-medium', tone === 'danger' ? 'text-accent' : 'text-fg')}>
           {title}
         </span>
-        {summary && <span className="ml-auto text-xs text-ink-3">{summary}</span>}
+        {summary && <span className="ml-auto text-xs text-fg-3">{summary}</span>}
       </button>
 
       <AnimatePresence initial={false}>
@@ -62,7 +62,7 @@ export function Disclosure({
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-rail px-5 py-4">{children}</div>
+            <div className="border-t border-line px-5 py-4">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -25,7 +25,7 @@ export function UsernameStep(): JSX.Element {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="flex h-16 w-16 items-center justify-center rounded bg-ink/15 text-ink"
+        className="flex h-16 w-16 items-center justify-center rounded bg-fg/15 text-fg"
       >
         <User size={28} />
       </motion.div>
@@ -34,7 +34,7 @@ export function UsernameStep(): JSX.Element {
         <h1 className="text-3xl font-bold tracking-tight">
           {trimmed ? `Bienvenue, ${trimmed}.` : 'Comment tu t’appelles ?'}
         </h1>
-        <p className="mt-2 text-sm text-ink-2">
+        <p className="mt-2 text-sm text-fg-2">
           {'Ton prénom apparaît dans l’interface. Tu peux le laisser vide.'}
         </p>
       </div>
@@ -46,7 +46,7 @@ export function UsernameStep(): JSX.Element {
         onChange={(e) => setName(e.target.value)}
         placeholder="Alex"
         maxLength={100}
-        className="w-full max-w-md rounded border border-rail bg-panel px-5 py-4 text-center text-2xl font-semibold tracking-tight text-ink outline-none transition-colors focus:border-rail-strong focus:ring-4 focus:ring-signal/20"
+        className="w-full max-w-md rounded border border-line bg-surface px-5 py-4 text-center text-2xl font-semibold tracking-tight text-fg outline-none transition-colors focus:border-line-strong focus:ring-4 focus:ring-accent/20"
       />
     </div>
   )

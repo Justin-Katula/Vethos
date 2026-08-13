@@ -12,7 +12,7 @@ import type { PlacedBlock, ScheduleEntry } from '@/lib/planning/types'
  *   - la bande intérieure, claire, c'est ce que le moteur a posé pour toi.
  *
  * L'aiguille est rouge, avec le disque de Hilfiker à sa pointe. C'est le seul
- * rouge du hall, et il ne dit qu'une chose : maintenant.
+ * rouge du base, et il ne dit qu'une chose : maintenant.
  *
  * LE MOMENT CHORÉGRAPHIÉ : au chargement, l'aiguille balaie depuis minuit
  * jusqu'à l'heure courante, marque un temps d'arrêt, puis se pose. C'est le
@@ -26,7 +26,7 @@ const R_FIXED = 116
 const W_FIXED = 13
 const R_PLAN = 94
 // Une bande fine posée dans une rainure visible se lit comme une graduation.
-// Épaisse et flottant sur un rail à moitié effacé, un bloc isolé devenait un
+// Épaisse et flottant sur un line à moitié effacé, un bloc isolé devenait un
 // pâté blanc au lieu d'un arc de précision.
 const W_PLAN = 7
 const R_TICK = 128
@@ -113,14 +113,14 @@ export function HallClock({
             y1={t.y1}
             x2={t.x2}
             y2={t.y2}
-            stroke={t.major ? 'var(--ink-2)' : 'var(--rail-strong)'}
+            stroke={t.major ? 'var(--fg-2)' : 'var(--line-strong)'}
             strokeWidth={t.major ? 2.5 : 1}
           />
         ))}
 
         {/* Les deux rails vides : le cadran reste lisible même sans rien dessus. */}
-        <circle cx={C} cy={C} r={R_FIXED} fill="none" stroke="var(--rail)" strokeWidth={W_FIXED} />
-        <circle cx={C} cy={C} r={R_PLAN} fill="none" stroke="var(--rail)" strokeWidth={W_PLAN} />
+        <circle cx={C} cy={C} r={R_FIXED} fill="none" stroke="var(--line)" strokeWidth={W_FIXED} />
+        <circle cx={C} cy={C} r={R_PLAN} fill="none" stroke="var(--line)" strokeWidth={W_PLAN} />
 
         {/* Bande extérieure : ce qui est déjà pris. */}
         {fixed.map((e, i) => (
@@ -147,9 +147,9 @@ export function HallClock({
         {/* L'aiguille de Hilfiker : le seul rouge du cadran. */}
         {nowMinute !== null && (
           <g>
-            <motion.path d={handD} stroke="var(--signal)" strokeWidth={2.5} strokeLinecap="butt" />
-            <motion.circle cx={discX} cy={discY} r={7} fill="var(--signal)" />
-            <circle cx={C} cy={C} r={4} fill="var(--signal)" />
+            <motion.path d={handD} stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="butt" />
+            <motion.circle cx={discX} cy={discY} r={7} fill="var(--accent)" />
+            <circle cx={C} cy={C} r={4} fill="var(--accent)" />
           </g>
         )}
       </svg>

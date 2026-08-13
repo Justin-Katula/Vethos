@@ -16,19 +16,19 @@ const ICON: Record<ToastType['variant'], typeof CheckCircle2> = {
 // Seule l'erreur en porte une — c'est à cela qu'elle sert.
 const STYLES: Record<ToastType['variant'], { bg: string; ring: string; icon: string }> = {
   success: {
-    bg: 'bg-panel-lit',
-    ring: 'ring-signal/40',
-    icon: 'text-ink',
+    bg: 'bg-surface-2',
+    ring: 'ring-accent/40',
+    icon: 'text-fg',
   },
   info: {
-    bg: 'bg-panel-lit',
-    ring: 'ring-signal/40',
-    icon: 'text-ink',
+    bg: 'bg-surface-2',
+    ring: 'ring-accent/40',
+    icon: 'text-fg',
   },
   error: {
-    bg: 'bg-signal/10',
-    ring: 'ring-signal/30',
-    icon: 'text-signal',
+    bg: 'bg-accent/10',
+    ring: 'ring-accent/30',
+    icon: 'text-accent',
   },
 }
 
@@ -50,20 +50,20 @@ function ToastItem({ toast }: { toast: ToastType }): JSX.Element {
       exit={{ opacity: 0, x: 40, scale: 0.95, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        'pointer-events-auto flex w-80 items-start gap-3 rounded border border-rail px-4 py-3 ring-1 backdrop-blur-md',
+        'pointer-events-auto flex w-80 items-start gap-3 rounded border border-line px-4 py-3 ring-1 backdrop-blur-md',
         style.bg,
         style.ring,
       )}
     >
       <Icon size={18} className={cn('mt-0.5 shrink-0', style.icon)} />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-ink">{toast.title}</div>
-        {toast.description && <div className="mt-0.5 text-xs text-ink-2">{toast.description}</div>}
+        <div className="text-sm font-semibold text-fg">{toast.title}</div>
+        {toast.description && <div className="mt-0.5 text-xs text-fg-2">{toast.description}</div>}
       </div>
       <button
         type="button"
         onClick={() => dismiss(toast.id)}
-        className="shrink-0 rounded p-1 text-ink-3 transition-colors hover:bg-panel hover:text-ink"
+        className="shrink-0 rounded p-1 text-fg-3 transition-colors hover:bg-surface hover:text-fg"
         aria-label="Fermer"
       >
         <X size={14} />

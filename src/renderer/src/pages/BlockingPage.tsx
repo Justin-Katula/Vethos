@@ -99,7 +99,7 @@ function Stepper({
   etiquette: string
 }): JSX.Element {
   const bouton =
-    'flex h-9 w-9 items-center justify-center rounded border border-rail text-ink-2 transition hover:border-rail-strong hover:text-ink disabled:opacity-30'
+    'flex h-9 w-9 items-center justify-center rounded border border-line text-fg-2 transition hover:border-line-strong hover:text-fg disabled:opacity-30'
   return (
     <div className="flex items-center gap-2">
       <button
@@ -111,7 +111,7 @@ function Stepper({
       >
         <Minus size={15} />
       </button>
-      <span className="min-w-[5.5rem] text-center font-mono text-sm text-ink">
+      <span className="min-w-[5.5rem] text-center font-mono text-sm text-fg">
         {format(valeur)}
       </span>
       <button
@@ -156,7 +156,7 @@ function ChampSites({
           faisait lire deux fois la même chose. Ne reste que le compte, et
           seulement quand il y a quelque chose à compter. */}
       {sites.length > 0 && (
-        <p className="mb-2 text-sm text-ink-2">
+        <p className="mb-2 text-sm text-fg-2">
           {sites.length} site{sites.length > 1 ? 's' : ''} bloqué
           {sites.length > 1 ? 's' : ''}
         </p>
@@ -165,7 +165,7 @@ function ChampSites({
         <div className="relative flex-1">
           <Globe
             size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
           />
           <input
             type="text"
@@ -181,36 +181,36 @@ function ChampSites({
               }
             }}
             placeholder="youtube.com"
-            className={`w-full rounded border bg-hall py-2 pl-8 pr-3 text-sm text-ink outline-none transition focus:border-rail-strong ${
-              invalide || erreur !== null ? 'border-signal/60' : 'border-rail'
+            className={`w-full rounded border bg-base py-2 pl-8 pr-3 text-sm text-fg outline-none transition focus:border-line-strong ${
+              invalide || erreur !== null ? 'border-accent/60' : 'border-line'
             }`}
           />
         </div>
         <button
           type="button"
           onClick={ajouter}
-          className="rounded border border-rail px-3 text-sm text-ink-2 transition hover:border-rail-strong hover:text-ink"
+          className="rounded border border-line px-3 text-sm text-fg-2 transition hover:border-line-strong hover:text-fg"
         >
           Ajouter
         </button>
       </div>
       {invalide && (
-        <p className="mt-1.5 text-xs text-signal">Entre un domaine, par exemple « youtube.com ».</p>
+        <p className="mt-1.5 text-xs text-accent">Entre un domaine, par exemple « youtube.com ».</p>
       )}
-      {erreur !== null && <p className="mt-1.5 text-xs text-signal">{erreur}</p>}
+      {erreur !== null && <p className="mt-1.5 text-xs text-accent">{erreur}</p>}
       {sites.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {sites.map((site) => (
             <span
               key={site}
-              className="flex items-center gap-1.5 rounded border border-rail bg-panel/60 py-1 pl-2.5 pr-1 text-xs text-ink-2"
+              className="flex items-center gap-1.5 rounded border border-line bg-surface/60 py-1 pl-2.5 pr-1 text-xs text-fg-2"
             >
               {site}
               <button
                 type="button"
                 onClick={() => onChange(sites.filter((s) => s !== site))}
                 aria-label={`Retirer ${site}`}
-                className="rounded p-0.5 text-ink-3 transition hover:bg-panel-lit hover:text-signal"
+                className="rounded p-0.5 text-fg-3 transition hover:bg-surface-2 hover:text-accent"
               >
                 <X size={12} />
               </button>
@@ -218,7 +218,7 @@ function ChampSites({
           ))}
         </div>
       )}
-      <p className="mt-2 text-xs text-ink-3">
+      <p className="mt-2 text-xs text-fg-3">
         Seule la page du site est recouverte : tes onglets et ta barre d&apos;adresse restent
         visibles, et changer d&apos;onglet lève le blocage.
       </p>
@@ -232,7 +232,7 @@ function IconeApp({ app }: { app: AppInstallee }): JSX.Element {
   }
   // Repli lisible plutôt qu'un carré vide : l'initiale suffit à distinguer.
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-panel-lit text-xs font-semibold text-ink-2">
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-2 text-xs font-semibold text-fg-2">
       {app.name.trim().charAt(0).toUpperCase() || '?'}
     </span>
   )
@@ -353,8 +353,8 @@ export default function BlockingPage(): JSX.Element {
     <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-8 px-14 pb-14 pt-12">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Blocage</h1>
-          <p className="mt-1 text-sm text-ink-2">
+          <h1 className="text-2xl font-semibold text-fg">Blocage</h1>
+          <p className="mt-1 text-sm text-fg-2">
             Vethos continue de surveiller l&apos;heure même fenêtre fermée.
           </p>
         </div>
@@ -365,7 +365,7 @@ export default function BlockingPage(): JSX.Element {
               setErreur(null)
               setBrouillon(brouillonVide())
             }}
-            className="flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-bg-base transition hover:bg-white"
+            className="flex items-center gap-2 rounded bg-fg px-4 py-2 text-sm font-medium text-bg-base transition hover:bg-white"
           >
             <Plus size={16} />
             Nouveau blocage
@@ -375,23 +375,23 @@ export default function BlockingPage(): JSX.Element {
 
       <section
         className={`flex items-start gap-3 rounded border p-4 ${
-          session.active ? 'border-signal/40 bg-signal/10' : 'border-rail bg-panel'
+          session.active ? 'border-accent/40 bg-accent/10' : 'border-line bg-surface'
         }`}
       >
         {session.active ? (
-          <Shield size={20} className="mt-0.5 shrink-0 text-signal" />
+          <Shield size={20} className="mt-0.5 shrink-0 text-accent" />
         ) : (
-          <ShieldOff size={20} className="mt-0.5 shrink-0 text-ink-3" />
+          <ShieldOff size={20} className="mt-0.5 shrink-0 text-fg-3" />
         )}
         <div className="min-w-0 flex-1">
           {session.active ? (
             <>
-              <p className="text-sm font-medium text-signal">
+              <p className="text-sm font-medium text-accent">
                 Session active, {session.blockedAppIds.length} application
                 {session.blockedAppIds.length > 1 ? 's' : ''} bloquée
                 {session.blockedAppIds.length > 1 ? 's' : ''}
               </p>
-              <p className="mt-0.5 text-xs text-signal/70">
+              <p className="mt-0.5 text-xs text-accent/70">
                 {session.endsAt === null
                   ? 'Sans échéance connue'
                   : `Se termine dans ${resteAvant(session.endsAt, maintenant)}`}
@@ -402,7 +402,7 @@ export default function BlockingPage(): JSX.Element {
                   return (
                     <span
                       key={id}
-                      className="flex items-center gap-1.5 rounded bg-signal/15 px-2 py-1 text-xs text-signal"
+                      className="flex items-center gap-1.5 rounded bg-accent/15 px-2 py-1 text-xs text-accent"
                     >
                       {app?.iconDataUrl !== undefined && (
                         <img src={app.iconDataUrl} alt="" className="h-4 w-4 rounded" />
@@ -416,10 +416,10 @@ export default function BlockingPage(): JSX.Element {
           ) : pending !== null ? (
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-ink">
+                <p className="text-sm font-medium text-fg">
                   Blocage programmé, démarre dans {resteAvant(pending.startedAt, maintenant)}
                 </p>
-                <p className="mt-0.5 text-xs text-ink-3">
+                <p className="mt-0.5 text-xs text-fg-3">
                   {pending.appIds.length} application{pending.appIds.length > 1 ? 's' : ''} ·
                   pendant {dureeLisible(Math.round((pending.endsAt - pending.startedAt) / 60_000))}
                 </p>
@@ -427,20 +427,20 @@ export default function BlockingPage(): JSX.Element {
               <button
                 type="button"
                 onClick={() => void cancelPending()}
-                className="shrink-0 rounded px-3 py-1.5 text-xs text-ink-2 transition hover:bg-panel-lit hover:text-ink"
+                className="shrink-0 rounded px-3 py-1.5 text-xs text-fg-2 transition hover:bg-surface-2 hover:text-fg"
               >
                 Annuler
               </button>
             </div>
           ) : (
-            <p className="text-sm text-ink-2">Aucun blocage en cours ni programmé.</p>
+            <p className="text-sm text-fg-2">Aucun blocage en cours ni programmé.</p>
           )}
         </div>
       </section>
 
       {brouillon !== null && (
-        <section className="flex flex-col gap-5 rounded border border-rail bg-panel p-5">
-          <div className="flex rounded border border-rail p-1">
+        <section className="flex flex-col gap-5 rounded border border-line bg-surface p-5">
+          <div className="flex rounded border border-line p-1">
             {(['now', 'later'] as const).map((mode) => (
               <button
                 key={mode}
@@ -450,7 +450,7 @@ export default function BlockingPage(): JSX.Element {
                   setBrouillon({ ...brouillon, mode })
                 }}
                 className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition ${
-                  brouillon.mode === mode ? 'bg-ink text-bg-base' : 'text-ink-2 hover:text-ink'
+                  brouillon.mode === mode ? 'bg-fg text-bg-base' : 'text-fg-2 hover:text-fg'
                 }`}
               >
                 {mode === 'now' ? 'Maintenant' : 'Plus tard'}
@@ -460,7 +460,7 @@ export default function BlockingPage(): JSX.Element {
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <div>
-              <p className="mb-2 text-sm font-medium text-ink-2">Pendant</p>
+              <p className="mb-2 text-sm font-medium text-fg-2">Pendant</p>
               <Stepper
                 valeur={brouillon.durationMinutes}
                 onChange={(v) => setBrouillon({ ...brouillon, durationMinutes: v })}
@@ -474,7 +474,7 @@ export default function BlockingPage(): JSX.Element {
 
             {brouillon.mode === 'later' && (
               <div>
-                <p className="mb-2 text-sm font-medium text-ink-2">À partir de</p>
+                <p className="mb-2 text-sm font-medium text-fg-2">À partir de</p>
                 <Stepper
                   valeur={brouillon.startMinute}
                   onChange={(v) => setBrouillon({ ...brouillon, startMinute: v })}
@@ -489,10 +489,10 @@ export default function BlockingPage(): JSX.Element {
           </div>
 
           {messageDe('duration') !== null && (
-            <p className="text-xs text-signal">{messageDe('duration')}</p>
+            <p className="text-xs text-accent">{messageDe('duration')}</p>
           )}
 
-          <p className="text-xs text-ink-3">
+          <p className="text-xs text-fg-3">
             {brouillon.mode === 'now'
               ? `Blocage immédiat pendant ${dureeLisible(brouillon.durationMinutes)}.`
               : `Démarre ${
@@ -514,14 +514,14 @@ export default function BlockingPage(): JSX.Element {
                 setErreur(null)
                 setBrouillon(null)
               }}
-              className="rounded px-4 py-2 text-sm text-ink-2 transition hover:text-ink"
+              className="rounded px-4 py-2 text-sm text-fg-2 transition hover:text-fg"
             >
               Annuler
             </button>
             <button
               type="button"
               onClick={() => void lancer()}
-              className="rounded bg-ink px-4 py-2 text-sm font-medium text-bg-base transition hover:bg-white"
+              className="rounded bg-fg px-4 py-2 text-sm font-medium text-bg-base transition hover:bg-white"
             >
               {brouillon.mode === 'now' ? 'Bloquer maintenant' : 'Programmer'}
             </button>
@@ -530,8 +530,8 @@ export default function BlockingPage(): JSX.Element {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-ink">Sites web</h2>
-        <div className="rounded border border-rail bg-panel p-4">
+        <h2 className="text-sm font-medium text-fg">Sites web</h2>
+        <div className="rounded border border-line bg-surface p-4">
           <ChampSites
             sites={brouillon?.blockedSites ?? []}
             onChange={ajouterSites}
@@ -542,11 +542,11 @@ export default function BlockingPage(): JSX.Element {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium text-ink">
+          <h2 className="text-sm font-medium text-fg">
             Applications installées
-            <span className="ml-2 text-ink-3">{chargementApps ? '…' : apps.length}</span>
+            <span className="ml-2 text-fg-3">{chargementApps ? '…' : apps.length}</span>
             {brouillon !== null && brouillon.appIds.length > 0 && (
-              <span className="ml-2 text-ink-2">
+              <span className="ml-2 text-fg-2">
                 · {brouillon.appIds.length} choisie{brouillon.appIds.length > 1 ? 's' : ''}
               </span>
             )}
@@ -557,7 +557,7 @@ export default function BlockingPage(): JSX.Element {
               onClick={() => void rafraichir()}
               disabled={rafraichissement || chargementApps}
               title="Relancer le scan des applications installées"
-              className="flex items-center gap-1.5 rounded border border-rail px-3 py-2 text-xs text-ink-2 transition hover:border-rail-strong hover:text-ink disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded border border-line px-3 py-2 text-xs text-fg-2 transition hover:border-line-strong hover:text-fg disabled:opacity-40"
             >
               <RefreshCw size={13} className={rafraichissement ? 'animate-spin' : ''} />
               {rafraichissement ? 'Scan…' : 'Rafraîchir'}
@@ -565,21 +565,21 @@ export default function BlockingPage(): JSX.Element {
             <div className="relative">
               <Search
                 size={13}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
               />
               <input
                 type="text"
                 value={recherche}
                 onChange={(e) => setRecherche(e.target.value)}
                 placeholder="Rechercher une application…"
-                className="w-64 rounded border border-rail bg-hall/60 py-2 pl-8 pr-3 text-xs text-ink outline-none transition focus:border-rail-strong"
+                className="w-64 rounded border border-line bg-base/60 py-2 pl-8 pr-3 text-xs text-fg outline-none transition focus:border-line-strong"
               />
             </div>
           </div>
         </div>
 
         {(chargementApps || rafraichissement) && (
-          <p className="rounded border border-rail/70 bg-panel/30 p-6 text-center text-sm text-ink-3">
+          <p className="rounded border border-line/70 bg-surface/30 p-6 text-center text-sm text-fg-3">
             {rafraichissement
               ? 'Scan complet : menu Démarrer, registre, App Paths, Program Files, winget, Store…'
               : 'Chargement du catalogue…'}
@@ -587,7 +587,7 @@ export default function BlockingPage(): JSX.Element {
         )}
 
         {!chargementApps && groupes.length === 0 && (
-          <p className="rounded border border-dashed border-rail p-8 text-center text-sm text-ink-3">
+          <p className="rounded border border-dashed border-line p-8 text-center text-sm text-fg-3">
             Aucune application ne correspond à cette recherche.
           </p>
         )}
@@ -605,12 +605,12 @@ export default function BlockingPage(): JSX.Element {
                   onClick={() => basculerCategorie(cat)}
                   aria-expanded={ouverte}
                   className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition ${
-                    ouverte ? 'bg-panel/70' : 'hover:bg-panel/50'
+                    ouverte ? 'bg-surface/70' : 'hover:bg-surface/50'
                   }`}
                 >
                   <ChevronRight
                     size={15}
-                    className={`shrink-0 text-ink-3 transition-transform ${
+                    className={`shrink-0 text-fg-3 transition-transform ${
                       ouverte ? 'rotate-90' : ''
                     }`}
                   />
@@ -619,11 +619,11 @@ export default function BlockingPage(): JSX.Element {
                   >
                     {CATEGORY_LABELS[cat]}
                   </span>
-                  <span className="text-xs text-ink-3">
+                  <span className="text-xs text-fg-3">
                     ({appsDuGroupe.length} élément{appsDuGroupe.length > 1 ? 's' : ''})
                   </span>
                   {choisiesIci > 0 && (
-                    <span className="ml-auto shrink-0 text-xs font-medium text-signal">
+                    <span className="ml-auto shrink-0 text-xs font-medium text-accent">
                       {choisiesIci} choisie{choisiesIci > 1 ? 's' : ''}
                     </span>
                   )}
@@ -641,24 +641,24 @@ export default function BlockingPage(): JSX.Element {
                           onClick={() => basculerApp(app.exeName)}
                           className={`flex items-center gap-3 rounded border px-3 py-2.5 text-left transition disabled:opacity-50 ${
                             choisie
-                              ? 'border-signal/40 bg-signal/10'
-                              : 'border-transparent hover:border-rail hover:bg-panel/60'
+                              ? 'border-accent/40 bg-accent/10'
+                              : 'border-transparent hover:border-line hover:bg-surface/60'
                           }`}
                         >
                           <IconeApp app={app} />
                           <span className="min-w-0 flex-1">
                             <span
                               className={`block truncate text-sm font-medium ${
-                                choisie ? 'text-signal' : 'text-ink'
+                                choisie ? 'text-accent' : 'text-fg'
                               }`}
                             >
                               {app.name}
                             </span>
-                            <span className="block truncate font-mono text-[11px] text-ink-3">
+                            <span className="block truncate font-mono text-[11px] text-fg-3">
                               {app.exeName}
                             </span>
                           </span>
-                          {choisie && <Check size={16} className="shrink-0 text-signal" />}
+                          {choisie && <Check size={16} className="shrink-0 text-accent" />}
                         </button>
                       )
                     })}
