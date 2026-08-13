@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Home, Settings, Shield, LogOut, CalendarClock, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { NexusLogo } from '@/components/NexusLogo'
 import { nexus } from '@/lib/ipc'
 import { useAuthStore } from '@/store/auth.store'
 
-type NavItem = {
-  to: string
-  label: string
-  Icon: LucideIcon
-}
+/**
+ * LE QUAI
+ *
+ * La signalétique d'un quai : des noms alignés, un filet gravé, et un seul
+ * repère rouge sur la destination courante. Pas de pastille arrondie derrière
+ * l'élément actif, pas de halo : sur un panneau émaillé, ce qui est actif est
+ * marqué, pas éclairé.
+ *
+ * Les deux piliers du produit, planifier et bloquer, sont d'importance égale.
+ * Ils portent donc le même poids typographique et le même rang.
+ */
 
-const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Accueil', Icon: Home },
-  { to: '/temps', label: 'Mon temps', Icon: CalendarClock },
-  { to: '/blocage', label: 'Blocage', Icon: Shield },
-  { to: '/settings', label: 'Paramètres', Icon: Settings },
+const DESTINATIONS = [
+  { to: '/', label: 'Aujourd’hui' },
+  { to: '/temps', label: 'Mon temps' },
+  { to: '/blocage', label: 'Blocage' },
+  { to: '/settings', label: 'Réglages' },
 ]
 
 export function Sidebar() {
@@ -27,83 +31,62 @@ export function Sidebar() {
   const signOut = useAuthStore((s) => s.signOut)
 
   useEffect(() => {
-    void nexus.app.getVersion().then(setVersion).catch(() => setVersion(null))
+    void nexus.app
+      .getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null))
   }, [])
 
   return (
     <aside
-      className={cn(
-        'flex w-[220px] shrink-0 flex-col gap-1 px-3 py-6',
-        'border-r border-border-subtle',
-        'bg-bg-base',
-      )}
+      className="flex w-[224px] shrink-0 flex-col border-r border-rail bg-panel"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      <div className="px-3 pb-6">
-        <NexusLogo size={26} />
-        <p className="mt-1 text-xs text-text-muted">Focus, par design.</p>
+      <div className="border-b border-rail px-5 py-5">
+        <NexusLogo size={22} />
+        <p className="mt-1.5 text-[11px] text-ink-3">Focus, par design.</p>
       </div>
 
-      <nav
-        className="flex flex-col gap-1"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
-        {NAV_ITEMS.map(({ to, label, Icon }) => {
-          const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to)
+      <nav className="flex flex-col" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {DESTINATIONS.map(({ to, label }) => {
+          const active = to === '/' ? pathname === '/' : pathname.startsWith(to)
           return (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               className={cn(
-                'group relative flex items-center gap-3 rounded-md px-3 py-2.5',
-                'text-sm font-medium transition-colors duration-200 ease-out',
-                isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary',
+                'relative border-b border-rail px-5 py-3 text-sm transition-colors duration-150',
+                active ? 'bg-panel-lit text-ink' : 'text-ink-2 hover:bg-panel-lit hover:text-ink',
               )}
             >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 z-20 h-[60%] w-[3px] -translate-y-1/2 rounded-r-[2px] bg-accent" />
-              )}
-              {isActive && (
-                <motion.div
-                  layoutId="sidebar-active-pill"
-                  className="absolute inset-0 rounded-md bg-bg-card"
-                  style={{ boxShadow: 'var(--shadow-card)' }}
-                  transition={{ type: 'tween', duration: 0.25 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-3">
-                <Icon size={18} strokeWidth={1.75} />
-                {label}
-              </span>
+              {active && <span className="absolute inset-y-0 left-0 w-[3px] bg-signal" />}
+              {label}
             </NavLink>
           )
         })}
       </nav>
 
       <div
-        className="mt-auto space-y-3 px-3"
+        className="mt-auto border-t border-rail px-5 py-4"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         {account && (
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-text-primary">{account.name}</div>
-            <div className="truncate text-xs text-text-muted">{account.email}</div>
+            <div className="truncate text-[13px] text-ink">{account.name}</div>
+            <div className="truncate text-[11px] text-ink-3">{account.email}</div>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          className={cn(
-            'inline-flex w-full items-center gap-2 rounded-md border px-3 py-2',
-            'border-border-subtle text-xs font-medium text-text-secondary transition-colors',
-            'hover:border-border-strong hover:text-text-primary',
-          )}
-        >
-          <LogOut size={14} />
-          Déconnexion
-        </button>
-        <div className="text-xs text-text-muted">{version ? `v${version}` : 'Vethos'}</div>
+        <div className="mt-3 flex items-baseline justify-between">
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="text-[11px] text-ink-3 underline-offset-4 transition-colors hover:text-ink hover:underline"
+          >
+            Se déconnecter
+          </button>
+          <span className="font-mono text-[10.5px] text-ink-3">{version ? `v${version}` : ''}</span>
+        </div>
       </div>
     </aside>
   )

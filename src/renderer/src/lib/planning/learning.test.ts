@@ -19,7 +19,10 @@ const at = (startHour: number, completed: boolean): LearningObservation => ({
 
 describe('G.1 — mesurer, jamais déclarer', () => {
   it('l’horodatage est injecté : le moteur reste déterministe', () => {
-    const o = createObservation({ startHour: 9, completed: true }, new Date(Date.UTC(2026, 7, 11, 10, 0)))
+    const o = createObservation(
+      { startHour: 9, completed: true },
+      new Date(Date.UTC(2026, 7, 11, 10, 0)),
+    )
     expect(o.createdAt).toBe('2026-08-11T10:00:00.000Z')
   })
 
@@ -59,7 +62,9 @@ describe('G.3 — prudence sur données faibles', () => {
     expect(hasEnoughData(4)).toBe(false)
     expect(hasEnoughData(5)).toBe(true)
     // 4 réussites sur 4 : ce n'est PAS une tendance, ça reste NORMALE.
-    expect(windowLookup(buildWindowMap([at(9, true), at(9, true), at(9, true), at(9, true)]))(9)).toBe('NORMALE')
+    expect(
+      windowLookup(buildWindowMap([at(9, true), at(9, true), at(9, true), at(9, true)]))(9),
+    ).toBe('NORMALE')
   })
 
   it('l’absence de données se dit explicitement', () => {

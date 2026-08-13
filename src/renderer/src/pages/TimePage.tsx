@@ -19,7 +19,7 @@ const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dima
 const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
 const inputClass =
-  'rounded-md border border-border-subtle bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-border-strong'
+  'rounded border border-rail bg-hall px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition-colors focus:border-rail-strong'
 
 function hhmm(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
@@ -41,8 +41,14 @@ export default function TimePage() {
   const [now] = useState(() => new Date())
   const plan = usePlanning(now)
   const {
-    schedule, ancres, objectives,
-    setSchedule, addAncre, deleteAncre, addObjective, deleteObjective,
+    schedule,
+    ancres,
+    objectives,
+    setSchedule,
+    addAncre,
+    deleteAncre,
+    addObjective,
+    deleteObjective,
   } = usePlanningStore()
   const sleepStart = useSettingsStore((s) => s.sleepStart)
   const sleepEnd = useSettingsStore((s) => s.sleepEnd)
@@ -61,15 +67,15 @@ export default function TimePage() {
     <PageTransition>
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
         <header className="mb-10">
-          <h1 className="text-3xl font-semibold tracking-tight text-text-primary">Mon temps</h1>
-          <p className="mt-1.5 max-w-xl text-sm text-text-muted">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">Mon temps</h1>
+          <p className="mt-1.5 max-w-xl text-sm text-ink-3">
             Ce que tu déclares ici est le seul socle du planning. Une fois posé, tu n’y reviens
             presque jamais.
           </p>
         </header>
 
         {/* La conséquence à gauche, ce qui la produit à droite : on voit le
-            chiffre bouger en même temps qu'on déclare. */}
+ chiffre bouger en même temps qu'on déclare. */}
         <div className="flex flex-1 flex-wrap items-start gap-x-16 gap-y-10">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -81,9 +87,9 @@ export default function TimePage() {
               <CountUp
                 value={weekAvailable}
                 format={(n) => duration(Math.round(n))}
-                className="block text-5xl font-semibold tabular-nums tracking-tight text-text-primary"
+                className="block text-5xl font-semibold tabular-nums tracking-tight text-ink"
               />
-              <p className="mt-2 max-w-sm text-xs leading-relaxed text-text-muted">
+              <p className="mt-2 max-w-sm text-xs leading-relaxed text-ink-3">
                 réellement disponibles sur les sept prochains jours, sommeil, obligations, fragments
                 trop courts et repos déjà déduits.
               </p>
@@ -93,81 +99,92 @@ export default function TimePage() {
           </motion.div>
 
           <div className="min-w-[380px] flex-[1.15] space-y-3">
-        <Disclosure index={0} title="Sommeil" summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}>
-          <div className="flex flex-wrap items-center gap-5">
-            <label className="flex items-center gap-2 text-sm text-text-secondary">
-              Coucher
-              <input
-                type="time"
-                value={sleepStart}
-                onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
-                className={inputClass}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-text-secondary">
-              Lever
-              <input
-                type="time"
-                value={sleepEnd}
-                onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
-                className={inputClass}
-              />
-            </label>
-          </div>
-          <p className="mt-3 text-[11px] text-text-muted">
-            Jamais compté comme du travail. Aucune notification n’est émise pendant ces heures.
-          </p>
-        </Disclosure>
+            <Disclosure
+              index={0}
+              title="Sommeil"
+              summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}
+            >
+              <div className="flex flex-wrap items-center gap-5">
+                <label className="flex items-center gap-2 text-sm text-ink-2">
+                  Coucher
+                  <input
+                    type="time"
+                    value={sleepStart}
+                    onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-ink-2">
+                  Lever
+                  <input
+                    type="time"
+                    value={sleepEnd}
+                    onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="mt-3 text-[11px] text-ink-3">
+                Jamais compté comme du travail. Aucune notification n’est émise pendant ces heures.
+              </p>
+            </Disclosure>
 
-        <Disclosure
-          index={1}
-          title="Obligations fixes"
-          summary={
-            schedule.length === 0
-              ? 'rien de déclaré'
-              : `${schedule.length} créneau${schedule.length > 1 ? 'x' : ''} sur la semaine`
-          }
-        >
-          <ScheduleEditor entries={schedule} onChange={(entries) => void setSchedule(entries)} />
-        </Disclosure>
-
-        <Disclosure
-          index={2}
-          title="Ancres"
-          summary={ancres.length === 0 ? 'aucune' : `${ancres.length} habitude${ancres.length > 1 ? 's' : ''}`}
-        >
-          <AncresEditor
-            ancres={ancres}
-            onAdd={async (draft) => {
-              try {
-                await addAncre(draft)
-              } catch (err) {
-                // D.3 : la création est refusée, jamais décalée en silence.
-                toast.error({
-                  title: 'Ancre refusée',
-                  description: err instanceof Error ? err.message : String(err),
-                })
+            <Disclosure
+              index={1}
+              title="Obligations fixes"
+              summary={
+                schedule.length === 0
+                  ? 'rien de déclaré'
+                  : `${schedule.length} créneau${schedule.length > 1 ? 'x' : ''} sur la semaine`
               }
-            }}
-            onDelete={(id) => void deleteAncre(id)}
-          />
-        </Disclosure>
+            >
+              <ScheduleEditor
+                entries={schedule}
+                onChange={(entries) => void setSchedule(entries)}
+              />
+            </Disclosure>
 
-        <Disclosure
-          index={3}
-          title="Objectifs"
-          summary={
-            objectives.length === 0
-              ? 'aucun'
-              : `${duration(objectives.reduce((s, o) => s + o.weeklyTargetMinutes, 0))} par semaine`
-          }
-        >
-          <ObjectivesEditor
-            objectives={objectives}
-            onAdd={(draft) => void addObjective(draft)}
-            onDelete={(id) => void deleteObjective(id)}
-          />
-        </Disclosure>
+            <Disclosure
+              index={2}
+              title="Ancres"
+              summary={
+                ancres.length === 0
+                  ? 'aucune'
+                  : `${ancres.length} habitude${ancres.length > 1 ? 's' : ''}`
+              }
+            >
+              <AncresEditor
+                ancres={ancres}
+                onAdd={async (draft) => {
+                  try {
+                    await addAncre(draft)
+                  } catch (err) {
+                    // D.3 : la création est refusée, jamais décalée en silence.
+                    toast.error({
+                      title: 'Ancre refusée',
+                      description: err instanceof Error ? err.message : String(err),
+                    })
+                  }
+                }}
+                onDelete={(id) => void deleteAncre(id)}
+              />
+            </Disclosure>
+
+            <Disclosure
+              index={3}
+              title="Objectifs"
+              summary={
+                objectives.length === 0
+                  ? 'aucun'
+                  : `${duration(objectives.reduce((s, o) => s + o.weeklyTargetMinutes, 0))} par semaine`
+              }
+            >
+              <ObjectivesEditor
+                objectives={objectives}
+                onAdd={(draft) => void addObjective(draft)}
+                onDelete={(id) => void deleteObjective(id)}
+              />
+            </Disclosure>
 
             {plan && (
               <Disclosure
@@ -245,10 +262,10 @@ function ScheduleEditor({
               type="button"
               onClick={() => setDay(i)}
               className={cn(
-                'flex-1 rounded-md border py-2 text-xs font-medium transition-colors',
+                'flex-1 rounded border py-2 text-xs font-medium transition-colors',
                 day === i
-                  ? 'border-border-strong bg-bg-card-hover text-text-primary'
-                  : 'border-transparent text-text-muted hover:text-text-secondary',
+                  ? 'border-rail-strong bg-panel-lit text-ink'
+                  : 'border-transparent text-ink-3 hover:text-ink-2',
               )}
             >
               {label}
@@ -260,24 +277,30 @@ function ScheduleEditor({
 
       <div className="mt-4 space-y-1">
         {dayEntries.length === 0 ? (
-          <p className="py-4 text-center text-xs text-text-muted">
+          <p className="py-4 text-center text-xs text-ink-3">
             Rien de fixe le {DAYS[day]?.toLowerCase()}. La journée entière compte comme disponible.
           </p>
         ) : (
           dayEntries.map((entry, i) => (
-            <div key={`${entry.startMinute}-${i}`} className="group flex items-center gap-3 py-1 text-xs">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span className="w-24 shrink-0 font-mono text-text-muted">
+            <div
+              key={`${entry.startMinute}-${i}`}
+              className="group flex items-center gap-3 py-1 text-xs"
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="w-24 shrink-0 font-mono text-ink-3">
                 {hhmm(entry.startMinute)} → {hhmm(entry.endMinute)}
               </span>
-              <span className="truncate text-text-primary">{entry.label}</span>
-              <span className="ml-auto shrink-0 font-mono text-text-muted">
+              <span className="truncate text-ink">{entry.label}</span>
+              <span className="ml-auto shrink-0 font-mono text-ink-3">
                 {duration(entry.endMinute - entry.startMinute)}
               </span>
               <button
                 type="button"
                 onClick={() => onChange(entries.filter((e) => e !== entry))}
-                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                className="shrink-0 text-ink-3 opacity-0 transition-opacity hover:text-signal group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -287,7 +310,7 @@ function ScheduleEditor({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rail pt-4">
         <input
           type="text"
           value={draft.label}
@@ -321,7 +344,7 @@ function ScheduleEditor({
         <button
           type="button"
           onClick={add}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
+          className="inline-flex items-center gap-1.5 rounded border border-rail-strong px-3 py-2 text-sm text-ink transition-colors hover:bg-panel-lit"
         >
           <Plus size={14} /> Ajouter
         </button>
@@ -329,7 +352,7 @@ function ScheduleEditor({
           <button
             type="button"
             onClick={copyToWeekdays}
-            className="inline-flex items-center gap-1.5 text-[11px] text-text-muted transition-colors hover:text-text-secondary"
+            className="inline-flex items-center gap-1.5 text-[11px] text-ink-3 transition-colors hover:text-ink-2"
           >
             <Copy size={12} /> copier sur la semaine
           </button>
@@ -352,7 +375,12 @@ function AncresEditor({
   onAdd: (draft: AncreDraft) => void | Promise<void>
   onDelete: (id: string) => void
 }) {
-  const [draft, setDraft] = useState({ name: '', time: '18:00', minutes: 60, days: [0, 1, 2, 3, 4] })
+  const [draft, setDraft] = useState({
+    name: '',
+    time: '18:00',
+    minutes: 60,
+    days: [0, 1, 2, 3, 4],
+  })
 
   const toggleDay = (d: number) =>
     setDraft((s) => ({
@@ -378,25 +406,28 @@ function AncresEditor({
     <>
       <div className="space-y-1">
         {ancres.length === 0 ? (
-          <p className="py-4 text-center text-xs text-text-muted">
+          <p className="py-4 text-center text-xs text-ink-3">
             Le sport à 18 h, la lecture à 21 h. Un rendez-vous avec toi-même qui ne bouge jamais.
           </p>
         ) : (
           ancres.map((a) => (
             <div key={a.id} className="group flex items-center gap-3 py-1 text-xs">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.color }} />
-              <span className="w-24 shrink-0 font-mono text-text-muted">{hhmm(a.anchorMinute)}</span>
-              <span className="truncate text-text-primary">{a.name}</span>
-              <span className="shrink-0 text-text-muted">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: a.color }}
+              />
+              <span className="w-24 shrink-0 font-mono text-ink-3">{hhmm(a.anchorMinute)}</span>
+              <span className="truncate text-ink">{a.name}</span>
+              <span className="shrink-0 text-ink-3">
                 {a.daysOfWeek.map((d) => DAYS_SHORT[d]?.charAt(0)).join('')}
               </span>
-              <span className="ml-auto shrink-0 font-mono text-text-muted">
+              <span className="ml-auto shrink-0 font-mono text-ink-3">
                 {a.normalMaxMinutes} min · min. {a.minimumMinutes}
               </span>
               <button
                 type="button"
                 onClick={() => onDelete(a.id)}
-                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                className="shrink-0 text-ink-3 opacity-0 transition-opacity hover:text-signal group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -406,7 +437,7 @@ function AncresEditor({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rail pt-4">
         <input
           type="text"
           value={draft.name}
@@ -437,10 +468,10 @@ function AncresEditor({
               type="button"
               onClick={() => toggleDay(i)}
               className={cn(
-                'w-8 rounded-md border py-2 text-[11px] transition-colors',
+                'w-8 rounded border py-2 text-[11px] transition-colors',
                 draft.days.includes(i)
-                  ? 'border-border-strong bg-bg-card-hover text-text-primary'
-                  : 'border-transparent text-text-muted hover:text-text-secondary',
+                  ? 'border-rail-strong bg-panel-lit text-ink'
+                  : 'border-transparent text-ink-3 hover:text-ink-2',
               )}
             >
               {label.charAt(0)}
@@ -450,12 +481,12 @@ function AncresEditor({
         <button
           type="button"
           onClick={submit}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
+          className="inline-flex items-center gap-1.5 rounded border border-rail-strong px-3 py-2 text-sm text-ink transition-colors hover:bg-panel-lit"
         >
           <Plus size={14} /> Ancrer
         </button>
       </div>
-      <p className="mt-3 text-[11px] text-text-muted">
+      <p className="mt-3 text-[11px] text-ink-3">
         Deux ancres ne peuvent jamais occuper le même créneau : la seconde est refusée, jamais
         décalée à ta place.
       </p>
@@ -480,21 +511,24 @@ function ObjectivesEditor({
     <>
       <div className="space-y-1">
         {objectives.length === 0 ? (
-          <p className="py-4 text-center text-xs text-text-muted">
+          <p className="py-4 text-center text-xs text-ink-3">
             « Guitare, 4 h par semaine ». Ce qui avance sans jamais être en retard.
           </p>
         ) : (
           objectives.map((o) => (
             <div key={o.id} className="group flex items-center gap-3 py-1 text-xs">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: o.color }} />
-              <span className="truncate text-text-primary">{o.name}</span>
-              <span className="ml-auto shrink-0 font-mono text-text-muted">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: o.color }}
+              />
+              <span className="truncate text-ink">{o.name}</span>
+              <span className="ml-auto shrink-0 font-mono text-ink-3">
                 {duration(o.weeklyTargetMinutes)} / semaine
               </span>
               <button
                 type="button"
                 onClick={() => onDelete(o.id)}
-                className="shrink-0 text-text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                className="shrink-0 text-ink-3 opacity-0 transition-opacity hover:text-signal group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -504,7 +538,7 @@ function ObjectivesEditor({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rail pt-4">
         <input
           type="text"
           value={draft.name}
@@ -512,7 +546,7 @@ function ObjectivesEditor({
           placeholder="Guitare, sport, lecture…"
           className={cn(inputClass, 'min-w-[9rem] flex-1')}
         />
-        <label className="flex items-center gap-2 text-xs text-text-muted">
+        <label className="flex items-center gap-2 text-xs text-ink-3">
           <input
             type="number"
             min={1}
@@ -534,12 +568,12 @@ function ObjectivesEditor({
             })
             setDraft((s) => ({ ...s, name: '' }))
           }}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded border border-rail-strong px-3 py-2 text-sm text-ink transition-colors hover:bg-panel-lit disabled:opacity-40"
         >
           <Plus size={14} /> Ajouter
         </button>
       </div>
-      <p className="mt-3 text-[11px] text-text-muted">
+      <p className="mt-3 text-[11px] text-ink-3">
         Un objectif ne peut jamais recevoir de deadline. Il ne se dégrade pas non plus avec le temps
         qui passe.
       </p>
@@ -552,7 +586,7 @@ function ObjectivesEditor({
 function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
   return (
     <table className="w-full text-xs">
-      <thead className="text-left text-[10px] uppercase tracking-wider text-text-muted">
+      <thead className="text-left text-[10px] uppercase tracking-wider text-ink-3">
         <tr>
           <th className="pb-2 font-medium">Jour</th>
           <th className="pb-2 text-right font-medium">Brute</th>
@@ -562,11 +596,11 @@ function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanni
           <th className="pb-2 text-right font-medium">Disponible</th>
         </tr>
       </thead>
-      <tbody className="font-mono text-text-muted">
+      <tbody className="font-mono text-ink-3">
         {plan.capacities.map((c) => (
-          <tr key={c.date} className="border-t border-border-subtle">
-            <td className="py-1.5 font-sans text-text-secondary">
-              {DAYS_SHORT[c.dayOfWeek]} <span className="text-text-muted">{c.date.slice(5)}</span>
+          <tr key={c.date} className="border-t border-rail">
+            <td className="py-1.5 font-sans text-ink-2">
+              {DAYS_SHORT[c.dayOfWeek]} <span className="text-ink-3">{c.date.slice(5)}</span>
             </td>
             <td className="py-1.5 text-right">{duration(c.rawCapacityMinutes)}</td>
             <td className="py-1.5 text-right">−{duration(c.unusableMinutes)}</td>
@@ -576,7 +610,7 @@ function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanni
                 ? `−${duration(c.fatiguePenaltyMinutes + c.breathingReductionMinutes)}`
                 : '-'}
             </td>
-            <td className="py-1.5 text-right font-semibold text-text-primary">
+            <td className="py-1.5 text-right font-semibold text-ink">
               {duration(c.effectiveCapacityMinutes)}
             </td>
           </tr>
@@ -602,7 +636,7 @@ function RequestPanel({
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-text-secondary">
+        <label className="flex items-center gap-2 text-sm text-ink-2">
           Je veux
           <input
             type="number"
@@ -632,22 +666,22 @@ function RequestPanel({
               }),
             )
           }
-          className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-sm text-text-primary transition-colors hover:bg-bg-card-hover"
+          className="inline-flex items-center gap-1.5 rounded border border-rail-strong px-3 py-2 text-sm text-ink transition-colors hover:bg-panel-lit"
         >
           Demander
         </button>
       </div>
 
       {verdict && (
-        <div className="mt-4 border-t border-border-subtle pt-4">
-          <p className="text-sm font-medium text-text-primary">
+        <div className="mt-4 border-t border-rail pt-4">
+          <p className="text-sm font-medium text-ink">
             {verdict.status === 'granted'
               ? `Accordé, ${verdict.grantedMinutes} min.`
               : verdict.status === 'partial'
                 ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
                 : 'Refusé.'}
           </p>
-          <p className="mt-1 text-xs text-text-muted">{verdict.reason}</p>
+          <p className="mt-1 text-xs text-ink-3">{verdict.reason}</p>
         </div>
       )}
     </>

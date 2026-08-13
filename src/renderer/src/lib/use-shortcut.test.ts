@@ -23,7 +23,7 @@ describe('isMacPlatform', () => {
     expect(isMacPlatform('iPod')).toBe(true)
   })
 
-  it("renvoie false pour Windows et Linux", () => {
+  it('renvoie false pour Windows et Linux', () => {
     expect(isMacPlatform('Win32')).toBe(false)
     expect(isMacPlatform('Linux x86_64')).toBe(false)
   })
@@ -60,14 +60,14 @@ describe('matchesCombo', () => {
     expect(matchesCombo(mk({ key: 'k' }), 'Mod+K', false)).toBe(false)
   })
 
-  it("Enter sans modificateur ni shift", () => {
+  it('Enter sans modificateur ni shift', () => {
     expect(matchesCombo(mk({ key: 'Enter' }), 'Enter', false)).toBe(true)
     expect(matchesCombo(mk({ key: 'Enter', shiftKey: true }), 'Enter', false)).toBe(false)
     expect(matchesCombo(mk({ key: 'Enter', ctrlKey: true }), 'Enter', false)).toBe(false)
     expect(matchesCombo(mk({ key: 'Enter', metaKey: true }), 'Enter', true)).toBe(false)
   })
 
-  it("Mod+Enter requiert le modificateur", () => {
+  it('Mod+Enter requiert le modificateur', () => {
     expect(matchesCombo(mk({ key: 'Enter', metaKey: true }), 'Mod+Enter', true)).toBe(true)
     expect(matchesCombo(mk({ key: 'Enter', ctrlKey: true }), 'Mod+Enter', false)).toBe(true)
     expect(matchesCombo(mk({ key: 'Enter' }), 'Mod+Enter', false)).toBe(false)

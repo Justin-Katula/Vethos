@@ -36,7 +36,11 @@ describe('E.2 — plancher quotidien de repos', () => {
 })
 
 describe('E.3 — respiration hebdomadaire', () => {
-  const day = (date: string, worked: number) => ({ date, rawCapacityMinutes: 960, workedMinutes: worked })
+  const day = (date: string, worked: number) => ({
+    date,
+    rawCapacityMinutes: 960,
+    workedMinutes: worked,
+  })
 
   it('repos déjà pris ≥ cible → aucune intervention', () => {
     const r = computeWeeklyBreathing({
@@ -69,7 +73,9 @@ describe('E.3 — respiration hebdomadaire', () => {
   })
 
   it('écart important (≥5 jours à >85 %) → l’ampleur augmente', () => {
-    const heavy = ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'].map((d) => day(d, 900))
+    const heavy = ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'].map((d) =>
+      day(d, 900),
+    )
     const r = computeWeeklyBreathing({
       elapsedDays: heavy,
       weekRawCapacityMinutes: 6720,
@@ -106,11 +112,18 @@ describe('E.4 — fatigue accumulée', () => {
   })
 
   it('un seul jour chargé ne déclenche rien', () => {
-    expect(computeFatigue({ consecutiveHighDays: 1, effectiveCapacityBeforePenalty: 480 }).penaltyMinutes).toBe(0)
+    expect(
+      computeFatigue({ consecutiveHighDays: 1, effectiveCapacityBeforePenalty: 480 })
+        .penaltyMinutes,
+    ).toBe(0)
   })
 
   it('une crise prouvée rogne la protection sans jamais l’annuler', () => {
-    const f = computeFatigue({ consecutiveHighDays: 3, effectiveCapacityBeforePenalty: 480, isCrisis: true })
+    const f = computeFatigue({
+      consecutiveHighDays: 3,
+      effectiveCapacityBeforePenalty: 480,
+      isCrisis: true,
+    })
     // Plancher absolu : jamais sous 60 % de la capacité normale.
     expect(f.reductionPercent).toBe(100 - FATIGUE_CRISIS_FLOOR_PERCENT)
     expect(f.penaltyMinutes).toBe(192)
@@ -119,7 +132,11 @@ describe('E.4 — fatigue accumulée', () => {
   })
 
   it('une crise ne touche pas une protection déjà sous le plancher', () => {
-    const f = computeFatigue({ consecutiveHighDays: 2, effectiveCapacityBeforePenalty: 480, isCrisis: true })
+    const f = computeFatigue({
+      consecutiveHighDays: 2,
+      effectiveCapacityBeforePenalty: 480,
+      isCrisis: true,
+    })
     expect(f.reductionPercent).toBe(25)
     expect(f.crisisReduced).toBe(false)
   })

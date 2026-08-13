@@ -111,7 +111,10 @@ describe('CRITÈRE 1 — jamais « faisable » avec 0 minute placée', () => {
 
 describe('CRITÈRE 2 — un déficit partiel ne bloque jamais le reste', () => {
   it('une tâche impossible est placée autant que possible, pas abandonnée', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }),
+      NOW,
+    )
     expect(plan.feasibility.globallyFeasible).toBe(false)
     expect(plan.totalMinutesPlaced).toBeGreaterThan(0)
     expect(plan.verdicts[0]!.status).toBe('partial')
@@ -121,7 +124,12 @@ describe('CRITÈRE 2 — un déficit partiel ne bloque jamais le reste', () => {
     const plan = computePlan(
       input({
         tasks: [
-          task({ id: uuid(1), title: 'Impossible', remainingMinutes: 5000, deadline: '2026-08-13' }),
+          task({
+            id: uuid(1),
+            title: 'Impossible',
+            remainingMinutes: 5000,
+            deadline: '2026-08-13',
+          }),
           task({ id: uuid(2), title: 'Faisable', remainingMinutes: 60, deadline: '2026-08-16' }),
         ],
       }),
@@ -133,7 +141,10 @@ describe('CRITÈRE 2 — un déficit partiel ne bloque jamais le reste', () => {
   })
 
   it('le déficit est chiffré avec ses options, jamais un statut vague', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }),
+      NOW,
+    )
     const deficit = plan.feasibility.deficits[0]!
     expect(deficit.deficitMinutes).toBeGreaterThan(0)
     expect(deficit.options.length).toBeGreaterThanOrEqual(2)
@@ -154,7 +165,9 @@ describe('CRITÈRE 5 — un objectif ne peut jamais avoir de deadline', () => {
 
   it('un objectif est servi par quota hebdomadaire, jamais par urgence', () => {
     const plan = computePlan(input({ objectives: [objective({ weeklyTargetMinutes: 420 })] }), NOW)
-    const served = plan.blocks.filter((b) => b.kind === 'objective').reduce((s, b) => s + b.workMinutes, 0)
+    const served = plan.blocks
+      .filter((b) => b.kind === 'objective')
+      .reduce((s, b) => s + b.workMinutes, 0)
     expect(served).toBeGreaterThan(0)
     expect(served).toBeLessThanOrEqual(420)
   })
@@ -169,7 +182,10 @@ describe('CRITÈRE 6 — deux ancres ne peuvent pas occuper le même créneau', 
   })
 
   it('rien d’autre ne vient se poser sur le créneau d’une ancre', () => {
-    const plan = computePlan(input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 600 })] }), NOW)
+    const plan = computePlan(
+      input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 600 })] }),
+      NOW,
+    )
     const overlaps = plan.blocks.filter(
       (b) => b.kind !== 'ancre' && b.startMinute < 1140 && b.endMinute > 1080,
     )
@@ -182,8 +198,20 @@ describe('CRITÈRE 8 — cascade : deadline → importance → SRPT → créatio
     const plan = computePlan(
       input({
         tasks: [
-          task({ id: uuid(1), title: 'Urgente', deadline: '2026-08-12', importance: 1, remainingMinutes: 90 }),
-          task({ id: uuid(2), title: 'Importante', deadline: '2026-08-17', importance: 10, remainingMinutes: 90 }),
+          task({
+            id: uuid(1),
+            title: 'Urgente',
+            deadline: '2026-08-12',
+            importance: 1,
+            remainingMinutes: 90,
+          }),
+          task({
+            id: uuid(2),
+            title: 'Importante',
+            deadline: '2026-08-17',
+            importance: 10,
+            remainingMinutes: 90,
+          }),
         ],
       }),
       NOW,
@@ -196,8 +224,20 @@ describe('CRITÈRE 8 — cascade : deadline → importance → SRPT → créatio
     const plan = computePlan(
       input({
         tasks: [
-          task({ id: uuid(1), title: 'Basse', deadline: '2026-08-15', importance: 2, remainingMinutes: 60 }),
-          task({ id: uuid(2), title: 'Haute', deadline: '2026-08-15', importance: 9, remainingMinutes: 60 }),
+          task({
+            id: uuid(1),
+            title: 'Basse',
+            deadline: '2026-08-15',
+            importance: 2,
+            remainingMinutes: 60,
+          }),
+          task({
+            id: uuid(2),
+            title: 'Haute',
+            deadline: '2026-08-15',
+            importance: 9,
+            remainingMinutes: 60,
+          }),
         ],
       }),
       NOW,
@@ -209,12 +249,23 @@ describe('CRITÈRE 8 — cascade : deadline → importance → SRPT → créatio
 describe('D.5 — forme des blocs', () => {
   it('aucun bloc sous 25 minutes de travail', () => {
     const plan = computePlan(input({ tasks: [task({ remainingMinutes: 400 })] }), NOW)
-    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.workMinutes >= TASK_CONSTANTS.minBlockMinutes)).toBe(true)
+    expect(
+      plan.blocks
+        .filter((b) => b.kind === 'task')
+        .every((b) => b.workMinutes >= TASK_CONSTANTS.minBlockMinutes),
+    ).toBe(true)
   })
 
   it('aucun bloc de travail au-delà de 90 minutes', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 900, deadline: '2026-08-17' })] }), NOW)
-    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.workMinutes <= TASK_CONSTANTS.targetBlockMinutes)).toBe(true)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 900, deadline: '2026-08-17' })] }),
+      NOW,
+    )
+    expect(
+      plan.blocks
+        .filter((b) => b.kind === 'task')
+        .every((b) => b.workMinutes <= TASK_CONSTANTS.targetBlockMinutes),
+    ).toBe(true)
   })
 
   it('la pause est INCLUSE dans l’empreinte du bloc, jamais ajoutée après', () => {
@@ -226,7 +277,10 @@ describe('D.5 — forme des blocs', () => {
   })
 
   it('sans crise, une tâche ne dépasse pas 40 % de la capacité d’un jour', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }), NOW)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }),
+      NOW,
+    )
     for (const capacity of plan.capacities) {
       const dayMinutes = plan.blocks
         .filter((b) => b.kind === 'task' && b.date === capacity.date)
@@ -236,14 +290,22 @@ describe('D.5 — forme des blocs', () => {
   })
 
   it('le travail est découpé sur plusieurs jours plutôt qu’entassé', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }), NOW)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 600, deadline: '2026-08-17' })] }),
+      NOW,
+    )
     const days = new Set(plan.blocks.filter((b) => b.kind === 'task').map((b) => b.date))
     expect(days.size).toBeGreaterThan(1)
   })
 
   it('rien n’est jamais placé après la deadline', () => {
-    const plan = computePlan(input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }), NOW)
-    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.date <= '2026-08-13')).toBe(true)
+    const plan = computePlan(
+      input({ tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }),
+      NOW,
+    )
+    expect(plan.blocks.filter((b) => b.kind === 'task').every((b) => b.date <= '2026-08-13')).toBe(
+      true,
+    )
   })
 })
 
@@ -251,7 +313,13 @@ describe('invariants de placement', () => {
   const busy = input({
     tasks: [
       task({ id: uuid(1), title: 'A', remainingMinutes: 300, deadline: '2026-08-14' }),
-      task({ id: uuid(2), title: 'B', remainingMinutes: 240, deadline: '2026-08-16', importance: 8 }),
+      task({
+        id: uuid(2),
+        title: 'B',
+        remainingMinutes: 240,
+        deadline: '2026-08-16',
+        importance: 8,
+      }),
       task({ id: uuid(3), title: 'C', remainingMinutes: 120, deadline: '2026-08-17' }),
     ],
     objectives: [objective()],
@@ -313,7 +381,10 @@ describe('E — repos réservé avant distribution', () => {
     // 20 % de 480 = 96, au-dessus du plancher d'une heure.
     expect(day.restReservedMinutes).toBe(96)
     expect(day.effectiveCapacityMinutes).toBe(
-      day.rawCapacityMinutes - day.unusableMinutes - day.restReservedMinutes - day.fatiguePenaltyMinutes,
+      day.rawCapacityMinutes -
+        day.unusableMinutes -
+        day.restReservedMinutes -
+        day.fatiguePenaltyMinutes,
     )
   })
 
@@ -340,7 +411,10 @@ describe('E — repos réservé avant distribution', () => {
 describe('D.3 — version minimale des ancres', () => {
   it('journée saturée → l’ancre passe à sa version minimale, sans disparaître', () => {
     const plan = computePlan(
-      input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })] }),
+      input({
+        ancres: [ancre()],
+        tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-13' })],
+      }),
       NOW,
     )
     const today = plan.blocks.find((b) => b.kind === 'ancre' && b.date === TODAY)!
@@ -374,7 +448,10 @@ describe('CRITÈRE 7 — aucune question posée', () => {
   it('computePlan est une fonction pure : elle décide, elle ne demande rien', () => {
     const plan = computePlan(
       input({
-        tasks: [task({ remainingMinutes: 5000, deadline: '2026-08-12' }), task({ id: uuid(2), remainingMinutes: 200 })],
+        tasks: [
+          task({ remainingMinutes: 5000, deadline: '2026-08-12' }),
+          task({ id: uuid(2), remainingMinutes: 200 }),
+        ],
         objectives: [objective()],
         ancres: [ancre()],
       }),
@@ -383,7 +460,9 @@ describe('CRITÈRE 7 — aucune question posée', () => {
     // Tout est décidé : des blocs, des verdicts, des signaux — aucun état
     // « en attente d'une réponse » n'existe dans le résultat.
     expect(plan.blocks.length).toBeGreaterThan(0)
-    expect(plan.verdicts.every((v) => ['placed', 'partial', 'unplaced'].includes(v.status))).toBe(true)
+    expect(plan.verdicts.every((v) => ['placed', 'partial', 'unplaced'].includes(v.status))).toBe(
+      true,
+    )
     expect(JSON.stringify(plan)).not.toMatch(/question|confirm|choisis|veux-tu/i)
   })
 
@@ -395,14 +474,22 @@ describe('CRITÈRE 7 — aucune question posée', () => {
       }),
       NOW,
     )
-    expect(plan.signals.every((s) => ['density_deficit', 'anchor_missed_3x', 'objective_stalled'].includes(s.type))).toBe(true)
+    expect(
+      plan.signals.every((s) =>
+        ['density_deficit', 'anchor_missed_3x', 'objective_stalled'].includes(s.type),
+      ),
+    ).toBe(true)
   })
 })
 
 describe('D.6 — limite de travail en cours', () => {
   it('au-delà de la limite, un encouragement — jamais un blocage', () => {
     const plan = computePlan(
-      input({ tasks: [1, 2, 3, 4, 5].map((n) => task({ id: uuid(n), title: `T${n}`, remainingMinutes: 60 })) }),
+      input({
+        tasks: [1, 2, 3, 4, 5].map((n) =>
+          task({ id: uuid(n), title: `T${n}`, remainingMinutes: 60 }),
+        ),
+      }),
       NOW,
     )
     expect(plan.wip).toMatchObject({ activeCount: 5, limit: 4, overLimit: true })

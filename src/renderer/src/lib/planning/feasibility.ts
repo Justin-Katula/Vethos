@@ -1,4 +1,10 @@
-import type { Deficit, DensityPoint, FeasibilityResult, PlanningSignal, SeverityLevel } from './types'
+import type {
+  Deficit,
+  DensityPoint,
+  FeasibilityResult,
+  PlanningSignal,
+  SeverityLevel,
+} from './types'
 
 // ═══ PARTIE C — TEST DE FAISABILITÉ ═══════════════════════════════════════
 
@@ -60,7 +66,13 @@ export function computeDensities(args: {
       .filter((c) => c.date >= args.today && c.date <= deadline)
       .reduce((s, c) => s + c.capacityMinutes, 0)
     const density = capacity > 0 ? load / capacity : load > 0 ? Number.POSITIVE_INFINITY : 0
-    return { deadline, loadMinutes: load, capacityMinutes: capacity, density, feasible: density <= 1 }
+    return {
+      deadline,
+      loadMinutes: load,
+      capacityMinutes: capacity,
+      density,
+      feasible: density <= 1,
+    }
   })
 }
 
@@ -96,17 +108,32 @@ export function diagnoseDeficit(
 
   const options: Deficit['options'] = []
   if (heaviest) {
-    options.push({ action: `Repousser « ${heaviest.title} » après le ${point.deadline}`, minutesFreed: heaviest.remainingMinutes })
-    options.push({ action: `Réduire « ${heaviest.title} » de moitié`, minutesFreed: Math.round(heaviest.remainingMinutes / 2) })
+    options.push({
+      action: `Repousser « ${heaviest.title} » après le ${point.deadline}`,
+      minutesFreed: heaviest.remainingMinutes,
+    })
+    options.push({
+      action: `Réduire « ${heaviest.title} » de moitié`,
+      minutesFreed: Math.round(heaviest.remainingMinutes / 2),
+    })
   }
   if (second) {
     options.push({ action: `Retirer « ${second.title} »`, minutesFreed: second.remainingMinutes })
   }
   if (options.length < 2) {
-    options.push({ action: `Dégager ${deficit} min de capacité avant le ${point.deadline}`, minutesFreed: deficit })
+    options.push({
+      action: `Dégager ${deficit} min de capacité avant le ${point.deadline}`,
+      minutesFreed: deficit,
+    })
   }
 
-  return { deadline: point.deadline, deficitMinutes: deficit, deficitRatio: ratio, severity: severityFor(ratio), options }
+  return {
+    deadline: point.deadline,
+    deficitMinutes: deficit,
+    deficitRatio: ratio,
+    severity: severityFor(ratio),
+    options,
+  }
 }
 
 export function buildFeasibilityResult(args: {
@@ -116,7 +143,12 @@ export function buildFeasibilityResult(args: {
 }): FeasibilityResult {
   const densities = computeDensities(args)
   const deficits = densities
-    .map((d) => diagnoseDeficit(d, args.tasks.filter((t) => t.deadline <= d.deadline)))
+    .map((d) =>
+      diagnoseDeficit(
+        d,
+        args.tasks.filter((t) => t.deadline <= d.deadline),
+      ),
+    )
     .filter((x): x is Deficit => x !== null)
   return { densities, globallyFeasible: densities.every((d) => d.feasible), deficits }
 }
@@ -136,7 +168,12 @@ export const SIGNAL_COOLDOWN_HOURS = 72
 export function produceSignals(args: {
   deficits: Deficit[]
   anchorMissCounts: Record<string, number>
-  objectives: Array<{ objectiveId: string; name: string; quotaMet: boolean; daysSinceLastService: number }>
+  objectives: Array<{
+    objectiveId: string
+    name: string
+    quotaMet: boolean
+    daysSinceLastService: number
+  }>
   /** Sujet → ISO datetime du dernier signal émis. */
   lastSignalAt: Record<string, string>
   now: Date
@@ -150,14 +187,24 @@ export function produceSignals(args: {
       type: 'density_deficit',
       subject: `density:${d.deadline}`,
       severity: d.severity,
-      data: { deadline: d.deadline, deficitMinutes: d.deficitMinutes, deficitRatio: d.deficitRatio, options: d.options },
+      data: {
+        deadline: d.deadline,
+        deficitMinutes: d.deficitMinutes,
+        deficitRatio: d.deficitRatio,
+        options: d.options,
+      },
     })
   }
 
   for (const [ancreId, count] of Object.entries(args.anchorMissCounts)) {
     // Signal passif : aucune action automatique sur l'ancre.
     if (count >= 3) {
-      candidates.push({ type: 'anchor_missed_3x', subject: `anchor:${ancreId}`, severity: 'passive', data: { ancreId, missedCount: count } })
+      candidates.push({
+        type: 'anchor_missed_3x',
+        subject: `anchor:${ancreId}`,
+        severity: 'passive',
+        data: { ancreId, missedCount: count },
+      })
     }
   }
 
@@ -167,7 +214,11 @@ export function produceSignals(args: {
         type: 'objective_stalled',
         subject: `objective:${o.objectiveId}`,
         severity: 'passive',
-        data: { objectiveId: o.objectiveId, name: o.name, daysSinceLastService: o.daysSinceLastService },
+        data: {
+          objectiveId: o.objectiveId,
+          name: o.name,
+          daysSinceLastService: o.daysSinceLastService,
+        },
       })
     }
   }
@@ -175,7 +226,9 @@ export function produceSignals(args: {
   // F.2 : priorité au plus sévère en cas de déclenchement simultané, puis
   // silence de 72 h par sujet.
   const bySubject = new Map<string, PlanningSignal>()
-  for (const c of [...candidates].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])) {
+  for (const c of [...candidates].sort(
+    (a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity],
+  )) {
     if (!bySubject.has(c.subject)) bySubject.set(c.subject, c)
   }
 

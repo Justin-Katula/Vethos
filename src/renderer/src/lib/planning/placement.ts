@@ -58,7 +58,8 @@ export function findAncreConflict(
     if (a.trigger.trim().toLowerCase() === candidate.trigger.trim().toLowerCase()) return a
     const sharesDay = a.daysOfWeek.some((d) => candidate.daysOfWeek.includes(d))
     if (!sharesDay) continue
-    const overlaps = candidate.anchorMinute < a.anchorMinute + a.normalMaxMinutes && a.anchorMinute < candEnd
+    const overlaps =
+      candidate.anchorMinute < a.anchorMinute + a.normalMaxMinutes && a.anchorMinute < candEnd
     if (overlaps) return a
   }
   return null
@@ -81,8 +82,16 @@ export function computeObjectiveQuota(args: {
   remainingWeekCapacityMinutes: number
   daysSinceLastService: number
 }): number {
-  const remainingTarget = Math.max(0, args.objective.weeklyTargetMinutes - args.servedThisWeekMinutes)
-  if (remainingTarget <= 0 || args.remainingWeekCapacityMinutes <= 0 || args.todayCapacityMinutes <= 0) return 0
+  const remainingTarget = Math.max(
+    0,
+    args.objective.weeklyTargetMinutes - args.servedThisWeekMinutes,
+  )
+  if (
+    remainingTarget <= 0 ||
+    args.remainingWeekCapacityMinutes <= 0 ||
+    args.todayCapacityMinutes <= 0
+  )
+    return 0
 
   const evenDaily = args.objective.weeklyTargetMinutes / 7
   const weighted = remainingTarget * (args.todayCapacityMinutes / args.remainingWeekCapacityMinutes)
@@ -101,7 +110,11 @@ export function computeObjectiveQuota(args: {
 
 /** D.5 : bloc_cible = min(besoin_restant, 90 minutes, plafond 40 % du jour). */
 export function computeTargetBlockSize(remainingNeed: number, dayCapacity: number): number {
-  return Math.min(remainingNeed, TASK_CONSTANTS.targetBlockMinutes, Math.floor(dayCapacity * TASK_CONSTANTS.maxPercentPerDay))
+  return Math.min(
+    remainingNeed,
+    TASK_CONSTANTS.targetBlockMinutes,
+    Math.floor(dayCapacity * TASK_CONSTANTS.maxPercentPerDay),
+  )
 }
 
 /**
@@ -109,7 +122,11 @@ export function computeTargetBlockSize(remainingNeed: number, dayCapacity: numbe
  * restants — jamais tout sur un seul jour.
  *   part_jour = (capacité_du_jour / Σ capacités restantes) × besoin_total
  */
-export function computeProportionalShare(dayCapacity: number, totalRemainingCapacity: number, totalWork: number): number {
+export function computeProportionalShare(
+  dayCapacity: number,
+  totalRemainingCapacity: number,
+  totalWork: number,
+): number {
   if (totalRemainingCapacity <= 0) return 0
   return Math.round((dayCapacity / totalRemainingCapacity) * totalWork)
 }
@@ -129,13 +146,21 @@ export function computeTaskDayTarget(args: {
 }): { target: number; capOverride: boolean } {
   const cap40 = Math.floor(args.dayCapacity * TASK_CONSTANTS.maxPercentPerDay)
   const idealTotal = args.remainingDayCapacities.reduce(
-    (s, c) => s + Math.min(TASK_CONSTANTS.targetBlockMinutes, Math.floor(c * TASK_CONSTANTS.maxPercentPerDay)),
+    (s, c) =>
+      s +
+      Math.min(TASK_CONSTANTS.targetBlockMinutes, Math.floor(c * TASK_CONSTANTS.maxPercentPerDay)),
     0,
   )
 
   // L'idéal suffit : un bloc cible, plafond respecté.
   if (idealTotal >= args.remainingNeed) {
-    return { target: Math.min(computeTargetBlockSize(args.remainingNeed, args.dayCapacity), args.dayCapacity), capOverride: false }
+    return {
+      target: Math.min(
+        computeTargetBlockSize(args.remainingNeed, args.dayCapacity),
+        args.dayCapacity,
+      ),
+      capOverride: false,
+    }
   }
 
   // Pression réelle : part proportionnelle du besoin total.
@@ -158,7 +183,10 @@ export const WIP_COLD_START = 4
  * pour finir une tâche typique. Au-delà, simple encouragement à terminer —
  * jamais un blocage dur.
  */
-export function computeWIPLimit(args: { tasksCreatedPerWeek: Record<string, number>; targetWeeks: number }): number {
+export function computeWIPLimit(args: {
+  tasksCreatedPerWeek: Record<string, number>
+  targetWeeks: number
+}): number {
   const weeks = Object.values(args.tasksCreatedPerWeek)
   if (weeks.length < 2) return WIP_COLD_START
   const lambda = weeks.reduce((s, n) => s + n, 0) / weeks.length
@@ -170,7 +198,11 @@ export function computeWIPLimit(args: { tasksCreatedPerWeek: Record<string, numb
 // Un seul allocateur par jour : deux blocs ne peuvent pas occuper la même
 // minute. C'est la seule façon d'écrire un planning qu'on peut suivre.
 
-export type Allocation = { startMinute: number; endMinute: number; cognitiveWindow: CognitiveWindow }
+export type Allocation = {
+  startMinute: number
+  endMinute: number
+  cognitiveWindow: CognitiveWindow
+}
 
 export class DayAllocator {
   private free: Array<{ start: number; end: number }>

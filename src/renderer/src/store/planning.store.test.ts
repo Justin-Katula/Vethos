@@ -6,7 +6,8 @@ vi.stubGlobal('crypto', {
   ...globalThis.crypto,
   randomUUID: (() => {
     let n = 0
-    return () => `${String(++n).padStart(8, '0')}-1111-4111-8111-111111111111` as `${string}-${string}-${string}-${string}-${string}`
+    return () =>
+      `${String(++n).padStart(8, '0')}-1111-4111-8111-111111111111` as `${string}-${string}-${string}-${string}-${string}`
   })(),
 })
 
@@ -84,7 +85,9 @@ describe('B.1 — l’estimation de l’utilisateur n’entre jamais brute dans 
 describe('B.5 — découpage automatique, jamais une question', () => {
   it('une tâche qui ne tient pas dans un jour est découpée d’office', async () => {
     // 300 × 1.4 = 420 min planifiées, plafond 90 min/jour → 5 parts de 84.
-    await usePlanningStore.getState().addTask(taskDraft({ estimatedMinutes: 300 }), { maxPerDayMinutes: 90 })
+    await usePlanningStore
+      .getState()
+      .addTask(taskDraft({ estimatedMinutes: 300 }), { maxPerDayMinutes: 90 })
     const tasks = usePlanningStore.getState().tasks
 
     const group = tasks.find((t) => t.parentTaskId === null)!
@@ -98,12 +101,16 @@ describe('B.5 — découpage automatique, jamais une question', () => {
   })
 
   it('une tâche qui tient dans un jour n’est pas découpée', async () => {
-    await usePlanningStore.getState().addTask(taskDraft({ estimatedMinutes: 60 }), { maxPerDayMinutes: 90 })
+    await usePlanningStore
+      .getState()
+      .addTask(taskDraft({ estimatedMinutes: 60 }), { maxPerDayMinutes: 90 })
     expect(usePlanningStore.getState().tasks).toHaveLength(1)
   })
 
   it('supprimer le regroupement supprime ses sous-parties', async () => {
-    await usePlanningStore.getState().addTask(taskDraft({ estimatedMinutes: 300 }), { maxPerDayMinutes: 90 })
+    await usePlanningStore
+      .getState()
+      .addTask(taskDraft({ estimatedMinutes: 300 }), { maxPerDayMinutes: 90 })
     const group = usePlanningStore.getState().tasks.find((t) => t.parentTaskId === null)!
     await usePlanningStore.getState().deleteTask(group.id)
     expect(usePlanningStore.getState().tasks).toHaveLength(0)
@@ -114,7 +121,9 @@ describe('CRITÈRE 6 — deux ancres ne peuvent jamais occuper le même créneau
   it('la création de la seconde est refusée, sans décalage automatique', async () => {
     await usePlanningStore.getState().addAncre(ancreDraft())
     await expect(
-      usePlanningStore.getState().addAncre(ancreDraft({ name: 'Lecture', trigger: 'lecture', anchorMinute: 1110 })),
+      usePlanningStore
+        .getState()
+        .addAncre(ancreDraft({ name: 'Lecture', trigger: 'lecture', anchorMinute: 1110 })),
     ).rejects.toThrow(/Conflit d'horaire/)
     expect(usePlanningStore.getState().ancres).toHaveLength(1)
   })
@@ -122,13 +131,17 @@ describe('CRITÈRE 6 — deux ancres ne peuvent jamais occuper le même créneau
   it('une seule ancre par déclencheur', async () => {
     await usePlanningStore.getState().addAncre(ancreDraft())
     await expect(
-      usePlanningStore.getState().addAncre(ancreDraft({ name: 'Sport du soir', anchorMinute: 420, daysOfWeek: [1] })),
+      usePlanningStore
+        .getState()
+        .addAncre(ancreDraft({ name: 'Sport du soir', anchorMinute: 420, daysOfWeek: [1] })),
     ).rejects.toThrow(/déclencheur/)
   })
 
   it('un autre créneau, un autre déclencheur : accepté', async () => {
     await usePlanningStore.getState().addAncre(ancreDraft())
-    await usePlanningStore.getState().addAncre(ancreDraft({ name: 'Lecture', trigger: 'lecture', anchorMinute: 1260 }))
+    await usePlanningStore
+      .getState()
+      .addAncre(ancreDraft({ name: 'Lecture', trigger: 'lecture', anchorMinute: 1260 }))
     expect(usePlanningStore.getState().ancres).toHaveLength(2)
   })
 
@@ -145,7 +158,12 @@ describe('G.1 — on n’apprend que de ce qui est mesuré', () => {
     await usePlanningStore.getState().completeTask(id, 175)
 
     const [observation] = usePlanningStore.getState().learning.observations
-    expect(observation).toMatchObject({ taskId: id, estimatedMinutes: 100, actualMinutes: 175, completed: true })
+    expect(observation).toMatchObject({
+      taskId: id,
+      estimatedMinutes: 100,
+      actualMinutes: 175,
+      completed: true,
+    })
   })
 
   it('terminer sans mesure n’invente aucune observation', async () => {

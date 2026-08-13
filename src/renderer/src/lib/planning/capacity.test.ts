@@ -12,7 +12,11 @@ import {
 } from './capacity'
 import type { AncreItem, LearningObservation, ScheduleEntry } from './types'
 
-const entry = (start: number, end: number, categoryType: ScheduleEntry['categoryType'] = 'school'): ScheduleEntry => ({
+const entry = (
+  start: number,
+  end: number,
+  categoryType: ScheduleEntry['categoryType'] = 'school',
+): ScheduleEntry => ({
   dayOfWeek: 0,
   startMinute: start,
   endMinute: end,
@@ -33,7 +37,10 @@ const ancre = (anchorMinute: number, normalMaxMinutes: number): AncreItem => ({
   createdAt: '2026-08-01T10:00:00.000Z',
 })
 
-const obs = (o: Partial<LearningObservation>): LearningObservation => ({ createdAt: '2026-08-01T10:00:00.000Z', ...o })
+const obs = (o: Partial<LearningObservation>): LearningObservation => ({
+  createdAt: '2026-08-01T10:00:00.000Z',
+  ...o,
+})
 
 describe('A.1 — capacité brute', () => {
   it('1440 − sommeil (23 h → 7 h) = 960', () => {
@@ -50,7 +57,12 @@ describe('A.1 — capacité brute', () => {
   it('deux obligations qui se chevauchent ne sont comptées qu’une fois', () => {
     // 08 h → 12 h et 10 h → 16 h : 480 minutes occupées, pas 600.
     expect(computeRawCapacity([entry(480, 720), entry(600, 960)])).toBe(1440 - 480)
-    expect(mergeIntervals([{ start: 0, end: 10 }, { start: 5, end: 20 }])).toEqual([{ start: 0, end: 20 }])
+    expect(
+      mergeIntervals([
+        { start: 0, end: 10 },
+        { start: 5, end: 20 },
+      ]),
+    ).toEqual([{ start: 0, end: 20 }])
   })
 
   it('le sommeil n’est jamais compté comme charge de travail', () => {
@@ -62,7 +74,11 @@ describe('A.1 — capacité brute', () => {
 
 describe('A.2 — fragments et marges protégées', () => {
   it('les trous libres sont ceux que laissent obligations et ancres', () => {
-    const free = buildFreeIntervals([entry(0, 420, 'sleep'), entry(480, 960), entry(1380, 1440, 'sleep')])
+    const free = buildFreeIntervals([
+      entry(0, 420, 'sleep'),
+      entry(480, 960),
+      entry(1380, 1440, 'sleep'),
+    ])
     expect(free).toEqual([
       { start: 420, end: 480 },
       { start: 960, end: 1380 },
@@ -80,7 +96,10 @@ describe('A.2 — fragments et marges protégées', () => {
 
   it('un fragment sous le seuil est inutilisable', () => {
     const { usable, unusableMinutes } = splitUsable(
-      [{ start: 0, end: 20 }, { start: 100, end: 200 }],
+      [
+        { start: 0, end: 20 },
+        { start: 100, end: 200 },
+      ],
       25,
     )
     expect(usable).toEqual([{ start: 100, end: 200 }])
@@ -90,20 +109,31 @@ describe('A.2 — fragments et marges protégées', () => {
 
 describe('A.2.1 — seuil personnalisé', () => {
   it('sous 5 observations, le défaut tient et la confiance reste basse', () => {
-    const few = [30, 40, 50, 60].map((actualMinutes) => obs({ workKind: 'routine', actualMinutes, completed: true }))
+    const few = [30, 40, 50, 60].map((actualMinutes) =>
+      obs({ workKind: 'routine', actualMinutes, completed: true }),
+    )
     expect(measureFragmentThreshold(few, 'routine')).toEqual({ threshold: 25, confidence: 'low' })
   })
 
   it('dès 5 observations, le plus petit bloc réellement mené à terme remplace le défaut', () => {
-    const five = [32, 45, 60, 90, 120].map((actualMinutes) => obs({ workKind: 'routine', actualMinutes, completed: true }))
+    const five = [32, 45, 60, 90, 120].map((actualMinutes) =>
+      obs({ workKind: 'routine', actualMinutes, completed: true }),
+    )
     // 32 arrondi au multiple de 5 inférieur = 30.
-    expect(measureFragmentThreshold(five, 'routine')).toEqual({ threshold: 30, confidence: 'measured' })
+    expect(measureFragmentThreshold(five, 'routine')).toEqual({
+      threshold: 30,
+      confidence: 'measured',
+    })
   })
 
   it('les blocs abandonnés ne comptent pas comme un seuil utilisable', () => {
     const mixed = [
-      ...[10, 12].map((actualMinutes) => obs({ workKind: 'novel', actualMinutes, completed: false })),
-      ...[45, 50, 60, 70, 80].map((actualMinutes) => obs({ workKind: 'novel', actualMinutes, completed: true })),
+      ...[10, 12].map((actualMinutes) =>
+        obs({ workKind: 'novel', actualMinutes, completed: false }),
+      ),
+      ...[45, 50, 60, 70, 80].map((actualMinutes) =>
+        obs({ workKind: 'novel', actualMinutes, completed: true }),
+      ),
     ]
     expect(measureFragmentThreshold(mixed, 'novel').threshold).toBe(45)
   })

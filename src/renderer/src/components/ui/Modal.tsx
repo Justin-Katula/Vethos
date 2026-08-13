@@ -49,17 +49,17 @@ export function Modal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.99 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-lg rounded-lg border border-border-subtle bg-bg-elevated shadow-elevated"
+            className="w-full max-w-lg rounded border border-rail bg-panel "
           >
-            <header className="flex items-start gap-4 border-b border-border-subtle px-6 py-5">
+            <header className="flex items-start gap-4 border-b border-rail px-6 py-5">
               <div className="flex-1">
-                <h2 className="text-base font-semibold text-text-primary">{title}</h2>
-                {description && <p className="mt-1 text-xs text-text-muted">{description}</p>}
+                <h2 className="text-base font-semibold text-ink">{title}</h2>
+                {description && <p className="mt-1 text-xs text-ink-3">{description}</p>}
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-text-muted transition-colors hover:text-text-primary"
+                className="text-ink-3 transition-colors hover:text-ink"
                 aria-label="Fermer"
               >
                 <X size={16} />

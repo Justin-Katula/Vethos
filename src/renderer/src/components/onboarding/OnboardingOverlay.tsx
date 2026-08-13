@@ -2,11 +2,7 @@ import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import {
-  ONBOARDING_STEPS,
-  useOnboardingStore,
-  type OnboardingStep,
-} from '@/store/onboarding.store'
+import { ONBOARDING_STEPS, useOnboardingStore, type OnboardingStep } from '@/store/onboarding.store'
 import { WelcomeStep } from './WelcomeStep'
 import { UsernameStep } from './UsernameStep'
 import { DonePage } from './DonePage'
@@ -33,8 +29,7 @@ export function OnboardingOverlay(): JSX.Element {
   const isLastVisible = currentIdx === VISIBLE_STEPS.length - 1
   const isDone = step === 'done'
 
-  const progress =
-    step === 'done' ? 1 : (currentIdx + 1) / VISIBLE_STEPS.length
+  const progress = step === 'done' ? 1 : (currentIdx + 1) / VISIBLE_STEPS.length
 
   const handleNext = async (): Promise<void> => {
     if (isLastVisible) {
@@ -53,12 +48,12 @@ export function OnboardingOverlay(): JSX.Element {
       // l'application : on voit l'interface, rien ne répond.
       exit={{ opacity: 0, pointerEvents: 'none' }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] flex flex-col bg-bg-base/95 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex flex-col bg-hall/95 backdrop-blur-md"
     >
       {!isDone && (
-        <header className="flex items-center justify-between gap-6 border-b border-border-subtle px-10 py-5">
+        <header className="flex items-center justify-between gap-6 border-b border-rail px-10 py-5">
           <div className="flex flex-1 items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">
+            <span className="text-xs font-semibold uppercase tracking-widest text-ink-3">
               Onboarding
             </span>
             <div className="flex flex-1 items-center gap-1.5">
@@ -68,21 +63,19 @@ export function OnboardingOverlay(): JSX.Element {
                   <div
                     key={s}
                     className={cn(
-                      'h-1 flex-1 rounded-2xl transition-colors duration-300',
-                      reached ? 'bg-accent' : 'bg-border-subtle',
+                      'h-1 flex-1 rounded transition-colors duration-300',
+                      reached ? 'bg-ink' : 'bg-rail',
                     )}
                   />
                 )
               })}
             </div>
-            <span className="tabular-nums text-xs text-text-muted">
-              {Math.round(progress * 100)}%
-            </span>
+            <span className="tabular-nums text-xs text-ink-3">{Math.round(progress * 100)}%</span>
           </div>
           <button
             type="button"
             onClick={() => void skip()}
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-bg-card hover:text-text-primary"
+            className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-panel hover:text-ink"
           >
             <X size={14} />
             Passer
@@ -108,31 +101,31 @@ export function OnboardingOverlay(): JSX.Element {
       </main>
 
       {!isDone && (
-        <footer className="flex items-center justify-between border-t border-border-subtle px-10 py-5">
+        <footer className="flex items-center justify-between border-t border-rail px-10 py-5">
           <button
             type="button"
             onClick={prev}
             disabled={isFirstVisible}
             className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
+              'inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-medium transition-colors',
               isFirstVisible
-                ? 'cursor-not-allowed text-text-muted opacity-40'
-                : 'text-text-secondary hover:bg-bg-card hover:text-text-primary',
+                ? 'cursor-not-allowed text-ink-3 opacity-40'
+                : 'text-ink-2 hover:bg-panel hover:text-ink',
             )}
           >
             <ArrowLeft size={16} />
             Précédent
           </button>
 
-          <span className="text-xs text-text-muted">
+          <span className="text-xs text-ink-3">
             Étape {currentIdx + 1} sur {VISIBLE_STEPS.length} ·{' '}
-            <span className="text-text-secondary">{STEP_LABELS[step]}</span>
+            <span className="text-ink-2">{STEP_LABELS[step]}</span>
           </span>
 
           <button
             type="button"
             onClick={() => void handleNext()}
-            className="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            className="inline-flex items-center gap-2 rounded bg-ink px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white"
           >
             {isLastVisible ? (
               <>

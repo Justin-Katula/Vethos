@@ -8,7 +8,15 @@ import type {
   TaskVerdict,
 } from './types'
 import { buildDayCapacity, measureFragmentThreshold } from './capacity'
-import { addDays, dateKey, datesBetween, daysBetween, dayOfWeek, minutesUntilEndOf, startOfWeek } from './dates'
+import {
+  addDays,
+  dateKey,
+  datesBetween,
+  daysBetween,
+  dayOfWeek,
+  minutesUntilEndOf,
+  startOfWeek,
+} from './dates'
 import { estimateTask } from './estimation'
 import {
   buildFeasibilityResult,
@@ -27,7 +35,12 @@ import {
   TASK_CONSTANTS,
   type TaskWithMargin,
 } from './placement'
-import { computeBreakMinutes, computeFatigue, computeRestFloor, computeWeeklyBreathing } from './rest'
+import {
+  computeBreakMinutes,
+  computeFatigue,
+  computeRestFloor,
+  computeWeeklyBreathing,
+} from './rest'
 
 /** D.6 : semaines cibles pour finir une tâche typique (W de L = λ × W). */
 const WIP_TARGET_WEEKS = 2
@@ -53,7 +66,9 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
   // B.5 : une tâche découpée devient un simple regroupement visuel. Ce sont
   // ses sous-parties qui portent le travail — la compter aussi doublerait la
   // charge.
-  const groupIds = new Set(input.tasks.map((t) => t.parentTaskId).filter((id): id is string => id !== null))
+  const groupIds = new Set(
+    input.tasks.map((t) => t.parentTaskId).filter((id): id is string => id !== null),
+  )
   const activeTasks = input.tasks.filter((t) => t.status === 'active' && !groupIds.has(t.id))
 
   // ─── B. Ce qu'il reste à placer ─────────────────────────────────────────
@@ -65,15 +80,24 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
   const needByTask = new Map<string, number>()
   for (const task of activeTasks) {
     if (input.durationSource) {
-      const estimate = estimateTask({ task, observations: input.observations, durationSource: input.durationSource })
-      needByTask.set(task.id, estimate.measuredMinutes === null ? task.remainingMinutes : estimate.remainingMinutes)
+      const estimate = estimateTask({
+        task,
+        observations: input.observations,
+        durationSource: input.durationSource,
+      })
+      needByTask.set(
+        task.id,
+        estimate.measuredMinutes === null ? task.remainingMinutes : estimate.remainingMinutes,
+      )
     } else {
       needByTask.set(task.id, task.remainingMinutes)
     }
   }
 
-  const scheduleFor = (dow: number): ScheduleEntry[] => input.schedule.filter((e) => e.dayOfWeek === dow)
-  const ancresFor = (dow: number): AncreItem[] => input.ancres.filter((a) => a.daysOfWeek.includes(dow))
+  const scheduleFor = (dow: number): ScheduleEntry[] =>
+    input.schedule.filter((e) => e.dayOfWeek === dow)
+  const ancresFor = (dow: number): AncreItem[] =>
+    input.ancres.filter((a) => a.daysOfWeek.includes(dow))
 
   // A.2.1 : seuil de fragment personnalisé dès 5 observations, défaut sinon.
   const fragmentThreshold = Math.min(
@@ -305,10 +329,16 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
       })
 
       let dayTarget = Math.min(target, need)
-      while (dayTarget >= TASK_CONSTANTS.minBlockMinutes && budget >= TASK_CONSTANTS.minBlockMinutes) {
+      while (
+        dayTarget >= TASK_CONSTANTS.minBlockMinutes &&
+        budget >= TASK_CONSTANTS.minBlockMinutes
+      ) {
         let work = Math.min(dayTarget, TASK_CONSTANTS.targetBlockMinutes)
         // D.5 : maximum 2 blocs profonds (90 min) par jour.
-        if (work >= TASK_CONSTANTS.targetBlockMinutes && deepBlocksToday >= TASK_CONSTANTS.maxDeepBlocksPerDay) {
+        if (
+          work >= TASK_CONSTANTS.targetBlockMinutes &&
+          deepBlocksToday >= TASK_CONSTANTS.maxDeepBlocksPerDay
+        ) {
           work = TASK_CONSTANTS.targetBlockMinutes - 1
         }
 
@@ -385,7 +415,10 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
     now,
   })
 
-  const wipLimit = computeWIPLimit({ tasksCreatedPerWeek: input.tasksCreatedPerWeek, targetWeeks: WIP_TARGET_WEEKS })
+  const wipLimit = computeWIPLimit({
+    tasksCreatedPerWeek: input.tasksCreatedPerWeek,
+    targetWeeks: WIP_TARGET_WEEKS,
+  })
 
   return {
     blocks: blocks.sort((a, b) => a.date.localeCompare(b.date) || a.startMinute - b.startMinute),

@@ -16,19 +16,19 @@ const ICON: Record<ToastType['variant'], typeof CheckCircle2> = {
 // Seule l'erreur en porte une — c'est à cela qu'elle sert.
 const STYLES: Record<ToastType['variant'], { bg: string; ring: string; icon: string }> = {
   success: {
-    bg: 'bg-accent/10',
-    ring: 'ring-accent/25',
-    icon: 'text-text-primary',
+    bg: 'bg-panel-lit',
+    ring: 'ring-signal/40',
+    icon: 'text-ink',
   },
   info: {
-    bg: 'bg-accent/10',
-    ring: 'ring-accent/25',
-    icon: 'text-accent',
+    bg: 'bg-panel-lit',
+    ring: 'ring-signal/40',
+    icon: 'text-ink',
   },
   error: {
-    bg: 'bg-danger/10',
-    ring: 'ring-danger/30',
-    icon: 'text-danger',
+    bg: 'bg-signal/10',
+    ring: 'ring-signal/30',
+    icon: 'text-signal',
   },
 }
 
@@ -50,22 +50,20 @@ function ToastItem({ toast }: { toast: ToastType }): JSX.Element {
       exit={{ opacity: 0, x: 40, scale: 0.95, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        'pointer-events-auto flex w-80 items-start gap-3 rounded-lg border border-border-subtle px-4 py-3 shadow-card ring-1 backdrop-blur-md',
+        'pointer-events-auto flex w-80 items-start gap-3 rounded border border-rail px-4 py-3 ring-1 backdrop-blur-md',
         style.bg,
         style.ring,
       )}
     >
       <Icon size={18} className={cn('mt-0.5 shrink-0', style.icon)} />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-text-primary">{toast.title}</div>
-        {toast.description && (
-          <div className="mt-0.5 text-xs text-text-secondary">{toast.description}</div>
-        )}
+        <div className="text-sm font-semibold text-ink">{toast.title}</div>
+        {toast.description && <div className="mt-0.5 text-xs text-ink-2">{toast.description}</div>}
       </div>
       <button
         type="button"
         onClick={() => dismiss(toast.id)}
-        className="shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-bg-card hover:text-text-primary"
+        className="shrink-0 rounded p-1 text-ink-3 transition-colors hover:bg-panel hover:text-ink"
         aria-label="Fermer"
       >
         <X size={14} />

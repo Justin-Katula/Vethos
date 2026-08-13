@@ -47,7 +47,11 @@ const ancre = (over: Partial<AncreItem>): AncreItem => ({
   ...over,
 })
 
-const slot = (start: number, end: number, cognitiveWindow: TimeSlot['cognitiveWindow'] = 'NORMALE'): TimeSlot => ({
+const slot = (
+  start: number,
+  end: number,
+  cognitiveWindow: TimeSlot['cognitiveWindow'] = 'NORMALE',
+): TimeSlot => ({
   startMinute: start,
   endMinute: end,
   durationMinutes: end - start,
@@ -89,7 +93,12 @@ describe('D.6 — cascade : deadline → importance → SRPT → création', () 
 
   it('la marge n’ordonne jamais directement : une marge plus faible ne double pas une deadline plus proche', () => {
     const sorted = sortTasksByCascade([
-      task({ id: 'marge-negative', deadline: '2026-08-25', marginMinutes: -500, marginStatus: 'overdue' }),
+      task({
+        id: 'marge-negative',
+        deadline: '2026-08-25',
+        marginMinutes: -500,
+        marginStatus: 'overdue',
+      }),
       task({ id: 'deadline-proche', deadline: '2026-08-12', marginMinutes: 900 }),
     ])
     expect(sorted[0]!.id).toBe('deadline-proche')
@@ -97,8 +106,20 @@ describe('D.6 — cascade : deadline → importance → SRPT → création', () 
 
   it('l’ordre est stable et reproductible sur 4 tâches', () => {
     const build = () => [
-      task({ id: 'd', deadline: '2026-08-20', importance: 5, remainingMinutes: 100, createdAt: '2026-08-02T00:00:00.000Z' }),
-      task({ id: 'c', deadline: '2026-08-20', importance: 5, remainingMinutes: 100, createdAt: '2026-08-01T00:00:00.000Z' }),
+      task({
+        id: 'd',
+        deadline: '2026-08-20',
+        importance: 5,
+        remainingMinutes: 100,
+        createdAt: '2026-08-02T00:00:00.000Z',
+      }),
+      task({
+        id: 'c',
+        deadline: '2026-08-20',
+        importance: 5,
+        remainingMinutes: 100,
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }),
       task({ id: 'b', deadline: '2026-08-20', importance: 5, remainingMinutes: 50 }),
       task({ id: 'a', deadline: '2026-08-15', importance: 1, remainingMinutes: 900 }),
     ]
@@ -115,7 +136,9 @@ describe('D.3 — ancres', () => {
   })
 
   it('CRITÈRE 6 : deux ancres ne peuvent jamais occuper le même créneau', () => {
-    const existing = [ancre({ id: 'sport', anchorMinute: 1080, normalMaxMinutes: 60, daysOfWeek: [0, 2] })]
+    const existing = [
+      ancre({ id: 'sport', anchorMinute: 1080, normalMaxMinutes: 60, daysOfWeek: [0, 2] }),
+    ]
     // 18 h 30 chevauche 18 h → 19 h le lundi.
     const conflict = findAncreConflict(
       { anchorMinute: 1110, normalMaxMinutes: 30, daysOfWeek: [0], trigger: 'lecture' },
@@ -127,14 +150,20 @@ describe('D.3 — ancres', () => {
   it('pas de conflit un jour où l’autre ancre n’existe pas', () => {
     const existing = [ancre({ anchorMinute: 1080, daysOfWeek: [0, 2] })]
     expect(
-      findAncreConflict({ anchorMinute: 1080, normalMaxMinutes: 60, daysOfWeek: [1, 3], trigger: 'lecture' }, existing),
+      findAncreConflict(
+        { anchorMinute: 1080, normalMaxMinutes: 60, daysOfWeek: [1, 3], trigger: 'lecture' },
+        existing,
+      ),
     ).toBeNull()
   })
 
   it('une seule ancre par déclencheur, même à une autre heure', () => {
     const existing = [ancre({ trigger: 'sport', anchorMinute: 1080, daysOfWeek: [0] })]
     expect(
-      findAncreConflict({ anchorMinute: 420, normalMaxMinutes: 30, daysOfWeek: [3], trigger: 'Sport' }, existing),
+      findAncreConflict(
+        { anchorMinute: 420, normalMaxMinutes: 30, daysOfWeek: [3], trigger: 'Sport' },
+        existing,
+      ),
     ).not.toBeNull()
   })
 })
@@ -278,7 +307,12 @@ describe('D.6 — limite de travail en cours', () => {
   })
 
   it('L = λ × W dès que λ est mesuré : (3 + 5) / 2 × 2 = 8', () => {
-    expect(computeWIPLimit({ tasksCreatedPerWeek: { '2026-08-03': 3, '2026-08-10': 5 }, targetWeeks: 2 })).toBe(8)
+    expect(
+      computeWIPLimit({
+        tasksCreatedPerWeek: { '2026-08-03': 3, '2026-08-10': 5 },
+        targetWeeks: 2,
+      }),
+    ).toBe(8)
   })
 })
 
@@ -307,9 +341,8 @@ describe('allocateur — deux blocs n’occupent jamais la même minute', () => 
   })
 
   it('D.1.4 : la fenêtre PROFONDE est préférée quand elle existe', () => {
-    const a = new DayAllocator(
-      [slot(480, 600, 'BASSE'), slot(600, 720, 'PROFONDE')],
-      (hour) => (hour >= 10 ? 'PROFONDE' : 'BASSE'),
+    const a = new DayAllocator([slot(480, 600, 'BASSE'), slot(600, 720, 'PROFONDE')], (hour) =>
+      hour >= 10 ? 'PROFONDE' : 'BASSE',
     )
     expect(a.take(60, 'PROFONDE')).toMatchObject({ startMinute: 600, cognitiveWindow: 'PROFONDE' })
   })

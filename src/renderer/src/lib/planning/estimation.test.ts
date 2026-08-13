@@ -13,12 +13,14 @@ import {
 import type { LearningObservation, TaskItem } from './types'
 
 /** Ratios 1.0, 1.2, 1.4, 1.6, 1.8 sur la catégorie « maths ». */
-const mathsObservations: LearningObservation[] = [100, 120, 140, 160, 180].map((actualMinutes, i) => ({
-  category: 'maths',
-  estimatedMinutes: 100,
-  actualMinutes,
-  createdAt: `2026-08-0${i + 1}T10:00:00.000Z`,
-}))
+const mathsObservations: LearningObservation[] = [100, 120, 140, 160, 180].map(
+  (actualMinutes, i) => ({
+    category: 'maths',
+    estimatedMinutes: 100,
+    actualMinutes,
+    createdAt: `2026-08-0${i + 1}T10:00:00.000Z`,
+  }),
+)
 
 const task = (over: Partial<TaskItem> = {}): TaskItem => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -38,24 +40,38 @@ const task = (over: Partial<TaskItem> = {}): TaskItem => ({
 
 describe('B.1 — facteur de correction', () => {
   it('médiane des ratios réel/estimé = 1.4', () => {
-    const r = computeCorrectionFactor({ observations: mathsObservations, category: 'maths', workKind: 'routine' })
+    const r = computeCorrectionFactor({
+      observations: mathsObservations,
+      category: 'maths',
+      workKind: 'routine',
+    })
     expect(r.factor).toBe(1.4)
     expect(r.sampleSize).toBe(5)
     expect(r.confidence).toBe('medium')
   })
 
   it('dès 10 observations, la confiance passe haute', () => {
-    const ten = [...mathsObservations, ...mathsObservations.map((o, i) => ({ ...o, createdAt: `2026-08-1${i}T10:00:00.000Z` }))]
-    expect(computeCorrectionFactor({ observations: ten, category: 'maths', workKind: 'routine' }).confidence).toBe('high')
+    const ten = [
+      ...mathsObservations,
+      ...mathsObservations.map((o, i) => ({ ...o, createdAt: `2026-08-1${i}T10:00:00.000Z` })),
+    ]
+    expect(
+      computeCorrectionFactor({ observations: ten, category: 'maths', workKind: 'routine' })
+        .confidence,
+    ).toBe('high')
   })
 
   it('B.3 — sous 5 tâches complétées, le défaut tient : ×1.4 connu, ×1.7 nouveau', () => {
     const four = mathsObservations.slice(0, 4)
-    expect(computeCorrectionFactor({ observations: four, category: 'maths', workKind: 'routine' })).toMatchObject({
+    expect(
+      computeCorrectionFactor({ observations: four, category: 'maths', workKind: 'routine' }),
+    ).toMatchObject({
       factor: DEFAULT_FACTORS.routine,
       confidence: 'low',
     })
-    expect(computeCorrectionFactor({ observations: [], category: 'dessin', workKind: 'novel' })).toMatchObject({
+    expect(
+      computeCorrectionFactor({ observations: [], category: 'dessin', workKind: 'novel' }),
+    ).toMatchObject({
       factor: DEFAULT_FACTORS.novel,
       confidence: 'none',
     })
@@ -63,7 +79,11 @@ describe('B.1 — facteur de correction', () => {
 
   it('une autre catégorie n’emprunte jamais les mesures de la première', () => {
     expect(
-      computeCorrectionFactor({ observations: mathsObservations, category: 'rédaction', workKind: 'novel' }).factor,
+      computeCorrectionFactor({
+        observations: mathsObservations,
+        category: 'rédaction',
+        workKind: 'novel',
+      }).factor,
     ).toBe(DEFAULT_FACTORS.novel)
   })
 })

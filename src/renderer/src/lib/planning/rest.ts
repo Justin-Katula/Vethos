@@ -60,11 +60,20 @@ export function computeWeeklyBreathing(args: {
   const gap = restTaken - target
 
   if (gap >= 0 || args.remainingDays.length === 0) {
-    return { targetMinutes: target, restTakenMinutes: restTaken, gapMinutes: gap, adjustment: 'none', reducedDates: [], capPercent: 100 }
+    return {
+      targetMinutes: target,
+      restTakenMinutes: restTaken,
+      gapMinutes: gap,
+      adjustment: 'none',
+      reducedDates: [],
+      capPercent: 100,
+    }
   }
 
   const highDays = args.elapsedDays.filter(
-    (d) => d.rawCapacityMinutes > 0 && (d.workedMinutes / d.rawCapacityMinutes) * 100 > HIGH_UTILIZATION_PERCENT,
+    (d) =>
+      d.rawCapacityMinutes > 0 &&
+      (d.workedMinutes / d.rawCapacityMinutes) * 100 > HIGH_UTILIZATION_PERCENT,
   ).length
 
   // Le jour le moins perturbant = celui qui porte le moins de charge.

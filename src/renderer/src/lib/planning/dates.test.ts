@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { addDays, dateKey, datesBetween, dayOfWeek, daysBetween, minutesUntilEndOf, startOfWeek, weekKey } from './dates'
+import {
+  addDays,
+  dateKey,
+  datesBetween,
+  dayOfWeek,
+  daysBetween,
+  minutesUntilEndOf,
+  startOfWeek,
+  weekKey,
+} from './dates'
 
 describe('dates — arithmétique locale', () => {
   it('dateKey rend la date LOCALE, pas la date UTC', () => {
@@ -20,7 +29,11 @@ describe('dates — arithmétique locale', () => {
   })
 
   it('datesBetween rend les bornes incluses', () => {
-    expect(datesBetween('2026-08-11', '2026-08-13')).toEqual(['2026-08-11', '2026-08-12', '2026-08-13'])
+    expect(datesBetween('2026-08-11', '2026-08-13')).toEqual([
+      '2026-08-11',
+      '2026-08-12',
+      '2026-08-13',
+    ])
     expect(datesBetween('2026-08-13', '2026-08-11')).toEqual([])
   })
 

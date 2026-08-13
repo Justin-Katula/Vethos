@@ -14,7 +14,10 @@ const NOW = new Date(2026, 7, 11, 10, 0)
 
 describe('C.1 — marge et urgence', () => {
   it('marge > 0 → du jeu', () => {
-    expect(computeMargin(300, 120)).toMatchObject({ marginMinutes: 180, marginStatus: 'comfortable' })
+    expect(computeMargin(300, 120)).toMatchObject({
+      marginMinutes: 180,
+      marginStatus: 'comfortable',
+    })
   })
 
   it('marge = 0 → commencer maintenant, urgence maximale', () => {
@@ -83,8 +86,16 @@ describe('C.2 — test de charge', () => {
       dailyCapacity: capacity,
       today: '2026-08-11',
     })
-    expect(points[0]).toMatchObject({ deadline: '2026-08-12', loadMinutes: 300, capacityMinutes: 400 })
-    expect(points[1]).toMatchObject({ deadline: '2026-08-13', loadMinutes: 500, capacityMinutes: 600 })
+    expect(points[0]).toMatchObject({
+      deadline: '2026-08-12',
+      loadMinutes: 300,
+      capacityMinutes: 400,
+    })
+    expect(points[1]).toMatchObject({
+      deadline: '2026-08-13',
+      loadMinutes: 500,
+      capacityMinutes: 600,
+    })
   })
 
   it('aucune capacité mais du travail dû → densité infinie', () => {
@@ -100,7 +111,13 @@ describe('C.2 — test de charge', () => {
 describe('C.3 — diagnostic quantitatif', () => {
   it('déficit exact, période, et au moins deux options chiffrées', () => {
     const deficit = diagnoseDeficit(
-      { deadline: '2026-08-13', loadMinutes: 900, capacityMinutes: 600, density: 1.5, feasible: false },
+      {
+        deadline: '2026-08-13',
+        loadMinutes: 900,
+        capacityMinutes: 600,
+        density: 1.5,
+        feasible: false,
+      },
       [
         { title: 'Dossier', remainingMinutes: 600 },
         { title: 'Révisions', remainingMinutes: 300 },
@@ -108,14 +125,29 @@ describe('C.3 — diagnostic quantitatif', () => {
     )
     expect(deficit!.deficitMinutes).toBe(300)
     expect(deficit!.options.length).toBeGreaterThanOrEqual(2)
-    expect(deficit!.options[0]).toEqual({ action: 'Repousser « Dossier » après le 2026-08-13', minutesFreed: 600 })
-    expect(deficit!.options[1]).toEqual({ action: 'Réduire « Dossier » de moitié', minutesFreed: 300 })
+    expect(deficit!.options[0]).toEqual({
+      action: 'Repousser « Dossier » après le 2026-08-13',
+      minutesFreed: 600,
+    })
+    expect(deficit!.options[1]).toEqual({
+      action: 'Réduire « Dossier » de moitié',
+      minutesFreed: 300,
+    })
     expect(deficit!.options[2]).toEqual({ action: 'Retirer « Révisions »', minutesFreed: 300 })
   })
 
   it('aucun diagnostic quand la densité tient', () => {
     expect(
-      diagnoseDeficit({ deadline: '2026-08-13', loadMinutes: 100, capacityMinutes: 600, density: 0.16, feasible: true }, []),
+      diagnoseDeficit(
+        {
+          deadline: '2026-08-13',
+          loadMinutes: 100,
+          capacityMinutes: 600,
+          density: 0.16,
+          feasible: true,
+        },
+        [],
+      ),
     ).toBeNull()
   })
 })
@@ -137,7 +169,13 @@ describe('C.3.3 — sévérité proportionnelle au déficit de densité', () => 
   it('la sévérité porte sur le déficit, jamais sur l’avancement d’une tâche', () => {
     // 900 demandées, 600 possibles : 300 manquantes = 33 % du DEMANDÉ.
     const d = diagnoseDeficit(
-      { deadline: '2026-08-13', loadMinutes: 900, capacityMinutes: 600, density: 1.5, feasible: false },
+      {
+        deadline: '2026-08-13',
+        loadMinutes: 900,
+        capacityMinutes: 600,
+        density: 1.5,
+        feasible: false,
+      },
       [{ title: 'Dossier', remainingMinutes: 900 }],
     )
     expect(d!.deficitRatio).toBeCloseTo(1 / 3, 5)
@@ -158,11 +196,17 @@ describe('C.3.4 + F.2 — signaux', () => {
     const signals = produceSignals({
       deficits: [deficit],
       anchorMissCounts: { 'ancre-1': 3 },
-      objectives: [{ objectiveId: 'obj-1', name: 'Guitare', quotaMet: false, daysSinceLastService: 4 }],
+      objectives: [
+        { objectiveId: 'obj-1', name: 'Guitare', quotaMet: false, daysSinceLastService: 4 },
+      ],
       lastSignalAt: {},
       now: NOW,
     })
-    expect(signals.map((s) => s.type).sort()).toEqual(['anchor_missed_3x', 'density_deficit', 'objective_stalled'])
+    expect(signals.map((s) => s.type).sort()).toEqual([
+      'anchor_missed_3x',
+      'density_deficit',
+      'objective_stalled',
+    ])
   })
 
   it('un déficit sous 10 % ne produit aucun signal actif', () => {
@@ -177,8 +221,20 @@ describe('C.3.4 + F.2 — signaux', () => {
   })
 
   it('une ancre ratée 2 fois ne déclenche rien ; 3 fois, oui', () => {
-    const two = produceSignals({ deficits: [], anchorMissCounts: { a: 2 }, objectives: [], lastSignalAt: {}, now: NOW })
-    const three = produceSignals({ deficits: [], anchorMissCounts: { a: 3 }, objectives: [], lastSignalAt: {}, now: NOW })
+    const two = produceSignals({
+      deficits: [],
+      anchorMissCounts: { a: 2 },
+      objectives: [],
+      lastSignalAt: {},
+      now: NOW,
+    })
+    const three = produceSignals({
+      deficits: [],
+      anchorMissCounts: { a: 3 },
+      objectives: [],
+      lastSignalAt: {},
+      now: NOW,
+    })
     expect(two).toHaveLength(0)
     expect(three[0]).toMatchObject({ type: 'anchor_missed_3x', severity: 'passive' })
   })
@@ -187,7 +243,9 @@ describe('C.3.4 + F.2 — signaux', () => {
     const signals = produceSignals({
       deficits: [],
       anchorMissCounts: {},
-      objectives: [{ objectiveId: 'obj-1', name: 'Guitare', quotaMet: true, daysSinceLastService: 5 }],
+      objectives: [
+        { objectiveId: 'obj-1', name: 'Guitare', quotaMet: true, daysSinceLastService: 5 },
+      ],
       lastSignalAt: {},
       now: NOW,
     })
@@ -199,10 +257,22 @@ describe('C.3.4 + F.2 — signaux', () => {
     const old = new Date(NOW.getTime() - 80 * 3_600_000).toISOString()
 
     expect(
-      produceSignals({ deficits: [deficit], anchorMissCounts: {}, objectives: [], lastSignalAt: { 'density:2026-08-13': recent }, now: NOW }),
+      produceSignals({
+        deficits: [deficit],
+        anchorMissCounts: {},
+        objectives: [],
+        lastSignalAt: { 'density:2026-08-13': recent },
+        now: NOW,
+      }),
     ).toHaveLength(0)
     expect(
-      produceSignals({ deficits: [deficit], anchorMissCounts: {}, objectives: [], lastSignalAt: { 'density:2026-08-13': old }, now: NOW }),
+      produceSignals({
+        deficits: [deficit],
+        anchorMissCounts: {},
+        objectives: [],
+        lastSignalAt: { 'density:2026-08-13': old },
+        now: NOW,
+      }),
     ).toHaveLength(1)
   })
 

@@ -37,11 +37,9 @@ beforeEach(() => {
 })
 
 describe('useAppUsageStore', () => {
-  it('load() hydrate depuis l\'API', async () => {
+  it("load() hydrate depuis l'API", async () => {
     mockApi.get.mockResolvedValue({
-      entries: [
-        { appId: 'app-1', date: '2026-05-05', minutes: 12 },
-      ],
+      entries: [{ appId: 'app-1', date: '2026-05-05', minutes: 12 }],
       lastTickAt: '2026-05-05T10:00:00.000Z',
     })
     await useAppUsageStore.getState().load()

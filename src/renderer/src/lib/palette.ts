@@ -2,27 +2,24 @@ import type { ScheduleCategory } from '@shared/schemas'
 import type { BlockKind } from '@/lib/planning/types'
 
 /**
- * La palette de Vethos.
+ * L'ÉMAIL DU HALL
  *
- * Une seule règle : on distingue par la LUMINOSITÉ, jamais par la teinte.
- * Douze catégories en douze couleurs, c'est un tableau de bord ; douze
- * catégories en douze gris, c'est une interface qu'on lit d'un coup d'œil.
+ * Un tableau de gare n'a qu'une encre et un rouge. Tout le reste se distingue
+ * par la luminosité de l'émail : plus une bande est claire, plus le temps
+ * qu'elle occupe t'appartient.
  *
- * Les deux seules couleurs de l'application signalent un danger prouvé. Si
- * quelque chose est rouge, c'est que c'est cassé — pas que c'est décoré.
+ * Le rouge n'est pas ici. Il vit dans `--signal`, il dit « maintenant » et
+ * « ça a changé », et il n'a le droit de dire rien d'autre.
  */
 
-export const DANGER = 'var(--color-danger)'
-export const WARNING = 'var(--color-warning)'
-
-/** Réalité fixe : plus c'est contraignant, plus c'est sombre. */
+/** Ce qui est déjà pris. Le sommeil est presque le panneau lui-même. */
 export const CATEGORY_COLOR: Record<ScheduleCategory, string> = {
-  sleep: '#111113',
-  school: '#E2E2E2',
-  work: '#A8A8AC',
-  commute: '#525252',
-  commitment: '#737373',
-  custom: '#5E5E62',
+  sleep: '#1A1D21',
+  school: '#8C949D',
+  work: '#727A83',
+  commute: '#454C54',
+  commitment: '#5B636C',
+  custom: '#4E555D',
 }
 
 export const CATEGORY_LABEL: Record<ScheduleCategory, string> = {
@@ -34,18 +31,15 @@ export const CATEGORY_LABEL: Record<ScheduleCategory, string> = {
   custom: 'Autre',
 }
 
-/** Le plan : ce qui t'appartient est clair, ce qui est fixe est sourd. */
+/** Ce que le moteur a posé. Le travail à échéance est le plus clair du cadran. */
 export const BLOCK_COLOR: Record<BlockKind, string> = {
-  task: '#E8E8E8',
-  objective: '#A8A8AC',
-  ancre: '#737373',
+  task: '#F2F5F7',
+  objective: '#A6ADB5',
+  ancre: '#6B737C',
 }
 
-/**
- * Les teintes proposées à la création d'un objectif ou d'une ancre.
- * Cinq niveaux de gris — assez pour se repérer, jamais assez pour crier.
- */
-export const CHOOSABLE_SHADES = ['#E8E8E8', '#C4C4C8', '#A8A8AC', '#8A8A8E', '#6E6E72'] as const
+/** Les teintes proposées à la création. Cinq degrés d'émail, aucune couleur. */
+export const CHOOSABLE_SHADES = ['#F2F5F7', '#C3CAD1', '#A6ADB5', '#868E96', '#6B737C'] as const
 
 export function nextShade(index: number): string {
   return CHOOSABLE_SHADES[index % CHOOSABLE_SHADES.length]!

@@ -19,7 +19,9 @@ type SettingsState = {
   load: () => Promise<void>
   save: (username: string) => Promise<void>
   setOnboardingCompleted: (completed: boolean) => Promise<void>
-  updateSettings: (patch: Partial<Pick<SettingsState, 'username' | 'sleepStart' | 'sleepEnd'>>) => Promise<void>
+  updateSettings: (
+    patch: Partial<Pick<SettingsState, 'username' | 'sleepStart' | 'sleepEnd'>>,
+  ) => Promise<void>
 }
 
 function buildPayload(state: SettingsState): Settings {

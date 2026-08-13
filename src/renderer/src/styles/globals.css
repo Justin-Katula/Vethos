@@ -4,89 +4,62 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-  /* Panneau de contenu : sobre au repos, il ne s'éclaire qu'au survol. */
-  .info-panel {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-card);
-    background-image: none;
-    box-shadow: var(--shadow-card);
-    transition:
-      border-color var(--duration-slow) var(--ease-out),
-      background-color var(--duration-slow) var(--ease-out),
-      background-image var(--duration-slow) var(--ease-out),
-      box-shadow var(--duration-slow) var(--ease-out),
-      transform var(--duration-slow) var(--ease-out);
-  }
-
-  .info-panel:hover {
-    border-color: var(--border-strong);
-    background-image:
-      radial-gradient(circle at center, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%, transparent);
-    background-size: 6px 6px, auto;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 14px 34px rgba(0, 0, 0, 0.42);
-  }
-}
+/**
+ * LE HALL DES DÉPARTS
+ *
+ * Un hall de gare suisse contient deux instruments dessinés par le même
+ * programme : l'horloge de Hilfiker, et le tableau des départs. L'horloge
+ * porte la forme du jour. Le tableau porte le classement de ce qui est dû.
+ *
+ * Trois lois, tenues partout :
+ *   1. Le panneau est plat et carré. L'émail ne s'arrondit pas et ne flotte
+ *      pas : l'élévation se déclare une fois, par un filet, jamais par une
+ *      ombre en plus du filet.
+ *   2. Un seul rouge. C'est l'aiguille de l'horloge et c'est l'alerte du
+ *      tableau. Il encode une loi, jamais une catégorie : il dit « maintenant »
+ *      et « ça a changé », rien d'autre. Tout le reste se distingue par la
+ *      luminosité.
+ *   3. Les chiffres sont gravés. Chasse fixe, largeur constante, alignés en
+ *      colonne : une minute qui change ne déplace jamais sa voisine.
+ */
 
 @layer base {
   :root {
-    /* Backgrounds — noir profond, jamais pur : les cartes translucides
-       laissent respirer le fond animé au lieu de l'écraser. */
-    --bg-base: #020202;
-    --bg-elevated: rgba(12, 12, 13, 0.94);
-    --bg-card: rgba(20, 20, 22, 0.78);
-    --bg-card-hover: rgba(31, 31, 34, 0.88);
+    /* Le hall, puis la face du tableau. Jamais de noir pur : l'émail a du
+       fond, et deux plans distincts font la profondeur sans une seule ombre. */
+    --hall: #0F1113;
+    --panel: #16191D;
+    --panel-lit: #1D2126;
 
-    /* Borders */
-    --border-subtle: rgba(216, 216, 216, 0.1);
-    --border-strong: rgba(216, 216, 216, 0.22);
+    /* Filets gravés. La seule façon de séparer deux choses. */
+    --rail: #262B31;
+    --rail-strong: #3A4149;
 
-    /* Text */
-    --text-primary: #E8E8E8;
-    --text-secondary: #B4B4B6;
-    --text-muted: #7E7E82;
+    /* Lettrage émaillé, en trois degrés de luminosité. */
+    --ink: #F2F5F7;
+    --ink-2: #A6ADB5;
+    --ink-3: #6B737C;
 
-    /* Accent neutre, cohérent avec le fond animé. La couleur est réservée
-       au danger : elle ne sert jamais de décoration. */
-    --accent: #D8D8D8;
-    --accent-hover: #F0F0F0;
-    --accent-soft: rgba(216, 216, 216, 0.16);
+    /* Le seul rouge du hall. Aiguille et alerte, même encre. */
+    --signal: #E4000F;
+    --signal-lit: #FF2A38;
+    --signal-wash: rgba(228, 0, 15, 0.12);
 
-    /* Échelle de gris des catégories : on distingue par la luminosité,
-       jamais par la teinte. */
-    --grade-1: #E2E2E2;
-    --grade-2: #A8A8AC;
-    --grade-3: #737373;
-    --grade-4: #525252;
-    --grade-5: #2A2A2E;
-    --color-dark-grey: #151518;
+    /* L'émail ne s'arrondit pas. 2px est le rayon d'un coin fraisé, pas
+       d'une carte. */
+    --radius: 2px;
+    --radius-control: 3px;
 
-    /* Les deux seules couleurs de l'application : elles signalent, elles
-       ne décorent pas. */
-    --color-danger: #EF4444;
-    --color-warning: #FF8A00;
-
-    /* Radii */
-    --radius-sm: 12px;
-    --radius-md: 12px;
-    --radius-lg: 20px;
-    --radius-xl: 20px;
-
-    /* Shadows */
-    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 28px rgba(0, 0, 0, 0.52);
-    --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 56px rgba(0, 0, 0, 0.62);
-
-    /* Motion */
+    /* L'horloge de Hilfiker : l'aiguille file, s'arrête en haut, puis la
+       minute tombe. C'est le seul moment chorégraphié de l'application. */
+    --sweep: 1.6s;
+    --dwell: 320ms;
+    --ease-sweep: cubic-bezier(0.4, 0, 0.1, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --duration-fast: 200ms;
-    --duration-normal: 250ms;
-    --duration-slow: 300ms;
+    --fast: 140ms;
+    --normal: 220ms;
 
-    /* Rythme vertical. Une seule échelle, des multiples de 4, pour que deux
-       sections écrites à un mois d'intervalle respirent pareil. */
+    /* Rythme vertical. Multiples de 4, une seule échelle. */
     --step-1: 0.25rem;
     --step-2: 0.5rem;
     --step-3: 0.75rem;
@@ -104,71 +77,84 @@
   }
 
   body {
-    background: var(--bg-base);
-    background-attachment: fixed;
-    color: var(--text-primary);
+    background: var(--hall);
+    color: var(--ink);
     font-family: 'Geist Variable', system-ui, sans-serif;
-    /* Chiffres à chasse fixe et à hauteur constante : une heure qui change ne
-       doit jamais faire bouger ce qui l'entoure. */
+    /* Chiffres gravés : chasse fixe, hauteur constante. */
     font-variant-numeric: tabular-nums lining-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     overflow: hidden;
-    user-select: text;
   }
 
-  /* Scrollbar custom */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    transition: background var(--duration-fast) var(--ease-out);
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.16);
-  }
+  /* La signalétique resserre à mesure qu'elle grandit. Jamais au-delà de
+     -0.03em : au-delà les lettres se touchent et le panneau devient sale. */
+  h1 { letter-spacing: -0.028em; }
+  h2 { letter-spacing: -0.02em; }
+  h3, h4 { letter-spacing: -0.012em; }
 
-  /* Focus visible */
-  :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-  }
-
-  /* Sélection texte */
+  /**
+   * Les surfaces que le navigateur dessine à ma place portent quand même le
+   * hall : le curseur, la sélection, la barre de défilement, l'anneau de
+   * focus, le soulignement. C'est ce qui sépare une page construite d'une
+   * page assemblée.
+   */
   ::selection {
-    background: var(--accent-soft);
-    color: var(--text-primary);
+    background: var(--signal-wash);
+    color: var(--ink);
   }
 
-  /* Aux grandes tailles, l'espacement par défaut paraît lâche : on le resserre
-     à mesure que le corps grandit, jamais l'inverse. */
-  h1 { letter-spacing: -0.022em; }
-  h2 { letter-spacing: -0.016em; }
-  h3, h4 { letter-spacing: -0.01em; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--hall); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rail);
+    border: 3px solid var(--hall);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--rail-strong); }
 
-  /* Les chiffres sont la matière première de cette application : ils méritent
-     la fonte à chasse fixe partout où ils s'alignent. */
-  .numeric {
-    font-family: 'Geist Mono Variable', ui-monospace, monospace;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+  :focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+
+  input, textarea, select {
+    caret-color: var(--signal);
+    font-family: inherit;
+  }
+
+  a { text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
+
+  /* Le champ de saisie est une fente dans le panneau, pas une carte posée
+     dessus : creusé par un filet bas, il s'allume quand on l'occupe. */
+  .slot {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rail-strong);
+    border-radius: 0;
+    color: var(--ink);
+    padding: 0.4rem 0.15rem;
+    outline: none;
+    transition: border-color var(--fast) var(--ease-out);
+  }
+  .slot::placeholder { color: var(--ink-3); }
+  .slot:hover { border-bottom-color: var(--ink-3); }
+  .slot:focus { border-bottom-color: var(--signal); }
+
+  /* Un panneau : une face plate, un filet, rien d'autre. L'élévation se
+     déclare une seule fois. */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--rail);
+    border-radius: var(--radius);
   }
 
   /**
-   * Mouvement réduit.
-   *
-   * Une application de concentration qui impose du mouvement à quelqu'un qui a
-   * demandé le contraire au niveau du système se contredit elle-même. Tout
-   * s'arrête ici, y compris le fond animé : la règle vaut pour la décoration
-   * avant de valoir pour l'interface.
+   * Mouvement réduit : le hall s'immobilise. Une application de concentration
+   * ne peut pas imposer ce qu'on lui a refusé au niveau du système, et la
+   * règle vaut pour l'horloge avant de valoir pour l'interface.
    */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

@@ -82,9 +82,7 @@ function createSalt(): string {
 async function derivePasswordHash(password: string, saltBase64: string): Promise<string> {
   const crypto = assertCryptoAvailable()
   const encodedPassword = new TextEncoder().encode(password)
-  const key = await crypto.subtle.importKey('raw', encodedPassword, 'PBKDF2', false, [
-    'deriveBits',
-  ])
+  const key = await crypto.subtle.importKey('raw', encodedPassword, 'PBKDF2', false, ['deriveBits'])
   const hash = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',

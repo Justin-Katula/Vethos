@@ -1,4 +1,11 @@
-import type { AncreItem, CognitiveWindow, DayCapacity, LearningObservation, ScheduleEntry, TimeSlot } from './types'
+import type {
+  AncreItem,
+  CognitiveWindow,
+  DayCapacity,
+  LearningObservation,
+  ScheduleEntry,
+  TimeSlot,
+} from './types'
 
 // ═══ PARTIE A — TEMPS DISPONIBLE ═══════════════════════════════════════════
 
@@ -37,7 +44,10 @@ export function mergeIntervals(intervals: Interval[]): Interval[] {
 export function computeRawCapacity(entries: ScheduleEntry[], ancres: AncreItem[] = []): number {
   const occupied = mergeIntervals([
     ...entries.map((e) => ({ start: e.startMinute, end: e.endMinute })),
-    ...ancres.map((a) => ({ start: a.anchorMinute, end: Math.min(1440, a.anchorMinute + a.normalMaxMinutes) })),
+    ...ancres.map((a) => ({
+      start: a.anchorMinute,
+      end: Math.min(1440, a.anchorMinute + a.normalMaxMinutes),
+    })),
   ]).reduce((sum, i) => sum + (i.end - i.start), 0)
   return Math.max(0, 1440 - occupied)
 }
@@ -46,7 +56,10 @@ export function computeRawCapacity(entries: ScheduleEntry[], ancres: AncreItem[]
 export function buildFreeIntervals(entries: ScheduleEntry[], ancres: AncreItem[] = []): Interval[] {
   const busy = mergeIntervals([
     ...entries.map((e) => ({ start: e.startMinute, end: e.endMinute })),
-    ...ancres.map((a) => ({ start: a.anchorMinute, end: Math.min(1440, a.anchorMinute + a.normalMaxMinutes) })),
+    ...ancres.map((a) => ({
+      start: a.anchorMinute,
+      end: Math.min(1440, a.anchorMinute + a.normalMaxMinutes),
+    })),
   ])
   const free: Interval[] = []
   let cursor = 0
@@ -65,7 +78,10 @@ export function buildFreeIntervals(entries: ScheduleEntry[], ancres: AncreItem[]
 export function applyProtectedMargins(free: Interval[], entries: ScheduleEntry[]): Interval[] {
   const protectedStarts = entries.map((e) => ({
     at: e.startMinute,
-    margin: e.categoryType === 'sleep' ? FRAGMENT_DEFAULTS.preSleepTransition : FRAGMENT_DEFAULTS.preObligationPrep,
+    margin:
+      e.categoryType === 'sleep'
+        ? FRAGMENT_DEFAULTS.preSleepTransition
+        : FRAGMENT_DEFAULTS.preObligationPrep,
   }))
 
   return free

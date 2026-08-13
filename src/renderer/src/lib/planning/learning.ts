@@ -32,7 +32,9 @@ export function createObservation(
 }
 
 /** G.1 : taux de complétion des blocs, par heure de la journée. */
-export function groupByHour(observations: LearningObservation[]): Map<number, Array<{ completed: boolean }>> {
+export function groupByHour(
+  observations: LearningObservation[],
+): Map<number, Array<{ completed: boolean }>> {
   const map = new Map<number, Array<{ completed: boolean }>>()
   for (const o of observations) {
     if (o.startHour === undefined || o.completed === undefined) continue
@@ -68,7 +70,10 @@ export function anchorHoldRate(
 ): { rate: number; confidence: Confidence } {
   const at = observations.filter((o) => o.anchorHour === hour)
   if (at.length === 0) return { rate: 0, confidence: 'none' }
-  return { rate: at.filter((o) => o.held).length / at.length, confidence: dataConfidence(at.length) }
+  return {
+    rate: at.filter((o) => o.held).length / at.length,
+    confidence: dataConfidence(at.length),
+  }
 }
 
 /** G.1 : taux de report des objectifs. */
@@ -78,5 +83,8 @@ export function objectivePostponementRate(
 ): { rate: number; confidence: Confidence } {
   const of = observations.filter((o) => o.objectiveId === objectiveId)
   if (of.length === 0) return { rate: 0, confidence: 'none' }
-  return { rate: of.filter((o) => o.postponed).length / of.length, confidence: dataConfidence(of.length) }
+  return {
+    rate: of.filter((o) => o.postponed).length / of.length,
+    confidence: dataConfidence(of.length),
+  }
 }

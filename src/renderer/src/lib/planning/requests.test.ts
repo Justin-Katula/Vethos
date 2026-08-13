@@ -3,8 +3,22 @@ import { evaluateRequest, touchesAbsoluteRule } from './requests'
 import type { AncreItem, ScheduleEntry } from './types'
 
 const sleep: ScheduleEntry[] = [
-  { dayOfWeek: 1, startMinute: 0, endMinute: 420, categoryType: 'sleep', label: 'Sommeil', color: '#4C566A' },
-  { dayOfWeek: 1, startMinute: 1380, endMinute: 1440, categoryType: 'sleep', label: 'Sommeil', color: '#4C566A' },
+  {
+    dayOfWeek: 1,
+    startMinute: 0,
+    endMinute: 420,
+    categoryType: 'sleep',
+    label: 'Sommeil',
+    color: '#4C566A',
+  },
+  {
+    dayOfWeek: 1,
+    startMinute: 1380,
+    endMinute: 1440,
+    categoryType: 'sleep',
+    label: 'Sommeil',
+    color: '#4C566A',
+  },
 ]
 
 const sport: AncreItem = {

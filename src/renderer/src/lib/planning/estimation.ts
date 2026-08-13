@@ -32,13 +32,15 @@ export type CorrectionFactor = {
 type Ratio = { estimatedMinutes: number; actualMinutes: number; createdAt: string }
 
 function ratiosOf(observations: LearningObservation[], category: string): number[] {
-  return (observations.filter(
-    (o) =>
-      o.category === category &&
-      typeof o.estimatedMinutes === 'number' &&
-      typeof o.actualMinutes === 'number' &&
-      o.estimatedMinutes > 0,
-  ) as Ratio[])
+  return (
+    observations.filter(
+      (o) =>
+        o.category === category &&
+        typeof o.estimatedMinutes === 'number' &&
+        typeof o.actualMinutes === 'number' &&
+        o.estimatedMinutes > 0,
+    ) as Ratio[]
+  )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, FACTOR_WINDOW)
     .map((o) => o.actualMinutes / o.estimatedMinutes)
@@ -131,7 +133,10 @@ export function computePlannedDuration(userEstimate: number, factor: number): nu
  * B.2 : la durée réelle est la SOMME des sessions obligatoires mesurées.
  * Jamais une déclaration de l'utilisateur.
  */
-export function actualDuration(taskId: string, source: DurationRealSource = STUB_DURATION_SOURCE): number | null {
+export function actualDuration(
+  taskId: string,
+  source: DurationRealSource = STUB_DURATION_SOURCE,
+): number | null {
   return source.getActualMinutes(taskId)
 }
 

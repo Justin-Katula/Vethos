@@ -1,94 +1,40 @@
-import { useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { CheckCircle2 } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 
-const CONFETTI_COLORS = [
-  '#3b82f6',
-  '#06b6d4',
-  '#10b981',
-  '#a855f7',
-  '#ec4899',
-  '#f97316',
-  '#eab308',
-]
-
-type Confetto = {
-  x: number
-  y: number
-  size: number
-  color: string
-  rot: number
-  delay: number
-}
-
-function generateConfetti(count: number): Confetto[] {
-  const out: Confetto[] = []
-  for (let i = 0; i < count; i++) {
-    out.push({
-      x: Math.random() * 100,
-      y: -10 - Math.random() * 30,
-      size: 4 + Math.random() * 6,
-      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)]!,
-      rot: Math.random() * 360,
-      delay: Math.random() * 0.4,
-    })
-  }
-  return out
-}
-
+/**
+ * LE DÉPART EST ANNONCÉ
+ *
+ * Le tableau ne lance pas de confettis quand un train part. Il affiche la
+ * ligne, et la ligne s'allume. La fin de l'installation se dit dans la
+ * grammaire du hall : une barre qui se remplit, et la suite.
+ */
 export function DonePage(): JSX.Element {
-  const confetti = useMemo(() => generateConfetti(60), [])
+  const reduce = useReducedMotion()
 
   return (
-    <div className="relative flex h-full min-h-[500px] flex-col items-center justify-center gap-6 text-center">
-      {/* Confettis */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {confetti.map((c, i) => (
+    <div className="flex min-h-[420px] w-full flex-col items-center justify-center">
+      <div className="w-full max-w-md">
+        <div className="flex items-baseline justify-between border-b border-rail pb-3">
+          <span className="font-mono text-[13px] text-ink-3">Départ</span>
+          <span className="font-mono text-[13px] text-signal">à l’heure</span>
+        </div>
+
+        {/* La barre se remplit : c'est le seul mouvement, et il dit que le
+            réglage est fait, pas qu'il faut applaudir. */}
+        <div className="relative h-[2px] w-full overflow-hidden bg-rail">
           <motion.div
-            key={i}
-            initial={{ y: `${c.y}vh`, x: `${c.x}vw`, opacity: 1, rotate: c.rot }}
-            animate={{
-              y: '110vh',
-              rotate: c.rot + 90,
-              opacity: [1, 1, 0],
-            }}
-            transition={{
-              duration: 0.3,
-              delay: c.delay,
-              ease: [0.4, 0, 0.6, 1],
-            }}
-            className="absolute"
-            style={{
-              width: c.size,
-              height: c.size * 1.6,
-              backgroundColor: c.color,
-              borderRadius: 1,
-            }}
+            className="absolute inset-y-0 left-0 bg-signal"
+            initial={{ width: reduce ? '100%' : 0 }}
+            animate={{ width: '100%' }}
+            transition={{ duration: reduce ? 0 : 1.1, ease: [0.16, 1, 0.3, 1] }}
           />
-        ))}
-      </div>
+        </div>
 
-      <motion.div
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-accent/12 text-text-primary"
-      >
-        <CheckCircle2 size={48} strokeWidth={2.4} />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25, duration: 0.25 }}
-      >
-        <h1 className="text-4xl font-bold tracking-tight text-text-primary">
-          Tout est prêt.
-        </h1>
-        <p className="mt-3 text-base text-text-secondary">
-          Termine une session de focus pour voir tes premiers progrès.
+        <h1 className="mt-8 text-3xl font-medium text-ink">Le tableau est en service.</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
+          Déclare ton temps une fois dans « Mon temps ». À partir de là, l’application place le
+          travail elle-même et ne te demande plus rien.
         </p>
-      </motion.div>
+      </div>
     </div>
   )
 }

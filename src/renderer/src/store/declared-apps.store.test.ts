@@ -60,9 +60,7 @@ describe('useDeclaredAppsStore', () => {
       exeName: 'Notion.exe',
       linkedObjectiveId: null,
     })
-    expect(created.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    )
+    expect(created.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     expect(useDeclaredAppsStore.getState().apps).toHaveLength(1)
     expect(mockStorage.write).toHaveBeenCalledWith(
       'declared_apps',

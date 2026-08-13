@@ -37,7 +37,9 @@ export function touchesAbsoluteRule(args: {
   const end = start + args.request.minutes
   const sleeps = args.daySchedule.filter((e) => e.categoryType === 'sleep')
   const hitsSleep = sleeps.some((e) => start < e.endMinute && e.startMinute < end)
-  const hitsAncre = args.dayAncres.some((a) => start < a.anchorMinute + a.normalMaxMinutes && a.anchorMinute < end)
+  const hitsAncre = args.dayAncres.some(
+    (a) => start < a.anchorMinute + a.normalMaxMinutes && a.anchorMinute < end,
+  )
   return hitsSleep || hitsAncre
 }
 
@@ -70,13 +72,22 @@ function maxDensityIfGranted(args: {
   today: string
 }): { maxDensity: number; deficitMinutes: number } {
   const adjusted = args.dailyCapacity.map((c) =>
-    c.date === args.date ? { ...c, capacityMinutes: Math.max(0, c.capacityMinutes - args.minutes) } : c,
+    c.date === args.date
+      ? { ...c, capacityMinutes: Math.max(0, c.capacityMinutes - args.minutes) }
+      : c,
   )
-  const densities = computeDensities({ tasks: args.tasks, dailyCapacity: adjusted, today: args.today })
+  const densities = computeDensities({
+    tasks: args.tasks,
+    dailyCapacity: adjusted,
+    today: args.today,
+  })
   const worst = densities.reduce<{ maxDensity: number; deficitMinutes: number }>(
     (acc, d) =>
       d.density > acc.maxDensity
-        ? { maxDensity: d.density, deficitMinutes: Math.max(0, Math.round(d.loadMinutes - d.capacityMinutes)) }
+        ? {
+            maxDensity: d.density,
+            deficitMinutes: Math.max(0, Math.round(d.loadMinutes - d.capacityMinutes)),
+          }
         : acc,
     { maxDensity: 0, deficitMinutes: 0 },
   )
@@ -112,14 +123,23 @@ export function evaluateRequest(args: {
     return {
       status: 'denied',
       grantedMinutes: 0,
-      reason: 'Cette plage touche le sommeil ou une ancre — deux règles absolues. Voici la plage libre la plus proche.',
+      reason:
+        'Cette plage touche le sommeil ou une ancre — deux règles absolues. Voici la plage libre la plus proche.',
       alternative: nearestFreeWindow({ request: args.request, daySchedule, dayAncres }),
     }
   }
 
-  const full = maxDensityIfGranted({ ...args, minutes: args.request.minutes, date: args.request.date })
+  const full = maxDensityIfGranted({
+    ...args,
+    minutes: args.request.minutes,
+    date: args.request.date,
+  })
   if (full.maxDensity <= 1) {
-    return { status: 'granted', grantedMinutes: args.request.minutes, reason: 'Accordée — la faisabilité reste prouvée.' }
+    return {
+      status: 'granted',
+      grantedMinutes: args.request.minutes,
+      reason: 'Accordée — la faisabilité reste prouvée.',
+    }
   }
 
   // La plus grande version sûre, par dichotomie sur les minutes demandées.

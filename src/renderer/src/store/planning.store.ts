@@ -155,14 +155,18 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async updateTaskRemaining(id, minutes) {
-    const tasks = get().tasks.map((t) => (t.id === id ? { ...t, remainingMinutes: Math.max(0, Math.round(minutes)) } : t))
+    const tasks = get().tasks.map((t) =>
+      t.id === id ? { ...t, remainingMinutes: Math.max(0, Math.round(minutes)) } : t,
+    )
     set({ tasks })
     assertStorageWrite(await nexus.storage.write('tasks', { tasks }), 'tasks')
   },
 
   async completeTask(id, measuredMinutes) {
     const task = get().tasks.find((t) => t.id === id)
-    const tasks = get().tasks.map((t) => (t.id === id ? { ...t, status: 'history' as const, remainingMinutes: 0 } : t))
+    const tasks = get().tasks.map((t) =>
+      t.id === id ? { ...t, status: 'history' as const, remainingMinutes: 0 } : t,
+    )
 
     // G.1 : on n'enregistre une observation que s'il y a une MESURE.
     // Sans temps de session mesuré, rien n'est appris — on n'invente pas.
@@ -197,7 +201,11 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async addObjective(input) {
-    const objective: ObjectiveItem = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() }
+    const objective: ObjectiveItem = {
+      ...input,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    }
     const objectives = [...get().objectives, objective]
     set({ objectives })
     assertStorageWrite(await nexus.storage.write('objectives', { objectives }), 'objectives')
