@@ -31,8 +31,12 @@ export function Board({
   children: React.ReactNode
   className?: string
 }) {
+  // Un tableau de gare se lit de loin, avec vingt lignes qui guident l'œil.
+  // Sur un écran, à une ou deux lignes, une colonne de mille pixels ouvre un
+  // canyon entre le libellé et sa durée : la largeur est plafonnée pour que le
+  // regard fasse le trajet.
   return (
-    <div className={cn('panel overflow-hidden', className)}>
+    <div className={cn('panel max-w-[760px] overflow-hidden', className)}>
       <div className="flex items-baseline gap-4 border-b border-rail px-4 py-2.5 text-[10.5px] font-medium text-ink-3">
         <span className="w-[4.5rem] shrink-0">{columns[0]}</span>
         <span className="min-w-0 flex-1">{columns[1]}</span>
@@ -98,9 +102,9 @@ export function BoardRow({
       </span>
 
       <span className="flex min-w-0 flex-1 items-baseline gap-2.5">
-        <span className={cn('truncate', state === 'done' && 'line-through decoration-ink-3')}>
-          {label}
-        </span>
+        {/* Un bloc passé n'est pas annulé, il est derrière toi : il s'éteint,
+            il ne se raye pas. Une rature se lit comme une erreur. */}
+        <span className="truncate">{label}</span>
         {note && (
           <span
             className={cn(

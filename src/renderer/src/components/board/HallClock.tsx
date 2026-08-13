@@ -25,7 +25,10 @@ const C = VIEWBOX / 2
 const R_FIXED = 116
 const W_FIXED = 13
 const R_PLAN = 94
-const W_PLAN = 10
+// Une bande fine posée dans une rainure visible se lit comme une graduation.
+// Épaisse et flottant sur un rail à moitié effacé, un bloc isolé devenait un
+// pâté blanc au lieu d'un arc de précision.
+const W_PLAN = 7
 const R_TICK = 128
 
 /** 0 h en haut, sens horaire. */
@@ -117,15 +120,7 @@ export function HallClock({
 
         {/* Les deux rails vides : le cadran reste lisible même sans rien dessus. */}
         <circle cx={C} cy={C} r={R_FIXED} fill="none" stroke="var(--rail)" strokeWidth={W_FIXED} />
-        <circle
-          cx={C}
-          cy={C}
-          r={R_PLAN}
-          fill="none"
-          stroke="var(--rail)"
-          strokeWidth={W_PLAN}
-          opacity={0.5}
-        />
+        <circle cx={C} cy={C} r={R_PLAN} fill="none" stroke="var(--rail)" strokeWidth={W_PLAN} />
 
         {/* Bande extérieure : ce qui est déjà pris. */}
         {fixed.map((e, i) => (

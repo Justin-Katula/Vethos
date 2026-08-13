@@ -19,6 +19,17 @@ import { createReconciliationClock, type ReconciliationClock } from './blocking/
 import { createEnforcer } from './blocking/enforcer'
 import type { BlockingRules } from './blocking/schedule'
 
+/**
+ * Rendu du texte en niveaux de gris, jamais en sous-pixels.
+ *
+ * Sur Windows, Chromium lisse le texte par sous-pixels (ClearType). Sur un fond
+ * presque noir avec une graisse fine, chaque glyphe se retrouve bordé de
+ * franges roses et vertes : les chiffres du tableau et les petits libellés
+ * paraissent sales. Aucune règle CSS ne le corrige de façon fiable ici, et le
+ * commutateur doit être posé avant que l'application soit prête.
+ */
+app.commandLine.appendSwitch('disable-lcd-text')
+
 // Init logging avant toute autre logique main (cf. setup.ts pour le pourquoi
 // du module paresseux).
 setupLogging()
@@ -65,13 +76,14 @@ function createMainWindow(): BrowserWindow {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0a0a0c', // évite le flash blanc au démarrage
+    backgroundColor: '#0F1113', // le hall, pour éviter le flash blanc au démarrage
     show: false, // affichée seulement après ready-to-show
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#0a0a0c',
-      symbolColor: '#a1a1aa',
+      // La barre système fait partie du hall : même émail, même encre.
+      color: '#0F1113',
+      symbolColor: '#A6ADB5',
       height: 36,
     },
     webPreferences: {

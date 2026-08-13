@@ -125,6 +125,19 @@
     font-family: inherit;
   }
 
+  /* Le remplissage automatique du navigateur repeint le champ en clair et
+     rend le hall incohérent d'un écran à l'autre. On lui rend l'émail : la
+     couleur passe par l'ombre interne, seule propriété que ce style respecte. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--ink);
+    -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
+    caret-color: var(--signal);
+    transition: background-color 9999s ease-out 0s;
+  }
+
   a { text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
 
   /* Le champ de saisie est une fente dans le panneau, pas une carte posée

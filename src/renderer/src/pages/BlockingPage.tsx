@@ -152,14 +152,15 @@ function ChampSites({
 
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-ink-2">
-        Sites web
-        {sites.length > 0 && (
-          <span className="ml-2 normal-case text-ink-2">
-            {sites.length} bloqué{sites.length > 1 ? 's' : ''}
-          </span>
-        )}
-      </p>
+      {/* Le titre de la section porte déjà « Sites web » : le répéter ici
+          faisait lire deux fois la même chose. Ne reste que le compte, et
+          seulement quand il y a quelque chose à compter. */}
+      {sites.length > 0 && (
+        <p className="mb-2 text-sm text-ink-2">
+          {sites.length} site{sites.length > 1 ? 's' : ''} bloqué
+          {sites.length > 1 ? 's' : ''}
+        </p>
+      )}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Globe
