@@ -25,13 +25,13 @@ export function UsernameStep(): JSX.Element {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="flex h-16 w-16 items-center justify-center rounded bg-fg/15 text-fg"
+        className="flex h-16 w-16 items-center justify-center rounded border border-line bg-surface text-fg"
       >
         <User size={28} />
       </motion.div>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-3xl font-bold">
           {trimmed ? `Bienvenue, ${trimmed}.` : 'Comment tu t’appelles ?'}
         </h1>
         <p className="mt-2 text-sm text-fg-2">
@@ -42,11 +42,12 @@ export function UsernameStep(): JSX.Element {
       <input
         autoFocus
         type="text"
+        name="onboarding-name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Alex"
         maxLength={100}
-        className="w-full max-w-md rounded border border-line bg-surface px-5 py-4 text-center text-2xl font-semibold tracking-tight text-fg outline-none transition-colors focus:border-line-strong focus:ring-4 focus:ring-accent/20"
+        className="field w-full max-w-md px-5 py-4 text-center text-2xl font-semibold"
       />
     </div>
   )

@@ -1,14 +1,20 @@
 import log from '@main/logging/setup'
 import { listProcesses } from '@main/tracking/enumerator'
 import {
+  closeAppBlockOverlay,
   closeSiteBlockOverlayWindow,
   closeSiteBlockOverlayWindowsExcept,
   restoreBlockedAppResources,
   showBlockOverlayWindow,
 } from '@main/tracking/strict-block-window'
 import { createSiteTracker, type SiteTracker } from '@main/tracking/site-tracker'
-import { watchProcessWindows } from '@main/tracking/process-window-probe'
 import type { SessionSnapshot } from './clock'
+import { getProtectionLevel, BLOCK_REJECTED_PROTECTED } from './system-guard'
+import {
+  createNetworkController,
+  type InternetBlockLease,
+  type NetworkController,
+} from './network-controller'
 
 /**
  * Applique une session de blocage sur le monde réel.
@@ -42,7 +48,7 @@ type Suivi = {
   attemptToken: string
   /** Le processus tournait-il AVANT le début de la session ? */
   preexisting: boolean
-  unwatch: () => void
+  networkLease: InternetBlockLease | null
 }
 
 export type Enforcer = {
@@ -50,11 +56,14 @@ export type Enforcer = {
   apply: (snapshot: SessionSnapshot) => Promise<void>
   /** Lève tout : overlays fermés, barre des tâches et son restaurés. */
   stop: () => Promise<void>
+  /** Arrêt définitif de Vethos : lève la session puis ferme l'assistant pare-feu. */
+  shutdown: () => Promise<void>
   /** PIDs actuellement bloqués — pour l'interface et les tests. */
   blockedPids: () => number[]
 }
 
-export function createEnforcer(): Enforcer {
+export function createEnforcer(deps: { network?: NetworkController } = {}): Enforcer {
+  const network = deps.network ?? createNetworkController()
   const suivis = new Map<number, Suivi>()
   let scanTimer: NodeJS.Timeout | null = null
   let actif = false
@@ -64,47 +73,78 @@ export function createEnforcer(): Enforcer {
   let pidsAuDemarrage = new Set<number>()
   let appsBloquees = new Set<string>()
 
-  function libererUn(suivi: Suivi): void {
+  /**
+   * File d'exécution : tout ce qui touche `actif`, `suivis`, `appsBloquees` ou
+   * `pidsAuDemarrage` y passe, un seul à la fois.
+   *
+   * Sans elle, deux chemins se croisent pour de vrai. L'horloge appelle `apply` sans
+   * l'attendre (`void enforcer.apply(...)` dans index.ts) : deux transitions
+   * rapprochées voient toutes deux `actif === false`, prennent chacune l'instantané
+   * des processus lancés, et la seconde écrase la première — or c'est cet instantané
+   * qui décide si le bouton Fermer avertit d'un travail non sauvegardé. En parallèle,
+   * `scanner` bat sur un intervalle et parcourt `suivis` que `apply` est en train de
+   * modifier.
+   */
+  let file: Promise<unknown> = Promise.resolve()
+  function enFile<T>(travail: () => Promise<T>): Promise<T> {
+    const suivant = file.then(travail, travail)
+    // La file ne doit jamais rester rompue : un échec ne bloque pas les suivants.
+    file = suivant.catch(() => undefined)
+    return suivant
+  }
+
+  async function libererUn(suivi: Suivi): Promise<void> {
+    // Rend la barre des tâches, le son et les overlays. Appelé sur CHAQUE
+    // chemin de sortie : une application laissée muette et absente de la barre
+    // des tâches serait le pire défaut possible.
+    let overlayFerme = false
     try {
-      suivi.unwatch()
+      overlayFerme = await closeAppBlockOverlay(suivi.attemptToken)
     } catch (err) {
-      log.warn('[enforcer] arrêt de surveillance impossible', { pid: suivi.pid, err })
+      log.warn('[enforcer] fermeture du groupe overlay impossible', { pid: suivi.pid, err })
     }
-    // Rend la barre des tâches et le son. Appelé sur CHAQUE chemin de sortie :
-    // une application laissée muette et absente de la barre des tâches serait
-    // le pire défaut possible.
-    restoreBlockedAppResources(suivi.attemptToken, suivi.pid, suivi.exeName)
+    if (!overlayFerme) {
+      await restoreBlockedAppResources(suivi.attemptToken, suivi.pid, suivi.exeName)
+    }
+    if (suivi.networkLease) {
+      try {
+        await network.unblockProcess(suivi.networkLease)
+      } catch (err) {
+        log.warn('[enforcer] restauration réseau impossible', { pid: suivi.pid, err })
+      }
+      // eslint-disable-next-line require-atomic-updates -- `suivi` n'est plus dans `suivis` à ce stade : personne d'autre ne le voit.
+      suivi.networkLease = null
+    }
   }
 
   async function bloquer(pid: number, exeName: string): Promise<void> {
     if (suivis.has(pid)) return
+    if (getProtectionLevel(exeName) === 'NEVER_BLOCK') {
+      log.warn(
+        `[enforcer] [SystemGuard] ${BLOCK_REJECTED_PROTECTED}: interception au niveau processus pour "${exeName}" (pid=${pid}). Blocage refusé.`,
+      )
+      return
+    }
 
     const attemptToken = `${pid}-${Date.now()}`
     const preexisting = pidsAuDemarrage.has(pid)
 
-    // La surveillance des fenêtres du processus déclenche l'overlay dès qu'une
-    // fenêtre existe. Une application peut mettre plusieurs secondes à en
-    // ouvrir une : on ne peut pas se contenter d'un instantané.
-    // Le watcher rend TOUTES les fenêtres du processus, pas une seule : une
-    // application peut en avoir plusieurs, et chacune doit être recouverte.
-    const unwatch = await watchProcessWindows(pid, exeName, (fenetres) => {
-      if (!actif) return
-      for (const fenetre of fenetres) {
-        // Une fenêtre minimisée n'a rien à recouvrir, et ses bounds sont la
-        // sentinelle -32000 : la recouvrir placerait l'overlay hors écran.
-        if (fenetre.minimized === true || fenetre.windowId === undefined) continue
-        showBlockOverlayWindow({
-          targetName: exeName,
-          type: 'app',
-          mode: 'work',
-          pid,
-          attemptToken,
-          windowId: fenetre.windowId,
-        })
-      }
+    // Le groupe d'overlay possède l'unique watcher de fenêtres. L'ancien
+    // double watcher créait une course où deux callbacks tentaient de créer et
+    // rattacher le même overlay, d'où les apparitions intermittentes.
+    showBlockOverlayWindow({
+      targetName: exeName,
+      type: 'app',
+      mode: 'work',
+      pid,
+      attemptToken,
     })
 
-    suivis.set(pid, { pid, exeName, attemptToken, preexisting, unwatch })
+    const suivi: Suivi = { pid, exeName, attemptToken, preexisting, networkLease: null }
+    suivis.set(pid, suivi)
+    const lease = await network.blockProcess(pid, exeName)
+    if (suivis.get(pid) === suivi && actif) suivi.networkLease = lease
+    else if (lease) await network.unblockProcess(lease)
     log.info('[enforcer] application bloquée', { pid, exeName, preexisting })
   }
 
@@ -130,7 +170,7 @@ export function createEnforcer(): Enforcer {
     // Cibles disparues : le processus s'est terminé de lui-même.
     for (const [pid, suivi] of [...suivis]) {
       if (!vivants.has(pid)) {
-        libererUn(suivi)
+        await libererUn(suivi)
         suivis.delete(pid)
         log.info('[enforcer] processus disparu, suivi retiré', { pid })
       }
@@ -187,7 +227,7 @@ export function createEnforcer(): Enforcer {
     log.info('[enforcer] surveillance des sites arrêtée')
   }
 
-  async function stop(): Promise<void> {
+  async function lever(): Promise<void> {
     actif = false
     arreterTrackerSites()
     sitesBloques = new Set()
@@ -195,7 +235,7 @@ export function createEnforcer(): Enforcer {
       clearInterval(scanTimer)
       scanTimer = null
     }
-    for (const suivi of suivis.values()) libererUn(suivi)
+    await Promise.all([...suivis.values()].map((suivi) => libererUn(suivi)))
     suivis.clear()
     closeSiteBlockOverlayWindow()
     appsBloquees = new Set()
@@ -203,13 +243,24 @@ export function createEnforcer(): Enforcer {
     log.info('[enforcer] session levée, ressources restaurées')
   }
 
-  async function apply(snapshot: SessionSnapshot): Promise<void> {
+  async function appliquer(snapshot: SessionSnapshot): Promise<void> {
     if (!snapshot.active) {
-      if (actif) await stop()
+      if (actif) await lever()
       return
     }
 
-    const nouvelleListe = new Set(snapshot.blockedAppIds.map((id) => id.toLowerCase()))
+    const nouvelleListe = new Set<string>()
+    for (const rawId of snapshot.blockedAppIds) {
+      const lower = rawId.toLowerCase().trim()
+      if (!lower) continue
+      if (getProtectionLevel(lower) === 'NEVER_BLOCK') {
+        log.warn(
+          `[enforcer] [SystemGuard] ${BLOCK_REJECTED_PROTECTED}: "${rawId}" est sous protection NEVER_BLOCK. Aucune opération de blocage ne sera exécutée.`,
+        )
+        continue
+      }
+      nouvelleListe.add(lower)
+    }
 
     if (!actif) {
       // Démarrage : on note qui tourne déjà, avant de bloquer quoi que ce soit.
@@ -221,6 +272,7 @@ export function createEnforcer(): Enforcer {
         log.warn('[enforcer] instantané de démarrage impossible', err)
         pidsAuDemarrage = new Set()
       }
+      // eslint-disable-next-line require-atomic-updates -- `apply` est sérialisé par `enFile` : un seul passage à la fois.
       actif = true
       log.info('[enforcer] session démarrée', {
         apps: [...nouvelleListe],
@@ -231,7 +283,7 @@ export function createEnforcer(): Enforcer {
     // Applications retirées de la session en cours : on les libère.
     for (const [pid, suivi] of [...suivis]) {
       if (!nouvelleListe.has(suivi.exeName.toLowerCase())) {
-        libererUn(suivi)
+        await libererUn(suivi)
         suivis.delete(pid)
       }
     }
@@ -243,13 +295,32 @@ export function createEnforcer(): Enforcer {
     await scanner()
 
     if (scanTimer === null) {
-      scanTimer = setInterval(() => void scanner(), SCAN_INTERVAL_MS)
+      // Le balayage passe par la file comme le reste, et saute un battement quand il
+      // est déjà en cours : énumérer les processus puis poser des overlays peut durer
+      // plus longtemps que l'intervalle, et les passages empilés se marcheraient
+      // dessus — ou s'accumuleraient sans fin dans la file.
+      let balayageEnCours = false
+      scanTimer = setInterval(() => {
+        if (balayageEnCours) return
+        balayageEnCours = true
+        void enFile(() => scanner())
+          .catch((err) => log.warn('[enforcer] balayage interrompu', err))
+          .finally(() => {
+            balayageEnCours = false
+          })
+      }, SCAN_INTERVAL_MS)
     }
   }
 
   return {
-    apply,
-    stop,
+    // Toutes les entrées publiques sont sérialisées : l'horloge appelle `apply` sans
+    // l'attendre, et rien ne garantit qu'un appel soit fini quand le suivant arrive.
+    apply: (snapshot) => enFile(() => appliquer(snapshot)),
+    stop: () => enFile(() => lever()),
+    async shutdown() {
+      await enFile(() => lever())
+      await network.stop()
+    },
     blockedPids: () => [...suivis.keys()],
   }
 }

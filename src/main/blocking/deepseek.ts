@@ -1,16 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import log from '@main/logging/setup'
+import {
+  deepSeekMetrics,
+  type DeepSeekOperationType,
+  type DeepSeekTriggerReason,
+} from './deepseek-metrics'
 
 /**
- * Gateway DeepSeek pour le jugement des justifications de déblocage.
- *
- * Périmètre volontairement réduit (Partie 5 du document) : juste une fonction
- * `judgeJustification` qui répond oui/non avec une raison. Pas de système de
- * fermeté/paliers/coach — l'IA répond, point.
- *
- * Utilise le `fetch` global (Node 18+, embarqué dans Electron 30). Pas de
- * dépendance npm à ajouter.
+ * Gateway DeepSeek pour les opérations IA de Vethos.
+ * Centralise l'accès HTTP, le modèle, la gestion des timeouts et les métriques.
  */
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
@@ -21,34 +20,54 @@ function getModelName(): string {
   return readEnvValue('DEEPSEEK_MODEL') ?? DEFAULT_DEEPSEEK_MODEL
 }
 
+export type DeepSeekApiErrorType =
+  | 'NO_API_KEY'
+  | 'TIMEOUT'
+  | 'NETWORK_ERROR'
+  | 'HTTP_ERROR'
+  | 'UNREADABLE_JSON'
+
+export type DeepSeekDetailedResult =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: DeepSeekApiErrorType; status?: number; message: string }
+
 /**
- * Appel générique attendant une réponse JSON.
- *
- * Exposé pour que les autres usages de l'IA — le classement des applications,
- * par exemple — passent par le même accès plutôt que d'en recréer un. La clé,
- * le modèle et la gestion du délai restent définis à un seul endroit.
- *
- * Renvoie `null` sur clé absente, erreur HTTP, délai dépassé ou corps
- * illisible : l'appelant décide quoi faire d'une absence de réponse, il n'a
- * jamais à distinguer les causes d'échec.
+ * Appel générique détaillé avec rapport précis sur la cause d'échec
+ * (timeout, réseau, HTTP non-2xx, parse JSON).
  */
-export async function askDeepSeekJson(args: {
+export async function askDeepSeekJsonDetailed(args: {
   system: string
   user: string
   maxTokens: number
   timeoutMs?: number
-}): Promise<Record<string, unknown> | null> {
+  operationType?: DeepSeekOperationType
+  triggerReason?: DeepSeekTriggerReason
+}): Promise<DeepSeekDetailedResult> {
   const apiKey = getApiKey()
-  if (!apiKey) return null
+  if (!apiKey) {
+    return { ok: false, error: 'NO_API_KEY', message: 'Clé API DeepSeek absente.' }
+  }
+
+  const opType = args.operationType ?? 'APP_KNOWLEDGE'
+  const triggerReason =
+    args.triggerReason ??
+    (opType === 'BLOCK_DECISION'
+      ? 'BLOCK_NO_LOCAL_DECISION'
+      : opType === 'UNLOCK_REVIEW'
+        ? 'UNLOCK_REQUIRES_SEMANTIC_REVIEW'
+        : 'APP_PROFILE_UNRESOLVED_REQUIRED_NOW')
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), args.timeoutMs ?? REQUEST_TIMEOUT_MS)
+  const startTime = Date.now()
+  const model = getModelName()
+
   try {
     const response = await fetch(DEEPSEEK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: getModelName(),
+        model,
         messages: [
           { role: 'system', content: args.system },
           { role: 'user', content: args.user },
@@ -56,21 +75,116 @@ export async function askDeepSeekJson(args: {
         temperature: 0,
         max_tokens: args.maxTokens,
         response_format: { type: 'json_object' },
+        thinking: { type: 'disabled' },
+        reasoning_effort: 'none',
       }),
       signal: controller.signal,
     })
+
+    const latencyMs = Date.now() - startTime
+
     if (!response.ok) {
       log.warn('[deepseek] réponse HTTP non-OK', { status: response.status })
-      return null
+      deepSeekMetrics.recordCall({
+        operationType: opType,
+        triggerReason,
+        latencyMs,
+        inputTokens: 0,
+        outputTokens: 0,
+        promptCacheHitTokens: 0,
+        promptCacheMissTokens: 0,
+        model,
+        thinkingMode: 'disabled',
+        success: false,
+        error: `HTTP ${response.status}`,
+      })
+      return {
+        ok: false,
+        error: 'HTTP_ERROR',
+        status: response.status,
+        message: `Erreur HTTP ${response.status}`,
+      }
     }
-    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> }
-    return extractJsonObject(data.choices?.[0]?.message?.content ?? '')
+
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: {
+        prompt_tokens?: number
+        completion_tokens?: number
+        total_tokens?: number
+        prompt_cache_hit_tokens?: number
+        prompt_cache_miss_tokens?: number
+        prompt_tokens_details?: {
+          cached_tokens?: number
+        }
+      }
+    }
+
+    const inputTokens = data.usage?.prompt_tokens ?? 0
+    const outputTokens = data.usage?.completion_tokens ?? 0
+    const promptCacheHitTokens =
+      data.usage?.prompt_cache_hit_tokens ?? data.usage?.prompt_tokens_details?.cached_tokens ?? 0
+    const promptCacheMissTokens =
+      data.usage?.prompt_cache_miss_tokens ?? Math.max(0, inputTokens - promptCacheHitTokens)
+
+    deepSeekMetrics.recordCall({
+      operationType: opType,
+      triggerReason,
+      latencyMs,
+      inputTokens,
+      outputTokens,
+      promptCacheHitTokens,
+      promptCacheMissTokens,
+      model,
+      thinkingMode: 'disabled',
+      success: true,
+    })
+
+    const extracted = extractJsonObject(data.choices?.[0]?.message?.content ?? '')
+    if (!extracted) {
+      return { ok: false, error: 'UNREADABLE_JSON', message: 'Réponse IA illisible.' }
+    }
+    return { ok: true, data: extracted }
   } catch (err) {
+    const latencyMs = Date.now() - startTime
+    const isAbort = err instanceof Error && err.name === 'AbortError'
+    const errorType: DeepSeekApiErrorType = isAbort ? 'TIMEOUT' : 'NETWORK_ERROR'
+    const message = isAbort ? 'Délai d’attente DeepSeek dépassé.' : 'Erreur réseau DeepSeek.'
+
     log.warn('[deepseek] appel échoué', err)
-    return null
+    deepSeekMetrics.recordCall({
+      operationType: opType,
+      triggerReason,
+      latencyMs,
+      inputTokens: 0,
+      outputTokens: 0,
+      promptCacheHitTokens: 0,
+      promptCacheMissTokens: 0,
+      model,
+      thinkingMode: 'disabled',
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return { ok: false, error: errorType, message }
   } finally {
     clearTimeout(timeout)
   }
+}
+
+/**
+ * Appel générique attendant une réponse JSON.
+ * Renvoie `Record<string, unknown>` ou `null` en cas d'erreur.
+ */
+export async function askDeepSeekJson(args: {
+  system: string
+  user: string
+  maxTokens: number
+  timeoutMs?: number
+  operationType?: DeepSeekOperationType
+  triggerReason?: DeepSeekTriggerReason
+}): Promise<Record<string, unknown> | null> {
+  const result = await askDeepSeekJsonDetailed(args)
+  return result.ok ? result.data : null
 }
 
 export type JustificationVerdict = {
@@ -128,14 +242,14 @@ function getApiKey(): string | null {
   return cachedApiKey
 }
 
-/** Extrait un objet JSON depuis une réponse de modèle qui peut l'enrober de prose. */
+/** Extrait un objet JSON depuis une réponse de modèle qui peut l'enrober de prose ou être tronquée. */
 function extractJsonObject(text: string): Record<string, unknown> | null {
   const trimmed = text.trim()
   // Cas direct : la réponse est du JSON pur.
   try {
     return JSON.parse(trimmed) as Record<string, unknown>
   } catch {
-    // Continuer vers l'extraction par regex.
+    // Continuer vers l'extraction par regex ou réparation.
   }
   // Cas enrobé : on cherche le premier { ... } équilibré.
   const start = trimmed.indexOf('{')
@@ -147,6 +261,31 @@ function extractJsonObject(text: string): Record<string, unknown> | null {
       // Échec silencieux.
     }
   }
+
+  // Cas tronqué (ex: streaming interrompu ou maxTokens atteint) : tenter de refermer la structure valide
+  if (start >= 0) {
+    let lastBrace = trimmed.lastIndexOf('}')
+    while (lastBrace > start) {
+      const candidate = trimmed.slice(start, lastBrace + 1)
+      try {
+        return JSON.parse(candidate) as Record<string, unknown>
+      } catch {
+        /* ignore parsing error */
+      }
+      try {
+        return JSON.parse(candidate + '\n]}') as Record<string, unknown>
+      } catch {
+        /* ignore parsing error */
+      }
+      try {
+        return JSON.parse(candidate + '\n}') as Record<string, unknown>
+      } catch {
+        /* ignore parsing error */
+      }
+      lastBrace = trimmed.lastIndexOf('}', lastBrace - 1)
+    }
+  }
+
   return null
 }
 
@@ -201,55 +340,27 @@ export async function judgeJustification(
     ? `Application demandée : ${context.appName}\nJustification : "${cleaned}"`
     : `Justification : "${cleaned}"`
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const result = await askDeepSeekJsonDetailed({
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: 200,
+    timeoutMs: REQUEST_TIMEOUT_MS,
+    operationType: 'UNLOCK_REVIEW',
+    triggerReason: 'UNLOCK_REQUIRES_SEMANTIC_REVIEW',
+  })
 
-  try {
-    const response = await fetch(DEEPSEEK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: getModelName(),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0,
-        max_tokens: 200,
-        response_format: { type: 'json_object' },
-      }),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const errText = typeof response.text === 'function' ? await response.text().catch(() => '') : ''
-      log.warn('[deepseek] réponse HTTP non-OK', { status: response.status, body: errText })
-      return {
-        valid: false,
-        reason: `L'IA a renvoyé une erreur (${response.status}). Réessaie.`,
-      }
+  if (!result.ok) {
+    if (result.error === 'HTTP_ERROR') {
+      return { valid: false, reason: `L'IA a renvoyé une erreur (${result.status}). Réessaie.` }
     }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>
-    }
-    const content = data.choices?.[0]?.message?.content ?? ''
-    const parsed = extractJsonObject(content)
-    if (!parsed) {
-      log.warn('[deepseek] impossible de parser la réponse', { content })
-      return { valid: false, reason: 'Réponse IA illisible.' }
-    }
-    return coerceVerdict(parsed)
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
+    if (result.error === 'TIMEOUT') {
       return { valid: false, reason: 'Le jugement a expiré. Réessaie.' }
     }
-    log.error('[deepseek] erreur réseau', err)
-    return { valid: false, reason: "L'IA est injoignable. Réessaie plus tard." }
-  } finally {
-    clearTimeout(timeout)
+    if (result.error === 'NETWORK_ERROR') {
+      return { valid: false, reason: "L'IA est injoignable. Réessaie plus tard." }
+    }
+    return { valid: false, reason: 'Réponse IA illisible.' }
   }
+
+  return coerceVerdict(result.data)
 }

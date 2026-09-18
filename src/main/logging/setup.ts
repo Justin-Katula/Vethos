@@ -7,7 +7,7 @@ import log from 'electron-log/main'
  *
  * Pourquoi paresseux : ce module est importé en cascade par presque tous
  * les modules main (notamment via tracking/app-usage-tracker.ts et
- * blocking/session/timer.ts). Si on touche `app.getPath()` ou
+ * blocking/enforcer.ts). Si on touche `app.getPath()` ou
  * `app.isPackaged` au top-level, les tests Vitest qui importent ces
  * modules sans avoir mocké `electron` plantent avec "Cannot read
  * properties of undefined (reading 'isPackaged')".

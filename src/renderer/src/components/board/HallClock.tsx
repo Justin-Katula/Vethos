@@ -1,34 +1,22 @@
 import { useEffect, useMemo } from 'react'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion'
-import { CATEGORY_COLOR } from '@/lib/palette'
-import type { PlacedBlock, ScheduleEntry } from '@/lib/planning/types'
+import { BLOCK_COLOR, CATEGORY_COLOR, entryFill } from '@/lib/palette'
+import { useResolvedTheme } from '@/lib/use-theme'
 
-/**
- * L'HORLOGE DU HALL
- *
- * Le cadran de Hilfiker, ramené aux 24 heures d'une journée. Deux bandes
- * d'émail posées sur le cadran :
- *   - la bande extérieure, sourde, c'est ce qui est déjà pris ;
- *   - la bande intérieure, claire, c'est ce que le moteur a posé pour toi.
- *
- * L'aiguille est rouge, avec le disque de Hilfiker à sa pointe. C'est le seul
- * rouge du base, et il ne dit qu'une chose : maintenant.
- *
- * LE MOMENT CHORÉGRAPHIÉ : au chargement, l'aiguille balaie depuis minuit
- * jusqu'à l'heure courante, marque un temps d'arrêt, puis se pose. C'est le
- * stop-to-go de l'horloge suisse, et c'est la seule animation orchestrée de
- * l'application : on voit le temps déjà consommé au lieu de le lire.
- */
+import type { PlacedBlock, ScheduleEntry } from '@shared/planning/types'
+
+/** Cadran 24 h : obligations dehors, engagements dedans, present en rouge. */
 
 const VIEWBOX = 280
 const C = VIEWBOX / 2
 const R_FIXED = 116
-const W_FIXED = 13
+const W_FIXED = 11
 const R_PLAN = 94
-// Une bande fine posée dans une rainure visible se lit comme une graduation.
-// Épaisse et flottant sur un line à moitié effacé, un bloc isolé devenait un
-// pâté blanc au lieu d'un arc de précision.
-const W_PLAN = 7
+// Une bande posée dans une rainure VISIBLE se lit comme une graduation ; c'est
+// la rainure qui fait le travail, pas la finesse de la bande. Le rail vide est
+// donc dessiné plus franchement qu'avant, ce qui permet à la bande de
+// s'épaissir sans redevenir le pâté blanc d'origine.
+const W_PLAN = 9
 const R_TICK = 128
 
 /** 0 h en haut, sens horaire. */
@@ -48,6 +36,33 @@ function arc(radius: number, from: number, to: number): string {
   return `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p1.x} ${p1.y}`
 }
 
+/**
+ * Coupe un intervalle [start, end] à `now` : la portion déjà passée s'assombrit,
+ * exactement comme tout ce qui est déjà pris (palette.ts) — ce qui est derrière
+ * l'aiguille ne t'appartient plus à décider. `now` à `null` (jour affiché ≠
+ * aujourd'hui) laisse l'intervalle entier en pleine clarté : rien n'est «passé»
+ * sur un jour qu'on ne vit pas encore ou plus.
+ */
+function splitAtNow(
+  start: number,
+  end: number,
+  now: number | null,
+): { past: [number, number] | null; future: [number, number] | null } {
+  if (now === null) return { past: null, future: [start, end] }
+  const cut = Math.max(start, Math.min(end, now))
+  return {
+    past: cut > start ? [start, cut] : null,
+    future: end > cut ? [cut, end] : null,
+  }
+}
+
+/** L'opacité d'un bloc posé selon sa nature. La tâche à échéance brûle le plus fort. */
+const PLAN_OPACITY: Record<PlacedBlock['kind'], number> = {
+  task: 1,
+  objective: 0.72,
+  ancre: 0.46,
+}
+
 export function HallClock({
   entries,
   blocks,
@@ -63,6 +78,7 @@ export function HallClock({
   children?: React.ReactNode
 }) {
   const reduce = useReducedMotion()
+  const theme = useResolvedTheme()
   const fixed = useMemo(() => [...entries].sort((a, b) => a.startMinute - b.startMinute), [entries])
   const planned = useMemo(() => [...blocks].sort((a, b) => a.startMinute - b.startMinute), [blocks])
 
@@ -97,6 +113,32 @@ export function HallClock({
   const discX = useTransform(handAngle, (a) => polar(R_FIXED + W_FIXED / 2 + 2, a).x)
   const discY = useTransform(handAngle, (a) => polar(R_FIXED + W_FIXED / 2 + 2, a).y)
 
+  // Les arcs posés, découpés à « maintenant » une seule fois.
+  const planArcs = useMemo(
+    () =>
+      planned.flatMap((b) => {
+        const { past, future } = splitAtNow(b.startMinute, b.endMinute, nowMinute)
+        const base = PLAN_OPACITY[b.kind]
+        const out: { key: string; d: string; opacity: number; color: string }[] = []
+        if (past)
+          out.push({
+            key: `${b.id}-p`,
+            d: arc(R_PLAN, past[0], past[1]),
+            opacity: base * 0.34,
+            color: BLOCK_COLOR[b.kind],
+          })
+        if (future)
+          out.push({
+            key: `${b.id}-f`,
+            d: arc(R_PLAN, future[0], future[1]),
+            opacity: base,
+            color: BLOCK_COLOR[b.kind],
+          })
+        return out
+      }),
+    [planned, nowMinute],
+  )
+
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg
@@ -113,43 +155,82 @@ export function HallClock({
             y1={t.y1}
             x2={t.x2}
             y2={t.y2}
-            stroke={t.major ? 'var(--fg-2)' : 'var(--line-strong)'}
+            stroke={t.major ? 'var(--text-2)' : 'var(--line-strong)'}
             strokeWidth={t.major ? 2.5 : 1}
           />
         ))}
 
-        {/* Les deux rails vides : le cadran reste lisible même sans rien dessus. */}
-        <circle cx={C} cy={C} r={R_FIXED} fill="none" stroke="var(--line)" strokeWidth={W_FIXED} />
-        <circle cx={C} cy={C} r={R_PLAN} fill="none" stroke="var(--line)" strokeWidth={W_PLAN} />
+        <circle
+          cx={C}
+          cy={C}
+          r={R_FIXED}
+          fill="none"
+          stroke="var(--line-strong)"
+          strokeWidth={W_FIXED}
+          opacity={0.38}
+        />
+        <circle
+          cx={C}
+          cy={C}
+          r={R_PLAN}
+          fill="none"
+          stroke="var(--line-strong)"
+          strokeWidth={W_PLAN + 3}
+          opacity={0.2}
+        />
 
-        {/* Bande extérieure : ce qui est déjà pris. */}
-        {fixed.map((e, i) => (
-          <path
-            key={`f-${e.dayOfWeek}-${e.startMinute}-${i}`}
-            d={arc(R_FIXED, e.startMinute, e.endMinute)}
-            fill="none"
-            stroke={CATEGORY_COLOR[e.categoryType]}
-            strokeWidth={W_FIXED}
-          />
-        ))}
+        {/* Bande extérieure : ce qui est déjà pris. Le rocher. Sa portion déjà
+            vécue s'assombrit encore plus — déjà sombre, elle disparaît presque. */}
+        {fixed.map((e, i) => {
+          const { past, future } = splitAtNow(e.startMinute, e.endMinute, nowMinute)
+          const key = `f-${e.dayOfWeek}-${e.startMinute}-${i}`
+          return (
+            <g key={key}>
+              {past && (
+                <path
+                  d={arc(R_FIXED, past[0], past[1])}
+                  fill="none"
+                  stroke={entryFill(CATEGORY_COLOR[e.categoryType], theme)}
+                  strokeWidth={W_FIXED}
+                  opacity={0.4}
+                />
+              )}
+              {future && (
+                <path
+                  d={arc(R_FIXED, future[0], future[1])}
+                  fill="none"
+                  stroke={entryFill(CATEGORY_COLOR[e.categoryType], theme)}
+                  strokeWidth={W_FIXED}
+                />
+              )}
+            </g>
+          )
+        })}
 
-        {/* Bande intérieure : ce que le moteur a posé. */}
-        {planned.map((b) => (
+        {planArcs.map((a) => (
           <path
-            key={b.id}
-            d={arc(R_PLAN, b.startMinute, b.endMinute)}
+            key={a.key}
+            d={a.d}
             fill="none"
-            stroke={b.color}
+            stroke={a.color}
             strokeWidth={W_PLAN}
+            strokeLinecap="butt"
+            opacity={a.opacity}
           />
         ))}
 
-        {/* L'aiguille de Hilfiker : le seul rouge du cadran. */}
+        {/* L'aiguille de Hilfiker. Elle ne dit qu'une chose : maintenant. */}
         {nowMinute !== null && (
           <g>
-            <motion.path d={handD} stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="butt" />
-            <motion.circle cx={discX} cy={discY} r={7} fill="var(--accent)" />
-            <circle cx={C} cy={C} r={4} fill="var(--accent)" />
+            <motion.path
+              d={handD}
+              stroke="var(--text)"
+              strokeWidth={1.6}
+              strokeLinecap="butt"
+              opacity={0.64}
+            />
+            <motion.circle cx={discX} cy={discY} r={5.5} fill="var(--accent)" />
+            <circle cx={C} cy={C} r={3} fill="var(--text-3)" />
           </g>
         )}
       </svg>

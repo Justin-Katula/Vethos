@@ -68,6 +68,8 @@ describe('judgeJustification', () => {
     expect(body.model).toBe('deepseek-v4-flash')
     expect(body.temperature).toBe(0)
     expect(body.response_format).toEqual({ type: 'json_object' })
+    expect(body.thinking).toEqual({ type: 'disabled' })
+    expect(body.reasoning_effort).toBe('none')
     // Le contexte appName doit apparaître dans le prompt utilisateur
     const userMsg = body.messages.find((m: { role: string }) => m.role === 'user')
     expect(userMsg.content).toContain('Photoshop')

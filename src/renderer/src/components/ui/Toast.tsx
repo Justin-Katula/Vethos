@@ -12,23 +12,23 @@ const ICON: Record<ToastType['variant'], typeof CheckCircle2> = {
   error: AlertCircle,
 }
 
-// Une réussite n'a pas besoin de couleur : elle n'appelle aucune action.
-// Seule l'erreur en porte une — c'est à cela qu'elle sert.
+// Trois variantes, trois niveaux de signal : réussite en accent discret,
+// information neutre, erreur en avertissement.
 const STYLES: Record<ToastType['variant'], { bg: string; ring: string; icon: string }> = {
   success: {
     bg: 'bg-surface-2',
-    ring: 'ring-accent/40',
-    icon: 'text-fg',
+    ring: 'ring-accent/30',
+    icon: 'text-accent',
   },
   info: {
     bg: 'bg-surface-2',
-    ring: 'ring-accent/40',
-    icon: 'text-fg',
+    ring: 'ring-line-strong',
+    icon: 'text-fg-2',
   },
   error: {
-    bg: 'bg-accent/10',
-    ring: 'ring-accent/30',
-    icon: 'text-accent',
+    bg: 'bg-warn/[0.08]',
+    ring: 'ring-warn/30',
+    icon: 'text-warn',
   },
 }
 
@@ -50,10 +50,12 @@ function ToastItem({ toast }: { toast: ToastType }): JSX.Element {
       exit={{ opacity: 0, x: 40, scale: 0.95, transition: { duration: 0.2 } }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        'pointer-events-auto flex w-80 items-start gap-3 rounded border border-line px-4 py-3 ring-1 backdrop-blur-md',
+        'pointer-events-auto flex w-80 items-start gap-3 rounded border border-line px-4 py-3.5 shadow-lift ring-1',
         style.bg,
         style.ring,
       )}
+      role={toast.variant === 'error' ? 'alert' : 'status'}
+      aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
     >
       <Icon size={18} className={cn('mt-0.5 shrink-0', style.icon)} />
       <div className="min-w-0 flex-1">
@@ -75,7 +77,10 @@ function ToastItem({ toast }: { toast: ToastType }): JSX.Element {
 export function ToastViewport(): JSX.Element {
   const toasts = useToastStore((s) => s.toasts)
   return (
-    <div className="pointer-events-none fixed right-4 top-12 z-[200] flex flex-col items-end gap-2">
+    <div
+      className="pointer-events-none fixed right-4 top-12 z-[200] flex flex-col items-end gap-2"
+      aria-label="Notifications"
+    >
       <AnimatePresence initial={false}>
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} />

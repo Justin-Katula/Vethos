@@ -48,14 +48,15 @@ export function OnboardingOverlay(): JSX.Element {
       // l'application : on voit l'interface, rien ne répond.
       exit={{ opacity: 0, pointerEvents: 'none' }}
       transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] flex flex-col bg-base/95 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex flex-col bg-base"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Configuration initiale"
     >
       {!isDone && (
         <header className="flex items-center justify-between gap-6 border-b border-line px-10 py-5">
           <div className="flex flex-1 items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-widest text-fg-3">
-              Onboarding
-            </span>
+            <span className="text-xs font-semibold text-fg-3">Configuration</span>
             <div className="flex flex-1 items-center gap-1.5">
               {VISIBLE_STEPS.map((s, i) => {
                 const reached = i <= currentIdx
@@ -66,6 +67,7 @@ export function OnboardingOverlay(): JSX.Element {
                       'h-1 flex-1 rounded transition-colors duration-300',
                       reached ? 'bg-fg' : 'bg-line',
                     )}
+                    aria-hidden
                   />
                 )
               })}
@@ -122,11 +124,7 @@ export function OnboardingOverlay(): JSX.Element {
             <span className="text-fg-2">{STEP_LABELS[step]}</span>
           </span>
 
-          <button
-            type="button"
-            onClick={() => void handleNext()}
-            className="inline-flex items-center gap-2 rounded bg-fg px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white"
-          >
+          <button type="button" onClick={() => void handleNext()} className="btn-iris pressable">
             {isLastVisible ? (
               <>
                 <Check size={16} strokeWidth={3} />

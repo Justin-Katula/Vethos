@@ -62,6 +62,13 @@ const PAR_EXECUTABLE: Record<string, AppCategory> = {
   'launcherpatcher.exe': 'games',
   'playnite.desktopapp.exe': 'games',
   'heroic.exe': 'games',
+  'cyberpunk2077.exe': 'games',
+  'rdr2.exe': 'games',
+  'acblackflag.exe': 'games',
+  'forzahorizon6.exe': 'games',
+  'horizonforbiddenwest.exe': 'games',
+  '12minutes.exe': 'games',
+  'gunsaw.exe': 'games',
 
   // Divertissement
   'spotify.exe': 'entertainment',
@@ -196,6 +203,8 @@ const PAR_EXECUTABLE: Record<string, AppCategory> = {
   'virtualbox.exe': 'utilities',
   'vmware.exe': 'utilities',
   'msiafterburner.exe': 'utilities',
+  'rtss.exe': 'utilities',
+  'ultraiso.exe': 'utilities',
   'hwinfo64.exe': 'utilities',
   'cpu-z.exe': 'utilities',
   'gpu-z.exe': 'utilities',
@@ -224,7 +233,7 @@ const PAR_MOT_CLE: Array<[AppCategory, readonly string[]]> = [
   ['social', ['chat', 'messeng', 'social', 'discord', 'whatsapp', 'telegram', 'meet', 'confer']],
   // Pas de « play » seul : il attrape « Player », « Playback », « Playlist »
   // et volerait toutes les applications multimédia aux catégories voisines.
-  ['games', ['game', 'jeu', 'gaming', 'launcher']],
+  ['games', ['game', 'jeu', 'gaming', 'launcher', 'cyberpunk', 'red dead', 'assassin', 'forza', 'horizon']],
   // Pas de « lecteur » : en français le mot désigne aussi bien un lecteur
   // vidéo qu'un lecteur PDF. On s'appuie sur le nom du média lui-même.
   ['entertainment', ['music', 'musique', 'video', 'vidéo', 'stream', 'tv', 'film', 'movie', 'radio', 'podcast']],
@@ -235,7 +244,7 @@ const PAR_MOT_CLE: Array<[AppCategory, readonly string[]]> = [
   ['productivity', ['office', 'bureau', 'note', 'task', 'tâche', 'tache', 'todo', 'calendar', 'agenda', 'mail', 'code', 'develop', 'ide ', 'terminal', 'sql', 'database', 'bank', 'banque', 'finance', 'compta', 'invoice', 'facture', 'git', 'python', 'docker', 'llm', 'copilot', 'jupyter', 'console', 'shell', 'prompt', 'debug', 'profiler', 'compiler', '编']],
   ['shopping', ['shop', 'achat', 'store', 'boutique', 'food', 'cuisine', 'recipe', 'recette', 'delivery', 'livraison']],
   ['travel', ['travel', 'voyage', 'flight', 'vol', 'hotel', 'map', 'carte', 'gps', 'navigation', 'transit']],
-  ['utilities', ['tool', 'outil', 'util', 'clean', 'backup', 'sauvegarde', 'compress', 'archive', 'zip', 'ftp', 'ssh', 'remote', 'vpn', 'antivirus', 'monitor', 'browser', 'navigateur', 'blocker', 'bloqueur', 'screenshot', 'capture', 'benchmark', 'overclock', 'afterburner', 'settings', 'paramètre', 'parametre', 'control', 'contrôle', 'controle']],
+  ['utilities', ['tool', 'outil', 'util', 'clean', 'backup', 'sauvegarde', 'compress', 'archive', 'zip', 'ftp', 'ssh', 'remote', 'vpn', 'antivirus', 'monitor', 'browser', 'navigateur', 'blocker', 'bloqueur', 'screenshot', 'capture', 'benchmark', 'overclock', 'afterburner', 'settings', 'paramètre', 'parametre', 'control', 'contrôle', 'controle', 'driver easy', 'ultraiso', 'rivatuner']],
 ]
 
 function normaliser(valeur: string): string {

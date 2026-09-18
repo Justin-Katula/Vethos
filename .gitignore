@@ -29,3 +29,13 @@ nexus-data-dev/
 .npm-cache/
 .zcode/
 scratch/
+
+# Materiel local, jamais versionne sur cette branche : outillage d'agents, captures
+# d'inspiration et application de reference. Environ 74 Mo qui n'appartiennent pas
+# au code source.
+.agent/
+.agents/
+.impeccable/
+Inspiration/
+scratch_docx/
+Application a se baser sur/

@@ -7,38 +7,34 @@
  * de se comporter comme une alarme : fenêtre fermée, machine sortie de veille
  * ou fraîchement redémarrée, le verdict ne dépend que des règles et de l'heure.
  *
- * La signature de `activeSessionAt` est volontairement la couture prévue pour
- * le futur moteur de planification : il se branchera derrière elle sans que la
- * machinerie de blocage change d'une ligne.
+ * Il n'existe qu'une source de vérité : le bloc du planning confirmé par
+ * « Je commence ». La page Blocage ne possède plus sa propre minuterie.
  *
  * Module pur : l'heure entre toujours en paramètre, jamais lue ici.
  */
 
-export type RecurringSlot = {
-  id: string
-  label: string
-  /** 0 = dimanche … 6 = samedi. */
-  daysOfWeek: number[]
-  /** Minutes depuis minuit, 0..1439. */
-  startMinute: number
-  /** Si `<= startMinute`, le créneau franchit minuit. */
-  endMinute: number
-  appIds: string[]
-  /** Domaines bloqués pendant ce créneau. */
-  blockedSites?: string[]
-}
-
-export type ManualSession = {
+/**
+ * D.8 : une session pilotée par un bloc du planning (tâche, objectif ou ancre),
+ * ouverte par la confirmation « Je commence ».
+ *
+ * C'est le pont entre le mécanisme de blocage (Point 1) et le moteur de
+ * planification (Point 2). Point 1 continue de fournir toute l'infrastructure —
+ * overlay, sonde de fenêtre, masquage — et ne change pas d'une ligne : le
+ * moteur décide simplement QUOI bloquer et QUAND, selon le bloc réellement actif.
+ */
+export type BlockSession = {
+  /** Id du bloc confirmé, tel que produit par le moteur. */
+  blockId: string
   startedAt: number
   endsAt: number
+  /** `apps_à_bloquer(bloc)` — exactement cette liste, jamais celle d'un créneau. */
   appIds: string[]
-  /** Domaines bloqués pendant cette session. */
   blockedSites?: string[]
 }
 
 export type BlockingRules = {
-  slots: RecurringSlot[]
-  manual: ManualSession | null
+  /** D.8 : bloc actif, s'il y en a un. */
+  block?: BlockSession | null
 }
 
 export type ActiveSession = {
@@ -48,110 +44,23 @@ export type ActiveSession = {
   endsAt: number
 }
 
-export function minutesSinceMidnight(now: Date): number {
-  return now.getHours() * 60 + now.getMinutes()
-}
-
-const MINUTES_PAR_JOUR = 24 * 60
-
-function estMinuteValide(valeur: number): boolean {
-  return Number.isInteger(valeur) && valeur >= 0 && valeur < MINUTES_PAR_JOUR
-}
-
-/**
- * Un créneau mal formé n'est jamais actif.
- *
- * Deux formes invalides produisaient un blocage silencieux et intraçable :
- *
- * - `startMinute === endMinute` (ex. 10h00 → 10h00, faute de saisie banale)
- *   était interprété comme un franchissement de minuit, donc la condition
- *   `minute >= start || minute < end` devenait toujours vraie : **blocage
- *   permanent 24 h/24**, sans rien dans l'interface pour l'expliquer.
- * - une minute hors de 0..1439 (ex. `endMinute = 5000`) débordait dans
- *   `setMinutes` et produisait une **session de plusieurs jours**.
- *
- * On échoue du côté sûr : un créneau invalide ne bloque rien, plutôt que de
- * bloquer pour toujours. Exposé pour que l'interface puisse le signaler à la
- * saisie au lieu de laisser passer une règle qui ne se déclenchera jamais.
- */
-export function isValidSlot(slot: RecurringSlot): boolean {
-  if (!estMinuteValide(slot.startMinute)) return false
-  if (!estMinuteValide(slot.endMinute)) return false
-  // Durée nulle : rien à bloquer. Pour couvrir la journée entière, utiliser
-  // 0 → 1439.
-  if (slot.startMinute === slot.endMinute) return false
-  return slot.daysOfWeek.every((jour) => Number.isInteger(jour) && jour >= 0 && jour <= 6)
-}
-
-/** Un créneau dont la fin est antérieure au début franchit minuit. */
-function crossesMidnight(slot: RecurringSlot): boolean {
-  return slot.endMinute < slot.startMinute
-}
-
-export function slotIsActiveAt(slot: RecurringSlot, now: Date): boolean {
-  if (!isValidSlot(slot)) return false
-  if (!slot.daysOfWeek.includes(now.getDay())) return false
-
-  const minute = minutesSinceMidnight(now)
-  // Bornes semi-ouvertes [start, end) : la minute de fin n'est plus active.
-  if (crossesMidnight(slot)) {
-    // 22h00 -> 02h00 : actif le soir à partir du début, et jusqu'à la fin au
-    // petit matin. Le jour de la semaine est évalué sur le jour courant, pas
-    // sur celui où le créneau a commencé.
-    return minute >= slot.startMinute || minute < slot.endMinute
-  }
-  return minute >= slot.startMinute && minute < slot.endMinute
-}
-
-/**
- * Échéance absolue du créneau, en millisecondes epoch.
- *
- * Pour un créneau qui franchit minuit, la fin tombe le lendemain quand on est
- * dans sa portion du soir, et le jour même quand on est dans sa portion du
- * petit matin.
- */
-function slotEndTimestamp(slot: RecurringSlot, now: Date): number {
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-  // setMinutes gère le débordement : minuit + 720 minutes donne bien 12h00.
-  end.setMinutes(slot.endMinute)
-  if (crossesMidnight(slot) && minutesSinceMidnight(now) >= slot.startMinute) {
-    end.setDate(end.getDate() + 1)
-  }
-  return end.getTime()
-}
-
-function manualIsActiveAt(manual: ManualSession, now: Date): boolean {
+/** D.8 : même fenêtre semi-ouverte [début, fin) que partout ailleurs. */
+export function blockSessionIsActiveAt(block: BlockSession, now: Date): boolean {
   const stamp = now.getTime()
-  return manual.startedAt <= stamp && stamp < manual.endsAt
+  return block.endsAt > block.startedAt && block.startedAt <= stamp && stamp < block.endsAt
 }
 
 /**
- * Fusionne toutes les sources actives : union dédoublonnée des applications,
- * et l'échéance la plus lointaine — la session ne se termine que lorsque plus
- * aucune règle ne s'applique.
- *
- * Renvoie `null` si rien n'est actif.
+ * Renvoie le bloc confirmé actif, et lui seul. Les anciennes valeurs
+ * persistées `manual`/`slots` sont volontairement ignorées : une mise à jour
+ * ne doit jamais ressusciter une ancienne session autonome.
  */
 export function activeSessionAt(rules: BlockingRules, now: Date): ActiveSession | null {
-  const blockedAppIds = new Set<string>()
-  const blockedSites = new Set<string>()
-  let endsAt: number | null = null
-
-  for (const slot of rules.slots) {
-    if (!slotIsActiveAt(slot, now)) continue
-    for (const appId of slot.appIds) blockedAppIds.add(appId)
-    for (const site of slot.blockedSites ?? []) blockedSites.add(site)
-    const slotEnd = slotEndTimestamp(slot, now)
-    if (endsAt === null || slotEnd > endsAt) endsAt = slotEnd
+  const block = rules.block
+  if (block == null || !blockSessionIsActiveAt(block, now)) return null
+  return {
+    blockedAppIds: [...new Set(block.appIds)],
+    blockedSites: [...new Set(block.blockedSites ?? [])],
+    endsAt: block.endsAt,
   }
-
-  const manual = rules.manual
-  if (manual !== null && manualIsActiveAt(manual, now)) {
-    for (const appId of manual.appIds) blockedAppIds.add(appId)
-    for (const site of manual.blockedSites ?? []) blockedSites.add(site)
-    if (endsAt === null || manual.endsAt > endsAt) endsAt = manual.endsAt
-  }
-
-  if (endsAt === null) return null
-  return { blockedAppIds: [...blockedAppIds], blockedSites: [...blockedSites], endsAt }
 }

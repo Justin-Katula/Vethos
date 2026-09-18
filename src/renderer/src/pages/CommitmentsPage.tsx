@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
-import { AncresEditor, ObjectivesEditor, duration, inputClass } from '@/components/editors'
-import { usePlanningStore } from '@/store/planning.store'
+import { AncresEditor, ObjectivesEditor, inputClass } from '@/components/editors'
+import { TaskHierarchyList } from '@/components/tasks/TaskHierarchy'
+import { MORE_TIME_STEP_MINUTES, usePlanningStore, type TaskDraft } from '@/store/planning.store'
+import { usePlanning } from '@/lib/use-planning'
+import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { useToast } from '@/lib/use-toast'
-import { addDays, dateKey } from '@/lib/planning/dates'
+import { addDays, dateKey } from '@shared/planning/dates'
 import { cn } from '@/lib/cn'
-import type { TaskItem } from '@/lib/planning/types'
+import type { TaskItem } from '@shared/planning/types'
+import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 
 /**
  * Mes engagements.
@@ -25,20 +29,26 @@ export default function CommitmentsPage() {
     ancres,
     addTask,
     deleteTask,
-    completeTask,
+    addMoreTime,
     addObjective,
     deleteObjective,
     addAncre,
     deleteAncre,
+    learning,
   } = usePlanningStore()
   const toast = useToast()
   const reduce = useReducedMotion()
+  const plan = usePlanning()
 
   const active = useMemo(() => tasks.filter((t) => t.status === 'active'), [tasks])
+  const activeRoots = useMemo(() => active.filter((t) => t.parentTaskId === null), [active])
+  const worked = learning.workedMinutesByRef
+  // B.5 : seuil de déclenchement du découpage automatique.
+  const maxPerDayMinutes = maxTaskMinutesPerDay(plan?.capacities ?? [])
 
   return (
     <PageTransition>
-      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
+      <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto overflow-x-hidden px-8 pb-14 pt-12 xl:px-14">
         <header className="mb-10">
           <h1 className="text-3xl font-semibold text-fg">Mes engagements</h1>
           <p className="mt-1.5 max-w-2xl text-sm text-fg-3">
@@ -47,18 +57,19 @@ export default function CommitmentsPage() {
           </p>
         </header>
 
-        <div className="grid flex-1 items-start gap-x-14 gap-y-12 xl:grid-cols-3">
+        <div className="grid flex-1 items-start gap-x-12 gap-y-12 lg:grid-cols-2 2xl:grid-cols-3">
           <Section
             index={0}
             reduce={reduce}
             title="Tâches"
             law="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
-            count={active.length}
+            count={activeRoots.length}
           >
             <TasksEditor
               tasks={active}
-              onAdd={addTask}
-              onComplete={(id) => void completeTask(id)}
+              worked={worked}
+              onAdd={(draft) => addTask(draft, { maxPerDayMinutes })}
+              onAddMoreTime={(id) => void addMoreTime(id, MORE_TIME_STEP_MINUTES)}
               onDelete={(id) => void deleteTask(id)}
             />
           </Section>
@@ -149,17 +160,20 @@ function Section({
 
 function TasksEditor({
   tasks,
+  worked,
   onAdd,
-  onComplete,
+  onAddMoreTime,
   onDelete,
 }: {
   tasks: TaskItem[]
-  onAdd: (t: Omit<TaskItem, 'id' | 'createdAt' | 'parentTaskId'>) => Promise<void>
-  onComplete: (id: string) => void
+  worked: Record<string, number>
+  onAdd: (t: TaskDraft) => Promise<void>
+  onAddMoreTime: (id: string) => void
   onDelete: (id: string) => void
 }) {
   const [draft, setDraft] = useState(() => ({
     title: '',
+    plan: '',
     deadline: addDays(dateKey(new Date()), 7),
     minutes: 60,
     importance: 5,
@@ -167,11 +181,13 @@ function TasksEditor({
     workKind: 'routine' as 'routine' | 'novel',
   }))
   const [detailed, setDetailed] = useState(false)
+  const [pendingDraft, setPendingDraft] = useState<TaskDraft | null>(null)
 
   const submit = () => {
-    if (!draft.title.trim()) return
-    void onAdd({
+    if (!draft.title.trim() || !draft.plan.trim()) return
+    setPendingDraft({
       title: draft.title.trim(),
+      plan: draft.plan.trim(),
       deadline: draft.deadline,
       importance: draft.importance,
       category: draft.category.trim() || 'général',
@@ -182,55 +198,42 @@ function TasksEditor({
       remainingMinutes: draft.minutes,
       correctionFactor: draft.workKind === 'novel' ? 1.7 : 1.4,
       status: 'active',
+      appsToBlock: [],
     })
-    setDraft((d) => ({ ...d, title: '' }))
   }
 
   return (
     <>
-      <div className="space-y-1">
-        {tasks.length === 0 ? (
-          <p className="py-4 text-center text-xs text-fg-3">
-            Rien à rendre pour l{'’'}instant.
-          </p>
-        ) : (
-          tasks.map((t) => (
-            <div key={t.id} className="group flex items-center gap-3 py-1.5 text-xs">
-              <button
-                type="button"
-                onClick={() => onComplete(t.id)}
-                className="h-3.5 w-3.5 shrink-0 rounded-full border border-line-strong transition-colors hover:border-fg hover:bg-fg"
-                aria-label={`Terminer ${t.title}`}
-              />
-              <span className="truncate text-fg">{t.title}</span>
-              <span className="ml-auto shrink-0 font-mono tabular-nums text-fg-3">
-                {t.deadline.slice(5)} · {duration(t.remainingMinutes)}
-              </span>
-              <button
-                type="button"
-                onClick={() => onDelete(t.id)}
-                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-fg group-hover:opacity-100"
-                aria-label={`Supprimer ${t.title}`}
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+      <TaskHierarchyList
+        tasks={tasks}
+        worked={worked}
+        onAddMoreTime={onAddMoreTime}
+        onDelete={onDelete}
+        stepMinutes={MORE_TIME_STEP_MINUTES}
+      />
 
       <div className="mt-4 space-y-2 border-t border-line pt-4">
         <input
           type="text"
+          name="commitment-task-title"
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="Ce qu’il y a à faire…"
           className={cn(inputClass, 'w-full')}
         />
+        <input
+          type="text"
+          name="commitment-task-plan"
+          value={draft.plan}
+          onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
+          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Ce soir à mon bureau...)"
+          className={cn(inputClass, 'w-full')}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
+            name="commitment-task-deadline"
             value={draft.deadline}
             onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
             className={inputClass}
@@ -238,6 +241,7 @@ function TasksEditor({
           <label className="flex items-center gap-1.5 text-xs text-fg-3">
             <input
               type="number"
+              name="commitment-task-minutes"
               min={5}
               max={2400}
               step={5}
@@ -249,7 +253,7 @@ function TasksEditor({
           </label>
           <button
             type="button"
-            disabled={!draft.title.trim()}
+            disabled={!draft.title.trim() || !draft.plan.trim()}
             onClick={submit}
             className="pressable ml-auto inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
@@ -271,6 +275,7 @@ function TasksEditor({
               Importance
               <input
                 type="number"
+                name="commitment-task-importance"
                 min={1}
                 max={10}
                 value={draft.importance}
@@ -282,6 +287,7 @@ function TasksEditor({
               Catégorie
               <input
                 type="text"
+                name="commitment-task-category"
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                 className={cn(inputClass, 'mt-1 w-full')}
@@ -291,6 +297,7 @@ function TasksEditor({
               Nature
               <select
                 value={draft.workKind}
+                name="commitment-task-work-kind"
                 onChange={(e) =>
                   setDraft({ ...draft, workKind: e.target.value as 'routine' | 'novel' })
                 }
@@ -308,6 +315,24 @@ function TasksEditor({
           recalculée.
         </p>
       </div>
+
+      {pendingDraft && (
+        <IntelligentBlockingReviewModal
+          open={true}
+          title={pendingDraft.title}
+          plan={pendingDraft.plan}
+          kindLabel="tâche"
+          onConfirm={(blockedApps) => {
+            void onAdd({
+              ...pendingDraft,
+              appsToBlock: blockedApps,
+            })
+            setPendingDraft(null)
+            setDraft((d) => ({ ...d, title: '', plan: '' }))
+          }}
+          onCancel={() => setPendingDraft(null)}
+        />
+      )}
     </>
   )
 }

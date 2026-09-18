@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, screen, type IpcMainEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
+import { appIconWindowOptions } from '../app-icon'
 import log from '../logging/setup'
 import {
   attachOverlayWindow,
@@ -13,15 +14,12 @@ import {
   protectBlockedWindowPreview,
   restoreBlockedWindowPreview,
   restoreAppAudioForTarget,
-  restoreProcessTaskbar,
   syncOverlayWindow,
   watchProcessWindows,
   type ProcessWindowBounds,
 } from './process-window-probe'
 
-const JUSTIFICATION_CHANNEL = 'semantic-blocking:justification-submitted'
 let activeStrictBlockWindow: BrowserWindow | null = null
-let activeBlockOverlayArgs: BlockOverlayArgs | null = null
 let allowActiveBlockOverlayClose = false
 const WINDOW_CLOSE_GRACE_MS = 120
 // Garde audio ciblé: il ne touche qu'aux sessions audio de l'application bloquée.
@@ -51,6 +49,7 @@ type AppOverlayGroup = {
   stopped: boolean
   mediaGuardTimer: ReturnType<typeof setInterval> | null
   lastAudioMuteAt: number
+  audioMutePending: boolean
   lastMediaPauseAt: number
   lastTaskbarHideAt: number
   protectedWindowIds: Set<string>
@@ -58,125 +57,6 @@ type AppOverlayGroup = {
 
 const activeAppOverlayGroups = new Map<string, AppOverlayGroup>()
 const activeSiteOverlays = new Map<string, TrackedSiteOverlay>()
-
-function htmlShell(body: string, extraScript = ''): string {
-  return `<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vethos Focus Guard</title>
-  <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      color: #f8fafc;
-      background:
-        radial-gradient(circle at 20% 15%, rgba(125, 211, 252, 0.20), transparent 28rem),
-        radial-gradient(circle at 80% 75%, rgba(52, 211, 153, 0.16), transparent 26rem),
-        linear-gradient(135deg, #04111d 0%, #071827 48%, #0b1f24 100%);
-    }
-    .rain {
-      position: fixed;
-      inset: -20vh 0 0;
-      pointer-events: none;
-      opacity: 0.22;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.55) 0 35%, transparent 35% 100%);
-      background-size: 2px 30px;
-      animation: rain 0.75s linear infinite;
-      transform: rotate(12deg) scale(1.3);
-    }
-    @keyframes rain { from { background-position-y: 0; } to { background-position-y: 30px; } }
-    .panel {
-      width: min(760px, calc(100vw - 48px));
-      padding: 44px;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      border-radius: 18px;
-      background: rgba(2, 6, 23, 0.68);
-      box-shadow: 0 32px 120px rgba(0, 0, 0, 0.42);
-      backdrop-filter: blur(24px);
-    }
-    h1 { margin: 0; font-size: 28px; line-height: 1.15; letter-spacing: 0; }
-    p { margin: 14px 0 0; color: #cbd5e1; line-height: 1.55; }
-    .muted { color: #94a3b8; font-size: 13px; }
-    .breath {
-      width: 168px;
-      height: 168px;
-      margin: 34px auto 20px;
-      border-radius: 999px;
-      border: 1px solid rgba(186, 230, 253, 0.45);
-      background: radial-gradient(circle, rgba(186, 230, 253, 0.24), rgba(14, 165, 233, 0.08));
-      animation: boxBreath 16s ease-in-out infinite;
-      box-shadow: 0 0 80px rgba(125, 211, 252, 0.18);
-    }
-    @keyframes boxBreath {
-      0%, 100% { transform: scale(0.72); }
-      25%, 50% { transform: scale(1); }
-      75% { transform: scale(0.72); }
-    }
-    textarea {
-      display: block;
-      width: 100%;
-      min-height: 116px;
-      margin-top: 22px;
-      resize: none;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      border-radius: 10px;
-      padding: 14px 16px;
-      color: #f8fafc;
-      background: rgba(15, 23, 42, 0.82);
-      outline: none;
-      font: inherit;
-    }
-    textarea:focus { border-color: rgba(56, 189, 248, 0.75); }
-    button {
-      margin-top: 16px;
-      border: 0;
-      border-radius: 10px;
-      padding: 11px 16px;
-      color: #020617;
-      background: #7dd3fc;
-      font-weight: 700;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <div class="rain"></div>
-  ${body}
-  ${extraScript}
-</body>
-</html>`
-}
-
-function createBlockingWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    fullscreen: true,
-    alwaysOnTop: true,
-    kiosk: true,
-    frame: false,
-    autoHideMenuBar: true,
-    icon: join(__dirname, '../../build/icon.png'),
-    backgroundColor: '#020617',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  })
-  win.setAlwaysOnTop(true, 'screen-saver')
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  return win
-}
-
-function loadHtml(win: BrowserWindow, html: string): void {
-  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-}
 
 export type BlockOverlayArgs = {
   targetName: string
@@ -223,7 +103,7 @@ function createBlockOverlayWindow(
     autoHideMenuBar: true,
     skipTaskbar: true,
     show: false,
-    icon: join(__dirname, '../../build/icon.png'),
+    ...appIconWindowOptions(),
     backgroundColor: '#020202',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -266,16 +146,6 @@ function centerOnCursorDisplay(win: BrowserWindow): void {
   const x = Math.round(display.workArea.x + (display.workArea.width - width) / 2)
   const y = Math.round(display.workArea.y + (display.workArea.height - height) / 2)
   win.setPosition(x, y)
-}
-
-export async function isProcessRunning(pid: number): Promise<boolean> {
-  if (!Number.isInteger(pid) || pid <= 0) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM'
-  }
 }
 
 function applyBlockOverlayBounds(win: BrowserWindow, bounds: ProcessWindowBounds): void {
@@ -330,36 +200,76 @@ function loadBlockOverlay(win: BrowserWindow, args: BlockOverlayArgs): void {
   })
 }
 
-function destroyAppOverlayGroup(token: string): boolean {
+async function destroyAppOverlayGroup(token: string): Promise<boolean> {
   const group = activeAppOverlayGroups.get(token)
   if (!group) return false
   group.stopped = true
   group.allowClose = true
   if (group.mediaGuardTimer) clearInterval(group.mediaGuardTimer)
   group.mediaGuardTimer = null
-  group.stopWatching?.()
+  try {
+    group.stopWatching?.()
+  } catch (err) {
+    log.warn('[block-overlay] arrêt du watcher overlay impossible', { token, err })
+  }
   group.stopWatching = null
   for (const overlay of group.overlays.values()) {
     if (overlay.closeTimer) clearTimeout(overlay.closeTimer)
-    detachOverlayWindow(overlay.nativeWindowId)
-    if (!overlay.win.isDestroyed()) overlay.win.destroy()
+    try {
+      detachOverlayWindow(overlay.nativeWindowId)
+    } catch (err) {
+      log.warn('[block-overlay] détachement overlay impossible', {
+        token,
+        windowId: overlay.nativeWindowId,
+        err,
+      })
+    }
+    try {
+      if (!overlay.win.isDestroyed()) overlay.win.destroy()
+    } catch (err) {
+      log.warn('[block-overlay] destruction overlay impossible', {
+        token,
+        windowId: overlay.nativeWindowId,
+        err,
+      })
+    }
   }
-  for (const windowId of group.protectedWindowIds) restoreBlockedWindowPreview(windowId)
-  restoreBlockedAppResources(token, group.args.pid, group.args.targetName)
+  for (const windowId of group.protectedWindowIds) {
+    try {
+      restoreBlockedWindowPreview(windowId)
+    } catch (err) {
+      log.warn('[block-overlay] restauration preview impossible', { token, windowId, err })
+    }
+  }
   group.protectedWindowIds.clear()
   group.overlays.clear()
   activeAppOverlayGroups.delete(token)
+  await restoreBlockedAppResources(token, group.args.pid, group.args.targetName)
   return true
 }
 
-export function restoreBlockedAppResources(
+export function closeAppBlockOverlay(attemptToken: string): Promise<boolean> {
+  return destroyAppOverlayGroup(attemptToken)
+}
+
+export async function restoreBlockedAppResources(
   attemptToken: string,
   pid: number | undefined,
   targetName: string,
-): void {
+): Promise<void> {
   if (!pid) return
-  restoreProcessTaskbar(pid, targetName)
-  restoreAppAudioForTarget(attemptToken, pid, targetName)
+  try {
+    const restored = await restoreAppAudioForTarget(attemptToken, pid, targetName)
+    if (!restored) {
+      log.warn('[block-overlay] restauration non confirmée', { pid, targetName })
+    }
+  } catch (err) {
+    log.warn('[block-overlay] restauration audio/barre des tâches impossible', {
+      pid,
+      targetName,
+      err,
+    })
+  }
 }
 
 function siteOverlaySignature(args: BlockOverlayArgs): string {
@@ -496,7 +406,12 @@ function updateAppOverlayGroup(group: AppOverlayGroup, boundsList: ProcessWindow
     // cible : une seule vignette Windows, même minimisation et bon ordre Z.
     void attachOverlayWindow(overlay.nativeWindowId, key).then((attached) => {
       if (group.stopped || group.overlays.get(key) !== overlay || win.isDestroyed()) return
-      if (!attached) log.warn('[block-overlay] attachement natif impossible', { targetWindowId: key })
+      if (!attached) {
+        log.warn('[block-overlay] attachement natif impossible', { targetWindowId: key })
+        // Repli visible : même si Windows refuse la relation propriétaire,
+        // l'application ne doit pas apparaître une fraction de seconde devant.
+        win.setAlwaysOnTop(true, 'floating')
+      }
       // La couleur de fond bloque déjà l'application pendant le rendu React.
       win.showInactive()
     })
@@ -520,9 +435,18 @@ function updateAppOverlayGroup(group: AppOverlayGroup, boundsList: ProcessWindow
 function enforceAppMediaGuard(group: AppOverlayGroup): void {
   if (group.stopped) return
   const now = Date.now()
-  if (now - group.lastAudioMuteAt >= APP_AUDIO_GUARD_INTERVAL_MS) {
+  if (!group.audioMutePending && now - group.lastAudioMuteAt >= APP_AUDIO_GUARD_INTERVAL_MS) {
     group.lastAudioMuteAt = now
-    if (group.args.pid) muteAppAudio(group.args.attemptToken ?? '', group.args.pid, group.args.targetName)
+    if (group.args.pid) {
+      group.audioMutePending = true
+      void muteAppAudio(
+        group.args.attemptToken ?? '',
+        group.args.pid,
+        group.args.targetName,
+      ).finally(() => {
+        group.audioMutePending = false
+      })
+    }
   }
   if (now - group.lastMediaPauseAt >= APP_MEDIA_SESSION_PAUSE_INTERVAL_MS) {
     group.lastMediaPauseAt = now
@@ -555,6 +479,7 @@ function showEnforcedAppOverlay(args: BlockOverlayArgs): void {
     stopped: false,
     mediaGuardTimer: null,
     lastAudioMuteAt: 0,
+    audioMutePending: false,
     lastMediaPauseAt: 0,
     lastTaskbarHideAt: 0,
     protectedWindowIds: new Set(),
@@ -623,7 +548,6 @@ export function showBlockOverlayWindow(args: BlockOverlayArgs): void {
   }
 
   if (activeStrictBlockWindow && !activeStrictBlockWindow.isDestroyed()) {
-    activeBlockOverlayArgs = args
     allowActiveBlockOverlayClose = true
     loadBlockOverlay(activeStrictBlockWindow, args)
     void positionBlockOverlay(activeStrictBlockWindow, args)
@@ -633,114 +557,12 @@ export function showBlockOverlayWindow(args: BlockOverlayArgs): void {
   }
 
   allowActiveBlockOverlayClose = true
-  activeBlockOverlayArgs = args
   const win = createBlockOverlayWindow(args)
   activeStrictBlockWindow = win
   win.on('closed', () => {
     if (activeStrictBlockWindow === win) {
       activeStrictBlockWindow = null
-      activeBlockOverlayArgs = null
     }
   })
   loadBlockOverlay(win, args)
-}
-
-export function permitBlockOverlayClose(attemptToken: string): boolean {
-  return destroyAppOverlayGroup(attemptToken)
-}
-
-export function closeBlockOverlayWindow(): void {
-  allowActiveBlockOverlayClose = true
-  activeStrictBlockWindow?.close()
-  closeSiteBlockOverlayWindow()
-  for (const token of [...activeAppOverlayGroups.keys()]) destroyAppOverlayGroup(token)
-}
-
-export function showStrictBlockWindow(
-  reason: string,
-  _durationMs = 10_000,
-  title = 'Retourne au travail',
-): void {
-  showBlockOverlayWindow({
-    targetName: title === 'Retourne au travail' ? reason : title,
-    type: 'app',
-    mode: title.toLowerCase().includes('dormir') ? 'sleep' : 'work',
-  })
-}
-
-export function showRecoveryBreakWindow(restMinutes: number): void {
-  const durationMs = Math.max(10_000, Math.round(restMinutes) * 60_000)
-  const win = createBlockingWindow()
-  loadHtml(
-    win,
-    htmlShell(`
-      <main class="panel" aria-live="assertive">
-        <h1>Pause de récupération</h1>
-        <p>Le sprint de concentration est terminé. Cette pause protège ton énergie et évite que les blocs suivants repoussent ton coucher.</p>
-        <div class="breath" aria-hidden="true"></div>
-        <p class="muted">Pendant la pause: regarde à 20 pieds pendant 20 secondes, relâche les épaules, respire lentement, puis reprends au prochain bloc.</p>
-      </main>
-    `),
-  )
-  setTimeout(() => {
-    if (!win.isDestroyed()) win.close()
-  }, durationMs)
-}
-
-export function requestSemanticJustificationWindow(args: {
-  domain: string
-  title: string
-  taskTitle: string
-}): Promise<string | null> {
-  return new Promise((resolve) => {
-    const win = createBlockingWindow()
-    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    let settled = false
-
-    const cleanup = (): void => {
-      ipcMain.removeListener(JUSTIFICATION_CHANNEL, onSubmit)
-      if (!settled) {
-        settled = true
-        resolve(null)
-      }
-    }
-
-    const onSubmit = (_event: IpcMainEvent, payload: unknown): void => {
-      const data = payload as { token?: string; text?: string }
-      if (data?.token !== token) return
-      settled = true
-      cleanup()
-      if (!win.isDestroyed()) win.close()
-      resolve((data.text ?? '').trim())
-    }
-
-    ipcMain.on(JUSTIFICATION_CHANNEL, onSubmit)
-    win.on('closed', cleanup)
-    loadHtml(
-      win,
-      htmlShell(
-        `
-        <main class="panel">
-          <h1>Justifie ce site pour la tâche active</h1>
-          <p>Site: <strong>${args.domain}</strong></p>
-          <p class="muted">${args.title}</p>
-          <p>Tâche active: <strong>${args.taskTitle}</strong></p>
-          <textarea id="justification" autofocus maxlength="500" placeholder="En une phrase, explique pourquoi ce site est nécessaire maintenant."></textarea>
-          <button id="submit">Valider</button>
-        </main>
-        `,
-        `<script>
-          const { ipcRenderer } = require('electron');
-          const submit = () => {
-            const text = document.getElementById('justification').value || '';
-            ipcRenderer.send('${JUSTIFICATION_CHANNEL}', { token: '${token}', text });
-          };
-          document.getElementById('submit').addEventListener('click', submit);
-          document.getElementById('justification').addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) submit();
-          });
-        </script>`,
-      ),
-    )
-  })
 }

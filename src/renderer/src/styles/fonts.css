@@ -1,12 +1,12 @@
 /**
- * Geist et Geist Mono, en variable.
+ * Deux familles, deux rôles, aucune ambiguïté.
  *
- * Inter était le choix par défaut, et ça se voyait : c'est la police que prend
- * toute interface qui n'a pas choisi. Geist garde la même neutralité de
- * travail, avec des chiffres plus fermes et un dessin moins bavard aux grandes
- * tailles. Ça compte pour une application qui affiche surtout des heures.
- *
- * Deux familles en variable : un fichier chacune au lieu de six graisses.
+ * GEIST porte l'interface. GEIST MONO porte les heures, les durées et les
+ * totaux qui doivent se comparer en colonne. L'identité de Vethos vient de la
+ * grille, du filet et du rythme des données, pas d'un contraste décoratif de
+ * familles typographiques.
  */
+
+/* `@import` doit précéder toute autre règle : les @font-face suivent. */
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';

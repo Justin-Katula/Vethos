@@ -4,17 +4,23 @@ import { PageTransition } from '@/components/PageTransition'
 import { Disclosure } from '@/components/ui/Disclosure'
 import { CountUp } from '@/components/ui/CountUp'
 import { WeekCalendar } from '@/components/week/WeekCalendar'
-import { CapacityTable, RequestPanel, ScheduleEditor, duration, toMinutes } from '@/components/editors'
+import {
+  CapacityTable,
+  RequestPanel,
+  ScheduleEditor,
+  duration,
+  toMinutes,
+} from '@/components/editors'
 import { viewportFromSettings } from '@/lib/calendar-viewport'
 import { usePlanning } from '@/lib/use-planning'
 import { usePlanningStore } from '@/store/planning.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { dateKey } from '@/lib/planning/dates'
-import { CATEGORY_COLOR, CATEGORY_LABEL } from '@/lib/palette'
+import { dateKey } from '@shared/planning/dates'
+import { CATEGORY_COLOR, CATEGORY_LABEL, entryFill } from '@/lib/palette'
+import { useResolvedTheme } from '@/lib/use-theme'
 import type { ScheduleCategory } from '@shared/schemas'
 
-const inputClass =
-  'rounded border border-line bg-base px-3 py-2 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors focus:border-line-strong'
+const inputClass = 'field text-sm'
 
 /**
  * Mon temps.
@@ -28,6 +34,7 @@ const inputClass =
  * Ce qu'on veut faire de son temps se déclare ailleurs.
  */
 export default function TimePage() {
+  const theme = useResolvedTheme()
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -68,10 +75,10 @@ export default function TimePage() {
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
         <header className="mb-8 flex flex-wrap items-end justify-between gap-8">
           <div>
-            <h1 className="text-3xl font-semibold text-fg">Mon temps</h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-fg-3">
-              Le sombre est ce qui est déjà pris. Le clair est ce que le moteur a posé pour toi :
-              tu ne le places jamais toi-même.
+            <h1 className="text-[30px] font-semibold text-fg">Mon temps</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-3">
+              Déclare le temps déjà pris. Vethos calcule ensuite ce qui reste disponible sur la
+              semaine.
             </p>
           </div>
 
@@ -84,9 +91,9 @@ export default function TimePage() {
             <CountUp
               value={weekAvailable}
               format={(n) => duration(Math.round(n))}
-              className="block font-mono text-3xl tabular-nums text-fg"
+              className="num iris-text block text-[38px] leading-none"
             />
-            <p className="mt-1 text-[11px] text-fg-3">disponibles sur sept jours</p>
+            <p className="mt-2.5 text-[11.5px] text-fg-3">disponibles sur sept jours</p>
           </motion.div>
         </header>
 
@@ -105,7 +112,9 @@ export default function TimePage() {
               <span key={k} className="flex items-center gap-2 text-[11px] text-fg-3">
                 <span
                   className="h-2.5 w-2.5 rounded-[3px] ring-1 ring-line"
-                  style={{ backgroundColor: CATEGORY_COLOR[k] }}
+                  // Une légende doit montrer EXACTEMENT ce qu'elle nomme : le
+                  // même calcul que les arcs du cadran, pas une marque à part.
+                  style={{ backgroundColor: entryFill(CATEGORY_COLOR[k], theme) }}
                 />
                 {CATEGORY_LABEL[k]}
               </span>
@@ -125,6 +134,7 @@ export default function TimePage() {
                   Coucher
                   <input
                     type="time"
+                    name="sleep-start"
                     value={sleepStart}
                     onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
                     className={inputClass}
@@ -134,6 +144,7 @@ export default function TimePage() {
                   Lever
                   <input
                     type="time"
+                    name="sleep-end"
                     value={sleepEnd}
                     onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
                     className={inputClass}
@@ -155,7 +166,10 @@ export default function TimePage() {
                   : `${schedule.length} créneau${schedule.length > 1 ? 'x' : ''} sur la semaine`
               }
             >
-              <ScheduleEditor entries={schedule} onChange={(entries) => void setSchedule(entries)} />
+              <ScheduleEditor
+                entries={schedule}
+                onChange={(entries) => void setSchedule(entries)}
+              />
             </Disclosure>
           </div>
 

@@ -10,7 +10,7 @@ const version = pkg.version ?? '0.0.0'
 const version4 = version.split('.').concat(['0', '0', '0']).slice(0, 4).join('.')
 
 const sourceDir = join(root, 'release', 'win-unpacked')
-const outFile = join(root, 'release', `Nexus-Setup-${version}.exe`)
+const outFile = join(root, 'release', `Vethos-Setup-${version}.exe`)
 const script = join(root, 'scripts', 'nexus-simple-installer.nsi')
 
 if (!existsSync(sourceDir)) {

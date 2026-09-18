@@ -1,23 +1,7 @@
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 
-/**
- * LE TABLEAU DES DÉPARTS
- *
- * Une ligne par engagement, classées par échéance. L'heure ordonne tout,
- * donc consulter remplace chercher : on regarde un classement, on ne fouille
- * pas une liste.
- *
- * Trois règles héritées du tableau réel :
- *   - la ligne active s'inverse hors du fond, elle ne se colore pas ;
- *   - l'état s'imprime DANS la ligne, il ne devient jamais un badge posé à
- *     côté ;
- *   - ce qui change s'allume et le reste jusqu'à ce que tu l'aies vu.
- *
- * Le mouvement du tableau est le reclassement : une ligne qui change de rang
- * se déplace en gardant son identité, elle ne disparaît pas pour reparaître
- * ailleurs. C'est `layout` qui le porte, et rien d'autre.
- */
+/** Le tableau du jour : heure, engagement, duree, dans cet ordre. */
 
 export type BoardRowState = 'normal' | 'now' | 'changed' | 'done'
 
@@ -36,8 +20,8 @@ export function Board({
   // canyon entre le libellé et sa durée : la largeur est plafonnée pour que le
   // regard fasse le trajet.
   return (
-    <div className={cn('surface max-w-[760px] overflow-hidden', className)}>
-      <div className="flex items-baseline gap-4 border-b border-line px-4 py-2.5 text-[10.5px] font-medium text-fg-3">
+    <div className={cn('surface overflow-hidden', className)}>
+      <div className="flex items-baseline gap-4 border-b border-line px-5 py-3 text-[11px] font-medium text-fg-3">
         <span className="w-[4.5rem] shrink-0">{columns[0]}</span>
         <span className="min-w-0 flex-1">{columns[1]}</span>
         <span className="shrink-0">{columns[2]}</span>
@@ -85,8 +69,8 @@ export function BoardRow({
           : undefined
       }
       className={cn(
-        'group flex items-baseline gap-4 border-b border-line px-4 py-2.5 text-sm last:border-b-0',
-        state === 'now' && 'bg-fg text-base',
+        'group relative flex items-baseline gap-4 border-b border-line px-5 py-3 text-sm last:border-b-0',
+        state === 'now' && 'bg-accent text-white',
         state === 'done' && 'text-fg-3',
         interactive && state !== 'now' && 'cursor-pointer hover:bg-surface-2',
         interactive && state === 'now' && 'cursor-pointer',
@@ -95,7 +79,7 @@ export function BoardRow({
       <span
         className={cn(
           'w-[4.5rem] shrink-0 font-mono text-[13px]',
-          state === 'now' ? 'text-base' : state === 'done' ? 'text-fg-3' : 'text-fg-2',
+          state === 'now' ? 'text-white/75' : state === 'done' ? 'text-fg-3' : 'text-fg-2',
         )}
       >
         {time}
@@ -109,7 +93,7 @@ export function BoardRow({
           <span
             className={cn(
               'shrink-0 text-[11px]',
-              state === 'changed' ? 'text-accent' : state === 'now' ? 'text-base/60' : 'text-fg-3',
+              state === 'changed' ? 'text-accent' : state === 'now' ? 'text-white/70' : 'text-fg-3',
             )}
           >
             {note}
@@ -121,7 +105,7 @@ export function BoardRow({
         <span
           className={cn(
             'shrink-0 font-mono text-[13px]',
-            state === 'now' ? 'text-base' : 'text-fg-2',
+            state === 'now' ? 'text-white' : 'text-fg-2',
           )}
         >
           {value}

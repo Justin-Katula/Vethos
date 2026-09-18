@@ -51,6 +51,9 @@ function makeMocks(initial: DeclaredAppUsageState | null = null) {
       if (localDate) localDateProvider.mockReturnValue(localDate)
     },
     getStorageState: () => storageState.value,
+    setStorageState: (s: DeclaredAppUsageState) => {
+      storageState.value = s
+    },
   }
 }
 
@@ -258,5 +261,51 @@ describe('app-usage-tracker', () => {
     // L'entrée du 2025-01-01 doit être éliminée (>90 jours du 2026-05-05)
     expect(state!.entries.find((e) => e.date === '2025-01-01')).toBeUndefined()
     expect(state!.entries.find((e) => e.date === '2026-05-05')).toBeDefined()
+  })
+
+  it('ne perd pas les secondes comptées PENDANT une écriture', async () => {
+    // L'instantané part avant l'écriture. Si un tick compte une minute pendant que
+    // le disque travaille, elle n'est pas dans cet instantané — et effacer le
+    // drapeau à la fin de l'écriture la condamnait jusqu'au tick suivant, voire
+    // définitivement si l'application se fermait entre-temps.
+    const m = makeMocks(null)
+    m.setApps([APP_VSCODE])
+    m.setProcesses([{ name: 'code.exe', pid: 1 }])
+
+    const tracker = createTracker({
+      storage: m.storage,
+      getDeclaredApps: m.getDeclaredApps,
+      listProcesses: m.listProcesses,
+      now: m.dateProvider,
+      localDate: m.localDateProvider,
+    })
+    await tracker.hydrate()
+    await tracker.tick()
+
+    // Écriture retenue : on déclenche un tick pendant qu'elle est en vol.
+    let libere: () => void = () => {}
+    const enVol = new Promise<void>((r) => {
+      libere = r
+    })
+    let premiere = true
+    m.storage.write.mockImplementation(async (data: DeclaredAppUsageState) => {
+      if (premiere) {
+        premiere = false
+        await enVol
+      }
+      m.setStorageState(data)
+    })
+
+    const ecriture = tracker.flushNow()
+    await tracker.tick() // +1 minute, absente de l'instantané déjà parti
+    libere()
+    await ecriture
+
+    // Le second vidage doit écrire : le drapeau ne doit pas avoir été effacé.
+    await tracker.flushNow()
+
+    const vscode = m.getStorageState()!.entries.find((e) => e.appId === APP_VSCODE.id)
+    expect(vscode, 'aucune entrée persistée pour VS Code').toBeDefined()
+    expect(vscode!.minutes, 'la minute comptée pendant l’écriture a été perdue').toBe(2)
   })
 })

@@ -14,8 +14,8 @@ import * as fs from 'node:fs'
 import log from '@main/logging/setup'
 import { categorizeApp, type AppCategory } from './app-category'
 import { classerParIA, type AiCache } from './app-category-ai'
+import { type ClassificationSource } from '@shared/schemas'
 import { readFile, writeFile } from 'node:fs/promises'
-import { getInstalledApps } from 'get-installed-apps'
 
 const execFile = promisify(execFileCallback)
 
@@ -24,14 +24,20 @@ export type DiscoveredApp = {
   exeName: string
   exePath: string
   publisher: string
-  /** Catégorie affichable, calculée après la fusion. */
-  category: AppCategory
+  /** Catégorie affichable, calculée après la fusion. null si non résolue. */
+  category: AppCategory | null
+  classificationState?: 'RESOLVED' | 'UNRESOLVED'
+  classificationSource?: ClassificationSource
+  classificationReasonCode?: string
+  classifierVersion?: number
   source?: AppSource
   packageId?: string
   hasExecutablePath?: boolean
   iconDataUrl?: string
   /** Sources locales supplémentaires, retirées avant l'envoi au renderer. */
   iconSourcePaths?: string[]
+  id?: string
+  isProtected?: boolean
 }
 
 type ShortcutRecord = {
@@ -85,7 +91,7 @@ type AppxRecord = {
   LogoPath?: unknown
 }
 
-type AppSource = 'shortcut' | 'registry' | 'appPath' | 'programFiles' | 'winget' | 'appx'
+type AppSource = 'shortcut' | 'registry' | 'appPath' | 'programFiles' | 'winget' | 'appx' | 'appsFolder' | 'passive' | 'custom'
 
 /**
  * Candidat avant fusion. La catégorie en est délibérément absente : elle est
@@ -287,7 +293,6 @@ export async function discoverInstalledApps(): Promise<DiscoveredApp[]> {
 
     const uninstStr = String(item.UninstallString || '')
     const isSteamGame = /steam:\/\/uninstall\/|steam\.exe/i.test(uninstStr)
-    const canonical = canonicalNameKey(name)
     const registryIconPath = extractIconPathFromDisplayIcon(String(item.DisplayIcon || ''))
     const installLocation = normalizeLocalPath(String(item.InstallLocation || ''))
 
@@ -468,6 +473,8 @@ async function classerApplications(apps: DiscoveredApp[]): Promise<DiscoveredApp
   }
 
   const cle = (app: DiscoveredApp): string => (app.exeName || app.name).toLowerCase()
+
+  // Le catalogue intégré a été supprimé : plus aucune résolution locale ici.
   const inconnues = classees.filter((app) => cache[cle(app)] === undefined)
 
   if (inconnues.length > AI_TRIGGER_THRESHOLD) {
@@ -475,6 +482,7 @@ async function classerApplications(apps: DiscoveredApp[]): Promise<DiscoveredApp
       `[app-discovery] ${inconnues.length} application(s) inconnue(s) — appel IA (seuil ${AI_TRIGGER_THRESHOLD})`,
     )
     try {
+      // eslint-disable-next-line require-atomic-updates -- `cache` est local à cet appel, pas un état partagé.
       cache = await classerParIA(
         inconnues.map((a) => ({ exeName: cle(a), name: a.name, publisher: a.publisher })),
         cache,
@@ -559,14 +567,35 @@ const GENERIC_ICON_SIGNATURES = [
   'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB6UlEQVRYhe2WTUsbURSG37kJk4mGZJ'
 ]
 
-function isGenericWindowsIcon(dataUrl: string): boolean {
+export function isGenericWindowsIcon(dataUrl: string): boolean {
   return GENERIC_ICON_SIGNATURES.some((sig) => dataUrl.includes(sig))
 }
 
-async function extractIconWithPowerShell(filePath: string): Promise<string | null> {
+export async function extractIconWithPowerShell(filePath: string): Promise<string | null> {
+  const cleanPath = filePath.trim().replace(/^"|"$/g, '').replace(/,\s*-?\d+$/, '').replace(/^"|"$/g, '').trim()
+  if (!cleanPath) return null
+
+  if (cleanPath.toLowerCase().endsWith('.ico')) {
+    try {
+      if (fs.existsSync(cleanPath)) {
+        const buf = fs.readFileSync(cleanPath)
+        if (buf && buf.length > 0) {
+          return `data:image/x-icon;base64,${buf.toString('base64')}`
+        }
+      }
+    } catch {
+      // Ignore unreadable .ico file
+    }
+  }
+
   const script = `
     Add-Type -AssemblyName System.Drawing
-    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("${filePath.replace(/"/g, '""')}")
+    $p = "${cleanPath.replace(/"/g, '""')}"
+    if ($p -match '(?i)\\.ico$') {
+      $icon = New-Object System.Drawing.Icon($p)
+    } else {
+      $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($p)
+    }
     $bitmap = $icon.ToBitmap()
     $ms = New-Object System.IO.MemoryStream
     $bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -593,7 +622,7 @@ async function extractIconWithPowerShell(filePath: string): Promise<string | nul
       return `data:image/png;base64,${base64}`
     }
   } catch (err) {
-    log.warn('[app-discovery] PowerShell icon extraction failed', { filePath, err })
+    log.warn('[app-discovery] PowerShell icon extraction failed', { filePath: cleanPath, err })
   }
   return null
 }
@@ -685,21 +714,49 @@ async function readStartMenuShortcuts(): Promise<ShortcutRecord[]> {
 }
 
 async function readRegistryApps(): Promise<RegistryRecord[]> {
+  const script = `
+    $ErrorActionPreference = 'SilentlyContinue'
+    $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $keys = @(
+      'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+      'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+      'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+    )
+    $apps = Get-ItemProperty $keys -ErrorAction SilentlyContinue |
+      Where-Object {
+        $_.DisplayName -and
+        $_.SystemComponent -ne 1 -and
+        -not $_.ParentKeyName -and
+        -not $_.ParentDisplayName -and
+        $_.ReleaseType -ne 'Update' -and
+        $_.ReleaseType -ne 'Security Update' -and
+        $_.ReleaseType -ne 'Hotfix' -and
+        $_.NoDisplay -ne 1
+      } | ForEach-Object {
+        [PSCustomObject]@{
+          DisplayName = $_.DisplayName
+          InstallLocation = $_.InstallLocation
+          DisplayIcon = $_.DisplayIcon
+          Publisher = $_.Publisher
+          SystemComponent = $_.SystemComponent
+          NoDisplay = $_.NoDisplay
+          ReleaseType = $_.ReleaseType
+          UninstallString = $_.UninstallString
+          ParentDisplayName = $_.ParentDisplayName
+        }
+      }
+    @($apps) | ConvertTo-Json -Depth 2
+  `
+
   try {
-    const rawApps = (await getInstalledApps()) as Array<Record<string, unknown>>
-    return rawApps.map((app) => ({
-      DisplayName: app.appName || app.DisplayName,
-      InstallLocation: app.InstallLocation,
-      DisplayIcon: app.DisplayIcon,
-      Publisher: app.appPublisher || app.Publisher,
-      SystemComponent: app.SystemComponent,
-      NoDisplay: app.NoDisplay,
-      ReleaseType: app.ReleaseType,
-      UninstallString: app.UninstallString,
-      ParentDisplayName: app.ParentDisplayName,
-    }))
+    const { stdout } = await execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true, maxBuffer: 15 * 1024 * 1024, timeout: 15000 },
+    )
+    return parseJsonArray<RegistryRecord>(stdout)
   } catch (err) {
-    log.error('[app-discovery] getInstalledApps native query failed', err)
+    log.error('[app-discovery] Registry query failed', err)
     return []
   }
 }

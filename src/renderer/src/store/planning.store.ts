@@ -1,17 +1,19 @@
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import { assertStorageWrite } from '@/lib/storage-write'
-import { computeAncreMinimum, findAncreConflict } from '@/lib/planning/placement'
-import { autoSplit, computePlannedDuration, planningFactor } from '@/lib/planning/estimation'
-import { dateKey, weekKey } from '@/lib/planning/dates'
-import type { AncreItem, ObjectiveItem, ScheduleEntry, TaskItem } from '@/lib/planning/types'
+import { computeAncreMinimum, findAncreConflict } from '@shared/planning/placement'
+import { autoSplit, computePlannedDuration, planningFactor } from '@shared/planning/estimation'
+import { dateKey, weekKey } from '@shared/planning/dates'
+import type { AncreItem, ObjectiveItem, ScheduleEntry, TaskItem } from '@shared/planning/types'
 import {
   AncresStateSchema,
   LearningStateSchema,
   ObjectivesStateSchema,
   ScheduleStateSchema,
+  SessionConfirmationsStateSchema,
   TasksStateSchema,
   type LearningState,
+  type SessionConfirmationsState,
 } from '@shared/schemas'
 
 /**
@@ -30,7 +32,19 @@ const EMPTY_LEARNING: LearningState = {
   objectiveLastServed: {},
   lastSignalAt: {},
   tasksCreatedPerWeek: {},
+  consecutiveDelays: {},
+  workedMinutesByRef: {},
+  dailyDelayMinutes: {},
 }
+
+/**
+ * B.5.2 : le pas de « il m'en faut plus ». Un seul chiffre, pas un champ à
+ * remplir — la question posée est « ça ne suffisait pas », pas « combien
+ * exactement », à quoi l'utilisateur ne saurait pas mieux répondre qu'à sa
+ * première estimation (B.1). Aligné sur le bloc minimum utile (D.5) : accorder
+ * moins ne produirait aucun créneau plaçable.
+ */
+export const MORE_TIME_STEP_MINUTES = 25
 
 type PlanningStore = {
   loaded: boolean
@@ -39,6 +53,12 @@ type PlanningStore = {
   ancres: AncreItem[]
   schedule: ScheduleEntry[]
   learning: LearningState
+  /**
+   * D.7/D.8 : bookkeeping du jour courant écrit par l'horloge de planification
+   * (processus main) — `null` tant que rien n'a encore tourné aujourd'hui.
+   * Permet de savoir, bloc par bloc, si « Je commence » a vraiment eu lieu.
+   */
+  sessionConfirmations: SessionConfirmationsState | null
 
   load: () => Promise<void>
 
@@ -46,23 +66,51 @@ type PlanningStore = {
    * `maxPerDayMinutes` est le plafond réel d'un jour (40 % de la capacité
    * effective). Au-delà, la tâche est découpée automatiquement (B.5).
    */
-  addTask: (
-    t: Omit<TaskItem, 'id' | 'createdAt' | 'parentTaskId'>,
-    options?: { maxPerDayMinutes?: number },
-  ) => Promise<void>
+  addTask: (t: TaskDraft, options?: { maxPerDayMinutes?: number }) => Promise<void>
   updateTaskRemaining: (id: string, minutes: number) => Promise<void>
-  completeTask: (id: string, measuredMinutes?: number) => Promise<void>
+  /**
+   * B.5.2 : « il m'en faut plus ». La SEULE prise que l'utilisateur garde sur
+   * la fin d'une tâche — il ne la déclare plus terminée (c'est l'horloge de
+   * planification qui le décide, quand le temps prévu a réellement été fait),
+   * il peut seulement dire que le temps prévu ne suffisait pas.
+   *
+   * Les minutes s'ajoutent à `extraMinutes`, jamais à `estimatedMinutes` :
+   * gonfler l'estimation d'origine effacerait la seule trace exploitable par
+   * le facteur de correction (B.2), qui compare réel ÷ estimé.
+   */
+  addMoreTime: (id: string, minutes: number) => Promise<void>
   deleteTask: (id: string) => Promise<void>
 
-  addObjective: (o: Omit<ObjectiveItem, 'id' | 'createdAt'>) => Promise<void>
+  addObjective: (o: Creatable<ObjectiveItem, 'id' | 'createdAt'>) => Promise<void>
   deleteObjective: (id: string) => Promise<void>
 
   /** Refuse la création en cas de conflit d'heure ou de déclencheur (D.3). */
-  addAncre: (a: Omit<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>) => Promise<void>
+  addAncre: (a: Creatable<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>) => Promise<void>
   deleteAncre: (id: string) => Promise<void>
 
   setSchedule: (entries: ScheduleEntry[]) => Promise<void>
 }
+
+/**
+ * Ce que l'appelant fournit vraiment à la création : les champs générés par le
+ * store sont retirés, et `appsToBlock` (D.8) reste facultatif — le schéma le
+ * remplit à `[]`. Un bloc sans application déclarée suspend quand même
+ * l'horaire fixe le temps de sa session ; il ne bloque simplement rien de plus.
+ */
+export type Creatable<T, GeneratedKeys extends keyof T> = Omit<T, GeneratedKeys | 'appsToBlock'> & {
+  appsToBlock?: string[]
+}
+
+/**
+ * Ce que l'interface fournit vraiment pour créer une tâche. `partOrder` et
+ * `extraMinutes` en sont exclus À DESSEIN : le rang d'une partie est décidé par
+ * le découpage (B.5.1) et le temps supplémentaire par `addMoreTime` (B.5.2) —
+ * jamais choisis à la création.
+ */
+export type TaskDraft = Creatable<
+  TaskItem,
+  'id' | 'createdAt' | 'parentTaskId' | 'partOrder' | 'extraMinutes'
+>
 
 export const usePlanningStore = create<PlanningStore>((set, get) => ({
   loaded: false,
@@ -71,15 +119,19 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   ancres: [],
   schedule: [],
   learning: EMPTY_LEARNING,
+  sessionConfirmations: null,
 
   async load() {
-    const [tasks, objectives, ancres, schedule, learning] = await Promise.all([
-      nexus.storage.read('tasks'),
-      nexus.storage.read('objectives'),
-      nexus.storage.read('ancres'),
-      nexus.storage.read('schedule'),
-      nexus.storage.read('learning'),
-    ])
+    const [tasks, objectives, ancres, schedule, learning, sessionConfirmations] = await Promise.all(
+      [
+        nexus.storage.read('tasks'),
+        nexus.storage.read('objectives'),
+        nexus.storage.read('ancres'),
+        nexus.storage.read('schedule'),
+        nexus.storage.read('learning'),
+        nexus.storage.read('session_confirmations'),
+      ],
+    )
 
     set({
       loaded: true,
@@ -88,6 +140,8 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
       ancres: AncresStateSchema.safeParse(ancres).data?.ancres ?? [],
       schedule: ScheduleStateSchema.safeParse(schedule).data?.entries ?? [],
       learning: LearningStateSchema.safeParse(learning).data ?? EMPTY_LEARNING,
+      sessionConfirmations:
+        SessionConfirmationsStateSchema.safeParse(sessionConfirmations).data ?? null,
     })
   },
 
@@ -107,10 +161,13 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
 
     const task: TaskItem = {
       ...input,
+      appsToBlock: input.appsToBlock ?? [],
       correctionFactor: factor.factor,
       remainingMinutes: planned,
       id,
       parentTaskId: null,
+      partOrder: null,
+      extraMinutes: 0,
       createdAt,
     }
 
@@ -130,6 +187,13 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
               ...task,
               id: crypto.randomUUID(),
               parentTaskId: id,
+              // B.5.1 : `autoSplit` produisait déjà ce rang — il était jeté ici,
+              // et sans lui les parties partageaient leurs QUATRE clés de tri
+              // (`createdAt` compris, calculé une seule fois ci-dessus pour
+              // tout le lot). Le comparateur renvoyait 0 partout et l'ordre
+              // final était arbitraire : défaut réel observé le 2026-08-23,
+              // les parties sortaient dans l'ordre 1, 4, 2, 5, 3.
+              partOrder: part.order,
               title: `${task.title} — ${part.label}`,
               estimatedMinutes: part.minutes,
               remainingMinutes: part.minutes,
@@ -162,36 +226,18 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
     assertStorageWrite(await nexus.storage.write('tasks', { tasks }), 'tasks')
   },
 
-  async completeTask(id, measuredMinutes) {
-    const task = get().tasks.find((t) => t.id === id)
+  async addMoreTime(id, minutes) {
+    const extra = Math.max(0, Math.round(minutes))
+    if (extra === 0) return
+
+    // B.5.2 : la tâche redevient active si l'horloge venait de la terminer —
+    // c'est précisément le cas que ce bouton existe pour rattraper : le temps
+    // prévu était fait, mais le travail ne l'était pas.
     const tasks = get().tasks.map((t) =>
-      t.id === id ? { ...t, status: 'history' as const, remainingMinutes: 0 } : t,
+      t.id === id ? { ...t, extraMinutes: t.extraMinutes + extra, status: 'active' as const } : t,
     )
-
-    // G.1 : on n'enregistre une observation que s'il y a une MESURE.
-    // Sans temps de session mesuré, rien n'est appris — on n'invente pas.
-    const learning: LearningState =
-      task && typeof measuredMinutes === 'number' && measuredMinutes > 0
-        ? {
-            ...get().learning,
-            observations: [
-              ...get().learning.observations,
-              {
-                taskId: task.id,
-                category: task.category,
-                workKind: task.workKind,
-                estimatedMinutes: task.estimatedMinutes,
-                actualMinutes: Math.round(measuredMinutes),
-                completed: true,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          }
-        : get().learning
-
-    set({ tasks, learning })
+    set({ tasks })
     assertStorageWrite(await nexus.storage.write('tasks', { tasks }), 'tasks')
-    assertStorageWrite(await nexus.storage.write('learning', learning), 'learning')
   },
 
   async deleteTask(id) {
@@ -203,6 +249,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   async addObjective(input) {
     const objective: ObjectiveItem = {
       ...input,
+      appsToBlock: input.appsToBlock ?? [],
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     }
@@ -232,6 +279,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
 
     const ancre: AncreItem = {
       ...input,
+      appsToBlock: input.appsToBlock ?? [],
       id: crypto.randomUUID(),
       minimumMinutes: computeAncreMinimum(input.normalMaxMinutes),
       createdAt: new Date().toISOString(),

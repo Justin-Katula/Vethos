@@ -8,14 +8,13 @@ export default defineConfig({
       'src/main/**/*.test.ts',
       'src/renderer/**/*.test.ts',
       'src/shared/**/*.test.ts',
-      'src/service/**/*.test.ts',
     ],
+    exclude: ['**/*.manual.test.ts'],
   },
   resolve: {
     alias: {
       '@main': resolve('src/main'),
       '@shared': resolve('src/shared'),
-      '@service': resolve('src/service'),
       '@': resolve('src/renderer/src'),
     },
   },

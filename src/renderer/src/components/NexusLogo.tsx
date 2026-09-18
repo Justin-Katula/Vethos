@@ -24,8 +24,11 @@ export function NexusLogo({ size = 28, className, withWordmark = true }: Props) 
         style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
         draggable={false}
       />
+      {/* La taille s'écrit explicitement : `text-base` désignerait la COULEUR
+          de fond ici, pas la taille — le thème définit une couleur nommée
+          `base`, et Tailwind émet sa règle après celle de la taille. */}
       {withWordmark ? (
-        <span className="text-base font-semibold tracking-tight text-fg">Vethos</span>
+        <span className="text-[16px] font-semibold text-fg">Vethos</span>
       ) : null}
     </div>
   )

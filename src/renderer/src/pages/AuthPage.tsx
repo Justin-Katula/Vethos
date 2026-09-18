@@ -4,6 +4,21 @@ import { NexusLogo } from '@/components/NexusLogo'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/store/auth.store'
 
+/**
+ * LE PREMIER ÉCRAN
+ *
+ * Deux moitiés qui ne font pas le même travail. À gauche, l'objet et une
+ * phrase : c'est tout ce que cet écran a à promettre. À droite, le formulaire,
+ * et rien qui le décore — un champ qui brille n'aide personne à le remplir.
+ *
+ * Deux défauts corrigés au passage, tous les deux invisibles à la relecture du
+ * code et évidents à l'écran :
+ *   - le trait de séparation était en `bg-border-subtle`, une classe qui
+ *     n'existe dans aucun thème : il ne s'est jamais affiché.
+ *   - le bouton d'envoi était en `bg-fg text-white`, c'est-à-dire du blanc sur
+ *     du blanc. Le libellé était là, personne ne pouvait le lire.
+ */
+
 type AuthMode = 'sign-in' | 'sign-up'
 
 export default function AuthPage(): JSX.Element {
@@ -65,34 +80,31 @@ export default function AuthPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-base text-fg lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
-      <section className="hidden min-h-0 flex-col justify-between border-r border-line bg-surface px-10 py-9 lg:flex">
+    <div className="grid h-[100dvh] w-screen grid-cols-1 overflow-hidden bg-base text-fg lg:grid-cols-[minmax(360px,0.9fr)_1.1fr]">
+      <section className="hidden min-h-0 flex-col justify-between border-r border-line bg-surface/70 px-14 py-12 lg:flex">
+        <NexusLogo size={34} />
         <div>
-          <NexusLogo size={32} />
-          <p className="mt-4 max-w-sm text-sm leading-6 text-fg-2">
-            Ton espace de focus reste lié à ce profil local sur cette machine.
+          <div className="mb-6 h-[2px] w-28 bg-accent" />
+          <h1 className="max-w-sm text-[30px] font-semibold leading-tight text-fg">
+            Ton temps reste local. Le plan reste lisible.
+          </h1>
+          <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-fg-2">
+            Vethos calcule tes plages de travail depuis tes engagements réels et protège les
+            sessions quand elles commencent.
           </p>
         </div>
-        <div className="space-y-3">
-          <p className="text-xs font-medium uppercase text-fg-3">Session locale</p>
-          <div className="h-px w-full bg-border-subtle" />
-          <p className="max-w-sm text-sm leading-6 text-fg-2">
-            Connecte-toi pour retrouver tes objectifs, tes tâches, ton planning et tes règles de
-            blocage.
-          </p>
-        </div>
+        <p className="text-[12px] text-fg-3">Tout reste sur cette machine.</p>
       </section>
 
-      <main className="flex min-h-0 items-center justify-center px-5 py-8 sm:px-8">
-        <div className="w-full max-w-[430px] rounded border border-line bg-surface p-6 sm:p-8">
-          <div className="mb-7 lg:hidden">
+      <main className="flex min-h-0 items-center justify-center px-5 py-8 sm:px-10">
+        <div className="w-full max-w-[420px]">
+          <div className="mb-8 lg:hidden">
             <NexusLogo size={30} />
           </div>
 
-          <header className="mb-7">
-            <p className="text-xs font-medium uppercase text-fg-3">Vethos</p>
-            <h1 className="mt-2 text-2xl font-semibold">{title}</h1>
-            <p className="mt-2 text-sm leading-6 text-fg-2">
+          <header className="mb-8">
+            <h1 className="mt-2.5 text-[28px] font-semibold leading-tight">{title}</h1>
+            <p className="mt-2.5 text-[14px] leading-relaxed text-fg-2">
               {mode === 'sign-up'
                 ? 'Crée un accès pour protéger ton espace local.'
                 : account?.name
@@ -101,106 +113,91 @@ export default function AuthPage(): JSX.Element {
             </p>
           </header>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              void handleSubmit(event)
+            }}
+          >
             {mode === 'sign-up' && (
-              <label className="block">
-                <span className="text-xs font-medium uppercase text-fg-3">Nom</span>
-                <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
-                  <User size={16} className="shrink-0 text-fg-3" />
-                  <input
-                    type="text"
-                    autoComplete="name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-                    placeholder="Ton nom"
-                  />
-                </span>
-              </label>
+              <AuthField label="Nom" icon={<User size={16} />}>
+                <input
+                  type="text"
+                  name="name"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
+                  placeholder="Ton nom"
+                />
+              </AuthField>
             )}
 
-            <label className="block">
-              <span className="text-xs font-medium uppercase text-fg-3">Email</span>
-              <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
-                <Mail size={16} className="shrink-0 text-fg-3" />
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-                  placeholder="toi@example.com"
-                />
-              </span>
-            </label>
+            <AuthField label="Email" icon={<Mail size={16} />}>
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
+                placeholder="toi@example.com"
+              />
+            </AuthField>
 
-            <label className="block">
-              <span className="text-xs font-medium uppercase text-fg-3">Mot de passe</span>
-              <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
-                <Lock size={16} className="shrink-0 text-fg-3" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-                  placeholder="8 caractères minimum"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                  className="rounded p-1 text-fg-3 transition-colors hover:text-fg"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  <span className="sr-only">
-                    {showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                  </span>
-                </button>
-              </span>
-            </label>
+            <AuthField label="Mot de passe" icon={<Lock size={16} />}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete={mode === 'sign-up' ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
+                placeholder="8 caractères minimum"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                className="rounded p-1 text-fg-3 transition-colors hover:bg-surface-2 hover:text-fg"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                <span className="sr-only">
+                  {showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                </span>
+              </button>
+            </AuthField>
 
             {mode === 'sign-up' && (
-              <label className="block">
-                <span className="text-xs font-medium uppercase text-fg-3">
-                  Confirmer le mot de passe
-                </span>
-                <span className="mt-2 flex items-center gap-2 rounded border border-line bg-base px-3 py-2.5 focus-within:border-line-strong focus-within:ring-2 focus-within:ring-accent/40">
-                  <Lock size={16} className="shrink-0 text-fg-3" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-                    placeholder="Répète le mot de passe"
-                  />
-                </span>
-              </label>
+              <AuthField label="Confirmer le mot de passe" icon={<Lock size={16} />}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="confirm-password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
+                  placeholder="Répète le mot de passe"
+                />
+              </AuthField>
             )}
 
             {error && (
-              <div className="rounded border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+              <p className="rounded-md border border-warn/30 bg-warn/[0.07] px-4 py-2.5 text-[13px] text-warn">
                 {error}
-              </div>
+              </p>
             )}
 
             <button
               type="submit"
               disabled={submitting}
-              className={cn(
-                'inline-flex h-11 w-full items-center justify-center gap-2 rounded px-4',
-                'text-sm font-medium transition-all duration-200',
-                submitting
-                  ? 'cursor-wait bg-surface-2 text-fg-3'
-                  : 'bg-fg text-white hover:bg-white',
-              )}
+              className="btn-iris pressable mt-2 h-12 w-full"
             >
               <SubmitIcon size={17} />
-              {submitting ? 'Traitement...' : submitLabel}
+              {submitting ? 'Traitement…' : submitLabel}
             </button>
           </form>
 
-          <div className="mt-6 flex items-center justify-between gap-3 text-sm">
+          <div className="mt-7 flex items-center justify-between gap-3 text-[13.5px]">
             <span className="text-fg-3">
               {mode === 'sign-up' ? 'Déjà un compte ?' : 'Pas encore de compte ?'}
             </span>
@@ -210,7 +207,7 @@ export default function AuthPage(): JSX.Element {
               disabled={!canSwitchMode}
               className={cn(
                 'rounded px-2 py-1 font-medium transition-colors',
-                canSwitchMode ? 'text-fg hover:text-white' : 'cursor-not-allowed text-fg-3',
+                canSwitchMode ? 'text-accent hover:brightness-110' : 'cursor-not-allowed text-fg-3',
               )}
             >
               {mode === 'sign-up' ? 'Se connecter' : 'Créer un compte'}
@@ -219,5 +216,32 @@ export default function AuthPage(): JSX.Element {
         </div>
       </main>
     </div>
+  )
+}
+
+/**
+ * Un champ avec son intitulé et son icône. L'anneau de focus est braise : sur
+ * cet écran, c'est le seul endroit où la couleur a le droit d'apparaître, et
+ * elle ne dit qu'une chose — c'est ici que tu écris.
+ */
+function AuthField({
+  label,
+  icon,
+  children,
+}: {
+  label: string
+  icon: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-medium text-fg-3">{label}</span>
+      {/* `--field-bg-active` et non `bg-white` : le champ actif se décolle de la
+          page dans les deux thèmes, au lieu d'être blanc dans les deux. */}
+      <span className="mt-2 flex items-center gap-2.5 rounded border border-line bg-surface px-3.5 py-3 transition-colors focus-within:border-accent/50 focus-within:bg-[var(--field-bg-active)]">
+        <span className="shrink-0 text-fg-3">{icon}</span>
+        {children}
+      </span>
+    </label>
   )
 }

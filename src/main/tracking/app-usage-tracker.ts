@@ -63,6 +63,14 @@ export function createTracker(deps: TrackerDeps): Tracker {
   const buffer = new Map<string, number>()
   let lastTickAt: string | null = null
   let dirty = false
+  /**
+   * Incrémentée à chaque modification du tampon. `flushNow` la relève avant son
+   * écriture et la compare après : si elle a bougé, c'est qu'un tick a compté des
+   * secondes PENDANT l'écriture — secondes absentes de l'instantané déjà parti.
+   * Effacer `dirty` les perdrait jusqu'au prochain tick, et définitivement si
+   * l'application se ferme entre-temps.
+   */
+  let revision = 0
 
   let tickHandle: NodeJS.Timeout | null = null
   let flushHandle: NodeJS.Timeout | null = null
@@ -85,6 +93,7 @@ export function createTracker(deps: TrackerDeps): Tracker {
       if (daysBetween(date, today) > RETENTION_DAYS) {
         buffer.delete(key)
         dirty = true
+        revision++
       }
     }
   }
@@ -117,6 +126,7 @@ export function createTracker(deps: TrackerDeps): Tracker {
         const key = entryKey(app.id, today)
         buffer.set(key, (buffer.get(key) ?? 0) + 1)
         dirty = true
+        revision++
       }
     }
     lastTickAt = now().toISOString()
@@ -124,6 +134,7 @@ export function createTracker(deps: TrackerDeps): Tracker {
 
   async function flushNow(): Promise<void> {
     if (!dirty) return
+    const preleve = revision
     const state: DeclaredAppUsageState = {
       entries: bufferToEntries().sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date)
@@ -132,7 +143,11 @@ export function createTracker(deps: TrackerDeps): Tracker {
       lastTickAt,
     }
     await deps.storage.write(state)
-    dirty = false
+    // On n'efface le drapeau que si RIEN n'a bougé pendant l'écriture. Un tick
+    // survenu entre le prélèvement et ici a compté des secondes absentes de
+    // `state` : les oublier reviendrait à les perdre.
+    // eslint-disable-next-line require-atomic-updates -- c'est précisément la garde : `revision` détecte le tick concurrent.
+    if (revision === preleve) dirty = false
     deps.onFlush?.(state)
   }
 

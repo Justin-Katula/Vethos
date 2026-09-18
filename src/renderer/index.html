@@ -8,22 +8,16 @@
   </head>
   <body>
     <!--
-      THESIS: Le hall des départs. L'heure ordonne tout, donc consulter remplace
-      chercher. Refuse la grille de cartes arrondies du tableau de bord sombre.
-      OWN-WORLD: Émail de gare suisse. Panneaux plats et carrés (rayon 2px),
-      filets gravés, lettrage Geist en trois degrés de luminosité, chiffres en
-      Geist Mono tabulaire. UN SEUL rouge (#E4000F) : l'aiguille de Hilfiker et
-      l'alerte du tableau. L'élévation se déclare une fois, par le filet.
-      STORY: L'utilisateur voit que l'arithmétique est déjà faite, qu'on ne lui
-      demandera rien, et referme.
-      FIRST VIEWPORT: Quai à gauche (224px). À droite, la date en filet, puis le
-      cadran 24 h à 340px et le tableau des départs côte à côte. La ligne en
-      cours s'inverse hors du fond. L'action primaire est en haut à droite.
-      FORM: Fusion carte d'embarquement + horloge de gare, choisie par
-      l'utilisateur contre le tirage (assigné 7, tableau de service).
-      Seed 134252f3, scope direction, mode operate.
-      FINISH: unreviewed and undocumented is unfinished; this build ends with
-      the finish review, the verdict, and DESIGN.md
+      THESIS: Tableau d'exploitation du temps. Vethos doit faire voir ce qui
+      est deja calcule, pas motiver l'utilisateur a recalculer mentalement.
+      OWN-WORLD: gris strictement neutres, filets fins, rail fixe, chiffres
+      Geist Mono. Un seul rouge (#C1121F) pour le present, la contrainte et le
+      blocage. Aucun vert, pas meme en nuance.
+      STORY: ouvrir, lire la prochaine ligne utile, agir ou refermer.
+      FIRST VIEWPORT: navigation stable a gauche; date, cadran 24 h, tableau du
+      jour et signaux factuels a droite, sans hero ni grille decorative.
+      FORM: direction briefee hors reseau, seed local f3108f37, mode operate.
+      FINISH: revue visuelle, detecteur, captures, DESIGN.md et validations.
     -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

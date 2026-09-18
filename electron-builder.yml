@@ -14,6 +14,12 @@ files:
 
 asar: true
 
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+  - from: Informations/Vethos_catalogue.json
+    to: Informations/Vethos_catalogue.json
+
 win:
   target:
     - target: nsis

@@ -1,0 +1,2562 @@
+{
+  "schemaVersion": "1.0.0",
+  "topicCount": 136,
+  "actionCount": 23,
+  "topics": [
+    {
+      "id": "MATHEMATICS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "math",
+        "maths",
+        "mathematiques",
+        "mathématiques"
+      ],
+      "aliases_en": [
+        "math",
+        "maths",
+        "mathematics"
+      ]
+    },
+    {
+      "id": "ARITHMETIC",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "arithmetique",
+        "arithmétique"
+      ],
+      "aliases_en": [
+        "arithmetic"
+      ]
+    },
+    {
+      "id": "ALGEBRA",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "algebre",
+        "algèbre"
+      ],
+      "aliases_en": [
+        "algebra"
+      ]
+    },
+    {
+      "id": "EQUATIONS",
+      "parentTopics": [
+        "ALGEBRA"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "equation",
+        "équation",
+        "equations",
+        "équations"
+      ],
+      "aliases_en": [
+        "equation",
+        "equations"
+      ]
+    },
+    {
+      "id": "LINEAR_EQUATIONS",
+      "parentTopics": [
+        "EQUATIONS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "equation lineaire",
+        "équation linéaire",
+        "equations lineaires"
+      ],
+      "aliases_en": [
+        "linear equation",
+        "linear equations"
+      ]
+    },
+    {
+      "id": "QUADRATIC_EQUATIONS",
+      "parentTopics": [
+        "EQUATIONS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "equation quadratique",
+        "équation quadratique",
+        "trinome",
+        "trinôme"
+      ],
+      "aliases_en": [
+        "quadratic equation",
+        "quadratic equations"
+      ]
+    },
+    {
+      "id": "FRACTIONS",
+      "parentTopics": [
+        "ARITHMETIC"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "fraction",
+        "fractions"
+      ],
+      "aliases_en": [
+        "fraction",
+        "fractions"
+      ]
+    },
+    {
+      "id": "PERCENTAGES",
+      "parentTopics": [
+        "ARITHMETIC"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "pourcentage",
+        "pourcentages"
+      ],
+      "aliases_en": [
+        "percentage",
+        "percentages"
+      ]
+    },
+    {
+      "id": "GEOMETRY",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "geometrie",
+        "géométrie"
+      ],
+      "aliases_en": [
+        "geometry"
+      ]
+    },
+    {
+      "id": "TRIGONOMETRY",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "trigonometrie",
+        "trigonométrie"
+      ],
+      "aliases_en": [
+        "trigonometry"
+      ]
+    },
+    {
+      "id": "CALCULUS",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "calcul differentiel",
+        "calcul intégral",
+        "analyse mathematique"
+      ],
+      "aliases_en": [
+        "calculus"
+      ]
+    },
+    {
+      "id": "DERIVATIVES",
+      "parentTopics": [
+        "CALCULUS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "derivee",
+        "dérivée",
+        "derivees",
+        "dérivées"
+      ],
+      "aliases_en": [
+        "derivative",
+        "derivatives"
+      ]
+    },
+    {
+      "id": "INTEGRALS",
+      "parentTopics": [
+        "CALCULUS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "integrale",
+        "intégrale",
+        "integrales",
+        "intégrales"
+      ],
+      "aliases_en": [
+        "integral",
+        "integrals"
+      ]
+    },
+    {
+      "id": "FUNCTIONS_MATH",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "fonction mathematique",
+        "fonctions mathematiques"
+      ],
+      "aliases_en": [
+        "mathematical function",
+        "functions"
+      ]
+    },
+    {
+      "id": "GRAPHING_MATH",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "graphe de fonction",
+        "tracer une fonction"
+      ],
+      "aliases_en": [
+        "function graph",
+        "graphing"
+      ]
+    },
+    {
+      "id": "STATISTICS",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "DATA_SCIENCE_ANALYTICS"
+      ],
+      "aliases_fr": [
+        "statistiques",
+        "statistique"
+      ],
+      "aliases_en": [
+        "statistics"
+      ]
+    },
+    {
+      "id": "PROBABILITY",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "probabilite",
+        "probabilité",
+        "probabilites"
+      ],
+      "aliases_en": [
+        "probability",
+        "probabilities"
+      ]
+    },
+    {
+      "id": "LINEAR_ALGEBRA",
+      "parentTopics": [
+        "ALGEBRA"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "algebre lineaire",
+        "algèbre linéaire"
+      ],
+      "aliases_en": [
+        "linear algebra"
+      ]
+    },
+    {
+      "id": "DISCRETE_MATHEMATICS",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "mathematiques discretes",
+        "mathématiques discrètes"
+      ],
+      "aliases_en": [
+        "discrete mathematics"
+      ]
+    },
+    {
+      "id": "LOGIC",
+      "parentTopics": [
+        "MATHEMATICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "logique mathematique",
+        "logique formelle"
+      ],
+      "aliases_en": [
+        "mathematical logic",
+        "formal logic"
+      ]
+    },
+    {
+      "id": "PHYSICS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "physique"
+      ],
+      "aliases_en": [
+        "physics"
+      ]
+    },
+    {
+      "id": "MECHANICS_PHYSICS",
+      "parentTopics": [
+        "PHYSICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "mecanique",
+        "mécanique classique"
+      ],
+      "aliases_en": [
+        "mechanics",
+        "classical mechanics"
+      ]
+    },
+    {
+      "id": "ELECTRICITY",
+      "parentTopics": [
+        "PHYSICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "electricite",
+        "électricité"
+      ],
+      "aliases_en": [
+        "electricity"
+      ]
+    },
+    {
+      "id": "THERMODYNAMICS",
+      "parentTopics": [
+        "PHYSICS"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "thermodynamique"
+      ],
+      "aliases_en": [
+        "thermodynamics"
+      ]
+    },
+    {
+      "id": "CHEMISTRY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "chimie"
+      ],
+      "aliases_en": [
+        "chemistry"
+      ]
+    },
+    {
+      "id": "BIOLOGY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "biologie"
+      ],
+      "aliases_en": [
+        "biology"
+      ]
+    },
+    {
+      "id": "ANATOMY",
+      "parentTopics": [
+        "BIOLOGY"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "anatomie"
+      ],
+      "aliases_en": [
+        "anatomy"
+      ]
+    },
+    {
+      "id": "GENETICS",
+      "parentTopics": [
+        "BIOLOGY"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "genetique",
+        "génétique"
+      ],
+      "aliases_en": [
+        "genetics"
+      ]
+    },
+    {
+      "id": "ASTRONOMY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "astronomie"
+      ],
+      "aliases_en": [
+        "astronomy"
+      ]
+    },
+    {
+      "id": "HISTORY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "histoire"
+      ],
+      "aliases_en": [
+        "history"
+      ]
+    },
+    {
+      "id": "GEOGRAPHY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "geographie",
+        "géographie"
+      ],
+      "aliases_en": [
+        "geography"
+      ]
+    },
+    {
+      "id": "PHILOSOPHY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "philosophie"
+      ],
+      "aliases_en": [
+        "philosophy"
+      ]
+    },
+    {
+      "id": "LITERATURE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "litterature",
+        "littérature"
+      ],
+      "aliases_en": [
+        "literature"
+      ]
+    },
+    {
+      "id": "ECONOMICS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "economie",
+        "économie"
+      ],
+      "aliases_en": [
+        "economics"
+      ]
+    },
+    {
+      "id": "LAW",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "LEGAL_COMPLIANCE"
+      ],
+      "aliases_fr": [
+        "droit",
+        "juridique"
+      ],
+      "aliases_en": [
+        "law",
+        "legal studies"
+      ]
+    },
+    {
+      "id": "LANGUAGE_LEARNING",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "apprentissage de langue",
+        "langues"
+      ],
+      "aliases_en": [
+        "language learning"
+      ]
+    },
+    {
+      "id": "FRENCH_LANGUAGE",
+      "parentTopics": [
+        "LANGUAGE_LEARNING"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "francais",
+        "français"
+      ],
+      "aliases_en": [
+        "french"
+      ]
+    },
+    {
+      "id": "ENGLISH_LANGUAGE",
+      "parentTopics": [
+        "LANGUAGE_LEARNING"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "anglais"
+      ],
+      "aliases_en": [
+        "english"
+      ]
+    },
+    {
+      "id": "SPANISH_LANGUAGE",
+      "parentTopics": [
+        "LANGUAGE_LEARNING"
+      ],
+      "preferredDomains": [
+        "EDUCATION_LEARNING"
+      ],
+      "aliases_fr": [
+        "espagnol"
+      ],
+      "aliases_en": [
+        "spanish"
+      ]
+    },
+    {
+      "id": "PHYSICAL_EXERCISE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "sport",
+        "exercice physique",
+        "activite physique",
+        "activité physique"
+      ],
+      "aliases_en": [
+        "physical exercise",
+        "workout",
+        "exercise"
+      ]
+    },
+    {
+      "id": "HOME_WORKOUT",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "sport a la maison",
+        "sport à la maison",
+        "entrainement maison",
+        "entraînement maison",
+        "exercice a la maison",
+        "exercice à la maison"
+      ],
+      "aliases_en": [
+        "home workout",
+        "workout at home"
+      ]
+    },
+    {
+      "id": "BODYWEIGHT_TRAINING",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "poids du corps",
+        "entrainement au poids du corps",
+        "entraînement au poids du corps"
+      ],
+      "aliases_en": [
+        "bodyweight training",
+        "bodyweight workout"
+      ]
+    },
+    {
+      "id": "CALISTHENICS",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "calisthenie",
+        "calisthénie",
+        "street workout"
+      ],
+      "aliases_en": [
+        "calisthenics",
+        "street workout"
+      ]
+    },
+    {
+      "id": "STRENGTH_TRAINING",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "musculation",
+        "renforcement musculaire",
+        "force"
+      ],
+      "aliases_en": [
+        "strength training"
+      ]
+    },
+    {
+      "id": "WEIGHTLIFTING",
+      "parentTopics": [
+        "STRENGTH_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "halterophilie",
+        "haltérophilie",
+        "poids libres"
+      ],
+      "aliases_en": [
+        "weightlifting",
+        "lifting weights"
+      ]
+    },
+    {
+      "id": "CARDIO",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "cardio",
+        "cardiovasculaire"
+      ],
+      "aliases_en": [
+        "cardio"
+      ]
+    },
+    {
+      "id": "HIIT",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "hiit",
+        "entrainement fractionne",
+        "entraînement fractionné"
+      ],
+      "aliases_en": [
+        "hiit",
+        "high intensity interval training"
+      ]
+    },
+    {
+      "id": "RUNNING",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "courir",
+        "course a pied",
+        "course à pied",
+        "running"
+      ],
+      "aliases_en": [
+        "running",
+        "jogging"
+      ]
+    },
+    {
+      "id": "WALKING",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "marche",
+        "marcher"
+      ],
+      "aliases_en": [
+        "walking"
+      ]
+    },
+    {
+      "id": "CYCLING",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "velo",
+        "vélo",
+        "cyclisme"
+      ],
+      "aliases_en": [
+        "cycling",
+        "biking"
+      ]
+    },
+    {
+      "id": "SWIMMING",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "natation",
+        "nager"
+      ],
+      "aliases_en": [
+        "swimming"
+      ]
+    },
+    {
+      "id": "HIKING",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "randonnee",
+        "randonnée"
+      ],
+      "aliases_en": [
+        "hiking"
+      ]
+    },
+    {
+      "id": "YOGA",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "yoga"
+      ],
+      "aliases_en": [
+        "yoga"
+      ]
+    },
+    {
+      "id": "STRETCHING",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "etirement",
+        "étirement",
+        "etirements",
+        "étirements"
+      ],
+      "aliases_en": [
+        "stretching"
+      ]
+    },
+    {
+      "id": "MOBILITY",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "mobilite",
+        "mobilité"
+      ],
+      "aliases_en": [
+        "mobility"
+      ]
+    },
+    {
+      "id": "PUSH_UPS",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "pompe",
+        "pompes",
+        "faire des pompes"
+      ],
+      "aliases_en": [
+        "push up",
+        "push ups",
+        "push-up",
+        "push-ups"
+      ]
+    },
+    {
+      "id": "PULL_UPS",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "traction",
+        "tractions",
+        "faire des tractions"
+      ],
+      "aliases_en": [
+        "pull up",
+        "pull ups",
+        "pull-up",
+        "pull-ups"
+      ]
+    },
+    {
+      "id": "SQUATS",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "squat",
+        "squats"
+      ],
+      "aliases_en": [
+        "squat",
+        "squats"
+      ]
+    },
+    {
+      "id": "LUNGES",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "fente",
+        "fentes"
+      ],
+      "aliases_en": [
+        "lunge",
+        "lunges"
+      ]
+    },
+    {
+      "id": "PLANK_EXERCISE",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "planche abdominale",
+        "gainage",
+        "faire la planche"
+      ],
+      "aliases_en": [
+        "plank exercise",
+        "plank"
+      ]
+    },
+    {
+      "id": "BURPEES",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "burpee",
+        "burpees"
+      ],
+      "aliases_en": [
+        "burpee",
+        "burpees"
+      ]
+    },
+    {
+      "id": "SIT_UPS",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "sit up",
+        "sit-up",
+        "releve de buste",
+        "relevé de buste"
+      ],
+      "aliases_en": [
+        "sit up",
+        "sit ups",
+        "sit-up"
+      ]
+    },
+    {
+      "id": "CRUNCHES",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "crunch",
+        "crunchs",
+        "abdos"
+      ],
+      "aliases_en": [
+        "crunch",
+        "crunches"
+      ]
+    },
+    {
+      "id": "DIPS_EXERCISE",
+      "parentTopics": [
+        "BODYWEIGHT_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "dips",
+        "faire des dips"
+      ],
+      "aliases_en": [
+        "dips"
+      ]
+    },
+    {
+      "id": "JUMP_ROPE",
+      "parentTopics": [
+        "CARDIO"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "corde a sauter",
+        "corde à sauter"
+      ],
+      "aliases_en": [
+        "jump rope",
+        "skipping rope"
+      ]
+    },
+    {
+      "id": "CORE_TRAINING",
+      "parentTopics": [
+        "STRENGTH_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "abdominaux",
+        "entrainement du tronc",
+        "gainage"
+      ],
+      "aliases_en": [
+        "core training",
+        "core workout"
+      ]
+    },
+    {
+      "id": "UPPER_BODY_TRAINING",
+      "parentTopics": [
+        "STRENGTH_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "haut du corps"
+      ],
+      "aliases_en": [
+        "upper body workout"
+      ]
+    },
+    {
+      "id": "LOWER_BODY_TRAINING",
+      "parentTopics": [
+        "STRENGTH_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "bas du corps",
+        "jambes"
+      ],
+      "aliases_en": [
+        "lower body workout",
+        "leg workout"
+      ]
+    },
+    {
+      "id": "FULL_BODY_TRAINING",
+      "parentTopics": [
+        "STRENGTH_TRAINING"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "full body",
+        "corps entier"
+      ],
+      "aliases_en": [
+        "full body workout"
+      ]
+    },
+    {
+      "id": "SPORTS_TRAINING",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS"
+      ],
+      "aliases_fr": [
+        "entrainement sportif",
+        "entraînement sportif"
+      ],
+      "aliases_en": [
+        "sports training"
+      ]
+    },
+    {
+      "id": "RECOVERY_FITNESS",
+      "parentTopics": [
+        "PHYSICAL_EXERCISE"
+      ],
+      "preferredDomains": [
+        "FITNESS_SPORTS",
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "recuperation sportive",
+        "récupération sportive"
+      ],
+      "aliases_en": [
+        "workout recovery",
+        "sports recovery"
+      ]
+    },
+    {
+      "id": "PROGRAMMING",
+      "parentTopics": [],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "programmation",
+        "coder",
+        "code informatique"
+      ],
+      "aliases_en": [
+        "programming",
+        "coding"
+      ]
+    },
+    {
+      "id": "SOFTWARE_ENGINEERING",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "ingenierie logicielle",
+        "ingénierie logicielle",
+        "developpement logiciel"
+      ],
+      "aliases_en": [
+        "software engineering",
+        "software development"
+      ]
+    },
+    {
+      "id": "WEB_PROGRAMMING",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "WEB_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "developpement web",
+        "développement web"
+      ],
+      "aliases_en": [
+        "web development"
+      ]
+    },
+    {
+      "id": "FRONTEND_DEVELOPMENT_TOPIC",
+      "parentTopics": [
+        "WEB_PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "WEB_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "frontend",
+        "front end"
+      ],
+      "aliases_en": [
+        "frontend",
+        "front-end"
+      ]
+    },
+    {
+      "id": "BACKEND_DEVELOPMENT_TOPIC",
+      "parentTopics": [
+        "WEB_PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "WEB_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "backend",
+        "back end"
+      ],
+      "aliases_en": [
+        "backend",
+        "back-end"
+      ]
+    },
+    {
+      "id": "MOBILE_DEVELOPMENT_TOPIC",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "developpement mobile",
+        "développement mobile"
+      ],
+      "aliases_en": [
+        "mobile development"
+      ]
+    },
+    {
+      "id": "GAME_DEVELOPMENT_TOPIC",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "developpement de jeu",
+        "développement de jeux"
+      ],
+      "aliases_en": [
+        "game development"
+      ]
+    },
+    {
+      "id": "DATABASES",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT",
+        "DATA_SCIENCE_ANALYTICS"
+      ],
+      "aliases_fr": [
+        "base de donnees",
+        "base de données",
+        "sql"
+      ],
+      "aliases_en": [
+        "database",
+        "databases",
+        "sql"
+      ]
+    },
+    {
+      "id": "APIS",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT",
+        "WEB_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "api",
+        "apis"
+      ],
+      "aliases_en": [
+        "api",
+        "apis"
+      ]
+    },
+    {
+      "id": "VERSION_CONTROL_TOPIC",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "git",
+        "controle de version",
+        "contrôle de version"
+      ],
+      "aliases_en": [
+        "git",
+        "version control"
+      ]
+    },
+    {
+      "id": "SOFTWARE_TESTING_TOPIC",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "test logiciel",
+        "tests logiciel",
+        "tests unitaires"
+      ],
+      "aliases_en": [
+        "software testing",
+        "unit testing"
+      ]
+    },
+    {
+      "id": "DEBUGGING_TOPIC",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "debug",
+        "debogage",
+        "débogage"
+      ],
+      "aliases_en": [
+        "debugging",
+        "debug"
+      ]
+    },
+    {
+      "id": "ARTIFICIAL_INTELLIGENCE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "AI_AUTOMATION"
+      ],
+      "aliases_fr": [
+        "intelligence artificielle",
+        "ia generative",
+        "ia générative"
+      ],
+      "aliases_en": [
+        "artificial intelligence",
+        "generative ai"
+      ]
+    },
+    {
+      "id": "MACHINE_LEARNING_TOPIC",
+      "parentTopics": [
+        "ARTIFICIAL_INTELLIGENCE"
+      ],
+      "preferredDomains": [
+        "AI_AUTOMATION",
+        "DATA_SCIENCE_ANALYTICS"
+      ],
+      "aliases_fr": [
+        "machine learning",
+        "apprentissage automatique"
+      ],
+      "aliases_en": [
+        "machine learning"
+      ]
+    },
+    {
+      "id": "AUTOMATION_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "AI_AUTOMATION"
+      ],
+      "aliases_fr": [
+        "automatisation",
+        "workflow automatique"
+      ],
+      "aliases_en": [
+        "automation",
+        "workflow automation"
+      ]
+    },
+    {
+      "id": "CYBERSECURITY_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "CYBERSECURITY"
+      ],
+      "aliases_fr": [
+        "cybersecurite",
+        "cybersécurité",
+        "securite informatique"
+      ],
+      "aliases_en": [
+        "cybersecurity",
+        "computer security"
+      ]
+    },
+    {
+      "id": "NETWORKING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "IT_SYSTEM_ADMINISTRATION"
+      ],
+      "aliases_fr": [
+        "reseau informatique",
+        "réseau informatique"
+      ],
+      "aliases_en": [
+        "computer networking",
+        "networking"
+      ]
+    },
+    {
+      "id": "WINDOWS_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "IT_SYSTEM_ADMINISTRATION",
+        "SYSTEM_UTILITIES"
+      ],
+      "aliases_fr": [
+        "windows 11",
+        "windows 10",
+        "microsoft windows"
+      ],
+      "aliases_en": [
+        "windows 11",
+        "windows 10",
+        "microsoft windows"
+      ]
+    },
+    {
+      "id": "LINUX_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "IT_SYSTEM_ADMINISTRATION"
+      ],
+      "aliases_fr": [
+        "linux",
+        "ubuntu",
+        "debian"
+      ],
+      "aliases_en": [
+        "linux",
+        "ubuntu",
+        "debian"
+      ]
+    },
+    {
+      "id": "PROJECT_MANAGEMENT_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "PROJECT_TASK_MANAGEMENT"
+      ],
+      "aliases_fr": [
+        "gestion de projet",
+        "projet professionnel"
+      ],
+      "aliases_en": [
+        "project management"
+      ]
+    },
+    {
+      "id": "PERSONAL_FINANCE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING",
+        "BANKING_PAYMENTS"
+      ],
+      "aliases_fr": [
+        "finance personnelle",
+        "finances personnelles"
+      ],
+      "aliases_en": [
+        "personal finance"
+      ]
+    },
+    {
+      "id": "BUDGETING_TOPIC",
+      "parentTopics": [
+        "PERSONAL_FINANCE"
+      ],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "budget",
+        "faire mon budget"
+      ],
+      "aliases_en": [
+        "budget",
+        "budgeting"
+      ]
+    },
+    {
+      "id": "ACCOUNTING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "comptabilite",
+        "comptabilité"
+      ],
+      "aliases_en": [
+        "accounting"
+      ]
+    },
+    {
+      "id": "TAXES_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "impot",
+        "impôt",
+        "impots",
+        "impôts",
+        "taxes"
+      ],
+      "aliases_en": [
+        "tax",
+        "taxes"
+      ]
+    },
+    {
+      "id": "INVESTING_TOPIC",
+      "parentTopics": [
+        "PERSONAL_FINANCE"
+      ],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "investissement",
+        "investir"
+      ],
+      "aliases_en": [
+        "investing",
+        "investment"
+      ]
+    },
+    {
+      "id": "BANKING_TOPIC",
+      "parentTopics": [
+        "PERSONAL_FINANCE"
+      ],
+      "preferredDomains": [
+        "BANKING_PAYMENTS"
+      ],
+      "aliases_fr": [
+        "banque",
+        "compte bancaire"
+      ],
+      "aliases_en": [
+        "banking",
+        "bank account"
+      ]
+    },
+    {
+      "id": "MARKETING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "MARKETING_ADVERTISING"
+      ],
+      "aliases_fr": [
+        "marketing",
+        "publicite",
+        "publicité"
+      ],
+      "aliases_en": [
+        "marketing",
+        "advertising"
+      ]
+    },
+    {
+      "id": "SALES_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "SALES_CRM"
+      ],
+      "aliases_fr": [
+        "vente",
+        "ventes",
+        "prospection"
+      ],
+      "aliases_en": [
+        "sales",
+        "selling"
+      ]
+    },
+    {
+      "id": "CUSTOMER_SERVICE_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "CUSTOMER_SERVICE"
+      ],
+      "aliases_fr": [
+        "service client",
+        "support client"
+      ],
+      "aliases_en": [
+        "customer service",
+        "customer support"
+      ]
+    },
+    {
+      "id": "RECRUITING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "HR_RECRUITING"
+      ],
+      "aliases_fr": [
+        "recrutement",
+        "embauche"
+      ],
+      "aliases_en": [
+        "recruiting",
+        "hiring"
+      ]
+    },
+    {
+      "id": "ECOMMERCE_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "SHOPPING_COMMERCE",
+        "BUSINESS_ADMINISTRATION"
+      ],
+      "aliases_fr": [
+        "ecommerce",
+        "commerce en ligne",
+        "boutique en ligne"
+      ],
+      "aliases_en": [
+        "ecommerce",
+        "online store"
+      ]
+    },
+    {
+      "id": "GRAPHIC_DESIGN_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "GRAPHIC_DESIGN"
+      ],
+      "aliases_fr": [
+        "design graphique",
+        "graphisme"
+      ],
+      "aliases_en": [
+        "graphic design"
+      ]
+    },
+    {
+      "id": "UI_UX_DESIGN",
+      "parentTopics": [
+        "GRAPHIC_DESIGN_TOPIC"
+      ],
+      "preferredDomains": [
+        "GRAPHIC_DESIGN"
+      ],
+      "aliases_fr": [
+        "ui ux",
+        "design d'interface",
+        "interface utilisateur"
+      ],
+      "aliases_en": [
+        "ui ux",
+        "interface design"
+      ]
+    },
+    {
+      "id": "PHOTOGRAPHY",
+      "parentTopics": [],
+      "preferredDomains": [
+        "PHOTO_CREATION_EDITING"
+      ],
+      "aliases_fr": [
+        "photo",
+        "photographie"
+      ],
+      "aliases_en": [
+        "photography"
+      ]
+    },
+    {
+      "id": "VIDEO_EDITING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "VIDEO_CREATION_EDITING"
+      ],
+      "aliases_fr": [
+        "montage video",
+        "montage vidéo"
+      ],
+      "aliases_en": [
+        "video editing"
+      ]
+    },
+    {
+      "id": "MUSIC_PRODUCTION_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "AUDIO_MUSIC_CREATION"
+      ],
+      "aliases_fr": [
+        "production musicale",
+        "faire de la musique"
+      ],
+      "aliases_en": [
+        "music production"
+      ]
+    },
+    {
+      "id": "THREE_D_MODELING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "THREE_D_CREATION"
+      ],
+      "aliases_fr": [
+        "modelisation 3d",
+        "modélisation 3d",
+        "3d"
+      ],
+      "aliases_en": [
+        "3d modeling"
+      ]
+    },
+    {
+      "id": "ANIMATION_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "THREE_D_CREATION",
+        "VIDEO_CREATION_EDITING"
+      ],
+      "aliases_fr": [
+        "animation",
+        "animation 3d"
+      ],
+      "aliases_en": [
+        "animation",
+        "3d animation"
+      ]
+    },
+    {
+      "id": "GAMING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "GAMING"
+      ],
+      "aliases_fr": [
+        "jeu video",
+        "jeux video",
+        "jeu vidéo",
+        "jeux vidéo"
+      ],
+      "aliases_en": [
+        "gaming",
+        "video games"
+      ]
+    },
+    {
+      "id": "MOVIES",
+      "parentTopics": [],
+      "preferredDomains": [
+        "VIDEO_CONSUMPTION",
+        "ENTERTAINMENT"
+      ],
+      "aliases_fr": [
+        "film",
+        "films",
+        "cinema",
+        "cinéma"
+      ],
+      "aliases_en": [
+        "movie",
+        "movies",
+        "cinema"
+      ]
+    },
+    {
+      "id": "TV_SHOWS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "VIDEO_CONSUMPTION",
+        "ENTERTAINMENT"
+      ],
+      "aliases_fr": [
+        "serie tv",
+        "série tv",
+        "series tv",
+        "séries tv"
+      ],
+      "aliases_en": [
+        "tv show",
+        "tv shows",
+        "series"
+      ]
+    },
+    {
+      "id": "ANIME",
+      "parentTopics": [],
+      "preferredDomains": [
+        "VIDEO_CONSUMPTION",
+        "ENTERTAINMENT"
+      ],
+      "aliases_fr": [
+        "anime",
+        "animé",
+        "animes",
+        "animés"
+      ],
+      "aliases_en": [
+        "anime"
+      ]
+    },
+    {
+      "id": "MANGA",
+      "parentTopics": [],
+      "preferredDomains": [
+        "ENTERTAINMENT",
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "manga",
+        "mangas"
+      ],
+      "aliases_en": [
+        "manga"
+      ]
+    },
+    {
+      "id": "MUSIC_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "MUSIC_AUDIO_CONSUMPTION"
+      ],
+      "aliases_fr": [
+        "musique",
+        "chanson",
+        "chansons"
+      ],
+      "aliases_en": [
+        "music",
+        "song",
+        "songs"
+      ]
+    },
+    {
+      "id": "PODCASTS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "MUSIC_AUDIO_CONSUMPTION"
+      ],
+      "aliases_fr": [
+        "podcast",
+        "podcasts"
+      ],
+      "aliases_en": [
+        "podcast",
+        "podcasts"
+      ]
+    },
+    {
+      "id": "NEWS_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "actualites",
+        "actualités",
+        "nouvelles"
+      ],
+      "aliases_en": [
+        "news"
+      ]
+    },
+    {
+      "id": "SOCIAL_MEDIA_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "SOCIAL_NETWORKING"
+      ],
+      "aliases_fr": [
+        "reseaux sociaux",
+        "réseaux sociaux"
+      ],
+      "aliases_en": [
+        "social media"
+      ]
+    },
+    {
+      "id": "HEALTH_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "sante",
+        "santé"
+      ],
+      "aliases_en": [
+        "health"
+      ]
+    },
+    {
+      "id": "MENTAL_HEALTH",
+      "parentTopics": [
+        "HEALTH_TOPIC"
+      ],
+      "preferredDomains": [
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "sante mentale",
+        "santé mentale"
+      ],
+      "aliases_en": [
+        "mental health"
+      ]
+    },
+    {
+      "id": "SLEEP",
+      "parentTopics": [
+        "HEALTH_TOPIC"
+      ],
+      "preferredDomains": [
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "sommeil",
+        "dormir"
+      ],
+      "aliases_en": [
+        "sleep"
+      ]
+    },
+    {
+      "id": "NUTRITION",
+      "parentTopics": [
+        "HEALTH_TOPIC"
+      ],
+      "preferredDomains": [
+        "FOOD_COOKING",
+        "HEALTH_MEDICAL"
+      ],
+      "aliases_fr": [
+        "nutrition",
+        "alimentation"
+      ],
+      "aliases_en": [
+        "nutrition"
+      ]
+    },
+    {
+      "id": "COOKING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FOOD_COOKING"
+      ],
+      "aliases_fr": [
+        "cuisine",
+        "cuisiner",
+        "faire a manger",
+        "faire à manger"
+      ],
+      "aliases_en": [
+        "cooking",
+        "cook"
+      ]
+    },
+    {
+      "id": "RECIPES",
+      "parentTopics": [
+        "COOKING_TOPIC"
+      ],
+      "preferredDomains": [
+        "FOOD_COOKING"
+      ],
+      "aliases_fr": [
+        "recette",
+        "recettes"
+      ],
+      "aliases_en": [
+        "recipe",
+        "recipes"
+      ]
+    },
+    {
+      "id": "TRAVEL_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "TRAVEL_NAVIGATION"
+      ],
+      "aliases_fr": [
+        "voyage",
+        "voyager"
+      ],
+      "aliases_en": [
+        "travel",
+        "trip"
+      ]
+    },
+    {
+      "id": "DRIVING",
+      "parentTopics": [],
+      "preferredDomains": [
+        "TRAVEL_NAVIGATION",
+        "TRANSPORT_DELIVERY"
+      ],
+      "aliases_fr": [
+        "conduire",
+        "voiture",
+        "trajet en voiture"
+      ],
+      "aliases_en": [
+        "driving",
+        "car trip"
+      ]
+    },
+    {
+      "id": "SHOPPING_TOPIC",
+      "parentTopics": [],
+      "preferredDomains": [
+        "SHOPPING_COMMERCE"
+      ],
+      "aliases_fr": [
+        "shopping",
+        "magasinage",
+        "achats"
+      ],
+      "aliases_en": [
+        "shopping"
+      ]
+    },
+    {
+      "id": "HOME_MAINTENANCE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "HOME_SMART_HOME",
+        "SYSTEM_UTILITIES"
+      ],
+      "aliases_fr": [
+        "entretien maison",
+        "bricolage maison"
+      ],
+      "aliases_en": [
+        "home maintenance",
+        "diy home"
+      ]
+    },
+    {
+      "id": "CLEANING_HOME",
+      "parentTopics": [
+        "HOME_MAINTENANCE"
+      ],
+      "preferredDomains": [
+        "PERSONAL_LIFESTYLE"
+      ],
+      "aliases_fr": [
+        "menage",
+        "ménage",
+        "nettoyage maison"
+      ],
+      "aliases_en": [
+        "house cleaning",
+        "cleaning"
+      ]
+    },
+    {
+      "id": "MEDITATION",
+      "parentTopics": [],
+      "preferredDomains": [
+        "HEALTH_MEDICAL",
+        "PERSONAL_LIFESTYLE"
+      ],
+      "aliases_fr": [
+        "meditation",
+        "méditation"
+      ],
+      "aliases_en": [
+        "meditation"
+      ]
+    },
+    {
+      "id": "FINANCE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "finance",
+        "finances",
+        "argent"
+      ],
+      "aliases_en": [
+        "finance",
+        "finances",
+        "money"
+      ]
+    },
+    {
+      "id": "PERSONAL_FINANCE_BUDGETING",
+      "parentTopics": [
+        "FINANCE",
+        "PERSONAL_FINANCE"
+      ],
+      "preferredDomains": [
+        "FINANCE_ACCOUNTING"
+      ],
+      "aliases_fr": [
+        "budget personnel",
+        "gestion budget",
+        "budget"
+      ],
+      "aliases_en": [
+        "personal budgeting",
+        "budget"
+      ]
+    },
+    {
+      "id": "COMPUTER_SCIENCE",
+      "parentTopics": [
+        "PROGRAMMING"
+      ],
+      "preferredDomains": [
+        "SOFTWARE_DEVELOPMENT"
+      ],
+      "aliases_fr": [
+        "informatique",
+        "science informatique"
+      ],
+      "aliases_en": [
+        "computer science"
+      ]
+    },
+    {
+      "id": "CINEMA_FILM",
+      "parentTopics": [],
+      "preferredDomains": [
+        "VIDEO_CREATION_EDITING",
+        "ENTERTAINMENT_MEDIA"
+      ],
+      "aliases_fr": [
+        "cinema",
+        "cinéma",
+        "film",
+        "films"
+      ],
+      "aliases_en": [
+        "cinema",
+        "film",
+        "movies"
+      ]
+    },
+    {
+      "id": "VISUAL_ARTS",
+      "parentTopics": [],
+      "preferredDomains": [
+        "GRAPHIC_DESIGN",
+        "PHOTO_CREATION_EDITING"
+      ],
+      "aliases_fr": [
+        "arts visuels",
+        "dessin",
+        "graphisme",
+        "art"
+      ],
+      "aliases_en": [
+        "visual arts",
+        "drawing",
+        "art"
+      ]
+    },
+    {
+      "id": "GENERAL_KNOWLEDGE",
+      "parentTopics": [],
+      "preferredDomains": [
+        "EDUCATION_LEARNING",
+        "READING_NEWS"
+      ],
+      "aliases_fr": [
+        "culture generale",
+        "culture générale"
+      ],
+      "aliases_en": [
+        "general knowledge"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "LEARN",
+      "aliases_fr": [
+        "apprendre",
+        "etudier",
+        "étudier",
+        "reviser",
+        "réviser"
+      ],
+      "aliases_en": [
+        "learn",
+        "study",
+        "revise"
+      ]
+    },
+    {
+      "id": "PRACTICE",
+      "aliases_fr": [
+        "pratiquer",
+        "m'entrainer",
+        "m’entraîner",
+        "s'exercer",
+        "faire des exercices"
+      ],
+      "aliases_en": [
+        "practice",
+        "train",
+        "do exercises"
+      ]
+    },
+    {
+      "id": "SOLVE",
+      "aliases_fr": [
+        "resoudre",
+        "résoudre",
+        "solutionner"
+      ],
+      "aliases_en": [
+        "solve",
+        "work out"
+      ]
+    },
+    {
+      "id": "CALCULATE",
+      "aliases_fr": [
+        "calculer",
+        "faire le calcul",
+        "faire des calculs"
+      ],
+      "aliases_en": [
+        "calculate",
+        "compute"
+      ]
+    },
+    {
+      "id": "READ",
+      "aliases_fr": [
+        "lire",
+        "lecture"
+      ],
+      "aliases_en": [
+        "read",
+        "reading"
+      ]
+    },
+    {
+      "id": "WRITE",
+      "aliases_fr": [
+        "ecrire",
+        "écrire",
+        "rediger",
+        "rédiger",
+        "prendre des notes"
+      ],
+      "aliases_en": [
+        "write",
+        "draft",
+        "take notes"
+      ]
+    },
+    {
+      "id": "CREATE",
+      "aliases_fr": [
+        "creer",
+        "créer",
+        "faire",
+        "fabriquer",
+        "produire"
+      ],
+      "aliases_en": [
+        "create",
+        "make",
+        "produce"
+      ]
+    },
+    {
+      "id": "EDIT",
+      "aliases_fr": [
+        "modifier",
+        "editer",
+        "éditer",
+        "corriger"
+      ],
+      "aliases_en": [
+        "edit",
+        "modify",
+        "revise"
+      ]
+    },
+    {
+      "id": "RESEARCH",
+      "aliases_fr": [
+        "rechercher",
+        "faire des recherches",
+        "chercher des informations"
+      ],
+      "aliases_en": [
+        "research",
+        "look up",
+        "find information"
+      ]
+    },
+    {
+      "id": "PLAN",
+      "aliases_fr": [
+        "planifier",
+        "organiser",
+        "preparer",
+        "préparer"
+      ],
+      "aliases_en": [
+        "plan",
+        "organize",
+        "prepare"
+      ]
+    },
+    {
+      "id": "COMMUNICATE",
+      "aliases_fr": [
+        "parler",
+        "discuter",
+        "appeler",
+        "envoyer un message"
+      ],
+      "aliases_en": [
+        "talk",
+        "chat",
+        "call",
+        "message"
+      ]
+    },
+    {
+      "id": "PLAY",
+      "aliases_fr": [
+        "jouer",
+        "faire une partie"
+      ],
+      "aliases_en": [
+        "play",
+        "game"
+      ]
+    },
+    {
+      "id": "EXERCISE",
+      "aliases_fr": [
+        "faire du sport",
+        "m'entrainer",
+        "m’entraîner",
+        "faire de l'exercice",
+        "faire des exercices physiques"
+      ],
+      "aliases_en": [
+        "exercise",
+        "work out",
+        "train"
+      ]
+    },
+    {
+      "id": "WATCH",
+      "aliases_fr": [
+        "regarder",
+        "visionner"
+      ],
+      "aliases_en": [
+        "watch",
+        "view"
+      ]
+    },
+    {
+      "id": "LISTEN",
+      "aliases_fr": [
+        "ecouter",
+        "écouter"
+      ],
+      "aliases_en": [
+        "listen"
+      ]
+    },
+    {
+      "id": "TRACK",
+      "aliases_fr": [
+        "suivre",
+        "mesurer",
+        "enregistrer"
+      ],
+      "aliases_en": [
+        "track",
+        "measure",
+        "log"
+      ]
+    },
+    {
+      "id": "MANAGE",
+      "aliases_fr": [
+        "gerer",
+        "gérer",
+        "administrer"
+      ],
+      "aliases_en": [
+        "manage",
+        "administer"
+      ]
+    },
+    {
+      "id": "SHOP",
+      "aliases_fr": [
+        "acheter",
+        "magasiner",
+        "faire des achats"
+      ],
+      "aliases_en": [
+        "shop",
+        "buy",
+        "purchase"
+      ]
+    },
+    {
+      "id": "TRAVEL",
+      "aliases_fr": [
+        "voyager",
+        "me rendre",
+        "aller a",
+        "aller à"
+      ],
+      "aliases_en": [
+        "travel",
+        "go to",
+        "navigate"
+      ]
+    },
+    {
+      "id": "CODE",
+      "aliases_fr": [
+        "coder",
+        "programmer",
+        "developper",
+        "développer"
+      ],
+      "aliases_en": [
+        "code",
+        "program",
+        "develop"
+      ]
+    },
+    {
+      "id": "ANALYZE",
+      "aliases_fr": [
+        "analyser",
+        "etudier les donnees",
+        "étudier les données"
+      ],
+      "aliases_en": [
+        "analyze",
+        "analyse"
+      ]
+    },
+    {
+      "id": "DESIGN",
+      "aliases_fr": [
+        "designer",
+        "concevoir",
+        "faire le design"
+      ],
+      "aliases_en": [
+        "design"
+      ]
+    },
+    {
+      "id": "TEST",
+      "aliases_fr": [
+        "tester",
+        "verifier",
+        "vérifier"
+      ],
+      "aliases_en": [
+        "test",
+        "verify"
+      ]
+    }
+  ],
+  "rules": {
+    "topicAloneCannotAuthorizeApp": true,
+    "aliasesAreForDetectionNotNewIDs": true,
+    "unknownAliasDoesNotCreateTopic": true,
+    "parentTopicsMayBeExpandedLocally": true
+  },
+  "version": "1.0.0"
+}

@@ -40,7 +40,7 @@ const TIER = {
   /** Ce contre quoi tu te protèges. */
   distraction: 'border-grade-1/35 bg-grade-1/10 text-grade-1',
   /** Neutre : ni aide ni obstacle. */
-  neutral: 'border-grade-2/30 bg-grade-2/8 text-grade-2',
+  neutral: 'border-grade-2/30 bg-grade-2/10 text-grade-2',
   /** Ce qui sert ton travail. */
   productive: 'border-grade-3/35 bg-grade-3/10 text-grade-3',
   /** Le décor du système : présent, jamais saillant. */

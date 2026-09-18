@@ -49,7 +49,11 @@ export function viewportHeightPx(viewport: CalendarViewport, hourHeightPx: numbe
 }
 
 /** Convertit une minute du jour (0–1439) en y (px) dans la fenêtre. */
-export function minuteToYPx(viewport: CalendarViewport, minute: number, hourHeightPx: number): number {
+export function minuteToYPx(
+  viewport: CalendarViewport,
+  minute: number,
+  hourHeightPx: number,
+): number {
   return ((minute - viewport.startMinute) / 60) * hourHeightPx
 }
 

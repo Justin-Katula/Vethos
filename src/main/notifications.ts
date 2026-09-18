@@ -1,17 +1,17 @@
 /**
  * notifications.ts
  *
- * Système de notifications Windows natives pour Nexus.
+ * Système de notifications Windows natives pour Vethos.
  * Deux types combinés (comme demandé dans le prompt) :
  * 1. Notification Windows native pour appeler l'attention
- * 2. Quand l'utilisateur clique → fenêtre Nexus s'ouvre avec overlay interne
+ * 2. Quand l'utilisateur clique → fenêtre Vethos s'ouvre avec overlay interne
  */
 
 import { Notification, BrowserWindow } from 'electron'
 import { isWithinSleep } from '@shared/sleep'
 import log from './logging/setup'
 
-export type NexusNotification = {
+export type VethosNotification = {
   title: string
   body: string
   /** Données à envoyer au renderer quand l'utilisateur clique */
@@ -39,10 +39,10 @@ export function isSleepingNow(now: Date = new Date()): boolean {
 
 /**
  * Envoie une notification Windows native.
- * Quand cliquée, focus la fenêtre Nexus et envoie un événement au renderer.
+ * Quand cliquée, focus la fenêtre Vethos et envoie un événement au renderer.
  */
 export function sendNativeNotification(
-  notif: NexusNotification,
+  notif: VethosNotification,
   getMainWindow: () => BrowserWindow | null,
 ): void {
   // Critère 3 : aucune exception, à aucun niveau. Le point de passage est
@@ -67,7 +67,7 @@ export function sendNativeNotification(
     const win = getMainWindow()
     if (win && !win.isDestroyed()) {
       focusWindow(win)
-      // Envoyer l'événement au renderer pour afficher l'overlay interne
+      // Canal historique conservé pour le renderer existant.
       win.webContents.send('nexus:notification-clicked', {
         title: notif.title,
         body: notif.body,

@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-5 px-8 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded bg-accent/15 text-accent">
+          <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-warn/15 text-warn">
             <AlertOctagon size={28} />
           </div>
           <div>
@@ -44,11 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <pre className="max-w-lg overflow-auto rounded border border-line bg-base px-3 py-2 text-left font-mono text-xs text-fg-3">
             {this.state.error.message}
           </pre>
-          <button
-            type="button"
-            onClick={this.handleReload}
-            className="inline-flex items-center gap-2 rounded bg-fg px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white"
-          >
+          <button type="button" onClick={this.handleReload} className="btn-iris pressable">
             <RefreshCw size={16} />
             Recharger
           </button>

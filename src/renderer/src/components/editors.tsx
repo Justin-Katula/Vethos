@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Copy } from 'lucide-react'
 import { usePlanning } from '@/lib/use-planning'
-import { usePlanningStore } from '@/store/planning.store'
-import { evaluateRequest, type RequestVerdict } from '@/lib/planning/requests'
-import { CATEGORY_COLOR, CATEGORY_LABEL, nextShade } from '@/lib/palette'
+import { usePlanningStore, type Creatable } from '@/store/planning.store'
+import { evaluateRequest, type RequestVerdict } from '@shared/planning/requests'
+import { CATEGORY_COLOR, CATEGORY_LABEL, entryMark, nextShade } from '@/lib/palette'
+import { useResolvedTheme } from '@/lib/use-theme'
 import { cn } from '@/lib/cn'
+import { addDays, dateKey, dayOfWeek as dayOfWeekOfDate } from '@shared/planning/dates'
 import { SCHEDULE_CATEGORIES, type ScheduleCategory } from '@shared/schemas'
-import type { AncreItem, ObjectiveItem, ScheduleEntry } from '@/lib/planning/types'
+import type { AncreItem, ObjectiveItem, ScheduleEntry } from '@shared/planning/types'
+import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 
 /**
  * Les editeurs partages.
@@ -19,8 +22,13 @@ import type { AncreItem, ObjectiveItem, ScheduleEntry } from '@/lib/planning/typ
 export const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 export const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-export const inputClass =
-  'rounded border border-line bg-base px-3 py-2 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors focus:border-line-strong'
+/**
+ * Un champ, partout le même. Le style vit dans `.field` (globals.css) : la
+ * duplication d'ici redéfinissait la moitié de ses règles et loupait l'autre
+ * moitié — notamment l'anneau de focus braise, qui est le seul retour visuel
+ * qui dise « c'est ici que tu écris ».
+ */
+export const inputClass = 'field text-sm'
 
 export function hhmm(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
@@ -45,12 +53,18 @@ export function ScheduleEditor({
   entries: ScheduleEntry[]
   onChange: (entries: ScheduleEntry[]) => void
 }) {
+  // Une pastille de 8 px doit se VOIR : c'est une marque d'identité, pas la
+  // surface d'un bloc. D'où `entryMark` et non `entryFill` (cf. palette.ts).
+  const theme = useResolvedTheme()
   const [day, setDay] = useState(0)
   const [draft, setDraft] = useState({
     label: '',
     category: 'school' as ScheduleCategory,
     start: '08:00',
     end: '16:00',
+    /** Toutes les semaines (le défaut historique) ou une seule date précise. */
+    recurrence: 'weekly' as 'weekly' | 'once',
+    date: addDays(dateKey(new Date()), 7),
   })
 
   const dayEntries = useMemo(
@@ -62,22 +76,29 @@ export function ScheduleEditor({
     const start = toMinutes(draft.start)
     const end = toMinutes(draft.end)
     if (start === null || end === null || end <= start) return
+    const once = draft.recurrence === 'once'
+    if (once && !draft.date) return
     onChange([
       ...entries,
       {
-        dayOfWeek: day,
+        // Une occurrence unique porte son propre jour, dérivé de sa date —
+        // pas de l'onglet actuellement ouvert, qui ne sert qu'à parcourir.
+        dayOfWeek: once ? dayOfWeekOfDate(draft.date) : day,
         startMinute: start,
         endMinute: end,
         categoryType: draft.category,
         label: draft.label.trim() || CATEGORY_LABEL[draft.category],
         color: CATEGORY_COLOR[draft.category],
+        ...(once ? { date: draft.date } : {}),
       },
     ])
     setDraft((d) => ({ ...d, label: '' }))
   }
 
   const copyToWeekdays = () => {
-    const source = entries.filter((e) => e.dayOfWeek === day)
+    // Une occurrence unique ne se duplique jamais : sa date resterait la même
+    // sur des copies qui prétendraient pourtant occuper un autre jour.
+    const source = entries.filter((e) => e.dayOfWeek === day && !e.date)
     const kept = entries.filter((e) => e.dayOfWeek === day || e.dayOfWeek > 4)
     const copies = [0, 1, 2, 3, 4]
       .filter((d) => d !== day)
@@ -122,19 +143,27 @@ export function ScheduleEditor({
             >
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: entry.color }}
+                style={{ backgroundColor: entryMark(entry.color, theme) }}
               />
               <span className="w-24 shrink-0 font-mono text-fg-3">
                 {hhmm(entry.startMinute)} → {hhmm(entry.endMinute)}
               </span>
               <span className="truncate text-fg">{entry.label}</span>
+              {entry.date && (
+                <span
+                  className="shrink-0 rounded-sm border border-line px-1 py-0.5 font-mono text-[9.5px] text-fg-3"
+                  title="Occurrence unique, jamais répétée la semaine suivante"
+                >
+                  {entry.date.slice(5).replace('-', '.')}
+                </span>
+              )}
               <span className="ml-auto shrink-0 font-mono text-fg-3">
                 {duration(entry.endMinute - entry.startMinute)}
               </span>
               <button
                 type="button"
                 onClick={() => onChange(entries.filter((e) => e !== entry))}
-                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -145,14 +174,31 @@ export function ScheduleEditor({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+        <div className="flex gap-0.5 rounded border border-line p-0.5">
+          {(['weekly', 'once'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setDraft({ ...draft, recurrence: r })}
+              className={cn(
+                'rounded px-2 py-1.5 text-[11px] font-medium transition-colors',
+                draft.recurrence === r ? 'bg-surface-2 text-fg' : 'text-fg-3 hover:text-fg-2',
+              )}
+            >
+              {r === 'weekly' ? 'Toutes les semaines' : 'Une seule fois'}
+            </button>
+          ))}
+        </div>
         <input
           type="text"
+          name="schedule-label"
           value={draft.label}
           onChange={(e) => setDraft({ ...draft, label: e.target.value })}
           placeholder={CATEGORY_LABEL[draft.category]}
           className={cn(inputClass, 'min-w-[9rem] flex-1')}
         />
         <select
+          name="schedule-category"
           value={draft.category}
           onChange={(e) => setDraft({ ...draft, category: e.target.value as ScheduleCategory })}
           className={inputClass}
@@ -163,14 +209,25 @@ export function ScheduleEditor({
             </option>
           ))}
         </select>
+        {draft.recurrence === 'once' && (
+          <input
+            type="date"
+            name="schedule-date"
+            value={draft.date}
+            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+            className={inputClass}
+          />
+        )}
         <input
           type="time"
+          name="schedule-start"
           value={draft.start}
           onChange={(e) => setDraft({ ...draft, start: e.target.value })}
           className={inputClass}
         />
         <input
           type="time"
+          name="schedule-end"
           value={draft.end}
           onChange={(e) => setDraft({ ...draft, end: e.target.value })}
           className={inputClass}
@@ -182,7 +239,7 @@ export function ScheduleEditor({
         >
           <Plus size={14} /> Ajouter
         </button>
-        {dayEntries.length > 0 && day <= 4 && (
+        {dayEntries.some((e) => !e.date) && day <= 4 && (
           <button
             type="button"
             onClick={copyToWeekdays}
@@ -192,13 +249,19 @@ export function ScheduleEditor({
           </button>
         )}
       </div>
+      {draft.recurrence === 'once' && (
+        <p className="mt-2 text-[11px] text-fg-3">
+          Cette occurrence ne comptera que le {draft.date.slice(5).replace('-', '.')} — jamais
+          répétée la semaine suivante.
+        </p>
+      )}
     </>
   )
 }
 
 // ─── Ancres ───────────────────────────────────────────────────────────────
 
-type AncreDraft = Omit<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>
+type AncreDraft = Creatable<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>
 
 export function AncresEditor({
   ancres,
@@ -209,12 +272,16 @@ export function AncresEditor({
   onAdd: (draft: AncreDraft) => void | Promise<void>
   onDelete: (id: string) => void
 }) {
+  const theme = useResolvedTheme()
   const [draft, setDraft] = useState({
     name: '',
+    plan: '',
     time: '18:00',
     minutes: 60,
     days: [0, 1, 2, 3, 4],
   })
+
+  const [pendingDraft, setPendingDraft] = useState<Creatable<AncreItem, 'id' | 'createdAt'> | null>(null)
 
   const toggleDay = (d: number) =>
     setDraft((s) => ({
@@ -224,16 +291,18 @@ export function AncresEditor({
 
   const submit = () => {
     const minute = toMinutes(draft.time)
-    if (!draft.name.trim() || minute === null || draft.days.length === 0) return
-    void onAdd({
+    if (!draft.name.trim() || !draft.plan.trim() || minute === null || draft.days.length === 0) return
+    setPendingDraft({
       name: draft.name.trim(),
+      plan: draft.plan.trim(),
       trigger: draft.name.trim().toLowerCase(),
       color: nextShade(ancres.length),
       anchorMinute: minute,
       daysOfWeek: draft.days,
       normalMaxMinutes: draft.minutes,
+      minimumMinutes: Math.min(draft.minutes, 15),
+      appsToBlock: [],
     })
-    setDraft((s) => ({ ...s, name: '' }))
   }
 
   return (
@@ -248,7 +317,7 @@ export function AncresEditor({
             <div key={a.id} className="group flex items-center gap-3 py-1 text-xs">
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: a.color }}
+                style={{ backgroundColor: entryMark(a.color, theme) }}
               />
               <span className="w-24 shrink-0 font-mono text-fg-3">{hhmm(a.anchorMinute)}</span>
               <span className="truncate text-fg">{a.name}</span>
@@ -261,7 +330,7 @@ export function AncresEditor({
               <button
                 type="button"
                 onClick={() => onDelete(a.id)}
-                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -271,59 +340,90 @@ export function AncresEditor({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      <div className="mt-4 space-y-2 border-t border-line pt-4">
         <input
           type="text"
+          name="ancre-name"
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           placeholder="Sport, lecture, méditation…"
-          className={cn(inputClass, 'min-w-[9rem] flex-1')}
+          className={cn(inputClass, 'w-full')}
         />
         <input
-          type="time"
-          value={draft.time}
-          onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-          className={inputClass}
+          type="text"
+          name="ancre-plan"
+          value={draft.plan}
+          onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
+          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Ce soir à la salle...)"
+          className={cn(inputClass, 'w-full')}
         />
-        <input
-          type="number"
-          min={15}
-          max={480}
-          step={5}
-          value={draft.minutes}
-          onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
-          title="Durée normale, en minutes"
-          className={cn(inputClass, 'w-20')}
-        />
-        <div className="flex gap-0.5">
-          {DAYS_SHORT.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => toggleDay(i)}
-              className={cn(
-                'w-8 rounded border py-2 text-[11px] transition-colors',
-                draft.days.includes(i)
-                  ? 'border-line-strong bg-surface-2 text-fg'
-                  : 'border-transparent text-fg-3 hover:text-fg-2',
-              )}
-            >
-              {label.charAt(0)}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="time"
+            name="ancre-time"
+            value={draft.time}
+            onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+            className={inputClass}
+          />
+          <input
+            type="number"
+            name="ancre-minutes"
+            min={15}
+            max={480}
+            step={5}
+            value={draft.minutes}
+            onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
+            title="Durée normale, en minutes"
+            className={cn(inputClass, 'w-20')}
+          />
+          <div className="flex gap-0.5">
+            {DAYS_SHORT.map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => toggleDay(i)}
+                className={cn(
+                  'w-8 rounded border py-2 text-[11px] transition-colors',
+                  draft.days.includes(i)
+                    ? 'border-line-strong bg-surface-2 text-fg'
+                    : 'border-transparent text-fg-3 hover:text-fg-2',
+                )}
+                aria-pressed={draft.days.includes(i)}
+                aria-label={`${draft.days.includes(i) ? 'Retirer' : 'Ajouter'} ${DAYS[i]?.toLowerCase()}`}
+              >
+                {label.charAt(0)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={!draft.name.trim() || !draft.plan.trim()}
+            onClick={submit}
+            className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
+          >
+            <Plus size={14} /> Ancrer
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={submit}
-          className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2"
-        >
-          <Plus size={14} /> Ancrer
-        </button>
       </div>
       <p className="mt-3 text-[11px] text-fg-3">
         Deux ancres ne peuvent jamais occuper le même créneau : la seconde est refusée, jamais
         décalée à ta place.
       </p>
+
+      {pendingDraft && (
+        <IntelligentBlockingReviewModal
+          open={true}
+          title={pendingDraft.name}
+          plan={pendingDraft.plan}
+          kindLabel="ancre"
+          onConfirm={(blockedApps) => {
+            void onAdd({ ...pendingDraft, appsToBlock: blockedApps })
+            setPendingDraft(null)
+            setDraft((s) => ({ ...s, name: '', plan: '' }))
+          }}
+          onCancel={() => setPendingDraft(null)}
+        />
+      )}
     </>
   )
 }
@@ -336,10 +436,12 @@ export function ObjectivesEditor({
   onDelete,
 }: {
   objectives: ObjectiveItem[]
-  onAdd: (draft: Omit<ObjectiveItem, 'id' | 'createdAt'>) => void
+  onAdd: (draft: Creatable<ObjectiveItem, 'id' | 'createdAt'>) => void
   onDelete: (id: string) => void
 }) {
-  const [draft, setDraft] = useState({ name: '', hoursPerWeek: 5 })
+  const theme = useResolvedTheme()
+  const [draft, setDraft] = useState({ name: '', plan: '', hoursPerWeek: 5 })
+  const [pendingDraft, setPendingDraft] = useState<Creatable<ObjectiveItem, 'id' | 'createdAt'> | null>(null)
 
   return (
     <>
@@ -353,7 +455,7 @@ export function ObjectivesEditor({
             <div key={o.id} className="group flex items-center gap-3 py-1 text-xs">
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: o.color }}
+                style={{ backgroundColor: entryMark(o.color, theme) }}
               />
               <span className="truncate text-fg">{o.name}</span>
               <span className="ml-auto shrink-0 font-mono text-fg-3">
@@ -362,7 +464,7 @@ export function ObjectivesEditor({
               <button
                 type="button"
                 onClick={() => onDelete(o.id)}
-                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
                 aria-label="Supprimer"
               >
                 <Trash2 size={13} />
@@ -372,45 +474,74 @@ export function ObjectivesEditor({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      <div className="mt-4 space-y-2 border-t border-line pt-4">
         <input
           type="text"
+          name="objective-name"
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           placeholder="Guitare, sport, lecture…"
-          className={cn(inputClass, 'min-w-[9rem] flex-1')}
+          className={cn(inputClass, 'w-full')}
         />
-        <label className="flex items-center gap-2 text-xs text-fg-3">
-          <input
-            type="number"
-            min={1}
-            max={80}
-            value={draft.hoursPerWeek}
-            onChange={(e) => setDraft({ ...draft, hoursPerWeek: Number(e.target.value) })}
-            className={cn(inputClass, 'w-20')}
-          />
-          h / semaine
-        </label>
-        <button
-          type="button"
-          disabled={!draft.name.trim()}
-          onClick={() => {
-            onAdd({
-              name: draft.name.trim(),
-              color: nextShade(objectives.length),
-              weeklyTargetMinutes: Math.round(draft.hoursPerWeek * 60),
-            })
-            setDraft((s) => ({ ...s, name: '' }))
-          }}
-          className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
-        >
-          <Plus size={14} /> Ajouter
-        </button>
+        <input
+          type="text"
+          name="objective-plan"
+          value={draft.plan}
+          onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
+          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Tous les soirs au studio...)"
+          className={cn(inputClass, 'w-full')}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-fg-3">
+            <input
+              type="number"
+              name="objective-hours-per-week"
+              min={1}
+              max={80}
+              value={draft.hoursPerWeek}
+              onChange={(e) => setDraft({ ...draft, hoursPerWeek: Number(e.target.value) })}
+              className={cn(inputClass, 'w-20')}
+            />
+            h / semaine
+          </label>
+          <button
+            type="button"
+            disabled={!draft.name.trim() || !draft.plan.trim()}
+            onClick={() => {
+              if (!draft.name.trim() || !draft.plan.trim()) return
+              setPendingDraft({
+                name: draft.name.trim(),
+                plan: draft.plan.trim(),
+                color: nextShade(objectives.length),
+                weeklyTargetMinutes: Math.round(draft.hoursPerWeek * 60),
+                appsToBlock: [],
+              })
+            }}
+            className="pressable ml-auto inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
+          >
+            <Plus size={14} /> Ajouter
+          </button>
+        </div>
       </div>
       <p className="mt-3 text-[11px] text-fg-3">
         Un objectif ne peut jamais recevoir de deadline. Il ne se dégrade pas non plus avec le temps
         qui passe.
       </p>
+
+      {pendingDraft && (
+        <IntelligentBlockingReviewModal
+          open={true}
+          title={pendingDraft.name}
+          plan={pendingDraft.plan}
+          kindLabel="objectif"
+          onConfirm={(blockedApps) => {
+            void onAdd({ ...pendingDraft, appsToBlock: blockedApps })
+            setPendingDraft(null)
+            setDraft((s) => ({ ...s, name: '', plan: '' }))
+          }}
+          onCancel={() => setPendingDraft(null)}
+        />
+      )}
     </>
   )
 }
@@ -420,7 +551,7 @@ export function ObjectivesEditor({
 export function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof usePlanning>> }) {
   return (
     <table className="w-full text-xs">
-      <thead className="text-left text-[10px] uppercase tracking-wider text-fg-3">
+      <thead className="text-left text-[10px] text-fg-3">
         <tr>
           <th className="pb-2 font-medium">Jour</th>
           <th className="pb-2 text-right font-medium">Brute</th>
@@ -474,6 +605,7 @@ export function RequestPanel({
           Je veux
           <input
             type="number"
+            name="free-time-request-minutes"
             min={15}
             max={720}
             step={15}

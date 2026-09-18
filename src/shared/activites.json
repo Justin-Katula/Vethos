@@ -1,0 +1,170 @@
+{
+  "version": "1.0.0",
+  "note": "Vocabulaire fermé des ACTIVITÉS : ce qu'un humain s'assoit pour faire devant un ordinateur. Ce n'est PAS une description des logiciels. Une application n'est décrite que par les activités qu'elle sert. C'est le seul texte que l'IA a le droit de produire, et chaque mot qu'elle renvoie est vérifié contre cette liste avant d'être utilisé.",
+  "regles": [
+    "Une activité est une INTENTION humaine, formulée comme un verbe et son objet.",
+    "Si une entrée installée ne correspond à aucune activité, elle est NEUTRE : jamais bloquée, jamais comptée. Les pilotes, couches matérielles et services vivent ici.",
+    "Le vocabulaire ne grandit que si une intention humaine réelle n'a pas de mot. Jamais pour décrire un logiciel de plus."
+  ],
+  "groupes": [
+    {
+      "id": "developpement",
+      "nom": "Programmation",
+      "activites": [
+        { "id": "ECRIRE_DU_CODE", "libelle": "Écrire du code" },
+        { "id": "DEBOGUER", "libelle": "Déboguer un programme" },
+        { "id": "GERER_VERSIONS", "libelle": "Gérer des versions de code" },
+        { "id": "ADMINISTRER_BASE_DONNEES", "libelle": "Administrer une base de données" },
+        { "id": "TESTER_UNE_API", "libelle": "Tester une API" },
+        { "id": "ADMINISTRER_SYSTEME", "libelle": "Administrer un serveur ou un réseau" },
+        { "id": "VIRTUALISER", "libelle": "Virtualiser un environnement" },
+        { "id": "CREER_UN_JEU", "libelle": "Créer un jeu vidéo" }
+      ]
+    },
+    {
+      "id": "creation",
+      "nom": "Création",
+      "activites": [
+        { "id": "MODELISER_EN_3D", "libelle": "Modéliser en 3D" },
+        { "id": "RETOUCHER_UNE_IMAGE", "libelle": "Retoucher une image" },
+        { "id": "DESSINER", "libelle": "Dessiner ou illustrer" },
+        { "id": "MAQUETTER_UNE_INTERFACE", "libelle": "Créer une maquette d'interface" },
+        { "id": "MONTER_UNE_VIDEO", "libelle": "Monter une vidéo" },
+        { "id": "DIFFUSER_EN_DIRECT", "libelle": "Enregistrer ou diffuser en direct" },
+        { "id": "PRODUIRE_DE_LA_MUSIQUE", "libelle": "Produire de la musique" },
+        { "id": "EDITER_UN_SON", "libelle": "Éditer un son" },
+        { "id": "METTRE_EN_PAGE", "libelle": "Mettre en page un document" },
+        { "id": "CREER_UN_DIAGRAMME", "libelle": "Créer un diagramme ou un schéma" },
+        { "id": "CONCEVOIR_EN_CAO", "libelle": "Concevoir une pièce ou un plan en CAO" }
+      ]
+    },
+    {
+      "id": "ecriture",
+      "nom": "Écriture et réflexion",
+      "activites": [
+        { "id": "ECRIRE_UN_TEXTE", "libelle": "Écrire un texte" },
+        { "id": "PRENDRE_DES_NOTES", "libelle": "Prendre des notes" },
+        { "id": "ORGANISER_DES_CONNAISSANCES", "libelle": "Organiser des connaissances" },
+        { "id": "TRADUIRE", "libelle": "Traduire un texte" },
+        { "id": "RELIRE_ET_CORRIGER", "libelle": "Corriger ou relire un texte" }
+      ]
+    },
+    {
+      "id": "bureautique",
+      "nom": "Bureautique",
+      "activites": [
+        { "id": "REDIGER_UN_DOCUMENT", "libelle": "Rédiger un document" },
+        { "id": "TRAVAILLER_SUR_TABLEUR", "libelle": "Travailler sur un tableur" },
+        { "id": "PREPARER_UNE_PRESENTATION", "libelle": "Préparer une présentation" },
+        { "id": "LIRE_UN_PDF", "libelle": "Lire ou annoter un PDF" },
+        { "id": "SIGNER_UN_DOCUMENT", "libelle": "Signer un document" }
+      ]
+    },
+    {
+      "id": "communication",
+      "nom": "Communication",
+      "activites": [
+        { "id": "ECHANGER_PAR_MESSAGE", "libelle": "Échanger par message" },
+        { "id": "PARTICIPER_A_UNE_REUNION", "libelle": "Participer à une réunion" },
+        { "id": "GERER_SES_COURRIELS", "libelle": "Gérer ses courriels" },
+        { "id": "APPELER", "libelle": "Appeler quelqu'un" }
+      ]
+    },
+    {
+      "id": "apprentissage",
+      "nom": "Apprentissage et recherche",
+      "activites": [
+        { "id": "CHERCHER_UNE_INFORMATION", "libelle": "Chercher une information" },
+        { "id": "LIRE_UNE_DOCUMENTATION", "libelle": "Lire un article ou une documentation" },
+        { "id": "SUIVRE_UN_COURS", "libelle": "Suivre un cours" },
+        { "id": "REVISER", "libelle": "Réviser des notions" },
+        { "id": "LIRE_UN_LIVRE", "libelle": "Lire un livre" },
+        { "id": "CHERCHER_DES_SOURCES", "libelle": "Chercher des sources académiques" }
+      ]
+    },
+    {
+      "id": "donnees",
+      "nom": "Données et calcul",
+      "activites": [
+        { "id": "ANALYSER_DES_DONNEES", "libelle": "Analyser des données" },
+        { "id": "CONSTRUIRE_UN_TABLEAU_DE_BORD", "libelle": "Construire un tableau de bord" },
+        { "id": "FAIRE_UN_CALCUL", "libelle": "Faire un calcul" },
+        { "id": "FAIRE_DES_MATHEMATIQUES", "libelle": "Faire des mathématiques" }
+      ]
+    },
+    {
+      "id": "organisation",
+      "nom": "Organisation",
+      "activites": [
+        { "id": "PLANIFIER_DES_TACHES", "libelle": "Planifier des tâches" },
+        { "id": "GERER_UN_PROJET", "libelle": "Gérer un projet" },
+        { "id": "GERER_SON_AGENDA", "libelle": "Gérer un agenda" },
+        { "id": "SUIVRE_SON_TEMPS", "libelle": "Suivre son temps" },
+        { "id": "BLOQUER_LES_DISTRACTIONS", "libelle": "Bloquer les distractions pour se concentrer" }
+      ]
+    },
+    {
+      "id": "fichiers",
+      "nom": "Fichiers",
+      "activites": [
+        { "id": "ORGANISER_DES_FICHIERS", "libelle": "Organiser des fichiers" },
+        { "id": "TRANSFERER_DES_FICHIERS", "libelle": "Transférer des fichiers" },
+        { "id": "SAUVEGARDER", "libelle": "Sauvegarder des données" },
+        { "id": "ARCHIVER", "libelle": "Compresser ou extraire une archive" },
+        { "id": "TELECHARGER", "libelle": "Télécharger un fichier" }
+      ]
+    },
+    {
+      "id": "jeu",
+      "nom": "Jeu",
+      "activites": [
+        { "id": "JOUER", "libelle": "Jouer à un jeu vidéo" },
+        { "id": "GERER_SA_LUDOTHEQUE", "libelle": "Installer ou mettre à jour un jeu" }
+      ]
+    },
+    {
+      "id": "divertissement",
+      "nom": "Divertissement",
+      "activites": [
+        { "id": "REGARDER_UNE_VIDEO", "libelle": "Regarder une vidéo" },
+        { "id": "ECOUTER_DE_LA_MUSIQUE", "libelle": "Écouter de la musique" },
+        { "id": "REGARDER_UN_DIRECT", "libelle": "Regarder un direct" },
+        { "id": "PARCOURIR_LES_RESEAUX_SOCIAUX", "libelle": "Parcourir les réseaux sociaux" },
+        { "id": "LIRE_LES_ACTUALITES", "libelle": "Lire les actualités" }
+      ]
+    },
+    {
+      "id": "vie_pratique",
+      "nom": "Vie pratique",
+      "activites": [
+        { "id": "GERER_SES_FINANCES", "libelle": "Gérer ses finances" },
+        { "id": "FAIRE_DES_ACHATS", "libelle": "Faire des achats" },
+        { "id": "PREPARER_UN_VOYAGE", "libelle": "Préparer un voyage" },
+        { "id": "SUIVRE_SON_ACTIVITE_PHYSIQUE", "libelle": "Suivre son activité physique" },
+        { "id": "CUISINER", "libelle": "Cuisiner" }
+      ]
+    },
+    {
+      "id": "machine",
+      "nom": "Machine",
+      "activites": [
+        { "id": "CONFIGURER_LE_SYSTEME", "libelle": "Configurer le système" },
+        { "id": "CONFIGURER_UN_PERIPHERIQUE", "libelle": "Configurer un périphérique" },
+        { "id": "SURVEILLER_LES_PERFORMANCES", "libelle": "Surveiller les performances" },
+        { "id": "SECURISER_LA_MACHINE", "libelle": "Sécuriser la machine" },
+        { "id": "GERER_SES_MOTS_DE_PASSE", "libelle": "Gérer ses mots de passe" },
+        { "id": "SE_CONNECTER_A_DISTANCE", "libelle": "Se connecter à distance" },
+        { "id": "INSTALLER_UN_LOGICIEL", "libelle": "Installer ou désinstaller un logiciel" },
+        { "id": "NAVIGUER_SUR_LE_WEB", "libelle": "Naviguer sur le web" }
+      ]
+    },
+    {
+      "id": "intelligence_artificielle",
+      "nom": "Intelligence artificielle",
+      "activites": [
+        { "id": "DIALOGUER_AVEC_UNE_IA", "libelle": "Dialoguer avec une IA" },
+        { "id": "GENERER_PAR_IA", "libelle": "Générer du contenu par IA" }
+      ]
+    }
+  ]
+}

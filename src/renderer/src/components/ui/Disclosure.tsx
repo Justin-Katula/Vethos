@@ -33,7 +33,7 @@ export function Disclosure({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 + index * 0.07, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className={cn('surface rounded', tone === 'danger' && 'border-accent/35')}
+      className={cn('surface rounded', tone === 'danger' && 'border-warn/35')}
     >
       <button
         type="button"
@@ -47,7 +47,7 @@ export function Disclosure({
             open && 'rotate-90',
           )}
         />
-        <span className={cn('text-sm font-medium', tone === 'danger' ? 'text-accent' : 'text-fg')}>
+        <span className={cn('text-sm font-medium', tone === 'danger' ? 'text-warn' : 'text-fg')}>
           {title}
         </span>
         {summary && <span className="ml-auto text-xs text-fg-3">{summary}</span>}

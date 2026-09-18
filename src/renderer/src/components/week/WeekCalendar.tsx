@@ -2,15 +2,26 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { dayOfWeek as dowOf } from '@/lib/planning/dates'
-import { BLOCK_COLOR, BLOCK_INK, CATEGORY_COLOR } from '@/lib/palette'
+import { dayOfWeek as dowOf } from '@shared/planning/dates'
+import {
+  BLOCK_COLOR,
+  BLOCK_INK,
+  BREAK_HATCH,
+  BREAK_SEAM,
+  BREAK_VEIL,
+  CATEGORY_COLOR,
+  entryFill,
+} from '@/lib/palette'
+import { useResolvedTheme } from '@/lib/use-theme'
+import { breakStartMinute, isBreakVisible } from '@shared/planning/rest'
+import { scheduleEntriesForDate } from '@shared/planning/capacity'
 import {
   minuteToYPx,
   viewportHeightPx,
   visibleHoursOfViewport,
   type CalendarViewport,
 } from '@/lib/calendar-viewport'
-import type { PlacedBlock, ScheduleEntry } from '@/lib/planning/types'
+import type { PlacedBlock, ScheduleEntry } from '@shared/planning/types'
 
 /**
  * La semaine, telle que le moteur l'a décidée.
@@ -59,7 +70,7 @@ const KIND_LABEL: Record<PlacedBlock['kind'], string> = {
  * Pourquoi ce bloc est ici. Chaque phrase vient d'un fait que le moteur a
  * produit : rien n'est deviné, et rien n'est inventé pour meubler.
  */
-function explain(block: PlacedBlock): string[] {
+function explain(block: PlacedBlock, showBreak: boolean): string[] {
   const lines: string[] = []
   if (block.kind === 'task') {
     lines.push('Placé par échéance : ce qui est dû en premier est servi en premier.')
@@ -73,8 +84,20 @@ function explain(block: PlacedBlock): string[] {
   } else if (block.cognitiveWindow === 'BASSE') {
     lines.push('Créneau peu fiable d’après tes propres relevés : rien d’exigeant n’y va.')
   }
-  if (block.breakMinutes > 0) {
-    lines.push(`${block.breakMinutes} min de pause sont comprises dans le bloc, pas ajoutées après.`)
+  if (block.breakMinutes > 0 && showBreak) {
+    lines.push(
+      `Travail jusqu’à ${clock(breakStartMinute(block))}, puis ${block.breakMinutes} min de pause : ` +
+        'elles sont comprises dans le bloc, pas ajoutées après.',
+    )
+  }
+  // B.5.1 : dit en premier ce qui décide de tout le reste — ce bloc n'est pas
+  // encore à toi, et pourquoi.
+  if (block.preview) {
+    lines.push(
+      'Aperçu : cette partie attend que la précédente soit terminée. Elle montre ' +
+        'seulement où elle tombera — elle ne démarrera aucune session et ne bloquera ' +
+        'aucune application tant que son tour n’est pas venu.',
+    )
   }
   if (block.capOverride) {
     lines.push('Dépasse le plafond de 40 % du jour : crise de deadline prouvée.')
@@ -85,9 +108,32 @@ function explain(block: PlacedBlock): string[] {
   return lines
 }
 
+/**
+ * Premier instant occupé (obligation fixe ou autre bloc) à partir de `after`,
+ * ce jour-là. Sert à savoir si la pause d'un bloc se heurte vraiment à
+ * quelque chose, ou si le temps libre qui suit joue déjà ce rôle.
+ */
+function nextOccupiedMinute(
+  after: number,
+  excludeBlockId: string,
+  dayEntries: ScheduleEntry[],
+  dayBlocks: PlacedBlock[],
+): number | null {
+  const starts = [
+    ...dayEntries.map((e) => e.startMinute),
+    ...dayBlocks.filter((b) => b.id !== excludeBlockId).map((b) => b.startMinute),
+  ].filter((m) => m >= after)
+  return starts.length > 0 ? Math.min(...starts) : null
+}
+
 export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowMinute }: Props) {
-  const [explained, setExplained] = useState<PlacedBlock | null>(null)
+  const [explained, setExplained] = useState<{ block: PlacedBlock; showBreak: boolean } | null>(
+    null,
+  )
   const reduce = useReducedMotion()
+  // Les entrées portent leur couleur dans les données : c'est le seul endroit
+  // de la grille où le thème doit être connu en JavaScript (cf. palette.ts).
+  const theme = useResolvedTheme()
 
   const height = viewportHeightPx(viewport, HOUR_HEIGHT)
   const hours = useMemo(() => visibleHoursOfViewport(viewport), [viewport])
@@ -145,15 +191,15 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
 
         <div className="grid grid-cols-7 gap-1.5" style={{ height }}>
           {columns.map((c) => {
-            const dayEntries = entries.filter((e) => e.dayOfWeek === c.dayOfWeek)
+            const dayEntries = scheduleEntriesForDate(entries, c.date, c.dayOfWeek)
             const dayBlocks = blocks.filter((b) => b.date === c.date)
 
             return (
               <div
                 key={c.date}
                 className={cn(
-                  'relative overflow-hidden rounded-md',
-                  c.isToday ? 'bg-surface-2/70 ring-1 ring-line-strong' : 'bg-surface/60',
+                  'relative overflow-hidden rounded',
+                  c.isToday ? 'bg-surface-2 ring-1 ring-line-strong' : 'bg-surface/80',
                 )}
               >
                 {hours.slice(1).map((h) => (
@@ -175,7 +221,10 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
                       style={{
                         top: top(e.startMinute),
                         height: h,
-                        backgroundColor: e.color || CATEGORY_COLOR[e.categoryType],
+                        backgroundColor: entryFill(
+                          e.color || CATEGORY_COLOR[e.categoryType],
+                          theme,
+                        ),
                       }}
                       title={`${e.label} · ${clock(e.startMinute)} → ${clock(e.endMinute)}`}
                     >
@@ -195,13 +244,26 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
 
                 {/* Ce que le moteur a posé. Clair, et il sait dire pourquoi. */}
                 {dayBlocks.map((b, i) => {
-                  const h = span(b.startMinute, b.endMinute)
+                  // E.1 : un seul bloc, jamais deux — la pause reste TOUJOURS
+                  // dans son empreinte, ça ne change jamais. Mais elle ne
+                  // mérite d'être DESSINÉE que si elle se heurte à quelque
+                  // chose : sans rien dans les 30 minutes qui suivent, on
+                  // arrête le rectangle où le travail s'arrête, et le reste
+                  // redevient un vrai vide sur la grille — pas un bloc encore
+                  // là, juste éteint.
+                  const showBreak = isBreakVisible(
+                    b,
+                    nextOccupiedMinute(b.endMinute, b.id, dayEntries, dayBlocks),
+                  )
+                  const visualEnd = showBreak ? b.endMinute : breakStartMinute(b)
+                  const h = span(b.startMinute, visualEnd)
                   if (h <= 0) return null
+                  const pauseTop = showBreak ? top(breakStartMinute(b)) - top(b.startMinute) : null
                   return (
                     <motion.button
                       key={b.id}
                       type="button"
-                      onClick={() => setExplained(b)}
+                      onClick={() => setExplained({ block: b, showBreak })}
                       initial={reduce ? false : { opacity: 0, scaleY: 0.75 }}
                       animate={{ opacity: 1, scaleY: 1 }}
                       transition={{
@@ -209,27 +271,81 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
                         delay: 0.08 + i * 0.02,
                         ease: [0.22, 1, 0.36, 1],
                       }}
-                      whileHover={reduce ? undefined : { scale: 1.03, zIndex: 20 }}
-                      className="absolute inset-x-[3px] origin-top overflow-hidden rounded-[5px] px-1.5 py-1 text-left"
+                      whileHover={reduce ? undefined : { scale: 1.015, zIndex: 20 }}
+                      className={cn(
+                        'absolute inset-x-[3px] origin-top overflow-hidden rounded-[5px] px-1.5 py-1 text-left',
+                        // B.5.1 : un aperçu se montre sans se donner pour
+                        // acquis. Il n'est pas grisé au sens « désactivé » —
+                        // il est ÉTEINT, le même langage que ce qui est déjà
+                        // derrière toi ailleurs dans l'app. Le contour tireté
+                        // dit la seule chose qui compte : ce n'est pas encore
+                        // à toi.
+                        b.preview === true &&
+                          'opacity-40 outline-dashed outline-1 -outline-offset-1',
+                      )}
                       style={{
                         top: top(b.startMinute),
                         height: Math.max(4, h - 2),
-                        backgroundColor: b.color || BLOCK_COLOR[b.kind],
+                        backgroundColor: BLOCK_COLOR[b.kind],
                         color: BLOCK_INK[b.kind],
                       }}
-                      title={`${b.label} · ${clock(b.startMinute)} → ${clock(b.endMinute)}`}
+                      title={
+                        showBreak
+                          ? `${b.label} · ${clock(b.startMinute)} → ${clock(b.endMinute)} · pause dès ${clock(breakStartMinute(b))}`
+                          : `${b.label} · ${clock(b.startMinute)} → ${clock(visualEnd)}`
+                      }
                     >
-                      <span className="block truncate text-[10.5px] font-medium leading-tight">
+                      {pauseTop !== null && (
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute inset-x-0 bottom-0"
+                          style={{
+                            top: pauseTop,
+                            backgroundColor: BREAK_VEIL,
+                            backgroundImage: BREAK_HATCH,
+                            borderTop: `1px solid ${BREAK_SEAM}`,
+                          }}
+                        />
+                      )}
+                      <span className="relative block truncate text-[10.5px] font-medium leading-tight">
                         {b.label}
                       </span>
                       {h > 30 && (
-                        <span className="mt-0.5 block truncate font-mono text-[9.5px] tabular-nums opacity-70">
+                        <span className="relative mt-0.5 block truncate font-mono text-[9.5px] tabular-nums opacity-70">
                           {clock(b.startMinute)}
                         </span>
                       )}
                     </motion.button>
                   )
                 })}
+
+                {/* Le temps déjà passé s'assombrit, comme tout ce qui est déjà
+                    pris (palette.ts) : ce qui est derrière toi ne t'appartient
+                    plus à décider. Effet de bord voulu — le bloc EN COURS se
+                    retrouve mi-sombre, mi-clair, exactement à la hauteur de ce
+                    qui est déjà fait : une barre de progression sans en être
+                    une.
+                    z-[25] > le survol (20) : le fait "c'est déjà passé" ne
+                    doit jamais disparaître juste parce que la souris passe
+                    dessus — ni clignoter d'un bloc à l'autre en travers du
+                    survol. Toujours sous la ligne « maintenant » (30) et le
+                    panneau d'explication (40). */}
+                {c.isToday &&
+                  (() => {
+                    const elapsed = span(viewport.startMinute, nowMinute)
+                    if (elapsed <= 0) return null
+                    return (
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-0 top-0 z-[25]"
+                        style={{
+                          height: elapsed,
+                          background:
+                            'linear-gradient(to bottom, var(--veil-past) 0%, var(--veil-past) calc(100% - 22px), transparent 100%)',
+                        }}
+                      />
+                    )
+                  })()}
 
                 {c.isToday &&
                   nowMinute >= viewport.startMinute &&
@@ -257,20 +373,39 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
             className="surface fixed bottom-8 left-1/2 z-40 w-[min(30rem,calc(100vw-8rem))] -translate-x-1/2 p-5"
           >
             <div className="flex items-start gap-4">
+              {/* Le même bloc en petit : la pause y éteint la même proportion. */}
               <span
-                className="mt-1 h-9 w-1 shrink-0 rounded-full"
-                style={{ backgroundColor: explained.color || BLOCK_COLOR[explained.kind] }}
-              />
+                className="mt-1 flex h-9 w-1 shrink-0 flex-col justify-end overflow-hidden rounded-sm"
+                style={{
+                  backgroundColor: BLOCK_COLOR[explained.block.kind],
+                }}
+              >
+                {explained.showBreak && (
+                  <span
+                    className="w-full"
+                    style={{
+                      height: `${(explained.block.breakMinutes / explained.block.durationMinutes) * 100}%`,
+                      backgroundColor: BREAK_VEIL,
+                      backgroundImage: BREAK_HATCH,
+                    }}
+                  />
+                )}
+              </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-fg">{explained.label}</p>
+                <p className="truncate text-sm font-medium text-fg">{explained.block.label}</p>
                 <p className="mt-0.5 font-mono text-xs tabular-nums text-fg-2">
-                  {clock(explained.startMinute)} {'→'} {clock(explained.endMinute)}
+                  {clock(explained.block.startMinute)} {'→'}{' '}
+                  {clock(
+                    explained.showBreak
+                      ? explained.block.endMinute
+                      : breakStartMinute(explained.block),
+                  )}
                   <span className="ml-2 font-sans text-fg-3">
-                    {KIND_LABEL[explained.kind]} · {duration(explained.workMinutes)}
+                    {KIND_LABEL[explained.block.kind]} · {duration(explained.block.workMinutes)}
                   </span>
                 </p>
                 <ul className="mt-3 space-y-1.5">
-                  {explain(explained).map((line) => (
+                  {explain(explained.block, explained.showBreak).map((line) => (
                     <li key={line} className="text-[12px] leading-relaxed text-fg-3">
                       {line}
                     </li>

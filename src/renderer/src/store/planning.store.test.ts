@@ -27,6 +27,7 @@ const { usePlanningStore } = await import('./planning.store')
 
 const taskDraft = (over: Record<string, unknown> = {}) => ({
   title: 'Dossier',
+  plan: 'Travailler sur le dossier à mon bureau ce soir.',
   deadline: '2026-08-20',
   importance: 5,
   category: 'général',
@@ -40,6 +41,7 @@ const taskDraft = (over: Record<string, unknown> = {}) => ({
 
 const ancreDraft = (over: Record<string, unknown> = {}) => ({
   name: 'Sport',
+  plan: 'Faire ma séance de sport à la salle à 18h.',
   color: '#3ECF8E',
   trigger: 'sport',
   anchorMinute: 1080,
@@ -63,6 +65,9 @@ beforeEach(() => {
       objectiveLastServed: {},
       lastSignalAt: {},
       tasksCreatedPerWeek: {},
+      consecutiveDelays: {},
+      workedMinutesByRef: {},
+      dailyDelayMinutes: {},
     },
   })
 })
@@ -151,25 +156,43 @@ describe('CRITÈRE 6 — deux ancres ne peuvent jamais occuper le même créneau
   })
 })
 
-describe('G.1 — on n’apprend que de ce qui est mesuré', () => {
-  it('terminer avec une mesure crée une observation', async () => {
-    await usePlanningStore.getState().addTask(taskDraft())
-    const id = usePlanningStore.getState().tasks[0]!.id
-    await usePlanningStore.getState().completeTask(id, 175)
-
-    const [observation] = usePlanningStore.getState().learning.observations
-    expect(observation).toMatchObject({
-      taskId: id,
-      estimatedMinutes: 100,
-      actualMinutes: 175,
-      completed: true,
-    })
+describe('B.5.2 — l’utilisateur ne termine plus une tâche, il dit seulement qu’il lui faut plus', () => {
+  it('aucun moyen de déclarer une tâche terminée depuis le store', () => {
+    // C'est l'horloge de planification (processus main) qui décide, quand le
+    // temps prévu a été RÉELLEMENT fait. Une porte de sortie côté renderer
+    // rouvrirait exactement ce que cette règle ferme.
+    expect(usePlanningStore.getState()).not.toHaveProperty('completeTask')
   })
 
-  it('terminer sans mesure n’invente aucune observation', async () => {
+  it('« il m’en faut plus » gonfle extraMinutes, JAMAIS estimatedMinutes', async () => {
     await usePlanningStore.getState().addTask(taskDraft())
-    await usePlanningStore.getState().completeTask(usePlanningStore.getState().tasks[0]!.id)
-    expect(usePlanningStore.getState().learning.observations).toHaveLength(0)
+    const id = usePlanningStore.getState().tasks[0]!.id
+    await usePlanningStore.getState().addMoreTime(id, 25)
+
+    const task = usePlanningStore.getState().tasks[0]!
+    expect(task.extraMinutes).toBe(25)
+    // Intacte : c'est elle que le facteur de correction compare au réel (B.2).
+    // La gonfler effacerait la seule preuve que la tâche a coûté plus cher.
+    expect(task.estimatedMinutes).toBe(100)
+  })
+
+  it('les minutes s’accumulent, elles ne se remplacent pas', async () => {
+    await usePlanningStore.getState().addTask(taskDraft())
+    const id = usePlanningStore.getState().tasks[0]!.id
+    await usePlanningStore.getState().addMoreTime(id, 25)
+    await usePlanningStore.getState().addMoreTime(id, 25)
+    expect(usePlanningStore.getState().tasks[0]!.extraMinutes).toBe(50)
+  })
+
+  it('une tâche déjà terminée par l’horloge redevient active', async () => {
+    await usePlanningStore.getState().addTask(taskDraft())
+    const id = usePlanningStore.getState().tasks[0]!.id
+    usePlanningStore.setState({
+      tasks: usePlanningStore.getState().tasks.map((t) => ({ ...t, status: 'history' as const })),
+    })
+
+    await usePlanningStore.getState().addMoreTime(id, 25)
+    expect(usePlanningStore.getState().tasks[0]!.status).toBe('active')
   })
 })
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
 import * as readline from 'node:readline'
 import log from '../logging/setup'
+import { recordActiveProcess } from './app-inventory'
 
 export type ProcessWindowBounds = {
   windowId?: string
@@ -40,6 +41,13 @@ type PendingVisibleWindows = {
 
 type PendingControl = {
   resolve: (ok: boolean) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
+export type AppAudioMuteState = 'muted' | 'unmuted' | 'missing'
+
+type PendingAudioState = {
+  resolve: (state: AppAudioMuteState) => void
   timer: ReturnType<typeof setTimeout>
 }
 
@@ -1012,6 +1020,50 @@ public static class VethosWindowProbe {
         return mutedAny;
     }
 
+    public static int GetAppAudioMuteState(int targetPid, string targetName) {
+        List<string> deviceIds = new List<string>();
+        List<IAudioSessionManager2> managers = GetAudioSessionManagers(deviceIds);
+        bool found = false;
+        try {
+            foreach (IAudioSessionManager2 manager in managers) {
+                IAudioSessionEnumerator sessions = null;
+                try {
+                    if (manager == null || manager.GetSessionEnumerator(out sessions) != 0 || sessions == null) continue;
+                    int count;
+                    if (sessions.GetCount(out count) != 0) continue;
+                    for (int index = 0; index < count; index++) {
+                        IAudioSessionControl session = null;
+                        try {
+                            if (sessions.GetSession(index, out session) != 0 || session == null) continue;
+                            IAudioSessionControl2 session2 = session as IAudioSessionControl2;
+                            ISimpleAudioVolume volume = session as ISimpleAudioVolume;
+                            if (session2 == null || volume == null) continue;
+                            int sessionState;
+                            if (session.GetState(out sessionState) != 0 || sessionState != 1) continue;
+                            uint sessionPid;
+                            if (session2.GetProcessId(out sessionPid) != 0 ||
+                                !AudioSessionMatches(sessionPid, targetPid, targetName)) continue;
+                            found = true;
+                            bool muted;
+                            if (volume.GetMute(out muted) == 0 && muted) return 1;
+                        } catch {
+                        } finally {
+                            if (session != null) Marshal.ReleaseComObject(session);
+                        }
+                    }
+                } finally {
+                    if (sessions != null) Marshal.ReleaseComObject(sessions);
+                }
+            }
+        } catch {
+        } finally {
+            foreach (IAudioSessionManager2 manager in managers) {
+                if (manager != null) Marshal.ReleaseComObject(manager);
+            }
+        }
+        return found ? 0 : -1;
+    }
+
     public static bool RestoreAppAudio(string token) {
         if (String.IsNullOrWhiteSpace(token)) return false;
         List<AudioMuteSnapshot> snapshots;
@@ -1602,13 +1654,28 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         }
         continue
     }
-    if ($line.StartsWith('MUTE_APP_AUDIO|')) {
-        $muteParts = $line.Split('|', 4)
+    if ($line.StartsWith('MUTE_TARGET|')) {
+        $muteParts = $line.Split('|', 5)
         $mutePid = 0
-        if ($muteParts.Length -ge 3 -and [int]::TryParse($muteParts[2], [ref]$mutePid)) {
-            $muteName = if ($muteParts.Length -eq 4) { $muteParts[3] } else { '' }
-            [VethosWindowProbe]::MuteAppAudio($muteParts[1], $mutePid, $muteName) | Out-Null
+        $ok = $false
+        if ($muteParts.Length -ge 4 -and [int]::TryParse($muteParts[3], [ref]$mutePid)) {
+            $muteName = if ($muteParts.Length -eq 5) { $muteParts[4] } else { '' }
+            $ok = [VethosWindowProbe]::MuteAppAudio($muteParts[2], $mutePid, $muteName)
         }
+        [Console]::Out.WriteLine("CONTROL|$($muteParts[1])|$(if ($ok) { '1' } else { '0' })")
+        [Console]::Out.Flush()
+        continue
+    }
+    if ($line.StartsWith('AUDIO_STATE|')) {
+        $audioParts = $line.Split('|', 4)
+        $audioPid = 0
+        $state = -1
+        if ($audioParts.Length -ge 3 -and [int]::TryParse($audioParts[2], [ref]$audioPid)) {
+            $audioName = if ($audioParts.Length -eq 4) { $audioParts[3] } else { '' }
+            $state = [VethosWindowProbe]::GetAppAudioMuteState($audioPid, $audioName)
+        }
+        [Console]::Out.WriteLine("AUDIO_STATE|$($audioParts[1])|$state")
+        [Console]::Out.Flush()
         continue
     }
     if ($line.StartsWith('PAUSE_APP_MEDIA_SESSION|')) {
@@ -1624,17 +1691,32 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         [VethosWindowProbe]::RestoreAppAudio($line.Substring(18)) | Out-Null
         continue
     }
-    if ($line.StartsWith('RESTORE_APP_AUDIO_TARGET|')) {
-        $restoreParts = $line.Split('|', 4)
+    if ($line.StartsWith('RESTORE_TARGET|')) {
+        $restoreParts = $line.Split('|', 5)
         $restorePid = 0
-        if ($restoreParts.Length -ge 3 -and [int]::TryParse($restoreParts[2], [ref]$restorePid)) {
-            $restoreName = if ($restoreParts.Length -eq 4) { $restoreParts[3] } else { '' }
-            [VethosWindowProbe]::RestoreAppAudioForTarget($restoreParts[1], $restorePid, $restoreName) | Out-Null
+        $ok = $false
+        if ($restoreParts.Length -ge 4 -and [int]::TryParse($restoreParts[3], [ref]$restorePid)) {
+            $restoreName = if ($restoreParts.Length -eq 5) { $restoreParts[4] } else { '' }
+            try {
+                [VethosWindowProbe]::RestoreAppAudioForTarget($restoreParts[2], $restorePid, $restoreName) | Out-Null
+                [VethosWindowProbe]::RestoreProcessTaskbar($restorePid, $restoreName)
+                $ok = $true
+            } catch {}
         }
+        [Console]::Out.WriteLine("CONTROL|$($restoreParts[1])|$(if ($ok) { '1' } else { '0' })")
+        [Console]::Out.Flush()
         continue
     }
-    if ($line -eq 'RESTORE_ALL_APP_AUDIO') {
-        [VethosWindowProbe]::RestoreAllAppAudio()
+    if ($line.StartsWith('RESTORE_ALL|')) {
+        $restoreAllParts = $line.Split('|', 2)
+        $ok = $false
+        try {
+            [VethosWindowProbe]::RestoreAllAppAudio()
+            [VethosWindowProbe]::RestoreAllTaskbarWindows()
+            $ok = $true
+        } catch {}
+        [Console]::Out.WriteLine("CONTROL|$($restoreAllParts[1])|$(if ($ok) { '1' } else { '0' })")
+        [Console]::Out.Flush()
         continue
     }
     if ($line.StartsWith('RESTORE_PROCESS_TASKBAR|')) {
@@ -1709,6 +1791,7 @@ const pending = new Map<string, PendingQuery>()
 const pendingForeground = new Map<string, PendingForeground>()
 const pendingVisibleWindows = new Map<string, PendingVisibleWindows>()
 const pendingControls = new Map<string, PendingControl>()
+const pendingAudioStates = new Map<string, PendingAudioState>()
 const watchers = new Map<string, WindowWatcherRegistration>()
 const attachments = new Map<string, AttachmentRegistration>()
 let restartTimer: ReturnType<typeof setTimeout> | null = null
@@ -1825,6 +1908,11 @@ function settlePendingAsMissing(): void {
     control.resolve(false)
   }
   pendingControls.clear()
+  for (const audioState of pendingAudioStates.values()) {
+    clearTimeout(audioState.timer)
+    audioState.resolve('missing')
+  }
+  pendingAudioStates.clear()
 }
 
 function sendWatcher(child: ChildProcessWithoutNullStreams, id: string, watcher: WindowWatcherRegistration): void {
@@ -1997,6 +2085,15 @@ function startProbe(): Promise<void> {
       control.resolve(result === '1')
       return
     }
+    if (value.startsWith('AUDIO_STATE|')) {
+      const [, requestId = '', rawState = '-1'] = value.split('|', 3)
+      const request = pendingAudioStates.get(requestId)
+      if (!request) return
+      pendingAudioStates.delete(requestId)
+      clearTimeout(request.timer)
+      request.resolve(rawState === '1' ? 'muted' : rawState === '0' ? 'unmuted' : 'missing')
+      return
+    }
     const separator = value.indexOf('|')
     if (separator < 1) return
     const requestId = value.slice(0, separator)
@@ -2004,14 +2101,24 @@ function startProbe(): Promise<void> {
     if (foreground) {
       pendingForeground.delete(requestId)
       clearTimeout(foreground.timer)
-      foreground.resolve(parseForegroundWindowInfo(value.slice(separator + 1)))
+      const info = parseForegroundWindowInfo(value.slice(separator + 1))
+      if (info && info.processName) {
+        recordActiveProcess(info.processName, info.title, info.pid)
+      }
+      foreground.resolve(info)
       return
     }
     const visibleWindows = pendingVisibleWindows.get(requestId)
     if (visibleWindows) {
       pendingVisibleWindows.delete(requestId)
       clearTimeout(visibleWindows.timer)
-      visibleWindows.resolve(parseVisibleWindowInfos(value.slice(separator + 1)))
+      const infos = parseVisibleWindowInfos(value.slice(separator + 1))
+      for (const info of infos) {
+        if (info && info.processName) {
+          recordActiveProcess(info.processName, info.title, info.pid)
+        }
+      }
+      visibleWindows.resolve(infos)
       return
     }
     const query = pending.get(requestId)
@@ -2036,6 +2143,10 @@ function startProbe(): Promise<void> {
     clearTimeout(startupTimer)
     cleanupProbeScript()
     if (probe !== child) return
+    if (intentionallyStopped) {
+      resetProbe(child)
+      return
+    }
     const err = new Error(
       `La sonde de fenêtre s'est arrêtée (code ${String(code)}). ${stderr.trim()}`.trim(),
     )
@@ -2253,11 +2364,76 @@ async function sendControlCommand(
   })
 }
 
-export function muteAppAudio(token: string, pid: number, processName: string): void {
-  if (process.platform !== 'win32' || !token || !Number.isInteger(pid) || pid <= 0) return
+async function sendAcknowledgedCommand(command: string, fields: string[]): Promise<boolean> {
+  if (process.platform !== 'win32') return true
+  try {
+    await startProbe()
+  } catch {
+    return false
+  }
   const child = probe
-  if (!child || child.stdin.destroyed) return
-  child.stdin.write(`MUTE_APP_AUDIO|${token}|${pid}|${processName.replace(/\|/gu, ' ')}\n`)
+  if (!child || child.stdin.destroyed) return false
+  const requestId = String(nextRequestId++)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingControls.delete(requestId)
+      resolve(false)
+    }, QUERY_TIMEOUT_MS)
+    pendingControls.set(requestId, { resolve, timer })
+    const safeFields = fields.map((field) => field.replace(/[|\r\n]/gu, ' '))
+    const suffix = safeFields.length > 0 ? `|${safeFields.join('|')}` : ''
+    child.stdin.write(`${command}|${requestId}${suffix}\n`, (err) => {
+      if (!err) return
+      const control = pendingControls.get(requestId)
+      if (!control) return
+      pendingControls.delete(requestId)
+      clearTimeout(control.timer)
+      control.resolve(false)
+    })
+  })
+}
+
+export async function muteAppAudio(
+  token: string,
+  pid: number,
+  processName: string,
+): Promise<boolean> {
+  if (process.platform !== 'win32') return true
+  if (!token || !Number.isInteger(pid) || pid <= 0) return false
+  return sendAcknowledgedCommand('MUTE_TARGET', [token, String(pid), processName])
+}
+
+export async function getAppAudioMuteState(
+  pid: number,
+  processName: string,
+): Promise<AppAudioMuteState> {
+  if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return 'missing'
+  try {
+    await startProbe()
+  } catch {
+    return 'missing'
+  }
+  const child = probe
+  if (!child || child.stdin.destroyed) return 'missing'
+  const requestId = String(nextRequestId++)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingAudioStates.delete(requestId)
+      resolve('missing')
+    }, QUERY_TIMEOUT_MS)
+    pendingAudioStates.set(requestId, { resolve, timer })
+    child.stdin.write(
+      `AUDIO_STATE|${requestId}|${pid}|${processName.replace(/[|\r\n]/gu, ' ')}\n`,
+      (error) => {
+        if (!error) return
+        const request = pendingAudioStates.get(requestId)
+        if (!request) return
+        pendingAudioStates.delete(requestId)
+        clearTimeout(request.timer)
+        request.resolve('missing')
+      },
+    )
+  })
 }
 
 export function pauseAppMediaSession(pid: number, processName: string): void {
@@ -2272,12 +2448,14 @@ export function restoreAppAudio(token: string): void {
   sendProbeLine(`RESTORE_APP_AUDIO|${token}\n`, true)
 }
 
-export function restoreAppAudioForTarget(token: string, pid: number, processName: string): void {
-  if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return
-  sendProbeLine(
-    `RESTORE_APP_AUDIO_TARGET|${token.replace(/\|/gu, ' ')}|${pid}|${processName.replace(/\|/gu, ' ')}\n`,
-    true,
-  )
+export async function restoreAppAudioForTarget(
+  token: string,
+  pid: number,
+  processName: string,
+): Promise<boolean> {
+  if (process.platform !== 'win32') return true
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  return sendAcknowledgedCommand('RESTORE_TARGET', [token, String(pid), processName])
 }
 
 export function restoreProcessTaskbar(pid: number, processName: string): void {
@@ -2317,25 +2495,31 @@ export function restoreBlockedWindowPreview(windowId: string): void {
   child.stdin.write(`RESTORE_PREVIEW|${windowId}\n`)
 }
 
-export function stopProcessWindowProbe(): void {
+export async function stopProcessWindowProbe(): Promise<void> {
   intentionallyStopped = true
   if (restartTimer) clearTimeout(restartTimer)
   restartTimer = null
-  const child = probe
-  probe = null
-  readyPromise = null
-  resolveReady = null
-  rejectReady = null
-  settlePendingAsMissing()
   watchers.clear()
   attachments.clear()
-  if (child && !child.stdin.destroyed) {
-    try {
-      child.stdin.write('RESTORE_ALL_APP_AUDIO\n')
-      child.stdin.write('RESTORE_ALL_TASKBAR\n')
-    } catch {
-      // La sonde est déjà en train de disparaître.
+  const child = probe
+  if (!child) return
+
+  const restored = await sendAcknowledgedCommand('RESTORE_ALL', [])
+  if (!restored) log.warn('[window-probe] restauration globale non confirmée avant arrêt')
+
+  if (!child.stdin.destroyed) child.stdin.end()
+  await new Promise<void>((resolve) => {
+    if (child.exitCode !== null) {
+      resolve()
+      return
     }
-  }
-  setTimeout(() => child?.kill(), 80)
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve()
+    }, 2_000)
+    child.once('close', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
 }

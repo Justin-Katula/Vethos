@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type { Settings } from '@shared/schemas'
+import {
+  DEFAULT_DARK_AT,
+  DEFAULT_LIGHT_AT,
+  DEFAULT_THEME_MODE,
+  type ThemeMode,
+} from '@shared/theme'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { useToastStore } from './toast.store'
 
@@ -14,13 +20,26 @@ type SettingsState = {
   /** Source unique du sommeil : capacité brute (A.1) et silence nocturne (critère 3). */
   sleepStart: string
   sleepEnd: string
+  /**
+   * Apparence. Le mode est le CHOIX ; l'écran qui en sort est calculé ailleurs
+   * (`shared/theme.ts`). Les deux heures restent mémorisées même quand le mode
+   * ne s'en sert pas, pour qu'un aller-retour ne fasse pas perdre le réglage.
+   */
+  theme: ThemeMode
+  themeLightAt: string
+  themeDarkAt: string
   loaded: boolean
 
   load: () => Promise<void>
   save: (username: string) => Promise<void>
   setOnboardingCompleted: (completed: boolean) => Promise<void>
   updateSettings: (
-    patch: Partial<Pick<SettingsState, 'username' | 'sleepStart' | 'sleepEnd'>>,
+    patch: Partial<
+      Pick<
+        SettingsState,
+        'username' | 'sleepStart' | 'sleepEnd' | 'theme' | 'themeLightAt' | 'themeDarkAt'
+      >
+    >,
   ) => Promise<void>
 }
 
@@ -31,6 +50,9 @@ function buildPayload(state: SettingsState): Settings {
     onboardingCompleted: state.onboardingCompleted,
     sleepStart: state.sleepStart,
     sleepEnd: state.sleepEnd,
+    theme: state.theme,
+    themeLightAt: state.themeLightAt,
+    themeDarkAt: state.themeDarkAt,
   }
 }
 
@@ -103,6 +125,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   onboardingCompleted: false,
   sleepStart: DEFAULT_SLEEP_START,
   sleepEnd: DEFAULT_SLEEP_END,
+  theme: DEFAULT_THEME_MODE,
+  themeLightAt: DEFAULT_LIGHT_AT,
+  themeDarkAt: DEFAULT_DARK_AT,
   loaded: false,
 
   async load() {
@@ -113,6 +138,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       onboardingCompleted: data?.onboardingCompleted ?? false,
       sleepStart: data?.sleepStart ?? DEFAULT_SLEEP_START,
       sleepEnd: data?.sleepEnd ?? DEFAULT_SLEEP_END,
+      // Rien de choisi = suivre l'ordinateur. Une installation neuve ne décide
+      // pas d'une apparence à la place de l'utilisateur.
+      theme: data?.theme ?? DEFAULT_THEME_MODE,
+      themeLightAt: data?.themeLightAt ?? DEFAULT_LIGHT_AT,
+      themeDarkAt: data?.themeDarkAt ?? DEFAULT_DARK_AT,
       loaded: true,
     })
     syncSleepWindow(get())

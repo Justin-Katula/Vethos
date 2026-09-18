@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Check, FileText, RefreshCw } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Check, Clock4, FileText, Monitor, Moon, RefreshCw, Sun } from 'lucide-react'
 import { PageTransition } from '@/components/PageTransition'
 import { useSettingsStore } from '@/store/settings.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 import { useShortcut } from '@/lib/use-shortcut'
 import { useStagger } from '@/lib/motion'
 import { nexus } from '@/lib/ipc'
+import { THEME_MODES, type ThemeMode } from '@shared/theme'
 
 /**
  * Les réglages tiennent en trois choses : qui tu es, où se règle le reste, et
@@ -17,7 +18,19 @@ import { nexus } from '@/lib/ipc'
  * de l'emballage.
  */
 export default function SettingsPage() {
-  const { username, savedAt, sleepStart, sleepEnd, loaded, load, save } = useSettingsStore()
+  const {
+    username,
+    savedAt,
+    sleepStart,
+    sleepEnd,
+    theme,
+    themeLightAt,
+    themeDarkAt,
+    loaded,
+    load,
+    save,
+    updateSettings,
+  } = useSettingsStore()
   const restartOnboarding = useOnboardingStore((s) => s.restart)
   const { container, item } = useStagger()
 
@@ -76,22 +89,18 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 <input
                   type="text"
+                  name="settings-name"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
                   placeholder="Ton prénom"
-                  className="w-full max-w-xs rounded border border-line bg-base px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-line-strong"
+                  className="field w-full max-w-xs text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={!dirty || saving}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-2 rounded px-4 py-2 text-sm font-medium transition-colors',
-                    dirty && !saving
-                      ? 'bg-fg text-base hover:bg-white'
-                      : 'cursor-not-allowed border border-line text-fg-3',
-                  )}
+                  className="btn-iris pressable shrink-0"
                 >
                   {saving ? 'Sauvegarde' : 'Enregistrer'}
                 </button>
@@ -106,7 +115,7 @@ export default function SettingsPage() {
 
             <Row label="Sommeil" hint="Se règle avec le reste de ce qui prend ton temps.">
               <p className="text-sm text-fg-2">
-                <span className="numeric">
+                <span className="font-mono">
                   {sleepStart} {'→'} {sleepEnd}
                 </span>
                 <Link
@@ -116,6 +125,47 @@ export default function SettingsPage() {
                   Modifier dans Mon temps
                 </Link>
               </p>
+            </Row>
+
+            <Row label="Apparence" hint="S'applique tout de suite, partout, y compris aux overlays.">
+              <ThemeChoice
+                mode={theme}
+                onChange={(next) => void updateSettings({ theme: next })}
+              />
+
+              {/* Les heures n'existent que pour le mode qui s'en sert. Les
+                  laisser affichées en permanence donnerait deux réglages là où
+                  l'utilisateur n'en a choisi qu'un. */}
+              <AnimatePresence initial={false}>
+                {theme === 'schedule' && (
+                  <motion.div
+                    key="theme-hours"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-wrap items-end gap-x-6 gap-y-3 pt-4">
+                      <TimeField
+                        label="Clair dès"
+                        value={themeLightAt}
+                        onChange={(v) => void updateSettings({ themeLightAt: v })}
+                      />
+                      <TimeField
+                        label="Sombre dès"
+                        value={themeDarkAt}
+                        onChange={(v) => void updateSettings({ themeDarkAt: v })}
+                      />
+                    </div>
+                    <p className="mt-3 text-xs text-fg-3">
+                      {themeLightAt === themeDarkAt
+                        ? 'Deux fois la même heure : il fera sombre en permanence.'
+                        : `Sombre de ${themeDarkAt} à ${themeLightAt}, clair le reste du temps.`}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Row>
           </motion.section>
 
@@ -151,6 +201,94 @@ export default function SettingsPage() {
         </motion.div>
       </div>
     </PageTransition>
+  )
+}
+
+/**
+ * Le choix d'apparence.
+ *
+ * Quatre réponses, toutes visibles en même temps : c'est un choix qu'on fait
+ * une fois, et un menu déroulant obligerait à ouvrir pour savoir ce qui existe.
+ * Chaque option dit ce qu'elle FAIT, pas comment elle s'appelle — « suivre
+ * l'ordinateur » se comprend sans savoir ce qu'est un thème système.
+ */
+const THEME_LABELS: Record<ThemeMode, { title: string; hint: string; Icon: typeof Sun }> = {
+  system: { title: 'Ordinateur', hint: 'Comme Windows', Icon: Monitor },
+  light: { title: 'Clair', hint: 'Toujours', Icon: Sun },
+  dark: { title: 'Sombre', hint: 'Toujours', Icon: Moon },
+  schedule: { title: 'À l’heure', hint: 'Jour / nuit', Icon: Clock4 },
+}
+
+function ThemeChoice({
+  mode,
+  onChange,
+}: {
+  mode: ThemeMode
+  onChange: (mode: ThemeMode) => void
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Apparence"
+      className="grid max-w-md grid-cols-4 overflow-hidden rounded border border-line-strong"
+    >
+      {THEME_MODES.map((option, i) => {
+        const { title, hint, Icon } = THEME_LABELS[option]
+        const active = mode === option
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(option)}
+            className={cn(
+              'pressable relative flex flex-col items-center gap-1.5 px-2 py-3 text-center',
+              i > 0 && 'border-l border-line',
+              active ? 'bg-surface-3 text-fg' : 'bg-surface text-fg-3 hover:bg-surface-2 hover:text-fg-2',
+            )}
+          >
+            <Icon size={16} strokeWidth={active ? 2 : 1.75} />
+            <span className="text-[12.5px] font-medium leading-none">{title}</span>
+            <span className="text-[10.5px] leading-none text-fg-3">{hint}</span>
+            {/* Le filet rouge est la seule couleur du contrôle : il dit lequel
+                est retenu, comme le liseré sous le bouton primaire. */}
+            {active && (
+              <motion.span
+                layoutId="theme-choice-rule"
+                className="absolute inset-x-0 bottom-0 h-[2px] bg-accent"
+                transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Une heure de bascule. Le champ natif suit le thème via `color-scheme`. */
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs text-fg-3">{label}</span>
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => e.target.value && onChange(e.target.value)}
+        // Assez large pour un champ 12 h : en anglais, le segment AM/PM s'ajoute
+        // à l'heure et se faisait couper (« 07:00 AI »).
+        className="field num w-[9.5rem] text-sm"
+      />
+    </label>
   )
 }
 

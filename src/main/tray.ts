@@ -1,7 +1,6 @@
 import { app, Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import log from './logging/setup'
+import { resolveAppIconPath } from './app-icon'
 
 /**
  * Zone de notification — ce qui permet à Vethos de tenir sa promesse la plus
@@ -61,29 +60,12 @@ export function shouldStartHidden(argv: readonly string[]): boolean {
 }
 
 /**
- * Cherche une icône exploitable parmi les emplacements possibles.
- *
- * `build/icon.ico` est l'icône de l'application mais n'est pas suivie par git
- * (`build/` est ignoré), donc sa présence n'est pas garantie. On essaie
- * plusieurs candidats et on se rabat sur une image vide plutôt que de faire
- * échouer la création de la zone de notification : mieux vaut une icône
+ * Cherche une icône exploitable et se rabat sur une image vide plutôt que de
+ * faire échouer la création de la zone de notification : mieux vaut une icône
  * absente qu'un blocage qui ne démarre pas.
  */
 export function resolveTrayIconPath(): string | null {
-  const candidates = [
-    join(app.getAppPath(), 'build', 'icon.ico'),
-    join(process.resourcesPath ?? '', 'icon.ico'),
-    join(app.getAppPath(), 'src', 'renderer', 'src', 'assets', 'vethos-logo.png'),
-    join(__dirname, '..', 'renderer', 'assets', 'vethos-logo.png'),
-  ]
-  for (const candidate of candidates) {
-    try {
-      if (existsSync(candidate)) return candidate
-    } catch {
-      // Chemin illisible : on essaie le suivant.
-    }
-  }
-  return null
+  return resolveAppIconPath() ?? null
 }
 
 export type TrayDeps = {

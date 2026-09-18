@@ -1,14 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
 
-/**
- * Le passage d'une page à l'autre.
- *
- * La page sortante recule et s'efface, l'entrante arrive de l'avant. Ce n'est
- * pas de la décoration : c'est ce qui dit qu'on a changé d'endroit, à
- * l'instant où on l'a fait. Un contenu qui se remplace sans transition ne se
- * lit pas comme une navigation, il se lit comme un rafraîchissement.
- */
+/** Le changement de page reste perceptible, sans voler l'attention au contenu. */
 export function PageTransition({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion()
 
@@ -20,9 +13,9 @@ export function PageTransition({ children }: { children: ReactNode }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.996 }}
       transition={{
-        duration: 0.36,
+        duration: 0.24,
         ease: [0.22, 1, 0.36, 1],
-        opacity: { duration: 0.22 },
+        opacity: { duration: 0.16 },
       }}
       className="h-full"
     >

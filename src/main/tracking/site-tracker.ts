@@ -512,7 +512,26 @@ export function createSiteTracker(deps: SemanticSiteTrackerDeps = {}): SiteTrack
   return {
     start() {
       if (timer) return
-      timer = setInterval(async () => {
+      // Un battement qui dure plus longtemps que l'intervalle ne doit pas en
+      // chevaucher un autre : l'énumération des fenêtres est un appel système qui
+      // peut traîner, et deux passages simultanés se disputeraient `recentDomains`
+      // en émettant deux fois le même site. Un rejet non attrapé, lui, remonterait
+      // en promesse non gérée — à chaque battement.
+      let enCours = false
+      timer = setInterval(() => {
+        if (enCours) return
+        enCours = true
+        void battement()
+          .catch((err) => log.warn('[site-tracker] battement interrompu', err))
+          .finally(() => {
+            enCours = false
+          })
+      }, deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS)
+      if (deps.scanHistoryEnabled) {
+        void scanHistory()
+      }
+
+      async function battement(): Promise<void> {
         const hasSession = deps.hasActiveSession ? await deps.hasActiveSession() : true
         if (!hasSession) {
           void deps.onVisibleBrowserWindows?.([])
@@ -552,9 +571,6 @@ export function createSiteTracker(deps: SemanticSiteTrackerDeps = {}): SiteTrack
               emitSiteEvent(event)
             })
         }
-      }, deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS)
-      if (deps.scanHistoryEnabled) {
-        void scanHistory()
       }
     },
 

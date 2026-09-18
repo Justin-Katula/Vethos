@@ -5,15 +5,14 @@ import {
   snapshotFrom,
   type SessionSnapshot,
 } from './clock'
-import type { BlockingRules, RecurringSlot } from './schedule'
+import type { BlockingRules, BlockSession } from './schedule'
 
-function makeSlot(o: Partial<RecurringSlot> = {}): RecurringSlot {
+function makeBlock(o: Partial<BlockSession> = {}): BlockSession {
+  const startedAt = new Date(2026, 6, 29, 9, 0, 0, 0).getTime()
   return {
-    id: 's1',
-    label: 'Matin',
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    startMinute: 9 * 60,
-    endMinute: 12 * 60,
+    blockId: 'task-1',
+    startedAt,
+    endsAt: new Date(2026, 6, 29, 12, 0, 0, 0).getTime(),
     appIds: ['blender.exe'],
     ...o,
   }
@@ -91,10 +90,10 @@ describe('createReconciliationClock', () => {
   const mercrediDixHeures = new Date(2026, 6, 29, 10, 0, 0, 0)
   const mercrediQuinzeHeures = new Date(2026, 6, 29, 15, 0, 0, 0)
 
-  it('signale le démarrage au premier tic quand un créneau est actif', async () => {
+  it('signale le démarrage au premier tic quand un bloc confirmé est actif', async () => {
     const onTransition = vi.fn()
     const clock = createReconciliationClock({
-      readRules: async (): Promise<BlockingRules> => ({ slots: [makeSlot()], manual: null }),
+      readRules: async (): Promise<BlockingRules> => ({ block: makeBlock() }),
       now: () => mercrediDixHeures,
       onTransition,
     })
@@ -103,10 +102,10 @@ describe('createReconciliationClock', () => {
     expect(onTransition.mock.calls[0]?.[0]).toMatchObject({ kind: 'started' })
   })
 
-  it('ne signale rien quand aucun créneau ne s’applique', async () => {
+  it('ne signale rien quand le bloc est terminé', async () => {
     const onTransition = vi.fn()
     const clock = createReconciliationClock({
-      readRules: async (): Promise<BlockingRules> => ({ slots: [makeSlot()], manual: null }),
+      readRules: async (): Promise<BlockingRules> => ({ block: makeBlock() }),
       now: () => mercrediQuinzeHeures,
       onTransition,
     })
@@ -117,7 +116,7 @@ describe('createReconciliationClock', () => {
   it('ne signale pas deux fois le même état', async () => {
     const onTransition = vi.fn()
     const clock = createReconciliationClock({
-      readRules: async (): Promise<BlockingRules> => ({ slots: [makeSlot()], manual: null }),
+      readRules: async (): Promise<BlockingRules> => ({ block: makeBlock() }),
       now: () => mercrediDixHeures,
       onTransition,
     })
@@ -127,11 +126,11 @@ describe('createReconciliationClock', () => {
     expect(onTransition).toHaveBeenCalledTimes(1)
   })
 
-  it('signale la fin quand l’heure sort du créneau', async () => {
+  it('signale la fin quand l’heure sort du bloc', async () => {
     const onTransition = vi.fn()
     let maintenant = mercrediDixHeures
     const clock = createReconciliationClock({
-      readRules: async (): Promise<BlockingRules> => ({ slots: [makeSlot()], manual: null }),
+      readRules: async (): Promise<BlockingRules> => ({ block: makeBlock() }),
       now: () => maintenant,
       onTransition,
     })
@@ -144,7 +143,7 @@ describe('createReconciliationClock', () => {
 
   it('expose l’instantané courant', async () => {
     const clock = createReconciliationClock({
-      readRules: async (): Promise<BlockingRules> => ({ slots: [makeSlot()], manual: null }),
+      readRules: async (): Promise<BlockingRules> => ({ block: makeBlock() }),
       now: () => mercrediDixHeures,
       onTransition: () => undefined,
     })
@@ -176,7 +175,7 @@ describe('createReconciliationClock', () => {
         maxSimultane = Math.max(maxSimultane, enCours)
         await new Promise((r) => setTimeout(r, 10))
         enCours -= 1
-        return { slots: [], manual: null }
+        return { block: null }
       },
       now: () => mercrediDixHeures,
       onTransition: () => undefined,

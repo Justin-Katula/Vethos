@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { APP_CATEGORIES } from './app-categories'
+import { THEME_MODES } from './theme'
 
 /**
  * Clés autorisées pour le stockage.
@@ -16,6 +18,10 @@ export const STORAGE_KEYS = [
   'ancres',
   'learning',
   'blocking_rules',
+  'session_confirmations',
+  'app_knowledge',
+  'blocking_decision_cache',
+  'app_overrides',
 ] as const
 export type StorageKey = (typeof STORAGE_KEYS)[number]
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
@@ -35,6 +41,15 @@ export const SettingsSchema = z.object({
    */
   sleepStart: z.string().regex(TIME_REGEX).optional(),
   sleepEnd: z.string().regex(TIME_REGEX).optional(),
+  /**
+   * Apparence. Absent = `system` : une installation qui n'a jamais rien choisi
+   * suit l'ordinateur, elle ne décide pas à la place de l'utilisateur.
+   * `themeLightAt`/`themeDarkAt` ne servent qu'au mode `schedule` mais restent
+   * mémorisés en dehors, pour qu'un aller-retour ne perde pas le réglage.
+   */
+  theme: z.enum(THEME_MODES).optional(),
+  themeLightAt: z.string().regex(TIME_REGEX).optional(),
+  themeDarkAt: z.string().regex(TIME_REGEX).optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -73,18 +88,31 @@ const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const EXE_NAME_REGEX = /^[A-Za-z0-9_.\- ]+\.exe$/i
 
-export const SCHEDULE_CATEGORIES = ['sleep', 'school', 'work', 'commute', 'commitment', 'custom'] as const
+export const SCHEDULE_CATEGORIES = [
+  'sleep',
+  'school',
+  'work',
+  'commute',
+  'commitment',
+  'custom',
+] as const
 export type ScheduleCategory = (typeof SCHEDULE_CATEGORIES)[number]
 
 export const ScheduleEntrySchema = z
   .object({
-    /** 0=lundi … 6=dimanche. */
+    /** 0=lundi … 6=dimanche. Toujours renseigné — dérivé de `date` pour une occurrence unique. */
     dayOfWeek: z.number().int().min(0).max(6),
     startMinute: z.number().int().min(0).max(1439),
     endMinute: z.number().int().min(1).max(1440),
     categoryType: z.enum(SCHEDULE_CATEGORIES),
     label: z.string().min(1).max(60),
     color: z.string().regex(HEX_COLOR_REGEX),
+    /**
+     * Occurrence unique (YYYY-MM-DD). Absent = récurrent chaque semaine sur
+     * `dayOfWeek` — le comportement historique, toujours le défaut. Présent =
+     * cette seule date, jamais répétée la semaine suivante.
+     */
+    date: z.string().regex(DATE_REGEX).optional(),
   })
   .refine((e) => e.endMinute > e.startMinute, {
     message: 'La fin doit être postérieure au début.',
@@ -107,10 +135,18 @@ export const ObjectiveSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string().min(1).max(60),
+    /** Plan d'action : En quoi consiste concrètement ce que tu vas faire ? (Obligatoire) */
+    plan: z.string().min(1).max(2000),
     description: z.string().max(500).optional(),
     color: z.string().regex(HEX_COLOR_REGEX),
     /** Cible hebdomadaire en minutes, déclarée une fois par l'utilisateur. (D.4) */
     weeklyTargetMinutes: z.number().int().min(0).max(6000).default(300),
+    /**
+     * D.8 : applications bloquées PENDANT un bloc de cet objectif, déclarées à
+     * la création. Ids de `declared_apps`. Vide = ce bloc ne bloque rien de
+     * lui-même ; il suspend quand même l'horaire fixe le temps de la session.
+     */
+    appsToBlock: z.array(z.string().min(1)).max(200).default([]),
     createdAt: z.string().datetime(),
   })
   .strict()
@@ -127,6 +163,8 @@ export type Objective = z.infer<typeof ObjectiveSchema>
 export const AncreSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(60),
+  /** Plan d'action : En quoi consiste concrètement ce que tu vas faire ? (Obligatoire) */
+  plan: z.string().min(1).max(2000),
   color: z.string().regex(HEX_COLOR_REGEX),
   /** Déclencheur (ex: « sport »). Une seule ancre par déclencheur (D.3). */
   trigger: z.string().min(1).max(80),
@@ -138,6 +176,13 @@ export const AncreSchema = z.object({
   normalMaxMinutes: z.number().int().min(15).max(480).default(60),
   /** Version minimale calculée (D.3) : MAX(20 min, 40% × normalMaxMinutes). */
   minimumMinutes: z.number().int().min(20).max(480).default(24),
+  /**
+   * D.8 : applications bloquées PENDANT cette ancre. Une ancre passe désormais
+   * par « Je commence » — uniquement pour déclencher ce blocage et mesurer sa
+   * confirmation. Elle ne débite jamais rien (ni repos, ni capacité) : son
+   * échec alimente le signal « ancre ratée » et rien d'autre (D.7/D.8).
+   */
+  appsToBlock: z.array(z.string().min(1)).max(200).default([]),
   createdAt: z.string().datetime(),
 })
 export type Ancre = z.infer<typeof AncreSchema>
@@ -157,6 +202,8 @@ export type ObjectivesState = z.infer<typeof ObjectivesStateSchema>
 export const TaskSchema = z.object({
   id: z.string().uuid(),
   title: z.string().min(1).max(100),
+  /** Plan d'action : En quoi consiste concrètement ce que tu vas faire ? (Obligatoire) */
+  plan: z.string().min(1).max(2000),
   /** Deadline ISO date string (YYYY-MM-DD). */
   deadline: z.string().regex(DATE_REGEX),
   /** Importance déclarée UNE SEULE FOIS à la création (1-10). Jamais recalculée. (C.1.1) */
@@ -173,6 +220,27 @@ export const TaskSchema = z.object({
   correctionFactor: z.number().min(0.5).max(3).default(1.4),
   /** Regroupement visuel : id de la tâche d'origine quand elle a été découpée (B.5). */
   parentTaskId: z.string().uuid().nullable().default(null),
+  /**
+   * B.5.1 : rang de cette partie parmi ses sœurs (1, 2, 3…) ; `null` hors
+   * découpage et pour la ligne de regroupement. `autoSplit` produit déjà cet
+   * ordre — il était jeté à la création, donc les parties se retrouvaient
+   * triées de façon arbitraire (leurs quatre clés de cascade sont identiques,
+   * `createdAt` compris : il est calculé UNE fois pour tout le lot).
+   */
+  partOrder: z.number().int().positive().nullable().default(null),
+  /**
+   * B.5.2 : minutes accordées en plus par « il m'en faut plus », cumulées.
+   * Séparées de `estimatedMinutes` À DESSEIN : l'estimation d'origine doit
+   * rester intacte pour que le facteur de correction apprenne quelque chose
+   * (B.2 compare réel ÷ estimé — gonfler l'estimé annulerait le signal).
+   */
+  extraMinutes: z.number().int().min(0).max(10000).default(0),
+  /**
+   * D.8 : applications bloquées PENDANT un bloc de cette tâche, déclarées à la
+   * création. Ids de `declared_apps`, spécifiques à CE bloc — jamais une liste
+   * globale héritée de l'horaire fixe.
+   */
+  appsToBlock: z.array(z.string().min(1)).max(200).default([]),
   status: z.enum(['active', 'history']),
   createdAt: z.string().datetime(),
 })
@@ -253,37 +321,46 @@ export const LearningStateSchema = z.object({
   lastSignalAt: z.record(z.string(), z.string().datetime()).default({}),
   /** Tâches créées par semaine (YYYY-Www → compte). Mesure λ pour le WIP (D.6). */
   tasksCreatedPerWeek: z.record(z.string(), z.number().int().min(0)).default({}),
+  /**
+   * D.7 : retards ou non-démarrages consécutifs, par tâche et par objectif
+   * (refId → compte). Mesuré par la confirmation « Je commence », jamais
+   * déclaré. Alimente le 4e signal (C.3.4) — passif, sans action automatique.
+   */
+  consecutiveDelays: z.record(z.string(), z.number().int().min(0)).default({}),
+  /**
+   * B.5.2 : minutes de travail RÉELLEMENT faites, cumulées par tâche
+   * (taskId → minutes). Une minute n'y entre que si son bloc a été confirmé
+   * (« Je commence ») ET que sa fenêtre s'est écoulée — jamais une
+   * déclaration, jamais du temps simplement planifié.
+   *
+   * C'est ce compteur, et lui seul, qui décide qu'une tâche est terminée :
+   * l'utilisateur ne le déclare plus. Il alimente aussi `DurationRealSource`
+   * (B.2), un type déclaré depuis l'origine du moteur et jamais branché
+   * jusqu'ici — la boucle d'apprentissage G tournait donc à vide.
+   */
+  workedMinutesByRef: z.record(z.string(), z.number().int().min(0)).default({}),
+  /**
+   * D.7 : retard non confirmé cumulé par jour (YYYY-MM-DD → minutes). La
+   * réserve de repos du jour l'absorbe d'abord ; seul l'excédent réduit la
+   * capacité effective (A.3). Jamais reporté au lendemain.
+   */
+  dailyDelayMinutes: z.record(z.string(), z.number().int().min(0).max(1440)).default({}),
 })
 export type LearningState = z.infer<typeof LearningStateSchema>
 
-/** Map clé → schéma. Utilisé par le storage pour valider à la lecture. */
 /**
- * Règles de blocage : créneaux récurrents et session manuelle ponctuelle.
+ * D.8 : une session pilotée par un bloc du planning (tâche, objectif, ancre),
+ * ouverte par la confirmation « Je commence ». Pendant sa fenêtre, elle
+ * bloque exactement `apps_à_bloquer(bloc)` (D.8).
  *
- * Les minutes sont bornées à 0..1439 et une durée nulle est refusée : un
- * créneau `10h00 → 10h00` était interprété comme un franchissement de minuit
- * et bloquait 24 h/24 en silence. La validation vit ici pour que la donnée
- * fautive n'atteigne jamais le disque, et dans `blocking/schedule.ts` pour
- * que le moteur reste sûr même face à un fichier édité à la main.
+ * `blockId` reprend l'id stable produit par le moteur (engine.ts) :
+ * déterministe sur (nature, référence, date, heure de placement), jamais sur
+ * un compteur qui glisse d'un calcul à l'autre. C'est ce qui permet de savoir,
+ * d'un tic à l'autre, si CE bloc précis a déjà été confirmé aujourd'hui.
  */
-export const RecurringSlotSchema = z
+export const BlockSessionSchema = z
   .object({
-    id: z.string().min(1),
-    label: z.string().max(120),
-    daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7),
-    startMinute: z.number().int().min(0).max(1439),
-    endMinute: z.number().int().min(0).max(1439),
-    appIds: z.array(z.string().min(1)).max(200),
-    /** Domaines bloqués, sans schéma ni www. Ex. « youtube.com ». */
-    blockedSites: z.array(z.string().min(1)).max(500).default([]),
-  })
-  .refine((slot) => slot.startMinute !== slot.endMinute, {
-    message: 'Un créneau de durée nulle bloquerait en permanence.',
-    path: ['endMinute'],
-  })
-
-export const ManualSessionSchema = z
-  .object({
+    blockId: z.string().min(1),
     startedAt: z.number().int(),
     endsAt: z.number().int(),
     appIds: z.array(z.string().min(1)).max(200),
@@ -295,13 +372,205 @@ export const ManualSessionSchema = z
   })
 
 export const BlockingRulesStateSchema = z.object({
-  slots: z.array(RecurringSlotSchema).max(100).default([]),
-  manual: ManualSessionSchema.nullable().default(null),
+  /** Unique source : le bloc du planning confirmé par « Je commence ». */
+  block: BlockSessionSchema.nullable().default(null),
 })
 
-export type RecurringSlot = z.infer<typeof RecurringSlotSchema>
-export type ManualSession = z.infer<typeof ManualSessionSchema>
+export type BlockSession = z.infer<typeof BlockSessionSchema>
 export type BlockingRulesState = z.infer<typeof BlockingRulesStateSchema>
+
+/**
+ * D.7/D.8 : bookkeeping de la confirmation « Je commence », pour AUJOURD'HUI
+ * seulement — un stockage qui grossirait indéfiniment n'aurait aucune utilité,
+ * seul le jour courant décide si un bloc a déjà été confirmé ou déjà crédité
+ * en retard. `date` change → l'horloge de planification repart d'un état vide,
+ * jamais d'un jour à cheval sur l'autre (cohérent avec D.7 : le retard ne
+ * franchit jamais le jour même).
+ */
+const MinuteRangeSchema = z
+  .object({
+    start: z.number().int().min(0).max(1439),
+    end: z.number().int().min(1).max(1440),
+  })
+  .refine((r) => r.end > r.start, { message: 'La fin doit être postérieure au début.' })
+
+export const SessionConfirmationsStateSchema = z.object({
+  date: z.string().regex(DATE_REGEX),
+  /** blockId (id stable produit par le moteur) → horodatage epoch ms de la confirmation. */
+  confirmedAt: z.record(z.string(), z.number().int()).default({}),
+  /**
+   * Intervalles [début, fin) de la journée déjà crédités en retard (D.7),
+   * fusionnés et non chevauchants — empêche un double crédit si l'horloge
+   * repasse dessus à un tic suivant.
+   *
+   * Dédupliqué par CHEVAUCHEMENT D'INTERVALLE, jamais par blockId ni par
+   * simple minute de départ : le moteur recalcule le plan à chaque tic
+   * (ÉCHEC 3), et rien ne garantit qu'un même créneau reste occupé par le
+   * MÊME bloc, ni même par un bloc qui démarre exactement à la même minute,
+   * d'un tic à l'autre. Bug réel observé le 2026-08-22 : deux tics à 5
+   * secondes d'écart ont produit deux placements différents du début de
+   * journée — un chevauchait l'autre sans partager une seule minute de
+   * départ identique — et 283 des 881 minutes créditées ce jour-là étaient un
+   * pur doublon. Seul un test de recouvrement d'intervalle (pas d'égalité de
+   * point) attrape ce cas : pour chaque bloc manqué, seule la portion qui ne
+   * chevauche AUCUN intervalle déjà crédité s'ajoute au total du jour.
+   */
+  lapsedCreditedRanges: z.array(MinuteRangeSchema).default([]),
+  /**
+   * B.5.2 : intervalles de la journée déjà crédités en TRAVAIL FAIT — le
+   * jumeau exact de `lapsedCreditedRanges` juste au-dessus, pour les blocs
+   * confirmés cette fois. Même protection par recouvrement d'intervalle, pour
+   * exactement la même raison : le plan se recalcule à chaque tic et deux
+   * placements successifs peuvent couvrir les mêmes minutes sans partager le
+   * moindre blockId ni la moindre minute de départ. Sans ça, une tâche
+   * pourrait se croire terminée avec la moitié du travail réellement fait.
+   */
+  workCreditedRanges: z.array(MinuteRangeSchema).default([]),
+  /**
+   * refId (tâche, objectif, ancre) dont le compteur de ratés a déjà avancé
+   * AUJOURD'HUI. D.8 est explicite : une ancre (et par le même principe, une
+   * tâche ou un objectif — signal 4) est comptée ratée « pour un jour donné »
+   * — une fois par jour, jamais une fois par bloc manqué. Un objectif qui
+   * reçoit 2 blocs profonds le même jour (D.5) et rate les deux ne doit faire
+   * avancer `consecutiveDelays`/`anchorMissCounts` que de +1, pas +2. Bug réel
+   * observé le 2026-08-22 : sans cette garde, le compteur de l'objectif avait
+   * grimpé à 4 en seulement deux jours au lieu de 2.
+   */
+  streakBumpedRefs: z.array(z.string()).default([]),
+  /**
+   * Le bloc actuellement surveillé — celui que le dernier tic a trouvé actif
+   * et non confirmé — ou `null`. C'est la mémoire qui permet de détecter
+   * qu'une fenêtre s'est fermée SANS jamais avoir besoin de la retrouver dans
+   * un recalcul frais.
+   *
+   * Nécessaire précisément parce que le plan se recalcule à chaque tic
+   * (ÉCHEC 3) : une fois qu'un bloc a quitté la fenêtre visible (temps déjà
+   * passé, D.9/`clipElapsedToday`), plus AUCUN recalcul ne le reproposera
+   * jamais — il disparaît purement et simplement du plan. Sans se souvenir de
+   * ce qu'on observait AVANT qu'il disparaisse, rien ne peut jamais dire
+   * « ça vient de se fermer sans confirmation ». Bug réel du 2026-08-22 :
+   * l'overlay « Je commence » ne s'est déclenché qu'une seule fois de toute
+   * la journée, puis plus jamais, alors que plusieurs blocs ont bien fermé
+   * sans confirmation entre-temps — le mécanisme cherchait sa réponse dans un
+   * plan qui avait déjà tout oublié du passé.
+   */
+  observedPending: z
+    .object({
+      blockId: z.string().min(1),
+      kind: z.enum(['task', 'objective', 'ancre']),
+      refId: z.string().min(1),
+      startMinute: z.number().int().min(0).max(1439),
+      endMinute: z.number().int().min(1).max(1440),
+      /**
+       * B.5.2 : minutes de TRAVAIL du bloc, pause exclue (E.1) — nécessaire
+       * pour créditer le bon total quand la fenêtre se ferme. Optionnel : une
+       * mémoire écrite par une version antérieure ne le porte pas, le code
+       * retombe alors sur la durée pleine.
+       */
+      workMinutes: z.number().int().min(0).max(1440).optional(),
+    })
+    .nullable()
+    .default(null),
+})
+export type SessionConfirmationsState = z.infer<typeof SessionConfirmationsStateSchema>
+export type ObservedPendingBlock = NonNullable<SessionConfirmationsState['observedPending']>
+
+// ─── Base de connaissances des applications partagée ───────────────────────
+
+export const KnowledgeSourceSchema = z.enum([
+  'BUILTIN_CATALOG',
+  'LOCAL_RULE',
+  'WINDOWS_METADATA',
+  'AI',
+  'WEB_PLUS_AI',
+])
+export type KnowledgeSource = z.infer<typeof KnowledgeSourceSchema>
+
+export const ClassificationStateSchema = z.enum(['RESOLVED', 'UNRESOLVED'])
+export type ClassificationState = z.infer<typeof ClassificationStateSchema>
+
+export const AppKnowledgeProfileSchema = z.object({
+  identifiant: z.string().min(1),
+  appIdInterne: z.string().min(1).optional(),
+  nom_affiche: z.string().min(1),
+  categorie_de_base: z.string().min(1),
+  category: z.string().default('unknown'),
+  classificationState: ClassificationStateSchema.default('RESOLVED'),
+  source: KnowledgeSourceSchema.default('AI'),
+  sourceVersion: z.number().int().default(1),
+  ce_qu_on_y_fait: z.string().min(1),
+  exemples_utilite: z.array(z.string().min(1)).min(3),
+  points_faibles: z.array(z.string().min(1)),
+  capacites_confirmees: z.array(z.string().min(1)),
+  capacites_incertaines: z.array(z.string()),
+  confiance: z.enum(['haute', 'moyenne', 'basse']),
+  date_recherche: z.string(),
+  /** URLs des sources web consultées en direct lors de la recherche. */
+  sources_web: z.array(z.string()).default([]),
+  iconDataUrl: z.string().optional(),
+  defaultRole: z.string().optional(),
+  distractionPotential: z.enum(['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']).optional(),
+  domains: z.array(z.string()).optional(),
+  coreCapabilities: z.array(z.string()).optional(),
+  supportingCapabilities: z.array(z.string()).optional(),
+})
+export type AppKnowledgeProfile = z.infer<typeof AppKnowledgeProfileSchema>
+
+export const AppKnowledgeBaseSchema = z.object({
+  profiles: z.record(z.string(), AppKnowledgeProfileSchema).default({}),
+})
+export type AppKnowledgeBase = z.infer<typeof AppKnowledgeBaseSchema>
+
+// ─── Cache de décision de blocage strict V1 ──────────────────────────────
+
+export const BlockedAppDecisionRecordSchema = z.object({
+  identifiant: z.string(),
+  nom_affiche: z.string(),
+  raison: z.string(),
+  iconDataUrl: z.string().optional(),
+})
+
+export const BlockingDecisionCachedItemSchema = z.object({
+  key: z.string().min(1),
+  allowedAppIds: z.array(z.string()),
+  questionIds: z.array(z.string()).default([]),
+  blockedApps: z.array(BlockedAppDecisionRecordSchema),
+  inventoryVersion: z.string(),
+  rulesVersion: z.number().int(),
+  createdAt: z.string(),
+})
+export type BlockingDecisionCachedItem = z.infer<typeof BlockingDecisionCachedItemSchema>
+
+export const BlockingDecisionCacheStateSchema = z.object({
+  decisions: z.record(z.string(), BlockingDecisionCachedItemSchema).default({}),
+})
+export type BlockingDecisionCacheState = z.infer<typeof BlockingDecisionCacheStateSchema>
+
+// ─── Classification des applications & Overrides utilisateur ─────────────
+
+export const CLASSIFICATION_SOURCES = [
+  'USER_OVERRIDE',
+  'BUILTIN_CATALOG',
+  'EXACT_LOCAL_KNOWLEDGE',
+  'DETERMINISTIC_METADATA_RULE',
+  'AI_RESOLVED',
+  'UNRESOLVED',
+  'LEGACY_UNKNOWN',
+] as const
+export const ClassificationSourceSchema = z.enum(CLASSIFICATION_SOURCES)
+export type ClassificationSource = z.infer<typeof ClassificationSourceSchema>
+
+export const AppOverrideRecordSchema = z.object({
+  category: z.enum(APP_CATEGORIES),
+  overriddenAt: z.string(),
+  reason: z.string().optional(),
+})
+export type AppOverrideRecord = z.infer<typeof AppOverrideRecordSchema>
+
+export const AppOverridesStateSchema = z.object({
+  overrides: z.record(z.string(), AppOverrideRecordSchema).default({}),
+})
+export type AppOverridesState = z.infer<typeof AppOverridesStateSchema>
 
 export const STORAGE_SCHEMAS = {
   settings: SettingsSchema,
@@ -314,4 +583,8 @@ export const STORAGE_SCHEMAS = {
   ancres: AncresStateSchema,
   learning: LearningStateSchema,
   blocking_rules: BlockingRulesStateSchema,
+  session_confirmations: SessionConfirmationsStateSchema,
+  app_knowledge: AppKnowledgeBaseSchema,
+  blocking_decision_cache: BlockingDecisionCacheStateSchema,
+  app_overrides: AppOverridesStateSchema,
 } as const satisfies Record<StorageKey, z.ZodTypeAny>

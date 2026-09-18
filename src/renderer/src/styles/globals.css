@@ -7,59 +7,234 @@
 /**
  * VETHOS
  *
- * Noir, gris, blanc. Aucune autre couleur, nulle part.
+ * Tableau d'exploitation du temps.
  *
- * Sans teinte pour porter la hiérarchie, trois choses la portent à sa place,
- * et elles doivent être tenues partout :
- *   1. L'ÉLÉVATION. Une surface plus proche est plus claire. Quatre plans,
- *      pas plus, et jamais deux plans voisins à la même valeur.
- *   2. LE BLANC EST L'ACCENT. Ce qui est actif, en cours, ou primaire devient
- *      blanc. Le blanc ne décore jamais : il désigne.
- *   3. LE MOUVEMENT. Ce qu'on ne peut pas dire par la couleur se dit par la
- *      façon dont les choses arrivent, réagissent et se déplacent.
+ * L'interface n'essaie plus de paraitre lumineuse. Elle doit rendre l'horaire
+ * lisible, stable, presque administratif : des surfaces d'email clair, des
+ * filets fins, une encre franche, et un seul rouge pour le moment present, la
+ * contrainte et le blocage. La couleur n'est jamais une ambiance. Elle signale
+ * une decision du moteur ou une limite a respecter.
+ *
+ * ── Deux themes, un seul vocabulaire ──────────────────────────────────────
+ *
+ * `:root` porte le clair. `[data-theme='dark']` reecrit EXACTEMENT les memes
+ * noms, jamais d'autres : aucun composant ne sait dans quel theme il tourne, et
+ * aucune regle `@media (prefers-color-scheme)` ne traine ici. C'est le renderer
+ * qui pose l'attribut, parce que le choix appartient a l'utilisateur — suivre
+ * le systeme n'est qu'une des quatre reponses possibles (cf. shared/theme.ts).
+ *
+ * Regle d'ajout : une couleur en dur dans un composant est un bug de theme. Si
+ * une valeur doit changer la nuit, elle devient un jeton ici, dans les DEUX
+ * blocs. Un jeton present d'un seul cote laisse la nuit heriter du jour.
  */
 
 @layer base {
   :root {
-    /* Quatre plans d'élévation. Le fond n'est jamais noir pur : un noir pur
-       ne laisse aucune place à ce qui doit être plus sombre que lui. */
-    --bg: #08080a;
-    --surface: #121215;
-    --surface-2: #1a1a1e;
-    --surface-3: #242429;
+    color-scheme: light;
 
-    /* Séparations. Douces, jamais des traits durs. */
-    --line: rgba(255, 255, 255, 0.07);
-    --line-strong: rgba(255, 255, 255, 0.14);
+    /**
+     * Gris STRICTEMENT neutres. L'email tirait vers l'olive (teinte 90°) ; le
+     * vert a ete retire partout, jusqu'a la nuance. Chaque valeur ci-dessous
+     * est le gris de MEME luminance relative que l'ancienne : les contrastes et
+     * les paliers deja verifies sont conserves au centieme.
+     */
+    --bg: #e6e6e6;
+    --surface: #f8f8f8;
+    --surface-2: #eeeeee;
+    --surface-3: #e0e0e0;
 
-    /* Encre. Trois degrés, assez écartés pour se distinguer d'un coup d'œil. */
-    --text: #ffffff;
-    --text-2: #9b9ba4;
-    --text-3: #62626b;
+    --text: #181818;
+    --text-2: #4e4e4e;
+    --text-3: #787878;
 
-    /* Le blanc désigne. Il ne décore pas. */
-    --accent: #ffffff;
-    --accent-soft: rgba(255, 255, 255, 0.09);
-    --accent-glow: rgba(255, 255, 255, 0.16);
+    --line: rgba(24, 24, 24, 0.13);
+    --line-strong: rgba(24, 24, 24, 0.28);
 
-    /* Formes généreuses. Rien d'anguleux : l'application doit paraître
-       douce sous la main, pas gravée dans du métal. */
-    --r-sm: 8px;
-    --r-md: 12px;
-    --r-lg: 18px;
-    --r-xl: 26px;
+    /**
+     * Le rouge a deux metiers que le clair confond sans dommage et que le
+     * sombre separe : `--accent` est le rouge qu'on REMPLIT (du blanc se pose
+     * dessus), `--accent-ink` est le rouge qu'on ECRIT (il se pose sur une
+     * surface). Sur fond noir, un rouge assez clair pour se lire devient trop
+     * clair pour porter du blanc — d'ou les deux valeurs. En clair, elles sont
+     * identiques : c'est le meme #C1121F du contrat de design.
+     */
+    --accent: #c1121f;
+    --accent-ink: #c1121f;
+    --accent-on: #ffffff;
+    --accent-soft: rgba(193, 18, 31, 0.08);
+    --warn: #8d5b00;
+    --grade-1: #c1121f;
+    --grade-2: #8d5b00;
+    /* Etait l'olive #58664A. Ardoise : la seule teinte froide qui ne soit ni le
+       rouge de la contrainte, ni le bleu encre des ancres, ni du vert. */
+    --grade-3: #55585c;
+    --grade-4: #747474;
 
-    /* Profondeur : une ombre portée réelle, plus un liseré haut qui imite la
-       lumière rasante sur une surface bombée. */
-    --lift: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.5);
-    --lift-high: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 18px 48px rgba(0, 0, 0, 0.6);
+    /* Contours et fonds de controles. */
+    --field-bg: var(--surface);
+    --field-bg-active: #ffffff;
+    --focus-border: rgba(193, 18, 31, 0.52);
+    --focus-glow: rgba(193, 18, 31, 0.1);
+    --btn-iris-hover: #2b2b2b;
+    --shadow-hover: rgba(24, 24, 24, 0.12);
+    --glass: rgba(248, 248, 248, 0.9);
+    --scrim: rgba(0, 0, 0, 0.75);
+    --scrollbar: rgba(24, 24, 24, 0.24);
+    --scrollbar-hover: rgba(24, 24, 24, 0.42);
 
-    /* Une seule grammaire de mouvement pour toute l'application. */
-    --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+    /**
+     * Planning. Les couleurs de CATÉGORIE ne sont pas ici : elles sont écrites
+     * dans les données de l'utilisateur, en hexadécimal, donc adaptées au thème
+     * par calcul (`lib/palette.ts`). Ci-dessous, seulement ce qui est purement
+     * décoratif — ce que le moteur dessine, et que personne ne stocke.
+     */
+    --block-task: #c1121f;
+    --block-objective: #55585c;
+    --block-ancre: #253047;
+    --block-ink-task: #fff7f5;
+    --block-ink-objective: #f8f8f8;
+    --block-ink-ancre: #f8f9ff;
+
+    --break-veil: rgba(24, 24, 24, 0.2);
+    --break-hatch: repeating-linear-gradient(
+      -45deg,
+      rgba(24, 24, 24, 0.24) 0 2px,
+      transparent 2px 5px
+    );
+    --break-seam: rgba(24, 24, 24, 0.32);
+
+    /** Le temps déjà passé s'assombrit. Sur fond noir il faut appuyer plus fort
+        pour obtenir le même « c'est derrière toi ». */
+    --veil-past: rgba(24, 24, 24, 0.12);
+
+    --r-sm: 3px;
+    --r-md: 5px;
+    --r-lg: 6px;
+    --r-xl: 8px;
+
+    --lift: 0 1px 0 rgba(255, 255, 255, 0.75) inset, 0 10px 24px rgba(24, 24, 24, 0.08);
+    --lift-high: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 24px 52px rgba(24, 24, 24, 0.16);
+
+    --spring: cubic-bezier(0.16, 1, 0.3, 1);
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --fast: 160ms;
-    --normal: 260ms;
-    --slow: 420ms;
+    --fast: 150ms;
+    --normal: 240ms;
+    --slow: 360ms;
+  }
+
+  /**
+   * Graphite tiede : l'email gris-vert retourne, pas une autre marque.
+   *
+   * Le FOND est un noir franc, #000000. Les surfaces, elles, ne le sont pas :
+   * elles montent par paliers, sans quoi un panneau ne se distingue plus de la
+   * page et l'ecran devient un seul aplat ou plus rien n'a de bord. Gris
+   * strictement neutres, comme en clair — aucune nuance verte nulle part.
+   *
+   * C'est le piege du vrai noir : le contraste s'ecrase pres de zero. Entre
+   * #0C0D0B et #000 il ne reste que 1.08 — invisible. Les paliers retenus
+   * (1.14 fond→surface, 1.17 surface→surface-2, 1.37 surface→surface-3) sont
+   * caches sur le theme clair, qui vit a 1.18 / 1.10 / 1.24. Pour la meme
+   * raison les filets montent a 0.16 d'alpha : a 0.13 ils rendaient 1.39 la ou
+   * le clair rend 1.53. Baisser les surfaces vers #000 CASSE tout ca.
+   *
+   * L'encre ne va jamais jusqu'au blanc pur : sur du noir, #FFFFFF fait vibrer
+   * les graisses fines.
+   *
+   * Contrastes verifies : encre/fond 18.8, encre-2/surface 9.8, encre-3/surface
+   * 5.6, rouge ecrit/surface 5.6, blanc sur rouge rempli 5.5.
+   */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --bg: #000000;
+    --surface: #141414;
+    --surface-2: #232323;
+    --surface-3: #2f2f2f;
+
+    --text: #f2f2f2;
+    --text-2: #bebebe;
+    --text-3: #8d8d8d;
+
+    --line: rgba(242, 242, 242, 0.16);
+    --line-strong: rgba(242, 242, 242, 0.3);
+
+    --accent: #cf1b29;
+    --accent-ink: #f0525f;
+    --accent-on: #ffffff;
+    --accent-soft: rgba(240, 82, 95, 0.14);
+    --warn: #d69b3a;
+    --grade-1: #f0525f;
+    --grade-2: #d69b3a;
+    --grade-3: #9aa0a8;
+    --grade-4: #9f9f9f;
+
+    --field-bg: var(--surface);
+    --field-bg-active: #222222;
+    --focus-border: rgba(240, 82, 95, 0.6);
+    --focus-glow: rgba(240, 82, 95, 0.16);
+    /* Le bouton primaire s'inverse tout seul (fond = encre) : au survol il
+       s'eclaircit au lieu de s'assombrir. */
+    --btn-iris-hover: #ffffff;
+    --shadow-hover: rgba(0, 0, 0, 0.7);
+    --glass: rgba(20, 20, 20, 0.94);
+    /**
+     * Sur fond noir, assombrir n'assombrit plus rien : le voile ne peut pas
+     * detacher la boite en eteignant ce qu'il y a derriere, puisque c'est deja
+     * eteint. On monte donc a 0.82 pour effacer franchement le contenu, et
+     * c'est le filet de la boite qui trace son bord.
+     */
+    --scrim: rgba(0, 0, 0, 0.82);
+    --scrollbar: rgba(242, 242, 242, 0.22);
+    --scrollbar-hover: rgba(242, 242, 242, 0.38);
+
+    --block-task: #c62330;
+    --block-objective: #474b50;
+    --block-ancre: #2c3a56;
+    --block-ink-task: #fff2f2;
+    --block-ink-objective: #f2f2f2;
+    --block-ink-ancre: #eef2f8;
+
+    --break-veil: rgba(0, 0, 0, 0.34);
+    --break-hatch: repeating-linear-gradient(
+      -45deg,
+      rgba(0, 0, 0, 0.42) 0 2px,
+      transparent 2px 5px
+    );
+    --break-seam: rgba(0, 0, 0, 0.55);
+
+    --veil-past: rgba(0, 0, 0, 0.5);
+
+    /**
+     * Une ombre portee noire ne se voit pas sur du noir. Ce qui detache un
+     * panneau ici, c'est le trait clair pose sur son arete haute — il monte
+     * donc, pendant que l'ombre se contente des cas ou le panneau flotte
+     * au-dessus d'une surface deja levee.
+     */
+    --lift: 0 1px 0 rgba(242, 242, 242, 0.07) inset, 0 10px 24px rgba(0, 0, 0, 0.55);
+    --lift-high: 0 1px 0 rgba(242, 242, 242, 0.1) inset, 0 24px 52px rgba(0, 0, 0, 0.72);
+  }
+
+  /**
+   * La bascule elle-meme.
+   *
+   * Sans ca, passer du jour a la nuit fait clignoter l'ecran d'un seul coup.
+   * La transition n'est PAS permanente : posee sur <html> juste le temps du
+   * changement puis retiree, sinon elle s'ajouterait a toutes les transitions
+   * deja reglees des composants et les rendrait molles. `prefers-reduced-motion`
+   * l'annule via la regle globale en bas de fichier.
+   */
+  html[data-theme-switching],
+  html[data-theme-switching] *,
+  html[data-theme-switching] *::before,
+  html[data-theme-switching] *::after {
+    transition:
+      background-color 260ms var(--ease),
+      border-color 260ms var(--ease),
+      color 260ms var(--ease),
+      fill 260ms var(--ease),
+      stroke 260ms var(--ease),
+      box-shadow 260ms var(--ease) !important;
+    transition-delay: 0ms !important;
   }
 
   html,
@@ -81,18 +256,22 @@
     overflow: hidden;
   }
 
-  h1 {
-    letter-spacing: -0.03em;
-  }
-  h2 {
-    letter-spacing: -0.02em;
-  }
-  h3,
-  h4 {
-    letter-spacing: -0.012em;
+  .aurora {
+    display: none;
   }
 
-  /* Les surfaces que le navigateur dessine à ma place portent le même monde. */
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: 0;
+  }
+
   ::selection {
     background: var(--accent-soft);
     color: var(--text);
@@ -106,18 +285,18 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--surface-3);
+    background: var(--scrollbar);
     border: 3px solid transparent;
     background-clip: content-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #34343b;
+    background: var(--scrollbar-hover);
     background-clip: content-box;
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-ink);
     outline-offset: 2px;
     border-radius: var(--r-sm);
   }
@@ -125,18 +304,16 @@
   input,
   textarea,
   select {
-    caret-color: var(--accent);
+    caret-color: var(--accent-ink);
     font-family: inherit;
   }
 
-  /* Le remplissage automatique repeint le champ en clair : on lui rend la
-     surface par l'ombre interne, seule propriété que ce style respecte. */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
     -webkit-text-fill-color: var(--text);
-    -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
-    caret-color: var(--accent);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+    caret-color: var(--accent-ink);
   }
 
   a {
@@ -146,54 +323,131 @@
 }
 
 @layer components {
-  /* Une surface posée : elle a une ombre OU un liseré, jamais un trait dur. */
   .surface {
     background: var(--surface);
+    border: 1px solid var(--line);
     border-radius: var(--r-lg);
     box-shadow: var(--lift);
   }
 
-  /* Un champ : creusé, pas posé. Il s'éclaire quand on l'occupe. */
-  .field {
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-lg);
+    box-shadow: var(--lift);
+  }
+
+  .iris-text {
+    background: none;
+    color: var(--accent-ink);
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .iris-ring {
+    position: relative;
+  }
+  .iris-ring::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--accent-ink);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .pressable {
+    transition:
+      transform var(--fast) var(--spring),
+      background-color var(--fast) var(--ease),
+      border-color var(--fast) var(--ease),
+      color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease),
+      opacity var(--fast) var(--ease);
+  }
+  .pressable:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  .btn-iris {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--text);
+    border-bottom-color: var(--accent);
+    border-bottom-width: 2px;
+    border-radius: var(--r-md);
+    background: var(--text);
+    color: var(--surface);
+    padding: 0.55rem 0.9rem;
+    font-size: 14px;
+    font-weight: 560;
+  }
+  .btn-iris:hover:not(:disabled) {
+    background: var(--btn-iris-hover);
+    box-shadow: 0 10px 20px var(--shadow-hover);
+  }
+  .btn-iris:disabled {
+    border-color: var(--line-strong);
+    background: var(--surface-3);
+    color: var(--text-3);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-quiet {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text-2);
+    padding: 0.55rem 0.9rem;
+    font-size: 14px;
+    font-weight: 540;
+  }
+  .btn-quiet:hover:not(:disabled) {
     background: var(--surface-2);
-    border: 1px solid transparent;
+    color: var(--text);
+  }
+
+  .field {
+    background: var(--field-bg);
+    border: 1px solid var(--line-strong);
     border-radius: var(--r-md);
     color: var(--text);
-    padding: 0.55rem 0.75rem;
+    padding: 0.55rem 0.7rem;
     outline: none;
     transition:
       border-color var(--fast) var(--ease),
-      background-color var(--fast) var(--ease);
+      background-color var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease);
   }
   .field::placeholder {
     color: var(--text-3);
   }
   .field:hover {
-    background: var(--surface-3);
+    background: var(--field-bg-active);
   }
   .field:focus {
-    border-color: var(--line-strong);
-    background: var(--surface-3);
+    border-color: var(--focus-border);
+    background: var(--field-bg-active);
+    box-shadow: 0 0 0 3px var(--focus-glow);
   }
 
-  /* Tout ce qui se presse s'enfonce. C'est le retour tactile le moins cher
-     et le plus reconnaissable. */
-  .pressable {
-    transition:
-      transform var(--fast) var(--spring),
-      background-color var(--fast) var(--ease),
-      box-shadow var(--fast) var(--ease);
-  }
-  .pressable:active {
-    transform: scale(0.975);
+  .num {
+    font-family: 'Geist Mono Variable', ui-monospace, monospace;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 }
 
 @layer base {
-  /**
-   * Mouvement réduit : tout s'arrête. Une application de concentration ne
-   * peut pas imposer ce qu'on lui a refusé au niveau du système.
-   */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

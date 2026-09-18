@@ -3,20 +3,11 @@ import { join } from 'node:path'
 import { app as electronApp } from 'electron'
 import log from '@main/logging/setup'
 import { discoverInstalledApps, type DiscoveredApp } from './app-discovery'
+import { getOrRefreshInventory } from './app-inventory'
+import { isProtectedApp, isNonUserSystemHelper } from '@main/blocking/system-guard'
+import { resolveAppClassificationSync } from './classification-resolver'
 
-/**
- * Catalogue des applications installées, conservé sur disque.
- *
- * Le scan est coûteux : sept sources, dont un balayage de `Program Files`, un
- * appel `winget` et l'extraction d'une icône par application. Le refaire à
- * chaque ouverture de page — ou à chaque lancement de Vethos — n'a aucun sens :
- * la liste des logiciels installés ne change pas d'une minute à l'autre.
- *
- * Le catalogue est donc lu depuis le disque par défaut, et n'est reconstruit
- * que sur demande explicite de l'utilisateur, ou lorsqu'il n'existe pas encore.
- */
-
-const CATALOG_VERSION = 1
+const CATALOG_VERSION = 8
 
 type Catalogue = {
   version: number
@@ -25,7 +16,33 @@ type Catalogue = {
 }
 
 function cheminCatalogue(): string {
-  return join(electronApp.getPath('userData'), 'nexus_app_catalog.json')
+  if (electronApp && typeof electronApp.getPath === 'function') {
+    try {
+      return join(electronApp.getPath('userData'), 'nexus_app_catalog.json')
+    } catch {
+      // fallback below
+    }
+  }
+  const appData = process.env['APPDATA']
+  if (appData) {
+    const vethosDir = join(appData, 'vethos')
+    return join(vethosDir, 'nexus_app_catalog.json')
+  }
+  return join(process.cwd(), 'nexus_app_catalog.json')
+}
+
+export async function writeAppCatalogCache(apps: DiscoveredApp[]): Promise<void> {
+  await ecrire(apps)
+}
+
+export async function invalidateAppCatalogCache(): Promise<void> {
+  try {
+    const { unlink } = await import('node:fs/promises')
+    await unlink(cheminCatalogue()).catch(() => undefined)
+    log.info('[app-catalog] cache invalidé')
+  } catch {
+    // Ignorer si le fichier n'existait pas
+  }
 }
 
 async function lire(): Promise<Catalogue | null> {
@@ -51,35 +68,74 @@ async function ecrire(apps: DiscoveredApp[]): Promise<void> {
   try {
     await writeFile(cheminCatalogue(), JSON.stringify(catalogue), 'utf8')
   } catch (err) {
-    // Un catalogue non écrit coûte un rescan au prochain lancement, rien de
-    // plus : on ne fait pas échouer la découverte pour autant.
     log.warn('[app-catalog] écriture impossible', err)
   }
 }
 
 /**
- * Applications installées, depuis le cache si possible.
+ * Applications installées, issues du catalogue unifié AppInventory (shell:AppsFolder).
  *
- * `force: true` relance le scan complet — c'est le bouton Rafraîchir. Même
- * dans ce cas l'IA n'est pas rappelée pour les applications déjà jugées : son
- * cache lui est propre et survit au rafraîchissement.
+ * Le catalogue est lu depuis le disque par défaut, et reconstruit via shell:AppsFolder
+ * en quelques centaines de millisecondes sans balayage récursif de disques.
  */
 export async function getAppCatalog(options: { force?: boolean } = {}): Promise<DiscoveredApp[]> {
   if (options.force !== true) {
     const cache = await lire()
     if (cache !== null) {
-      log.info(`[app-catalog] ${cache.apps.length} application(s) depuis le cache`)
+      log.info(`[app-catalog] ${cache.apps.length} application(s) depuis le cache (v${CATALOG_VERSION})`)
       return cache.apps
     }
   }
 
-  log.info(`[app-catalog] scan complet${options.force === true ? ' (demandé)' : ' (aucun cache)'}`)
-  const apps = await discoverInstalledApps()
-  await ecrire(apps)
-  return apps
-}
+  log.info(`[app-catalog] scan AppsFolder${options.force === true ? ' (demandé)' : ' (aucun cache ou version obsolète)'}`)
+  try {
+    const records = await getOrRefreshInventory(options)
+    if (records && records.length > 0) {
+      const apps: DiscoveredApp[] = records
+        .filter((r) => !r.isProtected && !isProtectedApp(r) && !isNonUserSystemHelper(r.name, r.exeName))
+        .map((r) => ({
+          name: r.name,
+          exeName: r.exeName,
+          exePath: r.exePath,
+          publisher: r.publisher,
+          category: r.category,
+          classificationState: r.classificationState,
+          classificationSource: r.classificationSource,
+          classificationReasonCode: r.classificationReasonCode,
+          classifierVersion: r.classifierVersion,
+          source: r.source,
+          packageId: r.packageFamilyName,
+          hasExecutablePath: Boolean(r.exePath),
+          iconDataUrl: r.iconDataUrl,
+          id: r.id,
+          isProtected: false,
+        }))
+      await ecrire(apps)
+      return apps
+    }
+  } catch (err) {
+    log.warn('[app-catalog] échec getOrRefreshInventory, fallback discoverInstalledApps', err)
+  }
 
-/** Date du dernier scan, pour l'afficher à côté du bouton Rafraîchir. */
-export async function getCatalogScannedAt(): Promise<string | null> {
-  return (await lire())?.scannedAt ?? null
+  const fallbackApps = await discoverInstalledApps()
+  const sanitizedFallback = fallbackApps
+    .filter((a) => !a.isProtected && !isProtectedApp({ name: a.name, exeName: a.exeName, targetPath: a.exePath }) && !isNonUserSystemHelper(a.name, a.exeName))
+    .map((a) => {
+      const cl = resolveAppClassificationSync({
+        name: a.name,
+        exeName: a.exeName,
+        exePath: a.exePath,
+        publisher: a.publisher,
+      })
+      return {
+        ...a,
+        category: cl.category,
+        classificationState: cl.classificationState,
+        classificationSource: cl.classificationSource,
+        classificationReasonCode: cl.classificationReasonCode,
+        classifierVersion: cl.classifierVersion,
+      }
+    })
+  await ecrire(sanitizedFallback)
+  return sanitizedFallback
 }

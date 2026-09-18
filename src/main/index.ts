@@ -1,5 +1,5 @@
 import log, { setupLogging } from './logging/setup'
-import { app, BrowserWindow, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, powerMonitor, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from '@shared/storage'
@@ -7,6 +7,15 @@ import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
+import { appIconWindowOptions } from './app-icon'
+import { getMainProcessTheme, setMainProcessTheme, themeWindowOptions } from './theme-chrome'
+import {
+  DEFAULT_DARK_AT,
+  DEFAULT_LIGHT_AT,
+  DEFAULT_THEME_MODE,
+  resolveTheme,
+  type Theme,
+} from '@shared/theme'
 import {
   configureAutoStart,
   createVethosTray,
@@ -18,6 +27,9 @@ import {
 import { createReconciliationClock, type ReconciliationClock } from './blocking/clock'
 import { createEnforcer } from './blocking/enforcer'
 import type { BlockingRules } from './blocking/schedule'
+import { stopProcessWindowProbe } from './tracking/process-window-probe'
+import { createConfirmationOverlay } from './planning/confirmation-overlay'
+import { createPlanRunner, type PlanRunner } from './planning/plan-runner'
 
 /**
  * Rendu du texte en niveaux de gris, jamais en sous-pixels.
@@ -70,22 +82,41 @@ function handleFatalProcessError(label: string, err: unknown): void {
   app.exit(1)
 }
 
+/** Le thème à peindre au démarrage, lu depuis les réglages persistés. */
+async function readStartupTheme(storage: ReturnType<typeof createStorage>): Promise<Theme> {
+  try {
+    const settings = await storage.read('settings')
+    return resolveTheme(
+      {
+        mode: settings?.theme ?? DEFAULT_THEME_MODE,
+        systemDark: nativeTheme.shouldUseDarkColors,
+        schedule: {
+          lightAt: settings?.themeLightAt ?? DEFAULT_LIGHT_AT,
+          darkAt: settings?.themeDarkAt ?? DEFAULT_DARK_AT,
+        },
+      },
+      new Date(),
+    )
+  } catch (err) {
+    log.warn('[theme] réglages illisibles au démarrage, ouverture en clair', err)
+    return 'light'
+  }
+}
+
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0F1113', // le hall, pour éviter le flash blanc au démarrage
     show: false, // affichée seulement après ready-to-show
     autoHideMenuBar: true,
+    title: 'Vethos',
+    ...appIconWindowOptions(),
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      // La barre système fait partie du hall : même émail, même encre.
-      color: '#0F1113',
-      symbolColor: '#A6ADB5',
-      height: 36,
-    },
+    // Fond de fenêtre et barre système : la couleur de fond du thème en cours,
+    // pas une constante. La barre fait partie du hall, aucune boîte visible.
+    ...themeWindowOptions(getMainProcessTheme()),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -111,23 +142,39 @@ function createMainWindow(): BrowserWindow {
     win.hide()
   })
 
-  // Liens externes : ouvrir dans le navigateur, pas dans Electron
+  // Liens externes : ouvrir dans le navigateur, pas dans Electron.
+  //
+  // On n'ouvre que http et https. `shell.openExternal` confie l'adresse au système :
+  // un `file://` ouvrirait un fichier local, et un protocole applicatif lancerait le
+  // programme qui l'a enregistré. Une page qui appelle `window.open` ne doit pas
+  // pouvoir déclencher cela.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    let protocole = ''
+    try {
+      protocole = new URL(url).protocol
+    } catch {
+      protocole = ''
+    }
+    if (protocole === 'http:' || protocole === 'https:') {
+      void shell.openExternal(url).catch((err) => log.warn('[fenetre] ouverture externe impossible', err))
+    } else {
+      log.warn('[fenetre] ouverture refusée pour un protocole non web', { url })
+    }
     return { action: 'deny' }
   })
 
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  const charge =
+    isDev && process.env['ELECTRON_RENDERER_URL']
+      ? win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      : win.loadFile(join(__dirname, '../renderer/index.html'))
+  void charge.catch((err) => log.error('[fenetre] chargement du rendu impossible', err))
 
   return win
 }
 
 let mainWindow: BrowserWindow | null = null
-let quitAfterDebounceFlush = false
+let quitReady = false
+let quitPreparation: Promise<void> | null = null
 
 /**
  * Vrai uniquement quand un arrêt réel a été demandé. Distingue « fermer la
@@ -153,6 +200,18 @@ let blockingClock: ReconciliationClock | null = null
  * puisse déjà lui demander de tout restaurer.
  */
 const enforcer = createEnforcer()
+
+/**
+ * Horloge de planification (D.7/D.8), créée une fois l'application prête —
+ * elle a besoin du storage. Le pont vers `registerAllIpcHandlers` (appelé
+ * avant qu'elle existe) passe par une fermeture lisant cette variable au
+ * moment de l'appel, jamais à l'enregistrement : même patron que
+ * `getBlockingSession` juste en dessous.
+ */
+let planRunner: PlanRunner | null = null
+
+/** Fenêtre « Je commence ». Créée au chargement pour qu'un arrêt précoce puisse la fermer. */
+const confirmationOverlay = createConfirmationOverlay()
 
 function showMainWindow(): void {
   if (mainWindow === null || mainWindow.isDestroyed()) {
@@ -194,10 +253,16 @@ function startNexusApp(): void {
       writeCrashMarker()
 
       const storage = createStorage(app.getPath('userData'))
+      // Avant la fenêtre : une fenêtre créée sur le mauvais fond montre un
+      // éclair blanc à chaque ouverture en thème sombre, et l'inverse.
+      setMainProcessTheme(await readStartupTheme(storage))
       await registerAllIpcHandlers(
         storage,
         () => mainWindow,
         () => blockingClock?.current() ?? { active: false, blockedAppIds: [], endsAt: null },
+        (blockId) =>
+          planRunner?.confirmBlock(blockId) ??
+          Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
       )
 
       mainWindow = createMainWindow()
@@ -214,7 +279,7 @@ function startNexusApp(): void {
       blockingClock = createReconciliationClock({
         readRules: async (): Promise<BlockingRules> => {
           const stored = await storage.read('blocking_rules')
-          return stored ?? { slots: [], manual: null }
+          return stored ?? { block: null }
         },
         now: () => new Date(),
         onTransition: (transition, snapshot) => {
@@ -237,15 +302,39 @@ function startNexusApp(): void {
       })
       blockingClock.start()
 
+      // D.7/D.8 : l'horloge de planification tourne indépendamment de
+      // l'horloge de blocage — l'une décide QUAND confirmer un bloc et
+      // mesurer son retard, l'autre QUOI bloquer une fois que c'est fait.
+      // `onBlockConfirmed` les relie : dès qu'une session de blocage est
+      // écrite, le contrôleur de blocage se réconcilie tout de suite plutôt
+      // que d'attendre son propre tic.
+      planRunner = createPlanRunner({
+        storage,
+        overlay: confirmationOverlay,
+        now: () => new Date(),
+        onBlockConfirmed: () => void blockingClock?.tickNow(),
+        // Sans ce pont, une fenêtre déjà ouverte n'apprend jamais qu'un bloc a
+        // été raté ou confirmé pendant qu'elle tournait : le store du
+        // renderer ne relit le storage qu'une fois, à son propre chargement.
+        onPlanningDataChanged: () => {
+          const win = mainWindow
+          if (win && !win.isDestroyed()) win.webContents.send(IPC_CHANNELS.PLANNING_EVENT_CHANGED)
+        },
+        onError: (err) => log.warn('[planning] tic impossible', err),
+      })
+      planRunner.start()
+
       // Réveils indispensables : une machine en veille pendant tout un créneau
       // doit bloquer dès son réveil, sans attendre le tic suivant.
       powerMonitor.on('resume', () => {
         log.info('[blocage] sortie de veille — réconciliation immédiate')
         void blockingClock?.tickNow()
+        void planRunner?.tickNow()
       })
       powerMonitor.on('unlock-screen', () => {
         log.info('[blocage] session déverrouillée — réconciliation immédiate')
         void blockingClock?.tickNow()
+        void planRunner?.tickNow()
       })
 
       app.on('activate', () => {
@@ -281,33 +370,35 @@ function startNexusApp(): void {
     })
   }
 
-  app.on('will-quit', () => {
-    blockingClock?.stop()
-    // Restaure barre des tâches et son de toutes les applications touchées.
-    // Quitter Vethos ne doit jamais laisser une application muette ou absente
-    // de la barre des tâches.
-    void enforcer.stop()
-    destroyVethosTray()
-  })
+  app.on('will-quit', () => destroyVethosTray())
 
   app.on('before-quit', (event) => {
-    if (quitAfterDebounceFlush) {
-      clearCrashMarker()
-      return
-    }
-    const win = mainWindow
-    if (!win || win.isDestroyed()) {
-      clearCrashMarker()
-      return
-    }
-
+    if (quitReady) return
     event.preventDefault()
-    win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
-    setTimeout(() => {
-      quitAfterDebounceFlush = true
-      clearCrashMarker()
-      app.quit()
-    }, 650)
+    isQuitting = true
+    if (quitPreparation !== null) return
+
+    const win = mainWindow
+    if (win && !win.isDestroyed()) win.webContents.send(IPC_CHANNELS.APP_FLUSH_DEBOUNCES)
+
+    quitPreparation = new Promise<void>((resolve) => setTimeout(resolve, 650))
+      .then(async () => {
+        blockingClock?.stop()
+        planRunner?.stop()
+        confirmationOverlay.close()
+        // La restauration est une barrière d'arrêt, pas un message lancé sans
+        // attente. Le son et la barre des tâches sont confirmés par la sonde
+        // avant que le processus Electron puisse disparaître.
+        await enforcer.shutdown()
+        await stopProcessWindowProbe()
+        destroyVethosTray()
+        clearCrashMarker()
+      })
+      .catch((err) => log.error('[app] préparation de l’arrêt incomplète', err))
+      .finally(() => {
+        quitReady = true
+        app.quit()
+      })
   })
 
   process.on('uncaughtException', (err) => {
