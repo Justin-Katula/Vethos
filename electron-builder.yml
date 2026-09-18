@@ -20,6 +20,10 @@ asar: true
 extraResources:
   - from: build/icon.ico
     to: icon.ico
+  # MIT, ISC et OFL-1.1 exigent que leur avis accompagne le logiciel distribue.
+  # Genere par `npm run generer:licences`, appele depuis `npm run build`.
+  - from: build/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
 
 win:
   target:
@@ -48,7 +52,11 @@ nsis:
 portable:
   artifactName: ${productName}-Portable-${version}.${ext}
 
+# Ces deux lignes decident d'ou l'application telechargera ses mises a jour, et
+# `autoDownload` + `autoInstallOnAppQuit` sont actifs : ce qui est publie ici est
+# installe chez l'utilisateur. Elles doivent donc designer le depot que VOUS
+# controlez. Elles pointaient vers `obedi/Nexus`, qui n'est pas ce depot.
 publish:
   provider: github
-  owner: obedi
-  repo: Nexus
+  owner: Justin-Katula
+  repo: Vethos

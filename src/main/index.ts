@@ -163,6 +163,45 @@ function createMainWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
+  // Navigation EN PLACE : la fenêtre ne doit jamais quitter l'application.
+  //
+  // `setWindowOpenHandler` ci-dessus ne couvre que les nouvelles fenêtres. Un lien
+  // ordinaire, un formulaire, ou un `location.href` remplaceraient l'interface par
+  // une page distante — qui hériterait du preload et donc de tout le pont IPC.
+  // On n'autorise que l'origine que l'on a chargée soi-même.
+  win.webContents.on('will-navigate', (event, url) => {
+    const actuelle = win.webContents.getURL()
+    let memeOrigine = false
+    try {
+      memeOrigine = new URL(url).origin === new URL(actuelle).origin
+    } catch {
+      memeOrigine = false
+    }
+    if (memeOrigine) return
+    event.preventDefault()
+    log.warn('[fenetre] navigation refusée hors de l’application', { url })
+  })
+
+  // Si le rendu meurt, on le relance.
+  //
+  // Le processus principal, lui, survit — et il continue de bloquer. Sans ce
+  // rattrapage l'utilisateur se retrouverait devant une fenêtre vide, sans aucun
+  // moyen de lever la session : le pire état possible pour une application de
+  // blocage. `killed` est exclu : c'est nous qui fermons, pas un plantage.
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log.error('[fenetre] le rendu s’est arrêté', details)
+    if (details.reason === 'killed' || details.reason === 'clean-exit') return
+    if (win.isDestroyed()) return
+    void win.webContents.reload()
+  })
+
+  // Aucune permission web n'est nécessaire : ni caméra, ni micro, ni position, ni
+  // notifications par le rendu (elles passent par le processus principal).
+  win.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
+    log.warn('[fenetre] permission refusée', { permission })
+    callback(false)
+  })
+
   const charge =
     isDev && process.env['ELECTRON_RENDERER_URL']
       ? win.loadURL(process.env['ELECTRON_RENDERER_URL'])
