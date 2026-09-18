@@ -1154,26 +1154,3 @@ export function recordActiveProcess(
 /**
  * Met à jour une application de l'inventaire en mémoire si sa classification a changé.
  */
-export function updateInventoryRecordCategory(
-  idOrExe: string,
-  updates: Partial<Pick<AppRecord, 'category' | 'classificationState' | 'classificationSource' | 'classificationReasonCode'>>
-): boolean {
-  if (!inventoryCache) return false;
-  let changed = false;
-  const target = idOrExe.toLowerCase().trim();
-  for (const item of inventoryCache) {
-    if (
-      item.id.toLowerCase() === target ||
-      item.exeName.toLowerCase() === target ||
-      item.name.toLowerCase() === target
-    ) {
-      Object.assign(item, updates);
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-export function getCachedInventory(): AppRecord[] | null {
-  return inventoryCache;
-}

@@ -29,11 +29,6 @@ type PendingQuery = {
   timer: ReturnType<typeof setTimeout>
 }
 
-type PendingForeground = {
-  resolve: (info: ForegroundWindowInfo | null) => void
-  timer: ReturnType<typeof setTimeout>
-}
-
 type PendingVisibleWindows = {
   resolve: (windows: VisibleWindowInfo[]) => void
   timer: ReturnType<typeof setTimeout>
@@ -1561,14 +1556,6 @@ function Invoke-VethosMediaSessionPause([int] $targetPid, [string] $targetName) 
 [Console]::Out.Flush()
 
 while ($null -ne ($line = [Console]::In.ReadLine())) {
-    if ($line.StartsWith('FOREGROUND|')) {
-        $foregroundParts = $line.Split('|', 2)
-        if ($foregroundParts.Length -eq 2) {
-            [Console]::Out.WriteLine("$($foregroundParts[1])|$([VethosWindowProbe]::Foreground())")
-            [Console]::Out.Flush()
-        }
-        continue
-    }
     if ($line.StartsWith('VISIBLE_WINDOWS|')) {
         $visibleParts = $line.Split('|', 2)
         if ($visibleParts.Length -eq 2) {
@@ -1687,10 +1674,6 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         }
         continue
     }
-    if ($line.StartsWith('RESTORE_APP_AUDIO|')) {
-        [VethosWindowProbe]::RestoreAppAudio($line.Substring(18)) | Out-Null
-        continue
-    }
     if ($line.StartsWith('RESTORE_TARGET|')) {
         $restoreParts = $line.Split('|', 5)
         $restorePid = 0
@@ -1717,19 +1700,6 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         } catch {}
         [Console]::Out.WriteLine("CONTROL|$($restoreAllParts[1])|$(if ($ok) { '1' } else { '0' })")
         [Console]::Out.Flush()
-        continue
-    }
-    if ($line.StartsWith('RESTORE_PROCESS_TASKBAR|')) {
-        $taskbarParts = $line.Split('|', 3)
-        $taskbarPid = 0
-        if ($taskbarParts.Length -ge 2 -and [int]::TryParse($taskbarParts[1], [ref]$taskbarPid)) {
-            $taskbarName = if ($taskbarParts.Length -eq 3) { $taskbarParts[2] } else { '' }
-            [VethosWindowProbe]::RestoreProcessTaskbar($taskbarPid, $taskbarName)
-        }
-        continue
-    }
-    if ($line -eq 'RESTORE_ALL_TASKBAR') {
-        [VethosWindowProbe]::RestoreAllTaskbarWindows()
         continue
     }
     if ($line.StartsWith('PROTECT_PREVIEW|')) {
@@ -1788,7 +1758,6 @@ let rejectReady: ((err: Error) => void) | null = null
 let nextRequestId = 1
 let nextWatcherId = 1
 const pending = new Map<string, PendingQuery>()
-const pendingForeground = new Map<string, PendingForeground>()
 const pendingVisibleWindows = new Map<string, PendingVisibleWindows>()
 const pendingControls = new Map<string, PendingControl>()
 const pendingAudioStates = new Map<string, PendingAudioState>()
@@ -1893,11 +1862,6 @@ function settlePendingAsMissing(): void {
     query.resolve(null)
   }
   pending.clear()
-  for (const foreground of pendingForeground.values()) {
-    clearTimeout(foreground.timer)
-    foreground.resolve(null)
-  }
-  pendingForeground.clear()
   for (const visibleWindows of pendingVisibleWindows.values()) {
     clearTimeout(visibleWindows.timer)
     visibleWindows.resolve([])
@@ -2097,17 +2061,6 @@ function startProbe(): Promise<void> {
     const separator = value.indexOf('|')
     if (separator < 1) return
     const requestId = value.slice(0, separator)
-    const foreground = pendingForeground.get(requestId)
-    if (foreground) {
-      pendingForeground.delete(requestId)
-      clearTimeout(foreground.timer)
-      const info = parseForegroundWindowInfo(value.slice(separator + 1))
-      if (info && info.processName) {
-        recordActiveProcess(info.processName, info.title, info.pid)
-      }
-      foreground.resolve(info)
-      return
-    }
     const visibleWindows = pendingVisibleWindows.get(requestId)
     if (visibleWindows) {
       pendingVisibleWindows.delete(requestId)
@@ -2157,13 +2110,6 @@ function startProbe(): Promise<void> {
   return readyPromise
 }
 
-export function prewarmProcessWindowProbe(): void {
-  if (process.platform !== 'win32') return
-  void startProbe().catch((err) => {
-    log.warn('[window-probe] préchauffage échoué', err)
-  })
-}
-
 export async function getProcessWindowBounds(
   pid: number,
   processName = '',
@@ -2192,34 +2138,6 @@ export async function getProcessWindowBounds(
       pending.delete(requestId)
       clearTimeout(query.timer)
       query.resolve(null)
-    })
-  })
-}
-
-export async function getForegroundWindowInfo(): Promise<ForegroundWindowInfo | null> {
-  if (process.platform !== 'win32') return null
-  try {
-    await startProbe()
-  } catch {
-    return null
-  }
-  const child = probe
-  if (!child || child.stdin.destroyed) return null
-
-  const requestId = String(nextRequestId++)
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      pendingForeground.delete(requestId)
-      resolve(null)
-    }, QUERY_TIMEOUT_MS)
-    pendingForeground.set(requestId, { resolve, timer })
-    child.stdin.write(`FOREGROUND|${requestId}\n`, (err) => {
-      if (!err) return
-      const foreground = pendingForeground.get(requestId)
-      if (!foreground) return
-      pendingForeground.delete(requestId)
-      clearTimeout(foreground.timer)
-      foreground.resolve(null)
     })
   })
 }
@@ -2275,14 +2193,6 @@ export async function watchProcessWindows(
     const activeChild = probe
     if (activeChild && !activeChild.stdin.destroyed) activeChild.stdin.write(`STOP|${watcherId}\n`)
   }
-}
-
-export async function watchProcessWindow(
-  pid: number,
-  processName: string,
-  onBounds: (bounds: ProcessWindowBounds | null) => void,
-): Promise<() => void> {
-  return watchProcessWindows(pid, processName, (bounds) => onBounds(bounds[0] ?? null))
 }
 
 export async function minimizeProcessWindow(windowId: string): Promise<boolean> {
@@ -2443,11 +2353,6 @@ export function pauseAppMediaSession(pid: number, processName: string): void {
   child.stdin.write(`PAUSE_APP_MEDIA_SESSION|${pid}|${processName.replace(/\|/gu, ' ')}\n`)
 }
 
-export function restoreAppAudio(token: string): void {
-  if (process.platform !== 'win32' || !token) return
-  sendProbeLine(`RESTORE_APP_AUDIO|${token}\n`, true)
-}
-
 export async function restoreAppAudioForTarget(
   token: string,
   pid: number,
@@ -2456,29 +2361,6 @@ export async function restoreAppAudioForTarget(
   if (process.platform !== 'win32') return true
   if (!Number.isInteger(pid) || pid <= 0) return false
   return sendAcknowledgedCommand('RESTORE_TARGET', [token, String(pid), processName])
-}
-
-export function restoreProcessTaskbar(pid: number, processName: string): void {
-  if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return
-  sendProbeLine(`RESTORE_PROCESS_TASKBAR|${pid}|${processName.replace(/\|/gu, ' ')}\n`, true)
-}
-
-function sendProbeLine(line: string, startIfNeeded = false): void {
-  const child = probe
-  if (child && !child.stdin.destroyed) {
-    child.stdin.write(line)
-    return
-  }
-  if (!startIfNeeded) return
-  void startProbe()
-    .then(() => {
-      const activeChild = probe
-      if (!activeChild || activeChild.stdin.destroyed) return
-      activeChild.stdin.write(line)
-    })
-    .catch((err) => {
-      log.warn('[window-probe] commande différée impossible', err)
-    })
 }
 
 export function protectBlockedWindowPreview(windowId: string): void {

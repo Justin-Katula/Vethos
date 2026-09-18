@@ -428,31 +428,3 @@ export function isNonRootHelperProcess(exeName?: string, name?: string): boolean
 
   return false;
 }
-
-/**
- * Détermine si un processus observé représente réellement une application utilisateur (ROOT_APPLICATION)
- * éligible à la recherche Web et à l'analyse DeepSeek.
- * Rejette catégoriquement : crash handlers, helpers, updaters, installers, uninstallers,
- * processus protégés et infrastructure système Windows.
- */
-export function isProcessEligibleForResearch(app: {
-  name: string;
-  exeName?: string;
-  targetPath?: string;
-  aumid?: string;
-  packageFamilyName?: string;
-}): boolean {
-  // 1. Processus système protégé ou terminal
-  if (isProtectedApp(app)) return false;
-
-  // 2. Helper, crash handler, updater, installer, subprocess
-  if (isNonRootHelperProcess(app.exeName, app.name)) return false;
-
-  // 3. Nom vide ou générique sans substance
-  const cleanName = (app.name || '').trim();
-  if (!cleanName || cleanName.length < 2) return false;
-
-  return true;
-}
-
-

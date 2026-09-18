@@ -31,10 +31,6 @@ function cheminCatalogue(): string {
   return join(process.cwd(), 'nexus_app_catalog.json')
 }
 
-export async function writeAppCatalogCache(apps: DiscoveredApp[]): Promise<void> {
-  await ecrire(apps)
-}
-
 export async function invalidateAppCatalogCache(): Promise<void> {
   try {
     const { unlink } = await import('node:fs/promises')
