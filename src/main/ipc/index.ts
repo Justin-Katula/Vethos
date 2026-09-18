@@ -1,7 +1,7 @@
 import { ipcMain, app, shell, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { Storage } from '@shared/storage'
-import { getLogFilePath } from '@main/logging/setup'
+import log, { getLogFilePath } from '@main/logging/setup'
 import { setSleepWindow } from '@main/notifications'
 import { applyThemeToWindow, setMainProcessTheme } from '@main/theme-chrome'
 import { getAppCatalog, invalidateAppCatalogCache } from '@main/tracking/app-catalog'
@@ -142,17 +142,26 @@ export async function registerAllIpcHandlers(
         return true
       })
 
-      const existingBase = (await storage.read('app_knowledge')) ?? { profiles: {} }
-
-      // COUCHE DE DECISION SUPPRIMEE le 2026-09-11, a la demande de l'utilisateur.
-      // Le catalogue, la recherche web et le moteur ALLOW/BLOCK sont a reconstruire.
-      // En attendant, on ne bloque RIEN : « je ne sais pas » ne vaut pas « distraction ».
-      void detected
-      void existingBase
+      // La couche qui décidait AUTOMATIQUEMENT quoi bloquer a été supprimée le
+      // 2026-09-11. On ne la remplace pas par une devinette : rien n'est bloqué
+      // d'office, et l'utilisateur désigne lui-même ce qui le distrait.
+      //
+      // Sans cela l'application ne pouvait plus rien bloquer du tout : les deux
+      // listes revenaient vides, chaque tâche était créée avec `appsToBlock: []`,
+      // et il n'existe aucun autre écran pour choisir des applications.
+      //
+      // Toutes les applications partent donc du côté « autorisé » — c'est l'état
+      // de départ honnête — et l'utilisateur déplace vers « bloqué » ce qu'il veut
+      // écarter. Sa décision est la source la plus sûre qui soit : elle ne se
+      // devine pas.
       return {
         blockedApps: [],
-        allowedApps: [],
-        reasoning: "Couche de decision supprimee : aucune application n'est bloquee.",
+        allowedApps: detected.map((a) => ({
+          ...a,
+          raison: 'Autorisée par défaut — à toi de désigner ce qui te distrait.',
+        })),
+        reasoning:
+          'Rien n’est bloqué d’office. Choisis les applications à écarter pendant cette tâche.',
       }
     },
   )
@@ -169,23 +178,32 @@ export async function registerAllIpcHandlers(
         userJustification?: string
       },
     ) => {
-      const { title, plan, identifiant, action, userJustification } = args
-      const existingBase = (await storage.read('app_knowledge')) ?? { profiles: {} }
-      const key = identifiant.trim().toLowerCase()
-      const appProfile = existingBase.profiles[key]
+      const { identifiant, action } = args
 
-      if (!appProfile) {
+      // Il n'y a plus d'arbitre automatique, et c'est très bien ainsi : personne
+      // n'est mieux placé que l'utilisateur pour dire ce qui le distrait d'une
+      // tâche qu'il vient lui-même d'écrire.
+      //
+      // Cette demande était refusée deux fois — d'abord parce que la base de
+      // connaissances était vide, ensuite parce que l'arbitre n'existait plus.
+      // Aucune application ne pouvait donc passer du côté « bloqué ».
+      //
+      // Un garde subsiste, et c'est le seul qui compte : on ne bloque jamais un
+      // outil système, quoi que demande l'utilisateur.
+      if (action === 'add' && isProtectedApp({ name: identifiant, exeName: identifiant })) {
+        log.warn('[blocage] refus de bloquer un outil système protégé', { identifiant })
         return {
           accepted: false,
-          reason: `Application inconnue dans la base de connaissances.`,
+          reason: "C'est un outil du système : Vethos ne le bloquera jamais.",
         }
       }
 
-      // COUCHE DE DECISION SUPPRIMEE : plus personne pour arbitrer cette demande.
-      void title; void plan; void appProfile; void action; void userJustification
       return {
-        accepted: false,
-        reason: "Couche de decision supprimee : aucun arbitrage automatique disponible.",
+        accepted: true,
+        reason:
+          action === 'add'
+            ? 'Bloquée pendant cette tâche, parce que tu l’as décidé.'
+            : 'Autorisée pendant cette tâche, parce que tu l’as décidé.',
       }
     },
   )

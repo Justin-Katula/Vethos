@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { nexus } from '@/lib/ipc'
 import { ShieldAlert, ShieldCheck, FileText, Loader2, AlertCircle, Search, X, RotateCcw } from 'lucide-react'
@@ -121,7 +121,7 @@ export function IntelligentBlockingReviewModal({
       .then((res) => {
         if (!isMounted) return
         if (res.decisionState === 'BLOCK_DECISION_AI_FAILED') {
-          setAnalysisError("L'IA n'a pas pu finaliser l'analyse de tes applications. Vérifie ta connexion ou réessaie.")
+          setAnalysisError("La liste de tes applications n'a pas pu être établie. Réessaie.")
           return
         }
         if (res.blockedApps) {
@@ -167,6 +167,24 @@ export function IntelligentBlockingReviewModal({
       unsub()
     }
   }, [open, title, plan, reloadKey])
+
+  // On atterrit sur l'onglet où il y a quelque chose à faire. Rien n'étant bloqué
+  // d'office, ouvrir sur une liste vide obligerait l'utilisateur à deviner que
+  // l'action se trouve sur l'autre onglet.
+  //
+  // Une seule fois, à la fin de la lecture : ensuite l'onglet appartient à
+  // l'utilisateur, et le lui reprendre parce qu'il vient de tout débloquer serait
+  // le déplacer sous ses doigts.
+  const ongletDejaChoisi = useRef(false)
+  useEffect(() => {
+    if (!open) {
+      ongletDejaChoisi.current = false
+      return
+    }
+    if (isAnalyzing || ongletDejaChoisi.current) return
+    ongletDejaChoisi.current = true
+    if (blockedApps.length === 0 && allowedApps.length > 0) setActiveTab('allowed')
+  }, [open, isAnalyzing, blockedApps.length, allowedApps.length])
 
   // Débloquer une application bloquée (action: remove)
   const handleRequestRemoval = async (app: AppDecisionItem) => {
@@ -255,7 +273,7 @@ export function IntelligentBlockingReviewModal({
       open={open}
       onClose={onCancel}
       title="Blocage intelligent"
-      description="L'IA analyse ce que tu vas concrètement faire pour déterminer quelles applications bloquer et lesquelles autoriser."
+      description="Tes applications installées, à toi de désigner celles qui t'écarteraient de cette tâche. Rien n'est bloqué sans ton accord."
     >
       <div className="space-y-4">
         {/* Rappel du plan */}
@@ -276,7 +294,7 @@ export function IntelligentBlockingReviewModal({
               <span>
                 {streamProgress?.currentCategory
                   ? `Analyse en cours : ${streamProgress.currentCategory}`
-                  : 'Analyse de tes logiciels en direct...'}
+                  : 'Lecture de tes applications installées...'}
               </span>
             </div>
             {streamProgress && (
@@ -291,20 +309,20 @@ export function IntelligentBlockingReviewModal({
         {isAnalyzing && blockedApps.length === 0 && allowedApps.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Loader2 size={32} className="animate-spin text-accent" />
-            <p className="mt-3 text-sm font-medium text-fg">L{"'"}IA analyse tes applications...</p>
+            <p className="mt-3 text-sm font-medium text-fg">Lecture de tes applications installées...</p>
             <p className="mt-1 text-xs text-fg-3">
-              Identification des outils nécessaires et des distractions par lots.
+              Rien n{"'"}est bloqué d{"'"}office : à toi de désigner ce qui te distrait.
             </p>
           </div>
         )}
 
-        {/* Erreur de l'analyse IA */}
+        {/* Erreur de lecture du catalogue */}
         {analysisError && !isAnalyzing && (
           <div className="rounded border border-red-500/30 bg-red-500/10 p-3.5 text-xs">
             <div className="flex items-start gap-2.5 text-red-700 dark:text-red-400">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-semibold">L{"'"}analyse IA a échoué</p>
+                <p className="font-semibold">La liste n{"'"}a pas pu être établie</p>
                 <p className="text-fg-2">{analysisError}</p>
               </div>
             </div>
@@ -427,7 +445,7 @@ export function IntelligentBlockingReviewModal({
                     <div>
                       <p className="font-medium text-fg">Aucune distraction identifiée</p>
                       <p className="mt-0.5 text-fg-3">
-                        L{"'"}IA a estimé que toutes tes applications peuvent rester débloquées pour ce travail.
+                        Aucune application bloquée pour l{"'"}instant. Passe à l{"'"}onglet « autorisées » pour désigner ce qui te distrait.
                       </p>
                       {allowedApps.length > 0 && (
                         <button
@@ -599,13 +617,13 @@ export function IntelligentBlockingReviewModal({
                               }}
                               className="btn-iris pressable rounded px-2.5 py-1 text-[11px]"
                             >
-                              {isReviewing ? 'Évaluation IA...' : "Soumettre à l'IA"}
+                              {isReviewing ? 'Enregistrement…' : 'Confirmer'}
                             </button>
                           </div>
                         </div>
                       )}
 
-                      {/* Feedback en cas d'évaluation IA */}
+                      {/* Retour apres la decision de l'utilisateur */}
                       {reviewFeedback && reviewFeedback.id === app.identifiant && (
                         <div
                           className={cn(
