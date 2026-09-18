@@ -19,8 +19,12 @@ vk_swiftshader_icd.json
 .DS_Store
 .vscode/
 .idea/
+# Toute variante de .env, pas seulement les deux formes connues : une sauvegarde
+# nommee `.env.sauvegarde-2026-09-18` contenait des cles vivantes et n'etait
+# couverte par aucune des deux lignes precedentes.
 .env
-.env.local
+.env.*
+!.env.example
 coverage/
 *.tsbuildinfo
 nexus-data-dev/
