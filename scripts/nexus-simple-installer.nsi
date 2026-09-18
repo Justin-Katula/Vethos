@@ -34,6 +34,9 @@ VIAddVersionKey "CompanyName" "Vethos"
 VIAddVersionKey "FileDescription" "Vethos installer"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
+; Cle standard attendue par Windows : sans elle, makensis avertit a chaque build et
+; les proprietes du fichier n'affichent aucun droit d'auteur.
+VIAddVersionKey "LegalCopyright" "Vethos"
 
 !include "MUI2.nsh"
 

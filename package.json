@@ -3,6 +3,7 @@
   "version": "0.12.0",
   "private": true,
   "description": "Vethos — application desktop de focus",
+  "author": "Vethos",
   "main": "out/main/index.js",
   "scripts": {
     "build:logo": "node scripts/build-logo.mjs",

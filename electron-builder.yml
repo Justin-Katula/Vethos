@@ -14,11 +14,12 @@ files:
 
 asar: true
 
+# `Informations/Vethos_catalogue.json` figurait ici : le dossier a ete supprime avec
+# la couche de decision, et electron-builder se contentait d'avertir a chaque build
+# avant de sauter la ressource. Plus aucun code ne la lit.
 extraResources:
   - from: build/icon.ico
     to: icon.ico
-  - from: Informations/Vethos_catalogue.json
-    to: Informations/Vethos_catalogue.json
 
 win:
   target:
