@@ -219,10 +219,35 @@ async function getVisibleBrowserWindows(): Promise<Array<{
     }))
 }
 
-function canonicalUrlForDomain(domain: string, title: string): string {
-  const match = title.match(/https?:\/\/[^\s]+/i)
-  if (match?.[0]) return match[0]
-  return `https://${domain}/`
+/**
+ * Hôtes que l'on ne va JAMAIS interroger : la machine elle-même et le réseau local.
+ *
+ * Sans cette barrière, un simple titre de fenêtre décidait de l'adresse que Vethos
+ * allait chercher. Une page web dont le titre contient « http://192.168.1.1/reboot »
+ * suffisait à faire émettre cette requête depuis le poste de l'utilisateur, vers un
+ * service que l'attaquant ne peut pas joindre lui-même — routeur, serveur de
+ * développement, application interne.
+ */
+const HOTE_INTERNE =
+  /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/i
+
+/**
+ * L'adresse à interroger pour connaître le titre d'une page.
+ *
+ * On ne se sert JAMAIS de l'URL trouvée dans le titre de la fenêtre : elle vient
+ * d'une page web, donc de n'importe qui. On reconstruit l'adresse à partir du seul
+ * domaine, qui a déjà passé un filtre exigeant un vrai suffixe — ce qui écarte
+ * `localhost` et les adresses IP nues — puis on refuse ce qui reste interne.
+ *
+ * Renvoie `null` quand il n'y a rien de sûr à interroger.
+ */
+export function canonicalUrlForDomain(domain: string): string | null {
+  const propre = domain.trim().toLowerCase()
+  if (!propre || HOTE_INTERNE.test(propre)) return null
+  // Un domaine, rien d'autre : ni port, ni chemin, ni identifiants, ni caractère
+  // qui permettrait de sortir de l'hôte.
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(propre)) return null
+  return `https://${propre}/`
 }
 
 function textFromHtmlMeta(html: string, names: string[]): string | undefined {
@@ -253,17 +278,23 @@ function decodeHtml(value: string): string {
 }
 
 async function scrapeMetadata(domain: string, windowTitle: string): Promise<ScrapedPageMetadata> {
-  const url = canonicalUrlForDomain(domain, windowTitle)
+  const url = canonicalUrlForDomain(domain)
   const fallback: ScrapedPageMetadata = {
-    url,
+    url: url ?? `https://${domain}/`,
     domain,
     title: windowTitle || domain,
   }
+  // Rien de sûr à interroger : on garde le titre de la fenêtre, qui suffit.
+  if (url === null) return fallback
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 3500)
   try {
     const response = await fetch(url, {
       signal: controller.signal,
+      // On ne suit AUCUNE redirection : vérifier l'hôte de départ ne servirait à
+      // rien si un domaine public pouvait ensuite nous renvoyer vers 127.0.0.1.
+      // Une page qui redirige nous laisse simplement le titre de la fenêtre.
+      redirect: 'manual',
       headers: {
         'User-Agent': 'VethosFocusGuard/1.0',
       },

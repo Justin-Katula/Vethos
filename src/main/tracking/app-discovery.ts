@@ -588,9 +588,13 @@ export async function extractIconWithPowerShell(filePath: string): Promise<strin
     }
   }
 
+  // Guillemets SIMPLES, et non doubles. Une chaîne PowerShell entre guillemets
+  // doubles évalue ses sous-expressions : `"$(calc.exe)"` lance le programme. Or un
+  // nom de dossier Windows peut légalement contenir `$`, `(` et `)`. Doubler les
+  // apostrophes suffit alors, car une chaîne entre guillemets simples n'évalue rien.
   const script = `
     Add-Type -AssemblyName System.Drawing
-    $p = "${cleanPath.replace(/"/g, '""')}"
+    $p = '${cleanPath.replace(/'/g, "''")}'
     if ($p -match '(?i)\\.ico$') {
       $icon = New-Object System.Drawing.Icon($p)
     } else {
