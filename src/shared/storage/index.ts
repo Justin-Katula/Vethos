@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
-import { atomicRead, atomicWrite } from './atomic'
+import { atomicRead, atomicWrite, type Coffre } from './atomic'
 import { STORAGE_SCHEMAS, type StorageKey } from '@shared/schemas'
 import type { z } from 'zod'
 
@@ -13,8 +13,13 @@ type ValueFor<K extends StorageKey> = z.infer<SchemaFor<K>>
  * Crée une instance de storage rattachée à un répertoire de base.
  * En production : `app.getPath('userData')`.
  * En test : un tmpdir.
+ *
+ * `coffre` chiffre le contenu avant qu'il ne touche le disque. Sans lui, tout est
+ * écrit en clair — c'est le cas en test, et c'était le cas partout avant que le
+ * chiffrement n'existe. Les fichiers en clair restent lisibles et se chiffrent
+ * d'eux-mêmes à leur prochaine écriture.
  */
-export function createStorage(baseDir: string) {
+export function createStorage(baseDir: string, coffre?: Coffre) {
   const fileFor = (key: StorageKey) => join(baseDir, `nexus_${key}.json`)
 
   return {
@@ -22,7 +27,7 @@ export function createStorage(baseDir: string) {
       const filePath = fileFor(key)
       let raw: unknown | null
       try {
-        raw = await atomicRead<unknown>(filePath)
+        raw = await atomicRead<unknown>(filePath, coffre)
       } catch (err) {
         if (err instanceof SyntaxError) {
           await fs.copyFile(filePath, `${filePath}.bak`).catch(() => undefined)
@@ -47,7 +52,7 @@ export function createStorage(baseDir: string) {
       const schema = STORAGE_SCHEMAS[key]
       // Throw si invalide — protège contre des bugs dans le main process.
       schema.parse(data)
-      await atomicWrite(fileFor(key), data)
+      await atomicWrite(fileFor(key), data, coffre)
     },
 
     async exists(key: StorageKey): Promise<boolean> {

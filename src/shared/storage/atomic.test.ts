@@ -63,3 +63,59 @@ describe('atomic storage', () => {
     expect(result).toEqual({ v: 'original' })
   })
 })
+
+describe('chiffrement au repos', () => {
+  let dir: string
+
+  // Un coffre de test : pas du vrai chiffrement, mais la meme forme — une chaine
+  // qui entre, une chaine illisible qui sort, et l'inverse.
+  const coffre = {
+    chiffrer: (clair: string) => Buffer.from(clair, 'utf8').toString('base64'),
+    dechiffrer: (chiffre: string) => Buffer.from(chiffre, 'base64').toString('utf8'),
+  }
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(join(tmpdir(), 'vethos-coffre-'))
+  })
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('le fichier sur le disque ne contient plus les données en clair', async () => {
+    const chemin = join(dir, 'secret.json')
+    await atomicWrite(chemin, { objectif: 'quitter mon travail' }, coffre)
+
+    const surLeDisque = await fs.readFile(chemin, 'utf8')
+    expect(surLeDisque).not.toContain('quitter mon travail')
+    expect(surLeDisque).not.toContain('objectif')
+
+    expect(await atomicRead(chemin, coffre)).toEqual({ objectif: 'quitter mon travail' })
+  })
+
+  it('lit encore les fichiers en clair écrits par une version précédente', async () => {
+    // La migration ne doit rien demander a l'utilisateur et ne rien perdre.
+    const chemin = join(dir, 'ancien.json')
+    await atomicWrite(chemin, { garde: 'moi' })
+
+    expect(await atomicRead(chemin, coffre)).toEqual({ garde: 'moi' })
+
+    // Et la prochaine ecriture le chiffre.
+    await atomicWrite(chemin, { garde: 'moi' }, coffre)
+    expect(await fs.readFile(chemin, 'utf8')).not.toContain('moi')
+  })
+
+  it('un fichier venu d’ailleurs est traité comme corrompu, pas comme un plantage', async () => {
+    const chemin = join(dir, 'etranger.json')
+    await atomicWrite(chemin, { a: 1 }, coffre)
+
+    const autreCoffre = {
+      chiffrer: (c: string) => c,
+      dechiffrer: () => {
+        throw new Error('mauvaise clé')
+      },
+    }
+    // SyntaxError : c'est ce que la couche du dessus sait mettre de cote en .bak.
+    await expect(atomicRead(chemin, autreCoffre)).rejects.toThrow(SyntaxError)
+    await expect(atomicRead(chemin)).rejects.toThrow(SyntaxError)
+  })
+})

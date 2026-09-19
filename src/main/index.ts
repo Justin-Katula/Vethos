@@ -3,6 +3,7 @@ import { app, BrowserWindow, nativeTheme, powerMonitor, shell } from 'electron'
 import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from '@shared/storage'
+import { creerCoffre } from '@main/securite/coffre'
 import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
@@ -291,7 +292,9 @@ function startNexusApp(): void {
       const recoveredFromCrash = existsSync(crashMarkerPath())
       writeCrashMarker()
 
-      const storage = createStorage(app.getPath('userData'))
+      // Chiffrement au repos. Les fichiers deja ecrits en clair restent lisibles
+      // et se chiffrent a leur prochaine ecriture : rien n'est perdu a la mise a jour.
+      const storage = createStorage(app.getPath('userData'), creerCoffre())
       // Avant la fenêtre : une fenêtre créée sur le mauvais fond montre un
       // éclair blanc à chaque ouverture en thème sombre, et l'inverse.
       setMainProcessTheme(await readStartupTheme(storage))
