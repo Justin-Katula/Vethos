@@ -29,6 +29,7 @@ export default function SettingsPage() {
     loaded,
     load,
     save,
+    deepseekApiKey,
     updateSettings,
   } = useSettingsStore()
   const restartOnboarding = useOnboardingStore((s) => s.restart)
@@ -170,6 +171,27 @@ export default function SettingsPage() {
           </motion.section>
 
           <motion.section variants={item} className="space-y-8">
+            <Row
+              label="Clé DeepSeek"
+              hint="Facultative. Vethos reconnaît tes applications sans elle — hors ligne et sans rien envoyer."
+            >
+              <input
+                type="password"
+                name="settings-deepseek-key"
+                autoComplete="off"
+                spellCheck={false}
+                value={deepseekApiKey}
+                onChange={(e) => void updateSettings({ deepseekApiKey: e.target.value })}
+                placeholder="sk-…"
+                className="field w-full max-w-xs text-sm"
+              />
+              <p className="mt-3 text-xs text-fg-3">
+                {deepseekApiKey
+                  ? 'Ta clé est enregistrée, chiffrée, et ne sort jamais de cette machine sauf vers DeepSeek.'
+                  : 'Sans clé, seul le jugement par IA est désactivé. Rien d’autre ne change.'}
+              </p>
+            </Row>
+
             <Row label="Journal" hint="Ce que l'application a fait, dans l'ordre, avec l'heure.">
               <button
                 type="button"

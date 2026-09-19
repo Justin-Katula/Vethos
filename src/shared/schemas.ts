@@ -50,6 +50,17 @@ export const SettingsSchema = z.object({
   theme: z.enum(THEME_MODES).optional(),
   themeLightAt: z.string().regex(TIME_REGEX).optional(),
   themeDarkAt: z.string().regex(TIME_REGEX).optional(),
+  /**
+   * Clé DeepSeek de l'utilisateur, la sienne et pas celle de l'éditeur.
+   *
+   * Livrer une clé unique dans l'application reviendrait à la distribuer : elle
+   * est extractible du paquet par n'importe quel acheteur, et c'est l'éditeur
+   * qui paierait la consommation. Chacun met donc la sienne, ou n'en met aucune
+   * — tout le classement local fonctionne sans.
+   *
+   * Stockée avec le reste des réglages, donc chiffrée au repos par le coffre.
+   */
+  deepseekApiKey: z.string().max(200).optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 

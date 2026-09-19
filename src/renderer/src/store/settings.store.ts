@@ -28,6 +28,11 @@ type SettingsState = {
   theme: ThemeMode
   themeLightAt: string
   themeDarkAt: string
+  /**
+   * Clé DeepSeek de l'utilisateur. Vide par défaut, et l'application marche très
+   * bien ainsi : tout le classement local est déterministe et hors ligne.
+   */
+  deepseekApiKey: string
   loaded: boolean
 
   load: () => Promise<void>
@@ -37,7 +42,13 @@ type SettingsState = {
     patch: Partial<
       Pick<
         SettingsState,
-        'username' | 'sleepStart' | 'sleepEnd' | 'theme' | 'themeLightAt' | 'themeDarkAt'
+        | 'username'
+        | 'sleepStart'
+        | 'sleepEnd'
+        | 'theme'
+        | 'themeLightAt'
+        | 'themeDarkAt'
+        | 'deepseekApiKey'
       >
     >,
   ) => Promise<void>
@@ -53,6 +64,7 @@ function buildPayload(state: SettingsState): Settings {
     theme: state.theme,
     themeLightAt: state.themeLightAt,
     themeDarkAt: state.themeDarkAt,
+    deepseekApiKey: state.deepseekApiKey || undefined,
   }
 }
 
@@ -128,6 +140,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: DEFAULT_THEME_MODE,
   themeLightAt: DEFAULT_LIGHT_AT,
   themeDarkAt: DEFAULT_DARK_AT,
+  deepseekApiKey: '',
   loaded: false,
 
   async load() {
@@ -143,6 +156,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       theme: data?.theme ?? DEFAULT_THEME_MODE,
       themeLightAt: data?.themeLightAt ?? DEFAULT_LIGHT_AT,
       themeDarkAt: data?.themeDarkAt ?? DEFAULT_DARK_AT,
+      deepseekApiKey: data?.deepseekApiKey ?? '',
       loaded: true,
     })
     syncSleepWindow(get())

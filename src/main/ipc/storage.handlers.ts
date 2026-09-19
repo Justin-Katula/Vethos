@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '@shared/ipc-channels'
 import { StorageKeySchema, type StorageKey } from '@shared/schemas'
 import type { Storage } from '@shared/storage'
 import log from '@main/logging/setup'
+import { definirCleDeepSeek } from '@main/blocking/deepseek'
 
 export function registerStorageHandlers(storage: Storage): void {
   ipcMain.handle(IPC_CHANNELS.STORAGE_READ, async (_event, rawKey: unknown) => {
@@ -17,6 +18,12 @@ export function registerStorageHandlers(storage: Storage): void {
     // (qui a une signature surchargée par clé).
     try {
       await storage.write(key, data as never)
+      // Les réglages sont le seul endroit où l'utilisateur pose sa clé DeepSeek.
+      // On la propage ici, au point de passage unique des écritures, plutôt que
+      // de la relire à chaque appel réseau.
+      if (key === 'settings') {
+        definirCleDeepSeek((data as { deepseekApiKey?: string } | null)?.deepseekApiKey)
+      }
       return { ok: true as const }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { createStorage } from '@shared/storage'
 import { creerCoffre } from '@main/securite/coffre'
+import { definirCleDeepSeek } from '@main/blocking/deepseek'
 import { registerAllIpcHandlers } from './ipc'
 import { focusWindow, notifyCrashRecovered } from './notifications'
 import { startUpdater } from './updater/setup'
@@ -298,6 +299,8 @@ function startNexusApp(): void {
       // Avant la fenêtre : une fenêtre créée sur le mauvais fond montre un
       // éclair blanc à chaque ouverture en thème sombre, et l'inverse.
       setMainProcessTheme(await readStartupTheme(storage))
+      // La cle DeepSeek enregistree par l'utilisateur, appliquee des le demarrage.
+      definirCleDeepSeek((await storage.read('settings').catch(() => null))?.deepseekApiKey)
       await registerAllIpcHandlers(
         storage,
         () => mainWindow,

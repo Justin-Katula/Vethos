@@ -232,12 +232,31 @@ function readEnvValue(key: string): string | undefined {
 
 let cachedApiKey: string | null | undefined
 
+/**
+ * Clé fournie par l'utilisateur depuis les réglages, et non par l'éditeur.
+ *
+ * Une clé livrée dans le paquet serait distribuée à tous les acheteurs : chacun
+ * peut l'extraire, et c'est l'éditeur qui paierait. Chacun met donc la sienne.
+ */
+let cleUtilisateur: string | null = null
+
+/** Appelé quand les réglages changent. Vide le cache pour que la nouvelle clé prenne. */
+export function definirCleDeepSeek(cle: string | null | undefined): void {
+  const propre = (cle ?? '').trim()
+  cleUtilisateur = propre.length > 0 ? propre : null
+  cachedApiKey = undefined
+}
+
 function getApiKey(): string | null {
   if (cachedApiKey !== undefined) return cachedApiKey
-  const key = readEnvValue('DEEPSEEK_API_KEY')
+  // La clé des réglages prime sur `.env`, qui ne sert qu'au développement :
+  // en production, aucun `.env` n'accompagne l'exécutable.
+  const key = cleUtilisateur ?? readEnvValue('DEEPSEEK_API_KEY')
   cachedApiKey = key && key.length > 0 ? key : null
   if (!cachedApiKey) {
-    log.warn('[deepseek] DEEPSEEK_API_KEY manquant — le jugement de justification sera désactivé')
+    log.info(
+      '[deepseek] aucune clé configurée — le classement local continue, seul le jugement par IA est désactivé',
+    )
   }
   return cachedApiKey
 }
