@@ -29,6 +29,7 @@ export const Plus = (p: Props) => <Trait {...p} d="M12 5v14M5 12h14" />
 export const Croix = (p: Props) => <Trait {...p} d="M6 6l12 12M18 6L6 18" />
 export const Coche = (p: Props) => <Trait {...p} d="M4.5 12.5l5 5 10-11" epaisseur={p.epaisseur ?? 2} />
 export const Chevron = (p: Props) => <Trait {...p} d="M9 5l7 7-7 7" />
+export const GlypheTemps = (p: Props) => <Trait {...p} d="M5 3v3M19 3v3M3 9h18M4 5h16a1 1 0 011 1v14H3V6a1 1 0 011-1zM7 13h3M14 13h3M7 17h3" />
 
 /** Les quatre glyphes de la barre d'onglets. Géométrie pure, même grille. */
 export const GlypheJour = (p: Props) => (

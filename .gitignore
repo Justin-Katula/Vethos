@@ -3,7 +3,7 @@ out/
 native/vethos-probe/obj/
 dist/
 release/
-App/
+/App/
 build/
 locales/
 resources/

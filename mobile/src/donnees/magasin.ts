@@ -57,8 +57,34 @@ export const AncreSchema = z.object({
 })
 export type Ancre = z.infer<typeof AncreSchema>
 
+
+/**
+ * Une obligation fixe : ce que la semaine impose déjà.
+ *
+ * La forme est celle du bureau — `ScheduleEntry` — au champ près, pour que le
+ * moteur partagé la consomme sans traduction. Traduire ici serait s'inventer
+ * une occasion de diverger.
+ */
+export const ObligationSchema = z.object({
+  id: z.string(),
+  dayOfWeek: z.number().int().min(0).max(6),
+  startMinute: z.number().int().min(0).max(1439),
+  endMinute: z.number().int().min(1).max(1440),
+  categoryType: z.enum(['sleep', 'school', 'work', 'commute', 'commitment', 'custom']),
+  label: z.string().min(1).max(60),
+  color: z.string(),
+})
+export type Obligation = z.infer<typeof ObligationSchema>
+
 export const ReglagesSchema = z.object({
   prenom: z.string().max(40).default(''),
+  /**
+   * Les quatre modes du bureau : suivre l'appareil, clair, sombre, à l'heure.
+   * Le vocabulaire vient de `@shared/theme` — le partager évite que les deux
+   * applications ne finissent par ne plus s'accorder sur ce que « à l'heure »
+   * veut dire.
+   */
+  apparence: z.enum(['system', 'light', 'dark', 'schedule']).default('system'),
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
   lever: z.string().default('07:00'),
@@ -69,11 +95,18 @@ const ContenuSchema = z.object({
   taches: z.array(TacheSchema).default([]),
   objectifs: z.array(ObjectifSchema).default([]),
   ancres: z.array(AncreSchema).default([]),
+  obligations: z.array(ObligationSchema).default([]),
   reglages: ReglagesSchema.default({}),
 })
 export type Contenu = z.infer<typeof ContenuSchema>
 
-const VIDE: Contenu = { taches: [], objectifs: [], ancres: [], reglages: ReglagesSchema.parse({}) }
+const VIDE: Contenu = {
+  taches: [],
+  objectifs: [],
+  ancres: [],
+  obligations: [],
+  reglages: ReglagesSchema.parse({}),
+}
 
 /** Identifiant court, lisible dans les journaux, sans dépendance. */
 export function identifiant(): string {
@@ -93,6 +126,9 @@ type EtatDonnees = Contenu & {
 
   ajouterAncre: (a: Omit<Ancre, 'id' | 'creeeLe'>) => Promise<void>
   supprimerAncre: (id: string) => Promise<void>
+
+  ajouterObligation: (o: Omit<Obligation, 'id'>) => Promise<void>
+  supprimerObligation: (id: string) => Promise<void>
 
   majReglages: (r: Partial<Reglages>) => Promise<void>
 }
@@ -116,6 +152,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       taches: e.taches,
       objectifs: e.objectifs,
       ancres: e.ancres,
+      obligations: e.obligations,
       reglages: e.reglages,
     })
   }
@@ -182,6 +219,14 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
 
     async supprimerAncre(id) {
       await enregistrer({ ancres: get().ancres.filter((a) => a.id !== id) })
+    },
+
+    async ajouterObligation(o) {
+      await enregistrer({ obligations: [...get().obligations, { ...o, id: identifiant() }] })
+    },
+
+    async supprimerObligation(id) {
+      await enregistrer({ obligations: get().obligations.filter((o) => o.id !== id) })
     },
 
     async majReglages(r) {

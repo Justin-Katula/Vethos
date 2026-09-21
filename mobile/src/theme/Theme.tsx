@@ -1,21 +1,39 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useColorScheme } from 'react-native'
+import {
+  DEFAULT_DARK_AT,
+  DEFAULT_LIGHT_AT,
+  DEFAULT_THEME_MODE,
+  resolveTheme,
+  type Theme,
+  type ThemeMode,
+} from '@shared/theme'
+import { useDonnees } from '@/donnees/magasin'
 import { THEMES, type Jetons, type NomTheme } from './jetons'
 
 /**
- * Le thème, distribué à toute l'application.
+ * L'apparence, décidée par la MÊME règle que le bureau.
  *
- * Comme sur le bureau, un composant ne demande jamais « la couleur claire » : il
- * demande `surface` et reçoit la bonne. Aucune condition sur le thème ne doit
- * apparaître dans un écran — si vous en écrivez une, c'est qu'un jeton manque.
+ * `resolveTheme` vit dans `@shared/theme` : quatre modes — suivre l'appareil,
+ * clair, sombre, à l'heure — et une fonction pure qui tranche. On l'importe au
+ * lieu de la réécrire, sinon les deux applications finissent par ne plus
+ * s'accorder sur ce que « à l'heure » veut dire.
  *
- * Par défaut on suit l'appareil. C'est le choix honnête : une installation qui
- * n'a jamais rien demandé ne décide pas à la place de son propriétaire.
+ * Le mode horaire pose UN minuteur exactement sur la bascule, au lieu de
+ * réinterroger l'horloge chaque minute pour ne rien apprendre.
+ *
+ * Un composant ne demande jamais « la couleur claire » : il demande `surface`
+ * et reçoit la bonne. Une condition sur le thème dans un écran signifie qu'un
+ * jeton manque.
  */
-const Contexte = createContext<{ jetons: Jetons; nom: NomTheme }>({
+const Contexte = createContext<{ jetons: Jetons; nom: NomTheme; mode: ThemeMode }>({
   jetons: THEMES.sombre,
   nom: 'sombre',
+  mode: DEFAULT_THEME_MODE,
 })
+
+/** Du vocabulaire partagé vers le nôtre. */
+const enFrancais = (t: Theme): NomTheme => (t === 'dark' ? 'sombre' : 'clair')
 
 export function FournisseurTheme({
   children,
@@ -26,10 +44,30 @@ export function FournisseurTheme({
   force?: NomTheme
 }) {
   const apparenceSysteme = useColorScheme()
+  const mode = useDonnees((d) => d.reglages.apparence)
+  const [instant, setInstant] = useState(() => new Date())
+
+  // Le mode horaire est le seul dont l'avis change tout seul. On réveille donc
+  // le calcul à la minute — c'est assez fin pour une bascule à l'heure ronde, et
+  // assez rare pour ne rien coûter.
+  useEffect(() => {
+    if (mode !== 'schedule') return
+    const t = setInterval(() => setInstant(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [mode])
+
   const valeur = useMemo(() => {
-    const nom: NomTheme = force ?? (apparenceSysteme === 'light' ? 'clair' : 'sombre')
-    return { jetons: THEMES[nom], nom }
-  }, [apparenceSysteme, force])
+    const decide = resolveTheme(
+      {
+        mode,
+        systemDark: apparenceSysteme !== 'light',
+        schedule: { lightAt: DEFAULT_LIGHT_AT, darkAt: DEFAULT_DARK_AT },
+      },
+      instant,
+    )
+    const nom: NomTheme = force ?? enFrancais(decide)
+    return { jetons: THEMES[nom], nom, mode }
+  }, [apparenceSysteme, force, mode, instant])
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>
 }
@@ -40,4 +78,8 @@ export function useJetons(): Jetons {
 
 export function useNomTheme(): NomTheme {
   return useContext(Contexte).nom
+}
+
+export function useModeApparence(): ThemeMode {
+  return useContext(Contexte).mode
 }
