@@ -1,5 +1,9 @@
 import { Platform } from 'react-native'
 import { IDENTIFIANT_SELECTION, type EtatAutorisation, type Plage, type Selection } from './contrat'
+import type { PontEcran } from './contrat'
+import { creerPontDepuis, type ModuleEcran } from './pont-natif'
+
+export { creerPontDepuis, type ModuleEcran } from './pont-natif'
 
 /**
  * La frontière entre Vethos et le Temps d'écran d'Apple.
@@ -17,18 +21,7 @@ import { IDENTIFIANT_SELECTION, type EtatAutorisation, type Plage, type Selectio
  * Le simulateur n'est pas un bouchon vide : il se comporte comme iOS, délais
  * compris, pour que ce que l'on voit ressemble à ce que l'on aura.
  */
-export type PontEcran = {
-  /** Ce que le système fournit vraiment, par opposition au simulateur. */
-  estReel: boolean
-  lireAutorisation: () => Promise<EtatAutorisation>
-  demanderAutorisation: () => Promise<EtatAutorisation>
-  /** Ouvre le sélecteur d'Apple. `null` si l'utilisateur referme sans choisir. */
-  choisirApplications: (selectionExistante?: string) => Promise<Selection | null>
-  /** Programme les plages du jour. Rend le nombre réellement programmé. */
-  programmer: (plages: readonly Plage[]) => Promise<number>
-  /** Lève tout : aucun bouclier ne doit survivre à un arrêt. */
-  toutLever: () => Promise<void>
-}
+export type { PontEcran } from './contrat'
 
 // --------------------------------------------------------------------------
 // Simulateur — pour le navigateur, les tests, et pour regarder l'application
@@ -73,6 +66,9 @@ export function creerPontSimule(): PontEcran {
       }
     },
 
+    // `maintenant` ne sert qu'au vrai pont, qui doit savoir quelle plage a
+    // deja commence pour lever son bouclier tout de suite. Le simulateur n'a
+    // pas de bouclier a lever : il se contente de compter.
     async programmer(plages) {
       await attendre(220)
       programmees = plages.length
@@ -91,138 +87,14 @@ export function creerPontSimule(): PontEcran {
 // --------------------------------------------------------------------------
 
 /**
- * `react-native-device-activity` n'existe que sur iOS 16+. On ne l'importe donc
- * qu'au moment où on en a besoin, et jamais sur une autre plateforme : un import
- * en tête de fichier ferait tomber le navigateur avant le premier rendu.
- */
-function creerPontNatif(): PontEcran {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const natif = require('react-native-device-activity') as typeof import('react-native-device-activity')
-
-  // `require` REUSSIT toujours, meme sans le module natif : le paquet appelle
-  // `requireOptionalNativeModule`, qui rend `null` au lieu de lever. Dans Expo
-  // Go, on obtenait donc un pont qui se disait REEL, dont chaque appel ne
-  // faisait rien en silence, et un ecran qui promettait un masquage qui
-  // n'arriverait jamais. Exactement le mensonge que cet ecran existe pour
-  // eviter. `isAvailable()` est le seul test qui distingue les deux.
-  if (!natif.isAvailable()) throw new Error('Temps d’écran absent de cette version')
-
-  const traduire = (brut: string): EtatAutorisation => {
-    if (brut === 'approved') return 'accordee'
-    if (brut === 'denied') return 'refusee'
-    return 'jamais_demandee'
-  }
-
-  return {
-    estReel: true,
-
-    async lireAutorisation() {
-      return traduire(String(natif.getAuthorizationStatus()))
-    },
-
-    async demanderAutorisation() {
-      await natif.requestAuthorization('individual')
-      return traduire(String(natif.getAuthorizationStatus()))
-    },
-
-    async choisirApplications() {
-      // Le sélecteur d'Apple n'est PAS une fonction : c'est une vue native que
-      // l'on affiche. Il est rendu par `SelecteurApplications`, qui appelle
-      // ensuite `enregistrerSelection` ci-dessous. Cette méthode n'existe ici
-      // que pour tenir le contrat commun avec le simulateur.
-      return null
-    },
-
-    async programmer(plages) {
-      // On repart toujours de zéro : réconcilier des surveillances existantes
-      // avec un plan recalculé coûte plus cher que de tout reposer, et laisse
-      // des boucliers orphelins au moindre écart.
-      natif.stopMonitoring()
-
-      const maintenant = minuteCourante()
-
-      for (const plage of plages) {
-        const activite = nomActivite(plage.blocId)
-
-        // Surveiller ne bloque RIEN. `startMonitoring` dit seulement à iOS de
-        // réveiller l'extension aux bornes de la fenêtre ; c'est ce qu'elle
-        // fait en se réveillant qui compte. Sans ces deux `configureActions`,
-        // les surveillances se programmaient correctement et aucun bouclier ne
-        // se levait jamais — une application de blocage qui ne bloque pas, et
-        // qui n'a pas une erreur à montrer pour l'expliquer.
-        natif.configureActions({
-          activityName: activite,
-          callbackName: 'intervalDidStart',
-          actions: [{ type: 'blockSelection', familyActivitySelectionId: plage.selectionId }],
-        })
-        natif.configureActions({
-          activityName: activite,
-          callbackName: 'intervalDidEnd',
-          actions: [{ type: 'resetBlocks' }],
-        })
-
-        await natif.startMonitoring(
-          activite,
-          {
-            intervalStart: minuteVersComposantes(plage.debutMinute),
-            intervalEnd: minuteVersComposantes(plage.finMinute),
-            repeats: false,
-          },
-          [],
-        )
-      }
-
-      // `intervalDidStart` ne se déclenche qu'au FRANCHISSEMENT de la borne.
-      // Or une séance vient d'être confirmée : sa fenêtre a déjà commencé, la
-      // borne est derrière nous, et le rappel ne viendra jamais. Le bouclier
-      // de la séance en cours se lève donc ici, tout de suite. Celui-là est le
-      // seul qui compte vraiment — c'est maintenant qu'on travaille.
-      const enCours = plages.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
-      if (enCours) {
-        natif.blockSelection(
-          { activitySelectionId: enCours.selectionId },
-          `vethos:seance:${enCours.blocId}`,
-        )
-      } else {
-        // Aucune séance en cours : rien ne doit rester levé d'une précédente.
-        natif.resetBlocks('vethos:aucune-seance')
-      }
-
-      return plages.length
-    },
-
-    async toutLever() {
-      natif.stopMonitoring()
-      for (const activite of natif.getActivities()) natif.cleanUpAfterActivity(activite)
-      // `resetBlocks` abaisse les boucliers déjà levés. Sans lui, arrêter la
-      // surveillance laisserait l'utilisateur derrière un écran que plus rien ne
-      // viendrait retirer.
-      natif.resetBlocks('vethos:tout-lever')
-    },
-  }
-}
-
-/**
- * Le nom d'activite d'un bloc.
+ * Ce que Vethos utilise du Temps d'écran d'Apple, et rien de plus.
  *
- * Prefixe, parce que `stopMonitoring()` sans argument arrete TOUT ce que
- * l'application surveille : sans prefixe on ne saurait plus, en lisant
- * `getActivities()`, ce qui vient de Vethos et ce qui vient d'ailleurs.
+ * Écrit comme un paramètre plutôt que comme un import : c'est ce qui permet de
+ * VÉRIFIER la séquence d'appels sans iPhone, sans compte Apple et sans
+ * l'entitlement d'Apple. Sans ça, le seul chemin du produit qui touche
+ * vraiment au système était aussi le seul que rien ne testait — et il a déjà
+ * menti une fois (`requireOptionalNativeModule` rend `null` au lieu de lever).
  */
-function nomActivite(blocId: string): string {
-  return `vethos.${blocId}`
-}
-
-function minuteCourante(): number {
-  const d = new Date()
-  return d.getHours() * 60 + d.getMinutes()
-}
-
-/** Les composantes horaires qu'attend `DeviceActivitySchedule`. */
-function minuteVersComposantes(minute: number): { hour: number; minute: number } {
-  return { hour: Math.floor(minute / 60) % 24, minute: minute % 60 }
-}
-
 let pont: PontEcran | null = null
 
 /**
@@ -244,4 +116,14 @@ export function pontEcran(): PontEcran {
     pont = creerPontSimule()
   }
   return pont
+}
+
+/**
+ * `react-native-device-activity` n'existe que sur iOS 16+. On ne l'importe donc
+ * qu'au moment où on en a besoin, et jamais sur une autre plateforme : un import
+ * en tête de fichier ferait tomber le navigateur avant le premier rendu.
+ */
+function creerPontNatif(): PontEcran {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return creerPontDepuis(require('react-native-device-activity') as ModuleEcran)
 }

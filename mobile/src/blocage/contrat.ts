@@ -206,3 +206,30 @@ export function limiterAuxCapacitesIOS(plages: readonly Plage[]): {
     ecarteesPlafond: assezLongues.length - MAX_SURVEILLANCES,
   }
 }
+
+/**
+ * La frontière entre Vethos et le Temps d'écran d'Apple.
+ *
+ * Le TYPE vit ici, avec le reste du contrat, et pas à côté de son
+ * implémentation : `ecran-natif.ts` importe `Platform` de React Native, donc
+ * aucun test ne peut le charger. Un type qu'on ne peut pas importer sans
+ * traîner React Native derrière soi finit par n'être importé nulle part.
+ */
+export type PontEcran = {
+  /** Ce que le système fournit vraiment, par opposition au simulateur. */
+  estReel: boolean
+  lireAutorisation: () => Promise<EtatAutorisation>
+  demanderAutorisation: () => Promise<EtatAutorisation>
+  /** Ouvre le sélecteur d'Apple. `null` si l'utilisateur referme sans choisir. */
+  choisirApplications: (selectionExistante?: string) => Promise<Selection | null>
+  /**
+   * Programme les plages du jour. Rend le nombre réellement programmé.
+   *
+   * `maintenant` n'existe que pour les tests : le pont doit savoir laquelle
+   * des plages a DÉJÀ commencé, et une horloge qu'on ne peut pas figer rend
+   * ce cas-là invérifiable.
+   */
+  programmer: (plages: readonly Plage[], maintenant?: number) => Promise<number>
+  /** Lève tout : aucun bouclier ne doit survivre à un arrêt. */
+  toutLever: () => Promise<void>
+}
