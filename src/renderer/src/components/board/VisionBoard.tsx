@@ -4,71 +4,16 @@ import { Link } from 'react-router-dom'
 import { CountUp } from '@/components/ui/CountUp'
 import { cn } from '@/lib/cn'
 import type { ObjectiveItem, TaskItem, AncreItem } from '@shared/planning/types'
+import {
+  HORIZON_LABEL,
+  HORIZON_WEEKS,
+  anchorInsight,
+  hoursLabel,
+  objectiveMilestone,
+  type Horizon,
+} from '@shared/projection'
 
-type Horizon = 'month' | 'year'
 type Pillar = 'objectives' | 'tasks' | 'ancres'
-
-function durationStr(hours: number): string {
-  const rounded = Math.round(hours * 10) / 10
-  if (rounded === Math.floor(rounded)) {
-    return `${Math.floor(rounded)} h`
-  }
-  return `${rounded} h`
-}
-
-function getObjectiveMilestone(yearlyHours: number): { title: string; desc: string } {
-  if (yearlyHours < 40) {
-    return {
-      title: 'Prise d’élan & Découverte',
-      desc: 'Suffisant pour acquérir les bases fondamentales et installer la curiosité.',
-    }
-  }
-  if (yearlyHours < 100) {
-    return {
-      title: 'Fondations solides',
-      desc: 'Une pratique régulière qui commence à donner des réflexes automatiques.',
-    }
-  }
-  if (yearlyHours < 250) {
-    return {
-      title: 'Autonomie & Aisance',
-      desc: 'Le niveau où l’on pratique avec plaisir sans bloquer sur la technique.',
-    }
-  }
-  if (yearlyHours < 500) {
-    return {
-      title: 'Expertise confirmée',
-      desc: 'L’équivalent de plusieurs cours universitaires ou d’un projet majeur mené à terme.',
-    }
-  }
-  return {
-    title: 'Haut niveau de maîtrise',
-    desc: 'Un investissement exceptionnel qui place tes compétences dans le top niveau.',
-  }
-}
-
-function getAnchorInsight(ancre: AncreItem, yearlyHours: number): string {
-  const lower = ancre.name.toLowerCase()
-  if (lower.includes('lect') || lower.includes('livre') || lower.includes('read')) {
-    const books = Math.max(1, Math.round(yearlyHours / 8))
-    return `Soit environ ${books} livre${books > 1 ? 's' : ''} entier${books > 1 ? 's' : ''} dévoré${books > 1 ? 's' : ''} sur l’année (sur la base d’un livre de 250 pages toutes les 8 h).`
-  }
-  if (
-    lower.includes('sport') ||
-    lower.includes('muscu') ||
-    lower.includes('gym') ||
-    lower.includes('course') ||
-    lower.includes('run') ||
-    lower.includes('yoga') ||
-    lower.includes('fitness')
-  ) {
-    return `Une transformation physique et cardiovasculaire majeure grâce à ${Math.round(yearlyHours)} h d’entraînement régulier.`
-  }
-  if (lower.includes('medit') || lower.includes('zen') || lower.includes('respir')) {
-    return `Des centaines de séances de calme profond pour forger une stabilité émotionnelle et une concentration inébranlable.`
-  }
-  return `${Math.round(yearlyHours)} heures de rituel inamovible : la discipline quotidienne qui transforme ta routine en force.`
-}
 
 export function VisionBoard({
   objectives = [],
@@ -82,8 +27,8 @@ export function VisionBoard({
   const [horizon, setHorizon] = useState<Horizon>('year')
   const [pillar, setPillar] = useState<Pillar>('objectives')
 
-  const multiplier = horizon === 'month' ? 4 : 52
-  const horizonLabel = horizon === 'month' ? 'sur 1 mois (4 semaines)' : 'sur 1 an (52 semaines)'
+  const multiplier = HORIZON_WEEKS[horizon]
+  const horizonLabel = HORIZON_LABEL[horizon]
 
   // 1. Calculs Objectifs
   const weeklyObjectiveHours = useMemo(
@@ -161,7 +106,7 @@ export function VisionBoard({
         >
           <span>Objectifs</span>
           <span className="font-mono text-[11px] tabular-nums opacity-60">
-            {durationStr(totalObjectiveHours)}
+            {hoursLabel(totalObjectiveHours)}
           </span>
         </button>
 
@@ -195,7 +140,7 @@ export function VisionBoard({
         >
           <span>Ancres & Rituels</span>
           <span className="font-mono text-[11px] tabular-nums opacity-60">
-            {durationStr(totalAnchorHours)}
+            {hoursLabel(totalAnchorHours)}
           </span>
         </button>
       </div>
@@ -224,14 +169,14 @@ export function VisionBoard({
                   <div className="flex flex-wrap items-baseline justify-between gap-3 rounded border border-line bg-surface-2 px-4 py-3">
                     <div>
                       <span className="num iris-text text-[30px] leading-none">
-                        <CountUp value={totalObjectiveHours} format={(n) => durationStr(n)} />
+                        <CountUp value={totalObjectiveHours} format={(n) => hoursLabel(n)} />
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
                         prévues sur tes objectifs {horizonLabel}
                       </span>
                     </div>
                     <div className="text-right text-[11.5px] text-fg-3 font-mono">
-                      {durationStr(weeklyObjectiveHours)} / semaine
+                      {hoursLabel(weeklyObjectiveHours)} / semaine
                     </div>
                   </div>
 
@@ -240,7 +185,7 @@ export function VisionBoard({
                       const objWeeklyHours = obj.weeklyTargetMinutes / 60
                       const objTotalHours = objWeeklyHours * multiplier
                       const yearlyHours = objWeeklyHours * 52
-                      const milestone = getObjectiveMilestone(yearlyHours)
+                      const milestone = objectiveMilestone(yearlyHours)
 
                       return (
                         <div
@@ -253,7 +198,7 @@ export function VisionBoard({
                                 {obj.name}
                               </span>
                               <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-fg">
-                                {durationStr(objTotalHours)}
+                                {hoursLabel(objTotalHours)}
                               </span>
                             </div>
 
@@ -266,9 +211,9 @@ export function VisionBoard({
                           </div>
 
                           <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2 text-[10.5px] text-fg-3">
-                            <span>{durationStr(objWeeklyHours)}/semaine</span>
+                            <span>{hoursLabel(objWeeklyHours)}/semaine</span>
                             <span className="font-mono font-medium text-fg-2">
-                              {durationStr(yearlyHours)} / an
+                              {hoursLabel(yearlyHours)} / an
                             </span>
                           </div>
                         </div>
@@ -305,7 +250,7 @@ export function VisionBoard({
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
                         projet{activeRootTasks.length > 1 ? 's' : ''} en cours (
-                        {durationStr(totalTaskHours)} restant)
+                        {hoursLabel(totalTaskHours)} restant)
                       </span>
                     </div>
                     <span className="rounded border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-fg-2">
@@ -346,14 +291,14 @@ export function VisionBoard({
                   <div className="flex flex-wrap items-baseline justify-between gap-3 rounded border border-line bg-surface-2 px-4 py-3">
                     <div>
                       <span className="num iris-text text-[30px] leading-none">
-                        <CountUp value={totalAnchorHours} format={(n) => durationStr(n)} />
+                        <CountUp value={totalAnchorHours} format={(n) => hoursLabel(n)} />
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
                         prévues par tes ancres {horizonLabel}
                       </span>
                     </div>
                     <span className="text-[11.5px] font-mono text-fg-3">
-                      {durationStr(weeklyAnchorHours)} / semaine
+                      {hoursLabel(weeklyAnchorHours)} / semaine
                     </span>
                   </div>
 
@@ -363,7 +308,7 @@ export function VisionBoard({
                         (ancre.normalMaxMinutes * ancre.daysOfWeek.length) / 60
                       const ancreTotalHours = ancreWeeklyHours * multiplier
                       const yearlyHours = ancreWeeklyHours * 52
-                      const insight = getAnchorInsight(ancre, yearlyHours)
+                      const insight = anchorInsight(ancre.name, yearlyHours)
 
                       return (
                         <div
@@ -376,7 +321,7 @@ export function VisionBoard({
                                 {ancre.name}
                               </span>
                               <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-fg">
-                                {durationStr(ancreTotalHours)}
+                                {hoursLabel(ancreTotalHours)}
                               </span>
                             </div>
 
@@ -388,7 +333,7 @@ export function VisionBoard({
                               {ancre.daysOfWeek.length} j / semaine · {ancre.normalMaxMinutes} min
                             </span>
                             <span className="font-mono font-medium text-fg-2">
-                              {durationStr(yearlyHours)} / an
+                              {hoursLabel(yearlyHours)} / an
                             </span>
                           </div>
                         </div>

@@ -12,6 +12,7 @@ import { Horloge } from '@/ui/Horloge'
 import { AgendaJour } from '@/ui/AgendaJour'
 import { Faits } from '@/ui/Faits'
 import { Mesures } from '@/ui/Mesures'
+import { Projection } from '@/ui/Projection'
 import { Chevron, Plus } from '@/ui/icones'
 import { GEIST, MONO } from '@/ui/primitives'
 
@@ -227,6 +228,11 @@ export default function Aujourdhui() {
           })}
         </View>
       ) : null}
+
+      {/* La derniere section, et la seule qui regarde loin. En haut, elle
+          repousserait la journee — or c'est la journee qu'on ouvre
+          l'application pour voir. */}
+      <Projection />
     </ScrollView>
   )
 }
