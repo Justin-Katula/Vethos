@@ -5,6 +5,7 @@ import { minutesEveil } from '@/plan/moteur'
 import { useJetons, useModeApparence } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree } from '@/ui/Horloge'
+import { useLargeur } from '@/ui/largeur'
 import { BoutonPlat, GEIST, MONO, Rangee, Section, Texte, TitreEcran, Valeur } from '@/ui/primitives'
 
 /**
@@ -18,6 +19,7 @@ export default function Reglages() {
   const marges = useSafeAreaInsets()
   const j = useJetons()
   const { reglages, majReglages, taches, objectifs, ancres } = useDonnees()
+  const large = useLargeur().deuxColonnes
 
   // Deduit des MEMES plages que le moteur soustrait. Un calcul a part ici
   // affichait « 16 h 30 » pendant que le moteur en retirait autre chose.
@@ -34,6 +36,14 @@ export default function Reglages() {
       keyboardShouldPersistTaps="handled"
     >
       <TitreEcran>Réglages</TitreEcran>
+
+      {/* Deux colonnes des que l'ecran les permet, comme le bureau. Ce qui se
+          REGLE a gauche — le sommeil, le prenom, l'apparence — et ce qui se
+          consulte ou se rejoue a droite. */}
+      <View style={large
+        ? { flexDirection: 'row', alignItems: 'flex-start', gap: PAS[10], marginTop: PAS[6] }
+        : {}}>
+      <View style={large ? { flex: 1 } : {}}>
 
       <Section
         premiere
@@ -104,7 +114,11 @@ export default function Reglages() {
         ) : null}
       </Section>
 
+      </View>
+
+      <View style={large ? { flex: 1 } : {}}>
       <Section
+        premiere={large}
         titre="Introduction"
         loi="Ne touche ni à tes engagements, ni à ton temps déclaré. Rejoue seulement le premier lancement."
       >
@@ -135,6 +149,8 @@ export default function Reglages() {
           fonctionne sans réseau.
         </Texte>
       </Section>
+      </View>
+      </View>
     </ScrollView>
   )
 }
