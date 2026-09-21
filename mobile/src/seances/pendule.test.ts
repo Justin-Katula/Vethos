@@ -173,6 +173,42 @@ describe('B.5.2 — le travail fait, minute par minute', () => {
   })
 })
 
+describe('le téléphone qui dort', () => {
+  it('crédite toute une séance confirmée pendant que l’application était fermée', () => {
+    // C'est LA question que pose un telephone : l'application se ferme, et on
+    // revient deux heures plus tard. Une seance confirmee dont la fenetre
+    // s'est ecoulee pendant ce temps-la n'est PAS une supposition — on a la
+    // confirmation, on a l'horloge. Ne pas la crediter reviendrait a punir
+    // quelqu'un d'avoir range son telephone pour travailler.
+    const ouverte = confirmer({ maintenant: a(9, 0), bloc: bloc(), etat: vide() })
+    // Un seul tic, deux heures apres. Rien entre les deux.
+    const r = tic({ maintenant: a(11, 0), blocs: [bloc()], etat: ouverte })
+    expect(r.apprentissage.workedMinutesByRef['t1']).toBe(60)
+  })
+
+  it('crédite le retard d’un bloc ouvert puis abandonné pendant le sommeil', () => {
+    // Le bloc etait surveille (`observedPending` a survecu a la fermeture), il
+    // n'a jamais ete confirme, et sa fenetre est passee. Le retard est donc
+    // mesure, pas deduit.
+    const vu = tic({ maintenant: a(9, 30), blocs: [bloc()] })
+    const apres = tic({
+      maintenant: a(12, 0),
+      blocs: [bloc()],
+      etat: { apprentissage: vu.apprentissage, confirmations: vu.confirmations },
+    })
+    expect(apres.apprentissage.dailyDelayMinutes[JOUR]).toBe(60)
+  })
+
+  it('n’invente rien sur un bloc qu’il n’a jamais vu', () => {
+    // L'application etait fermee du debut a la fin de ce bloc. Aucune trace,
+    // donc aucun retard : D.7 dit « mesure, jamais deduit », et une absence de
+    // mesure n'est pas une mesure de zero — c'est une absence.
+    const r = tic({ maintenant: a(12, 0), blocs: [bloc({ startMinute: 9 * 60, endMinute: 10 * 60 })] })
+    expect(r.apprentissage.dailyDelayMinutes[JOUR]).toBeUndefined()
+    expect(r.change).toBe(false)
+  })
+})
+
 describe('la complétion que personne ne déclare', () => {
   it('termine la tâche quand le temps planifié a été fait', () => {
     const ouverte = confirmer({ maintenant: a(9, 0), bloc: bloc(), etat: vide() })
