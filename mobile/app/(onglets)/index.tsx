@@ -14,6 +14,7 @@ import { Faits } from '@/ui/Faits'
 import { Mesures } from '@/ui/Mesures'
 import { Projection } from '@/ui/Projection'
 import { Chevron, Plus } from '@/ui/icones'
+import { useLargeur } from '@/ui/largeur'
 import { GEIST, MONO } from '@/ui/primitives'
 
 /**
@@ -23,12 +24,12 @@ import { GEIST, MONO } from '@/ui/primitives'
 const PAS_DE_TEMPS = 25
 
 /**
- * Aujourd'hui — la même page que sur le bureau, dans une seule colonne.
+ * Aujourd'hui — la même page que sur le bureau.
  *
- * Le bureau met le cadran à gauche et ce qui se lit à droite. Un téléphone
- * n'a qu'une colonne : l'ordre vertical devient donc la hiérarchie. On
- * regarde d'abord (cadran, mesures), on lit ensuite (ce que l'application a
- * remarqué, la journée, les tâches ouvertes).
+ * **La même composition aussi, dès qu'il y a la largeur** : le cadran à
+ * gauche, tout ce qui se lit à droite. Sous 760 points, la colonne de droite
+ * deviendrait une gouttière, et l'ordre vertical reprend alors le travail de
+ * la hiérarchie — on regarde d'abord (cadran, mesures), on lit ensuite.
  *
  * Aucun chiffre de cet écran n'est calculé ici. Capacité, repos, retard,
  * déficit, tension, signaux : tout vient du moteur partagé, et cet écran ne
@@ -39,6 +40,7 @@ export default function Aujourdhui() {
   const marges = useSafeAreaInsets()
   const routeur = useRouter()
   const { fontScale } = useWindowDimensions()
+  const large = useLargeur().deuxColonnes
   const { resultat, jours, minute, maintenant, aujourdHui, chargees } = usePlan()
   const { taches, objectifs, ancres, obligations, ajouterDuTemps } = useDonnees()
 
@@ -93,6 +95,21 @@ export default function Aujourdhui() {
         </Pressable>
       </View>
 
+      {/* ── LA COMPOSITION ────────────────────────────────────────────────
+          Deux colonnes des que l'ecran les permet — l'objet qu'on REGARDE a
+          gauche, tout ce qui se LIT a droite — et une seule en dessous.
+
+          C'est la composition du bureau, et son commentaire dit pourquoi :
+          centre, le cadran laissait « cinq cents pixels de noir mort de chaque
+          cote, la mise en page d'un telephone etiree sur un ecran large ».
+          L'inverse gaspille exactement autant : cette meme colonne unique,
+          imposee a un iPad ou a un iPhone tourne, laisse la moitie de l'ecran
+          vide. Vethos ne choisit donc pas entre les deux — il prend celle que
+          la largeur permet. */}
+      <View style={large
+        ? { flexDirection: 'row', alignItems: 'flex-start', gap: PAS[10], marginTop: PAS[6] }
+        : {}}>
+      <View style={large ? { width: 400 } : {}}>
       {/* Au centre du cadran : ce qu'il te RESTE, pas l'heure. L'heure, le
           téléphone l'affiche déjà en haut de son propre écran ; la répéter au
           plus grand corps de l'application reviendrait à donner la place
@@ -120,8 +137,10 @@ export default function Aujourdhui() {
       />
 
       {capacite ? <Mesures capacite={capacite} engage={engage} /> : null}
+      </View>
 
-      <View style={{ marginTop: PAS[6], paddingVertical: PAS[5], borderTopWidth: 1, borderBottomWidth: 1, borderColor: j.line, gap: PAS[2] }}>
+      <View style={large ? { flex: 1, minWidth: 0 } : {}}>
+      <View style={{ marginTop: large ? 0 : PAS[6], paddingVertical: PAS[5], borderTopWidth: 1, borderBottomWidth: 1, borderColor: j.line, gap: PAS[2] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: j.accentEncre }} />
           <Text style={{ fontFamily: GEIST.moyen, fontSize: 12, color: j.text2 }}>
@@ -229,9 +248,13 @@ export default function Aujourdhui() {
         </View>
       ) : null}
 
+      </View>
+      </View>
+
       {/* La derniere section, et la seule qui regarde loin. En haut, elle
           repousserait la journee — or c'est la journee qu'on ouvre
-          l'application pour voir. */}
+          l'application pour voir. Pleine largeur : c'est ce que le bureau fait
+          aussi, sous ses deux colonnes. */}
       <Projection />
     </ScrollView>
   )

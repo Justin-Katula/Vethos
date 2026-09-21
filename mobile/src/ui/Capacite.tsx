@@ -3,6 +3,7 @@ import type { DayCapacity } from '@shared/planning/types'
 import { duree } from '@/plan/lecture'
 import { useJetons } from '@/theme/Theme'
 import { PAS } from '@/theme/jetons'
+import { useLargeur } from './largeur'
 import { GEIST, MONO } from './primitives'
 
 /**
@@ -14,21 +15,98 @@ import { GEIST, MONO } from './primitives'
  * justifie. Personne ne fait confiance à un nombre dont il ne voit pas le
  * calcul — et c'est ce nombre-là qui décide de tout le reste.
  *
- * Le bureau met six colonnes côte à côte. Portées telles quelles sur 375 px,
- * elles débordaient : le tableau défilait horizontalement et **« Disponible »
- * — la seule colonne qu'on vient lire — se retrouvait hors de l'écran.** Un
- * tableau dont on ne voit pas la réponse n'est pas un tableau réduit, c'est un
- * tableau cassé.
+ * **Deux compositions, et l'écran choisit.** Le bureau aligne six colonnes ;
+ * c'est la forme la plus lisible quand il y a la place, parce que deux jours
+ * se comparent alors colonne par colonne. Sous 600 points, cette même forme
+ * poussait « Disponible » — la seule colonne qu'on vient lire — hors de
+ * l'écran. On ne renonce donc pas à la table du bureau : on la reprend dès
+ * qu'elle tient, et en dessous chaque jour se replie sur deux lignes, réponse
+ * d'abord.
  *
- * Ici chaque jour tient sur deux lignes : la réponse d'abord, à droite, dans
- * la colonne où l'œil descend ; les soustractions en dessous, en plus petit,
- * pour qui veut vérifier. Même information, même ordre de lecture, aucune
- * donnée perdue.
+ * Aucune donnée ne disparaît d'une forme à l'autre. Une mise en page étroite
+ * qui cache un chiffre n'est pas une adaptation, c'est une perte.
  */
 
-const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+const JOURS_LONGS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+const JOURS_COURTS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim']
+
+const COLONNES = [
+  { cle: 'brute', titre: 'Brute' },
+  { cle: 'inutilisable', titre: 'Inutilis.' },
+  { cle: 'repos', titre: 'Repos' },
+  { cle: 'fatigue', titre: 'Fatigue' },
+  { cle: 'dispo', titre: 'Dispo' },
+] as const
 
 export function TableauCapacite({ capacites }: { capacites: readonly DayCapacity[] }) {
+  const large = useLargeur().tableau
+  return large ? <EnColonnes capacites={capacites} /> : <EnLignes capacites={capacites} />
+}
+
+/** La table du bureau, telle quelle. Six colonnes, un jour par rangée. */
+function EnColonnes({ capacites }: { capacites: readonly DayCapacity[] }) {
+  const j = useJetons()
+
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', gap: PAS[2], paddingBottom: PAS[2] }}>
+        <Text style={{ width: 74, fontFamily: GEIST.moyen, fontSize: 10, color: j.text3 }}>Jour</Text>
+        {COLONNES.map((c) => (
+          <Text
+            key={c.cle}
+            style={{ flex: 1, textAlign: 'right', fontFamily: GEIST.moyen, fontSize: 10, color: j.text3 }}
+          >
+            {c.titre}
+          </Text>
+        ))}
+      </View>
+
+      {capacites.map((c) => {
+        const ampute = c.fatiguePenaltyMinutes + c.breathingReductionMinutes
+        const cellule = (texte: string, fort?: boolean) => (
+          <Text
+            style={{
+              flex: 1,
+              textAlign: 'right',
+              fontFamily: fort ? MONO.demi : MONO.normal,
+              fontSize: 11.5,
+              color: fort ? j.text : j.text3,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {texte}
+          </Text>
+        )
+        return (
+          <View
+            key={c.date}
+            style={{
+              flexDirection: 'row',
+              gap: PAS[2],
+              alignItems: 'center',
+              paddingVertical: PAS[2],
+              borderTopWidth: 1,
+              borderTopColor: j.line,
+            }}
+          >
+            <Text style={{ width: 74, fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>
+              {JOURS_COURTS[c.dayOfWeek]}{' '}
+              <Text style={{ fontFamily: MONO.normal, color: j.text3 }}>{c.date.slice(8)}</Text>
+            </Text>
+            {cellule(duree(c.rawCapacityMinutes))}
+            {cellule(`−${duree(c.unusableMinutes)}`)}
+            {cellule(`−${duree(c.restReservedMinutes)}`)}
+            {cellule(ampute > 0 ? `−${duree(ampute)}` : '—')}
+            {cellule(duree(c.effectiveCapacityMinutes), true)}
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+/** La forme étroite : la réponse à droite, les soustractions en dessous. */
+function EnLignes({ capacites }: { capacites: readonly DayCapacity[] }) {
   const j = useJetons()
 
   return (
@@ -45,7 +123,7 @@ export function TableauCapacite({ capacites }: { capacites: readonly DayCapacity
           <View
             key={c.date}
             accessible
-            accessibilityLabel={`${JOURS[c.dayOfWeek]} ${c.date.slice(8)} : ${duree(c.effectiveCapacityMinutes)} disponibles`}
+            accessibilityLabel={`${JOURS_LONGS[c.dayOfWeek]} ${c.date.slice(8)} : ${duree(c.effectiveCapacityMinutes)} disponibles`}
             style={{
               paddingVertical: PAS[2] + 2,
               borderTopWidth: i === 0 ? 0 : 1,
@@ -55,18 +133,13 @@ export function TableauCapacite({ capacites }: { capacites: readonly DayCapacity
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: PAS[2] }}>
               <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 13, color: j.text }}>
-                {JOURS[c.dayOfWeek]}{' '}
+                {JOURS_LONGS[c.dayOfWeek]}{' '}
                 <Text style={{ fontFamily: MONO.normal, fontSize: 11.5, color: j.text3 }}>
                   {c.date.slice(8)}
                 </Text>
               </Text>
               <Text
-                style={{
-                  fontFamily: MONO.demi,
-                  fontSize: 13,
-                  color: j.text,
-                  fontVariant: ['tabular-nums'],
-                }}
+                style={{ fontFamily: MONO.demi, fontSize: 13, color: j.text, fontVariant: ['tabular-nums'] }}
               >
                 {duree(c.effectiveCapacityMinutes)}
               </Text>
