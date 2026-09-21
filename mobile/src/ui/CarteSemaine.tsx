@@ -37,7 +37,7 @@ export function CarteSemaine({ jours, selection, surSelection, aujourdHui, minut
             </View>
             <View style={{ height: H, width: 25, marginTop: 4, backgroundColor: j.surface2, borderRadius: 5, overflow: 'hidden' }}>
               {jour.segments.map((s) => <View key={`${s.nature}-${s.id}`} style={{ position: 'absolute',
-                left: 0, right: 0, top: s.debut / 1440 * H, height: (s.fin - s.debut) / 1440 * H,
+                left: s.nature === 'sleep' ? 8 : 0, right: s.nature === 'sleep' ? 8 : 0, top: s.debut / 1440 * H, height: (s.fin - s.debut) / 1440 * H,
                 backgroundColor: couleurTemps(s.nature, j), borderTopWidth: s.nature === 'sleep' ? 0 : 1, borderTopColor: j.bg }} />)}
               {[6, 12, 18].map((h) => <View key={h} style={{ position: 'absolute', left: 0, right: 0, top: h / 24 * H, height: 1, backgroundColor: j.lineForte }} />)}
               {maintenant && <View style={{ position: 'absolute', left: 0, right: 0, top: minute / 1440 * H, height: 2, backgroundColor: j.accentEncre }} />}

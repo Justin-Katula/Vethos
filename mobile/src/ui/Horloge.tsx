@@ -37,7 +37,7 @@ export function Horloge({ jour, minute }: { jour: JourTemps; minute: number }) {
             fill={j.text2} fontFamily={MONO.normal} fontSize={11}>{String(m / 60).padStart(2, '0')}</SvgText>
         })}
         {jour.segments.map((s) => <Path key={`${s.nature}-${s.id}`} d={arc(180, 135, angle(s.debut), angle(s.fin))}
-          stroke={couleurTemps(s.nature, j)} strokeWidth={s.nature === 'sleep' ? 10 : 14}
+          stroke={couleurTemps(s.nature, j)} strokeWidth={s.nature === 'sleep' ? 6 : 14}
           strokeLinecap="butt" fill="none" opacity={s.fin <= minute ? 0.5 : 1} />)}
         <Circle cx={repere.x} cy={repere.y} r={6} fill={j.accentEncre} stroke={j.bg} strokeWidth={3} />
       </Svg>
