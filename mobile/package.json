@@ -1,0 +1,40 @@
+{
+  "name": "vethos-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vethos pour iPhone — le même moteur de planification que le bureau, le blocage d'Apple.",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --platform ios --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "expo": "~57.0.24",
+    "expo-router": "~57.0.22",
+    "expo-constants": "~57.0.19",
+    "expo-linking": "~57.0.10",
+    "expo-status-bar": "~57.0.1",
+    "expo-haptics": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.87.1",
+    "react-native-device-activity": "^0.6.1",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-reanimated": "~4.7.0",
+    "react-native-safe-area-context": "~5.10.0",
+    "react-native-screens": "~4.28.0",
+    "react-native-svg": "~15.15.5",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.2",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~5.9.2",
+    "vitest": "^1.6.1"
+  }
+}

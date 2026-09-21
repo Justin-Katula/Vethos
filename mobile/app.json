@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Vethos",
+    "slug": "vethos",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "vethos",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.vethos.app",
+      "supportsTablet": false,
+      "deploymentTarget": "16.0",
+      "infoPlist": {
+        "NSFamilyControlsUsageDescription": "Vethos utilise le Temps d'écran pour masquer les applications que tu as toi-même choisi d'écarter pendant tes séances de travail. Rien n'est envoyé nulle part : iOS ne nous dit même pas de quelles applications il s'agit.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["processing"]
+      },
+      "entitlements": {
+        "com.apple.developer.family-controls": true
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "react-native-device-activity",
+        {
+          "appGroup": "group.com.vethos.app"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
