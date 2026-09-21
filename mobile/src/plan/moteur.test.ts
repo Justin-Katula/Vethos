@@ -166,6 +166,7 @@ describe('les lois que le moteur fait respecter', () => {
     const ancre: Ancre = {
       id: 'a1',
       nom: 'Déjeuner',
+      intention: 'Manger sans écran',
       declencheur: '',
       couleur: '#2c3a56',
       minuteAncrage: 12 * 60 + 30,

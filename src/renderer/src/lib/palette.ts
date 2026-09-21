@@ -70,12 +70,11 @@ export const BREAK_VEIL = 'var(--break-veil)'
 export const BREAK_HATCH = 'var(--break-hatch)'
 export const BREAK_SEAM = 'var(--break-seam)'
 
-/** L'olive #58664A et le gris-vert #6F7671 ont quitté la liste : plus de vert. */
-export const CHOOSABLE_SHADES = ['#c1121f', '#253047', '#55585c', '#9a6a11', '#747474'] as const
-
-export function nextShade(index: number): string {
-  return CHOOSABLE_SHADES[index % CHOOSABLE_SHADES.length]!
-}
+/**
+ * Les teintes d'engagement vivent dans `@shared/teintes` : le téléphone en a
+ * besoin des MÊMES, et deux listes finiraient par ne plus se ressembler.
+ */
+export { TEINTES as CHOOSABLE_SHADES, teinteSuivante as nextShade } from '@shared/teintes'
 
 // ─── Adaptation d'une couleur stockée au thème en cours ────────────────────
 

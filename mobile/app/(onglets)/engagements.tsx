@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { teinteSuivante } from '@shared/teintes'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { usePlan } from '@/plan/Plan'
@@ -65,7 +66,7 @@ export default function Engagements() {
         titre="Tâches"
         compte={groupes.length}
         loi="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
-        action={<BoutonAjout ouvert={ajout === 'tache'} surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
+        action={<BoutonAjout ouvert={ajout === 'tache'} quoi="une tâche" surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
       >
         {ajout === 'tache' ? <FormulaireTache surFin={() => setAjout('aucun')} /> : null}
 
@@ -96,7 +97,7 @@ export default function Engagements() {
         titre="Objectifs"
         compte={d.objectifs.length}
         loi="Une cible par semaine, jamais d’échéance. Gouverné par le rythme : il avance sans jamais être en retard."
-        action={<BoutonAjout ouvert={ajout === 'objectif'} surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')} />}
+        action={<BoutonAjout ouvert={ajout === 'objectif'} quoi="un objectif" surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')} />}
       >
         {ajout === 'objectif' ? <FormulaireObjectif surFin={() => setAjout('aucun')} /> : null}
 
@@ -116,7 +117,7 @@ export default function Engagements() {
               </Texte>
             </View>
             <Valeur>{duree(o.cibleHebdoMinutes)}</Valeur>
-            <Supprimer surPression={() => void d.supprimerObjectif(o.id)} />
+            <Supprimer quoi={o.nom} surPression={() => void d.supprimerObjectif(o.id)} />
           </Rangee>
         ))}
       </Section>
@@ -125,7 +126,7 @@ export default function Engagements() {
         titre="Ancres"
         compte={d.ancres.length}
         loi="Une heure fixe, choisie une fois. Gouvernée par la stabilité : elle ne bouge jamais d’un jour à l’autre."
-        action={<BoutonAjout ouvert={ajout === 'ancre'} surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')} />}
+        action={<BoutonAjout ouvert={ajout === 'ancre'} quoi="une ancre" surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')} />}
       >
         {ajout === 'ancre' ? <FormulaireAncre surFin={() => setAjout('aucun')} /> : null}
 
@@ -150,7 +151,7 @@ export default function Engagements() {
                 {duree(a.dureeMinutes)}
               </Valeur>
             </View>
-            <Supprimer surPression={() => void d.supprimerAncre(a.id)} />
+            <Supprimer quoi={a.nom} surPression={() => void d.supprimerAncre(a.id)} />
           </Rangee>
         ))}
       </Section>
@@ -247,7 +248,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
           <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2 }}>+{PAS_DE_TEMPS}</Text>
         </Pressable>
 
-        <Supprimer surPression={() => void d.supprimerTache(racine.id)} />
+        <Supprimer quoi={racine.titre} surPression={() => void d.supprimerTache(racine.id)} />
       </View>
 
       {/* Ce qui a ete MESURE, pas ce qui a ete promis. La barre ne bouge
@@ -325,24 +326,41 @@ function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
         </Valeur>
       </View>
 
-      <Supprimer surPression={() => void d.supprimerTache(tache.id)} />
+      <Supprimer quoi={tache.titre} surPression={() => void d.supprimerTache(tache.id)} />
     </Rangee>
   )
 }
 
-function Supprimer({ surPression }: { surPression: () => void }) {
+function Supprimer({ surPression, quoi }: { surPression: () => void; quoi: string }) {
   const j = useJetons()
   return (
-    <Pressable onPress={surPression} hitSlop={12} style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Supprimer ${quoi}`}
+      onPress={surPression}
+      hitSlop={12}
+      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+    >
       <Croix couleur={j.text3} taille={15} />
     </Pressable>
   )
 }
 
-function BoutonAjout({ ouvert, surPression }: { ouvert: boolean; surPression: () => void }) {
+/**
+ * Le « + » d'une section.
+ *
+ * Il porte un NOM, et c'est obligatoire : un bouton dont le seul contenu est
+ * un glyphe dessine n'a rien a annoncer a VoiceOver. Trois boutons identiques
+ * et muets sur le meme ecran, c'etait trois « bouton » lus a la suite, sans
+ * moyen de savoir lequel ajoutait quoi.
+ */
+function BoutonAjout({ ouvert, quoi, surPression }: { ouvert: boolean; quoi: string; surPression: () => void }) {
   const j = useJetons()
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={ouvert ? 'Fermer le formulaire' : `Ajouter ${quoi}`}
+      accessibilityState={{ expanded: ouvert }}
       onPress={surPression}
       hitSlop={10}
       style={({ pressed }) => ({
@@ -406,16 +424,17 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
 
   return (
     <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ valeur={titre} surChangement={setTitre} exemple="Finir le dossier" premier />
+      <Champ etiquette="Titre de la tâche" valeur={titre} surChangement={setTitre} exemple="Finir le dossier" premier />
       <Champ
+        etiquette="Le plan : en quoi ça consiste concrètement"
         valeur={intention}
         surChangement={setIntention}
-        exemple="Ce soir a mon bureau, je redige les trois premieres pages."
+        exemple="Ce soir à mon bureau, je rédige les trois premières pages."
         multiligne
       />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
-        <Champ valeur={jours} surChangement={setJours} exemple="7" suffixe="jours" numerique />
+        <Champ etiquette="Durée estimée en minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
+        <Champ etiquette="Échéance, dans combien de jours" valeur={jours} surChangement={setJours} exemple="7" suffixe="jours" numerique />
       </View>
       <Bascule
         valeur={nature}
@@ -475,25 +494,37 @@ function Bascule<T extends string>({
 
 function FormulaireObjectif({ surFin }: { surFin: () => void }) {
   const d = useDonnees()
-  const j = useJetons()
   const [nom, setNom] = useState('')
+  const [intention, setIntention] = useState('')
   const [heures, setHeures] = useState('5')
 
+  const complet = !!nom.trim() && !!intention.trim()
+
   const valider = async () => {
-    if (!nom.trim()) return
+    if (!complet) return
     await d.ajouterObjectif({
       nom: nom.trim(),
-      intention: '',
-      couleur: j.blocObjectif,
+      intention: intention.trim(),
+      // La teinte est ATTRIBUEE par rang de creation, jamais choisie. Un
+      // selecteur de couleur transformerait la liste des engagements en
+      // decoration personnelle, et rien de ce temps-la n'avance le plan.
+      couleur: teinteSuivante(d.objectifs.length),
       cibleHebdoMinutes: Math.max(0, Math.round((Number(heures) || 5) * 60)),
     })
     surFin()
   }
 
   return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={!!nom.trim()}>
-      <Champ valeur={nom} surChangement={setNom} exemple="Apprendre le piano" premier />
-      <Champ valeur={heures} surChangement={setHeures} exemple="5" suffixe="h / semaine" numerique />
+    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
+      <Champ etiquette="Nom de l’objectif" valeur={nom} surChangement={setNom} exemple="Guitare, sport, lecture…" premier />
+      <Champ
+        etiquette="Le plan : en quoi ça consiste concrètement"
+        valeur={intention}
+        surChangement={setIntention}
+        exemple="En quoi ça consiste ? Ex. : tous les soirs au studio, une heure de gammes."
+        multiligne
+      />
+      <Champ etiquette="Heures par semaine" valeur={heures} surChangement={setHeures} exemple="5" suffixe="h / semaine" numerique />
     </Formulaire>
   )
 }
@@ -502,20 +533,27 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
   const d = useDonnees()
   const j = useJetons()
   const [nom, setNom] = useState('')
+  const [intention, setIntention] = useState('')
   const [heure, setHeure] = useState('12:30')
   const [minutes, setMinutes] = useState('60')
+  const [jours, setJours] = useState([1, 2, 3, 4, 5])
   const [erreur, setErreur] = useState('')
 
+  const complet = !!nom.trim() && !!intention.trim() && jours.length > 0
+
   const valider = async () => {
-    if (!nom.trim()) return
+    if (!complet) return
     setErreur('')
     try {
       await d.ajouterAncre({
         nom: nom.trim(),
-        declencheur: '',
+        // D.3 : le declencheur derive du NOM, comme sur le bureau. Deux ancres
+        // qui s'appellent pareil sont la meme ancre, et le conflit doit le dire.
+        declencheur: nom.trim().toLowerCase(),
+        intention: intention.trim(),
         couleur: j.blocAncre,
         minuteAncrage: versMinuteSure(heure),
-        jours: [1, 2, 3, 4, 5],
+        jours,
         dureeMinutes: Math.max(15, Number(minutes) || 60),
       })
       surFin()
@@ -528,12 +566,20 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
   }
 
   return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={!!nom.trim()}>
-      <Champ valeur={nom} surChangement={setNom} exemple="Déjeuner" premier />
+    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
+      <Champ etiquette="Nom de l’ancre" valeur={nom} surChangement={setNom} exemple="Sport, lecture, méditation…" premier />
+      <Champ
+        etiquette="Le plan : en quoi ça consiste concrètement"
+        valeur={intention}
+        surChangement={setIntention}
+        exemple="En quoi ça consiste ? Ex. : ce soir à la salle, 45 min de haut du corps."
+        multiligne
+      />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
-        <Champ valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
+        <Champ etiquette="Heure de l’ancre" valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
+        <Champ etiquette="Durée en minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
       </View>
+      <ChoixJours valeur={jours} surChangement={setJours} />
       {erreur ? (
         <Text accessibilityRole="alert" style={{ fontFamily: GEIST.normal, fontSize: 12.5, lineHeight: 19, color: j.accentEncre }}>
           {erreur}
@@ -589,6 +635,7 @@ function Champ({
   numerique,
   premier,
   multiligne,
+  etiquette,
 }: {
   valeur: string
   surChangement: (v: string) => void
@@ -597,11 +644,21 @@ function Champ({
   numerique?: boolean
   premier?: boolean
   multiligne?: boolean
+  /**
+   * Ce que le champ demande, pour qui ne le voit pas.
+   *
+   * L'exemple sert de repli, mais il ne le remplace pas : un lecteur d'ecran
+   * n'annonce le placeholder que tant que le champ est VIDE. Une fois rempli,
+   * un champ sans etiquette ne dit plus que sa valeur — « 60 », sans jamais
+   * dire 60 quoi.
+   */
+  etiquette?: string
 }) {
   const j = useJetons()
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
       <TextInput
+        accessibilityLabel={etiquette ?? exemple}
         value={valeur}
         onChangeText={surChangement}
         placeholder={exemple}
@@ -625,6 +682,52 @@ function Champ({
         }}
       />
       {suffixe ? <Texte ton="eteint" taille={12.5}>{suffixe}</Texte> : null}
+    </View>
+  )
+}
+
+/**
+ * Les sept jours d'une ancre.
+ *
+ * L'ordre part du lundi, celui de la semaine vecue — pas du dimanche, qui
+ * n'est la convention que de JavaScript.
+ */
+function ChoixJours({ valeur, surChangement }: { valeur: number[]; surChangement: (v: number[]) => void }) {
+  const j = useJetons()
+  const noms = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
+  const basculer = (n: number) =>
+    surChangement(valeur.includes(n) ? valeur.filter((v) => v !== n) : [...valeur, n])
+
+  return (
+    <View style={{ gap: PAS[2] }}>
+      <Texte ton="eteint" taille={12.5}>Jours</Texte>
+      <View style={{ flexDirection: 'row', gap: 3 }}>
+        {[1, 2, 3, 4, 5, 6, 0].map((n) => {
+          const actif = valeur.includes(n)
+          return (
+            <Pressable
+              key={n}
+              accessibilityRole="button"
+              accessibilityLabel={noms[n]}
+              accessibilityState={{ selected: actif }}
+              onPress={() => basculer(n)}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: RAYON.sm,
+                borderWidth: 1,
+                borderColor: actif ? j.accent : j.line,
+                backgroundColor: actif ? j.accentDoux : 'transparent',
+                transform: [{ translateY: pressed ? 1 : 0 }],
+              })}
+            >
+              <Texte ton={actif ? 'accent' : 'eteint'} taille={11.5}>{noms[n]![0]!.toUpperCase()}</Texte>
+            </Pressable>
+          )
+        })}
+      </View>
     </View>
   )
 }

@@ -195,6 +195,12 @@ export function BoutonIris({
   const j = useJetons()
   return (
     <Pressable
+      // Le role et l'etat DECLARES, pas devines. Une `Pressable` nue n'est
+      // qu'une vue qui reagit au doigt : VoiceOver ne l'annonce pas comme un
+      // bouton, et ne dit pas non plus qu'elle est desactivee — on tape sur un
+      // element qui ne repond pas, sans jamais savoir pourquoi.
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!desactive }}
       onPress={onPress}
       disabled={desactive}
       style={({ pressed }) => [
@@ -237,6 +243,12 @@ export function BoutonPlat({
   const j = useJetons()
   return (
     <Pressable
+      // Le role et l'etat DECLARES, pas devines. Une `Pressable` nue n'est
+      // qu'une vue qui reagit au doigt : VoiceOver ne l'annonce pas comme un
+      // bouton, et ne dit pas non plus qu'elle est desactivee — on tape sur un
+      // element qui ne repond pas, sans jamais savoir pourquoi.
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!desactive }}
       onPress={onPress}
       disabled={desactive}
       style={({ pressed }) => [

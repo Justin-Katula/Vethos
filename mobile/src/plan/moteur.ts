@@ -23,15 +23,21 @@ import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/mag
  * complète avec les valeurs par défaut que le moteur attend, sans jamais
  * inventer une règle de placement ici.
  *
+ * `apprentissage` est optionnel, et son absence a un sens précis : sans lui, le
+ * moteur ne reçoit ni observations, ni retard mesuré, ni temps réellement fait.
+ * Il retombe alors sur ses valeurs par défaut — ce qui est le comportement
+ * voulu, et jamais un historique inventé. La pendule de séance le fournit dès
+ * qu'un « Je commence » a été pressé.
+ *
  * Ce qui reste vide, et pourquoi :
  *
- * - `observations` : le moteur apprend de la durée RÉELLE des séances passées.
- *   Le téléphone ne la mesure pas encore — il faudrait le « Je commence » et sa
- *   confirmation de fin. Sans mesure, le moteur retombe sur ses valeurs par
- *   défaut, ce qui est le comportement voulu : il n'invente pas d'historique.
- * - `confirmationSource` : le retard est MESURÉ, jamais déduit. Sans le
- *   composant qui le mesure, il n'y a pas de retard — et surtout pas un retard
- *   supposé.
+ * - `appsToBlock`, partout : le blocage d'applications n'existe pas sur iOS
+ *   sous la forme du bureau — un `ApplicationToken` y est opaque, et ce qui
+ *   remplace cette liste vit dans `src/blocage/`.
+ * - `category`, toujours « général » : le téléphone ne demande pas de
+ *   catégorie à la création. Le facteur de correction s'apprend donc sur un
+ *   seul groupe au lieu d'un par domaine — moins fin que le bureau, mais
+ *   jamais faux.
  */
 export function calculerPlan({
   taches,
@@ -80,7 +86,7 @@ export function calculerPlan({
     ancres: ancres.map((a) => ({
       id: a.id,
       name: a.nom,
-      plan: a.declencheur || a.nom,
+      plan: a.intention || a.nom,
       color: a.couleur,
       trigger: a.declencheur || a.nom,
       anchorMinute: a.minuteAncrage,

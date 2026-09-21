@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { HORIZON_WEEKS, anchorInsight, hoursLabel, objectiveMilestone } from './projection'
+import { TEINTES, teinteSuivante } from './teintes'
 
 /**
  * La projection est du TEXTE, et c'est précisément ce qui la rend fragile.
@@ -103,5 +104,30 @@ describe('ce qu’une ancre devient sur un an', () => {
 
   it('ignore la casse et les accents du nom', () => {
     expect(anchorInsight('SPORT', 10)).toContain('transformation physique')
+  })
+})
+
+describe('les teintes d’engagement', () => {
+  it('n’en propose que cinq, et les fait tourner', () => {
+    expect(TEINTES).toHaveLength(5)
+    expect(teinteSuivante(0)).toBe(TEINTES[0])
+    expect(teinteSuivante(5)).toBe(TEINTES[0])
+    expect(teinteSuivante(7)).toBe(TEINTES[2])
+  })
+
+  it('n’en contient aucune verte', () => {
+    // La règle d'identité interdit toute teinte entre 60° et 170°, sans
+    // exception ni nuance. Un vert qui se réintroduirait par une palette est
+    // exactement la façon dont ce genre de règle meurt.
+    for (const hex of TEINTES) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number]
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      if (max === min) continue // gris neutre : pas de teinte du tout
+      const h =
+        max === r ? ((g - b) / (max - min) + 6) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4
+      const teinte = h * 60
+      expect(teinte >= 60 && teinte <= 170, `${hex} tombe à ${Math.round(teinte)}°, dans la zone verte`).toBe(false)
+    }
   })
 })

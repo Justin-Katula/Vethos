@@ -62,6 +62,12 @@ export type Objectif = z.infer<typeof ObjectifSchema>
 export const AncreSchema = z.object({
   id: z.string(),
   nom: z.string().min(1).max(60),
+  /**
+   * Le plan : en quoi ca consiste concretement. Obligatoire a la creation,
+   * comme sur le bureau et pour la meme raison qu'une tache — « faire du
+   * sport » ne dit ni ou, ni quoi, ni comment commencer.
+   */
+  intention: z.string().max(2000).default(''),
   /** Ce qui la déclenche : « après le déjeuner », « en rentrant ». */
   declencheur: z.string().max(80).default(''),
   couleur: z.string(),
