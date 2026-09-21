@@ -14,7 +14,9 @@
       "infoPlist": {
         "NSFamilyControlsUsageDescription": "Vethos utilise le Temps d'écran pour masquer les applications que tu as toi-même choisi d'écarter pendant tes séances de travail. Rien n'est envoyé nulle part : iOS ne nous dit même pas de quelles applications il s'agit.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["processing"]
+        "UIBackgroundModes": [
+          "processing"
+        ]
       },
       "entitlements": {
         "com.apple.developer.family-controls": true
@@ -32,6 +34,10 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     }
   }
 }
