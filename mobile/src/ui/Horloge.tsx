@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { View } from 'react-native'
 import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg'
 import { useJetons } from '@/theme/Theme'
+import { GEIST, MONO } from '@/ui/primitives'
 import type { PlacedBlock } from '@shared/planning/types'
 
 /**
@@ -104,13 +105,13 @@ export function Horloge({
             x={r}
             y={r - 4}
             fill={j.text}
-            fontSize={38}
-            fontWeight="700"
+            fontSize={40}
+            fontFamily={MONO.demi}
             textAnchor="middle"
           >
             {enHeure(maintenant)}
           </SvgText>
-          <SvgText x={r} y={r + 20} fill={j.text3} fontSize={12} textAnchor="middle">
+          <SvgText x={r} y={r + 22} fill={j.text3} fontSize={11.5} fontFamily={GEIST.normal} textAnchor="middle">
             {eveille ? `éveillé depuis ${duree(maintenant - leverMinute)}` : 'nuit'}
           </SvgText>
         </G>

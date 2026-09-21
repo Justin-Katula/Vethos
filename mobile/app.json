@@ -30,7 +30,9 @@
         {
           "appGroup": "group.com.vethos.app"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-splash-screen"
     ],
     "experiments": {
       "typedRoutes": true
