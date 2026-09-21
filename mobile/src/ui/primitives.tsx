@@ -304,7 +304,10 @@ export function Rangee({
   )
   if (!onPress) return contenu
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+    // Une rangee qui reagit au doigt EST un bouton, meme si elle ressemble a
+    // une ligne de tableau. Sans le role, elle se lit comme du texte inerte
+    // et rien n'indique qu'on peut la toucher.
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
       {contenu}
     </Pressable>
   )

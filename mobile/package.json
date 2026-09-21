@@ -10,7 +10,8 @@
     "prebuild": "expo prebuild --platform ios --clean",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "audit:a11y": "node scripts/audit-accessibilite.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/geist": "^0.4.2",

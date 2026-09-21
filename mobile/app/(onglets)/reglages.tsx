@@ -163,6 +163,9 @@ function Champ({
         {etiquette}
       </Texte>
       <TextInput
+        // L'etiquette est AU-DESSUS du champ, pas dedans : rien ne les relie
+        // pour un lecteur d'ecran, qui n'annoncerait alors que la valeur.
+        accessibilityLabel={etiquette}
         value={valeur}
         onChangeText={surChangement}
         placeholder={exemple}

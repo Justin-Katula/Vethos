@@ -745,10 +745,17 @@ function Echelle({ valeur, surChangement }: { valeur: number; surChangement: (v:
           {valeur}/10
         </Valeur>
       </View>
+      {/* Dix barres de couleur, et RIEN d'autre : sans role ni nom, un lecteur
+          d'ecran ne les voyait pas du tout. L'importance — le champ qui decide
+          de l'ordre de passage de toute la semaine — etait simplement
+          impossible a regler autrement qu'a l'œil. */}
       <View style={{ flexDirection: 'row', gap: 3 }}>
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <Pressable
             key={n}
+            accessibilityRole="button"
+            accessibilityLabel={`Importance ${n} sur 10`}
+            accessibilityState={{ selected: n === valeur }}
             onPress={() => surChangement(n)}
             style={{
               flex: 1,
