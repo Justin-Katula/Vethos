@@ -142,7 +142,13 @@ type EtatDonnees = Contenu & {
     options?: { maxParJourMinutes?: number },
   ) => Promise<void>
   ajouterDuTemps: (id: string, minutes: number) => Promise<void>
-  basculerTache: (id: string) => Promise<void>
+  /**
+   * B.5.2 : la seule voie par laquelle une tache se termine — la pendule, sur
+   * du temps REELLEMENT mesure. Il n'existe deliberement aucune fonction pour
+   * qu'un geste de l'utilisateur la termine : la completion se constate, elle
+   * ne se declare pas.
+   */
+  terminerTaches: (ids: readonly string[]) => Promise<void>
   supprimerTache: (id: string) => Promise<void>
 
   ajouterObjectif: (o: Omit<Objectif, 'id' | 'creeLe'>) => Promise<void>
@@ -242,13 +248,19 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       })
     },
 
-    async basculerTache(id) {
+    async terminerTaches(ids) {
+      const finies = new Set(ids)
+      const taches = get().taches
+      // Rien de neuf : on evite une ecriture disque a chaque minute.
+      if (!taches.some((t) => finies.has(t.id) && !t.terminee)) return
+
+      // `minutesRestantes` n'est PAS remis a zero : il porte le total
+      // PLANIFIE, et c'est lui qui fixe la ligne d'arrivee. L'ecraser
+      // casserait « il m'en faut plus » — la cible retomberait aux seules
+      // minutes ajoutees, deja depassees par le travail fait, et la tache se
+      // reterminerait dans la seconde.
       await enregistrer({
-        taches: get().taches.map((t) =>
-          t.id === id
-            ? { ...t, terminee: !t.terminee, minutesRestantes: t.terminee ? t.minutesEstimees : 0 }
-            : t,
-        ),
+        taches: taches.map((t) => (finies.has(t.id) ? { ...t, terminee: true } : t)),
       })
     },
 

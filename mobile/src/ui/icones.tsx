@@ -31,6 +31,18 @@ export const Coche = (p: Props) => <Trait {...p} d="M4.5 12.5l5 5 10-11" epaisse
 export const Chevron = (p: Props) => <Trait {...p} d="M9 5l7 7-7 7" />
 export const GlypheTemps = (p: Props) => <Trait {...p} d="M5 3v3M19 3v3M3 9h18M4 5h16a1 1 0 011 1v14H3V6a1 1 0 011-1zM7 13h3M14 13h3M7 17h3" />
 
+/**
+ * Le triangle de « Je commence ». Plein, pas un contour.
+ *
+ * C'est le seul glyphe rempli de l'application, et c'est voulu : il marque le
+ * seul geste qui engage. Tous les autres se consultent.
+ */
+export const Depart = ({ taille = 16, couleur }: Props) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none">
+    <Path d="M8 5.2v13.6L19 12 8 5.2z" fill={couleur} />
+  </Svg>
+)
+
 /** Les quatre glyphes de la barre d'onglets. Géométrie pure, même grille. */
 export const GlypheJour = (p: Props) => (
   <Trait {...p} taille={p.taille ?? 20} d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 7.5V12l3 2" />

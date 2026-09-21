@@ -17,7 +17,7 @@ import {
   confirmationsFor,
   pendingConfirmation,
   tasksToAutoComplete,
-} from './plan-clock'
+} from '@shared/planning/clock'
 import type { ConfirmationOverlay } from './confirmation-overlay'
 
 /**
@@ -385,7 +385,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     }
 
     // Résolu par la même stabilisation que le tic (voir `pendingConfirmation`
-    // / `stabilized` dans `plan-clock.ts`) : le `blockId` que l'overlay a reçu
+    // / `stabilized` dans `@shared/planning/clock.ts`) : le `blockId` que l'overlay a reçu
     // à son ouverture peut ne plus exister tel quel dans un scan frais du
     // plan (D.9 le fait glisser à chaque minute) — c'est pourtant le MÊME
     // bloc conceptuel tant que `observedPending` le reconnaît comme tel.

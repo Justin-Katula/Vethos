@@ -1,5 +1,12 @@
 import { computePlan } from '@shared/planning/engine'
-import type { PlanningInput, PlanningResult } from '@shared/planning/types'
+import type {
+  ActiveSession,
+  PlanningInput,
+  PlanningResult,
+  SessionConfirmationSource,
+  TaskItem,
+} from '@shared/planning/types'
+import type { LearningState } from '@shared/schemas'
 import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/magasin'
 
 /**
@@ -31,6 +38,8 @@ export function calculerPlan({
   ancres,
   obligations,
   reglages,
+  apprentissage,
+  seanceActive = null,
   jours = 7,
   maintenant = new Date(),
 }: {
@@ -39,6 +48,10 @@ export function calculerPlan({
   ancres: readonly Ancre[]
   obligations: readonly Obligation[]
   reglages: Reglages
+  /** Ce qui a ete MESURE : temps fait, retards, ratees, observations. */
+  apprentissage?: LearningState
+  /** D.7 : la seance confirmee en cours. Elle se produit deja, donc on ne la replace pas. */
+  seanceActive?: ActiveSession | null
   /** Horizon, en jours. Sept couvre la semaine que le moteur raisonne. */
   jours?: number
   maintenant?: Date
@@ -51,33 +64,7 @@ export function calculerPlan({
     today: aujourdhui,
     rangeEnd: cleDate(fin),
 
-    tasks: taches
-      .filter((t) => !t.terminee)
-      .map((t) => ({
-        id: t.id,
-        title: t.titre,
-        plan: t.intention || t.titre,
-        deadline: t.echeance,
-        importance: t.importance,
-        category: 'général',
-        workKind: t.nature === 'nouveau' ? ('novel' as const) : ('routine' as const),
-        estimatedMinutes: t.minutesEstimees,
-        remainingMinutes: t.minutesRestantes,
-        // B.1 : le facteur retenu a la CREATION, pas recalcule ici. Le
-        // moteur lit `remainingMinutes`, deja corrige par le magasin ; ce
-        // champ ne sert qu'a garder le plan explicable.
-        correctionFactor: t.facteurCorrection,
-        // B.5/B.5.1 : le decoupage et le rang des parties viennent du magasin.
-        // Les mettre a `null` ici, comme avant, annulait le verrouillage
-        // sequentiel : les cinq parties d'une tache se placaient toutes dans
-        // la meme journee, dans un ordre arbitraire.
-        parentTaskId: t.parentId,
-        partOrder: t.rangPartie,
-        extraMinutes: t.minutesSupplementaires,
-        appsToBlock: [],
-        status: 'active' as const,
-        createdAt: t.creeeLe,
-      })),
+    tasks: versTachesMoteur(taches),
 
     objectives: objectifs.map((o) => ({
       id: o.id,
@@ -113,19 +100,76 @@ export function calculerPlan({
       ...sommeilEnObligations(reglages),
     ],
 
-    observations: [],
-    anchorMissCounts: {},
-    consecutiveDelays: {},
-    dailyUtilization: {},
-    weeklyObjectiveServed: {},
-    objectiveLastServed: {},
-    lastSignalAt: {},
+    observations: apprentissage?.observations ?? [],
+    anchorMissCounts: apprentissage?.anchorMissCounts ?? {},
+    consecutiveDelays: apprentissage?.consecutiveDelays ?? {},
+    dailyUtilization: apprentissage?.dailyUtilization ?? {},
+    weeklyObjectiveServed: apprentissage?.weeklyObjectiveServed ?? {},
+    objectiveLastServed: apprentissage?.objectiveLastServed ?? {},
+    lastSignalAt: apprentissage?.lastSignalAt ?? {},
     // D.6 : alimente le plafond de travail en cours. Vide tant que rien
     // n'est mesuré — le moteur retombe alors sur sa valeur par défaut.
-    tasksCreatedPerWeek: {},
+    tasksCreatedPerWeek: apprentissage?.tasksCreatedPerWeek ?? {},
+
+    // D.7 : le retard est MESURE par « Je commence », jamais deduit ici.
+    // `wasNeverConfirmed` reste faux comme sur le bureau : le fait de
+    // non-demarrage se lit dans les compteurs, pas dans une supposition.
+    ...(apprentissage ? { confirmationSource: sourceConfirmation(apprentissage) } : {}),
+    // B.5.2 : le temps REELLEMENT fait. Sans lui, le travail restant ne
+    // diminue jamais tout seul et la boucle d'apprentissage tourne a vide.
+    ...(apprentissage
+      ? {
+          durationSource: {
+            getActualMinutes: (id: string) => apprentissage.workedMinutesByRef[id] ?? null,
+          },
+        }
+      : {}),
+    ...(seanceActive ? { activeSession: seanceActive } : {}),
   }
 
   return computePlan(entree, maintenant)
+}
+
+function sourceConfirmation(apprentissage: LearningState): SessionConfirmationSource {
+  return {
+    getDelayMinutes: (date) => apprentissage.dailyDelayMinutes[date] ?? 0,
+    wasNeverConfirmed: () => false,
+  }
+}
+
+/**
+ * Les taches du telephone, dans la forme que le moteur ET la pendule lisent.
+ *
+ * Une seule traduction pour les deux : `tasksToAutoComplete` vise exactement
+ * la meme ligne d'arrivee que le placement (`plannedTotalFor`), et une seconde
+ * traduction qui deriverait d'un champ ferait viser deux cibles differentes —
+ * une tache qui ne se terminerait jamais toute seule.
+ */
+export function versTachesMoteur(taches: readonly Tache[]): TaskItem[] {
+  return taches
+    .filter((t) => !t.terminee)
+    .map((t) => ({
+      id: t.id,
+      title: t.titre,
+      plan: t.intention || t.titre,
+      deadline: t.echeance,
+      importance: t.importance,
+      category: 'général',
+      workKind: t.nature === 'nouveau' ? ('novel' as const) : ('routine' as const),
+      estimatedMinutes: t.minutesEstimees,
+      remainingMinutes: t.minutesRestantes,
+      // B.1 : le facteur retenu a la CREATION, pas recalcule ici. Le moteur
+      // lit `remainingMinutes`, deja corrige par le magasin ; ce champ ne sert
+      // qu'a garder le plan explicable.
+      correctionFactor: t.facteurCorrection,
+      // B.5/B.5.1 : le decoupage et le rang des parties viennent du magasin.
+      parentTaskId: t.parentId,
+      partOrder: t.rangPartie,
+      extraMinutes: t.minutesSupplementaires,
+      appsToBlock: [],
+      status: 'active' as const,
+      createdAt: t.creeeLe,
+    }))
 }
 
 /**

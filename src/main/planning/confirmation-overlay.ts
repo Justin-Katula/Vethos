@@ -13,7 +13,7 @@ import type { PlacedBlock } from '@shared/planning/types'
  * interrompt vraiment ce qui se passait avant.
  *
  * Une seule instance à la fois : au plus un bloc peut être en attente de
- * confirmation à un instant donné (voir `plan-clock.ts`), donc au plus une
+ * confirmation à un instant donné (voir `@shared/planning/clock.ts`), donc au plus une
  * fenêtre.
  */
 

@@ -160,9 +160,13 @@ function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
   const d = useDonnees()
   return (
     <Rangee premiere={premiere}>
-      <Pressable
-        onPress={() => void d.basculerTache(tache.id)}
-        hitSlop={10}
+      {/* Une case, pas une commande. La complétion se CONSTATE : elle arrive
+          quand le temps planifié a réellement été fait, mesuré séance après
+          séance (B.5.2). Un clic qui termine une tâche serait une déclaration,
+          et une déclaration n'apprend rien au moteur. */}
+      <View
+        accessible
+        accessibilityLabel={tache.terminee ? 'Terminée' : 'En cours'}
         style={{
           width: 20,
           height: 20,
@@ -175,12 +179,12 @@ function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
         }}
       >
         {tache.terminee ? <Coche couleur={j.accentSur} taille={12} /> : null}
-      </Pressable>
+      </View>
 
       <View style={{ flex: 1, opacity: tache.terminee ? 0.45 : 1 }}>
         <Texte>{tache.titre}</Texte>
         <Texte ton="eteint" taille={12.5}>
-          {quandEcheance(tache.echeance)}
+          {tache.terminee ? 'terminée — temps fait' : quandEcheance(tache.echeance)}
         </Texte>
       </View>
 

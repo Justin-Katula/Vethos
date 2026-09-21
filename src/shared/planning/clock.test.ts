@@ -10,7 +10,7 @@ import {
   pendingConfirmation,
   tasksToAutoComplete,
   uncoveredMinutes,
-} from './plan-clock'
+} from './clock'
 import type { PlacedBlock, TaskItem } from '@shared/planning/types'
 import type { LearningState, ObservedPendingBlock, SessionConfirmationsState } from '@shared/schemas'
 

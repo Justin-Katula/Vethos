@@ -161,7 +161,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
     // matin refermés dans SA vue à elle, elle n'avait plus jamais rien à
     // observer, et l'overlay ne s'est déclenché qu'une seule fois de toute la
     // journée du 2026-08-22. La détection des fenêtres fermées vit maintenant
-    // dans `observedPending` (mémoire explicite, `plan-clock.ts`), plus dans
+    // dans `observedPending` (mémoire explicite, `@shared/planning/clock.ts`), plus dans
     // une deuxième vue du plan — donc les deux consommateurs peuvent enfin
     // partager la même.
     const notBeforeMinute = date === input.today ? nowMinute : undefined
