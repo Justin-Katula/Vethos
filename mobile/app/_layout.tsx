@@ -16,6 +16,7 @@ import { useBlocage } from '@/blocage/etat'
 import { useDonnees } from '@/donnees/magasin'
 import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
+import { Introduction } from '@/accueil/Introduction'
 
 // On garde l'écran de lancement jusqu'à ce que les polices soient là. Sans cela
 // la première image s'affiche en police système puis saute vers Geist — et ce
@@ -47,6 +48,8 @@ function Coque() {
       {/* D.8 : au-dessus de TOUT, quel que soit l'onglet ouvert. Une question
           qu'on peut eviter en changeant d'onglet n'est pas une friction. */}
       <JeCommence />
+      {/* Au-dessus encore : au premier lancement, il n'y a rien derriere. */}
+      <Introduction />
     </View>
   )
 }

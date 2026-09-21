@@ -3,7 +3,7 @@ import { calculerPlan } from './moteur'
 import { lireSemaine, segmentActuel } from './lecture'
 
 describe('lecture commune du cercle et de la semaine', () => {
-  const reglages = { prenom: '', apparence: 'system' as const, lever: '07:00', coucher: '23:30' }
+  const reglages = { prenom: '', apparence: 'system' as const, clairDes: '07:00', sombreDes: '19:00', introductionFaite: true, lever: '07:00', coucher: '23:30' }
   const obligations = [{ id: 'cours', label: 'Cours', dayOfWeek: 1, startMinute: 540, endMinute: 720, categoryType: 'school' as const, color: '#777777' }]
   const resultat = calculerPlan({ taches: [], objectifs: [], ancres: [], obligations, reglages, maintenant: new Date(2026, 8, 21, 8) })
   it('projette une obligation le lundi, avec les mêmes bornes pour les deux vues', () => {

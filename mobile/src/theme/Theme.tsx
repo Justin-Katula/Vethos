@@ -1,13 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useColorScheme } from 'react-native'
-import {
-  DEFAULT_DARK_AT,
-  DEFAULT_LIGHT_AT,
-  DEFAULT_THEME_MODE,
-  resolveTheme,
-  type Theme,
-  type ThemeMode,
-} from '@shared/theme'
+import { DEFAULT_THEME_MODE, resolveTheme, type Theme, type ThemeMode } from '@shared/theme'
 import { useDonnees } from '@/donnees/magasin'
 import { THEMES, type Jetons, type NomTheme } from './jetons'
 
@@ -45,6 +38,8 @@ export function FournisseurTheme({
 }) {
   const apparenceSysteme = useColorScheme()
   const mode = useDonnees((d) => d.reglages.apparence)
+  const clairDes = useDonnees((d) => d.reglages.clairDes)
+  const sombreDes = useDonnees((d) => d.reglages.sombreDes)
   const [instant, setInstant] = useState(() => new Date())
 
   // Le mode horaire est le seul dont l'avis change tout seul. On réveille donc
@@ -61,13 +56,13 @@ export function FournisseurTheme({
       {
         mode,
         systemDark: apparenceSysteme !== 'light',
-        schedule: { lightAt: DEFAULT_LIGHT_AT, darkAt: DEFAULT_DARK_AT },
+        schedule: { lightAt: clairDes, darkAt: sombreDes },
       },
       instant,
     )
     const nom: NomTheme = force ?? enFrancais(decide)
     return { jetons: THEMES[nom], nom, mode }
-  }, [apparenceSysteme, force, mode, instant])
+  }, [apparenceSysteme, force, mode, instant, clairDes, sombreDes])
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>
 }

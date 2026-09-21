@@ -11,7 +11,7 @@ import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/mag
  * le moteur rend un plan vide sans rien dire.
  */
 
-const REGLAGES: Reglages = { prenom: '', apparence: 'system', coucher: '23:30', lever: '07:00' }
+const REGLAGES: Reglages = { prenom: '', apparence: 'system', clairDes: '07:00', sombreDes: '19:00', introductionFaite: true, coucher: '23:30', lever: '07:00' }
 const LUNDI = new Date(2026, 8, 21, 8, 0, 0) // 21 septembre 2026, 08:00 local
 
 const tache = (p: Partial<Tache> = {}): Tache => ({

@@ -100,6 +100,15 @@ export const ReglagesSchema = z.object({
    * veut dire.
    */
   apparence: z.enum(['system', 'light', 'dark', 'schedule']).default('system'),
+  /**
+   * Les deux bascules du mode « a l'heure ». Sans elles, ce mode existait dans
+   * le selecteur mais tournait sur des valeurs que personne ne pouvait changer
+   * — un reglage qu'on choisit et qui ne se regle pas.
+   */
+  clairDes: z.string().default('07:00'),
+  sombreDes: z.string().default('19:00'),
+  /** Le premier lancement a-t-il ete fait ? Relançable depuis les reglages. */
+  introductionFaite: z.boolean().default(false),
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
   lever: z.string().default('07:00'),

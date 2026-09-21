@@ -4,7 +4,7 @@ import { useDonnees } from '@/donnees/magasin'
 import { useJetons, useModeApparence } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree } from '@/ui/Horloge'
-import { GEIST, MONO, Rangee, Section, Texte, TitreEcran, Valeur } from '@/ui/primitives'
+import { BoutonPlat, GEIST, MONO, Rangee, Section, Texte, TitreEcran, Valeur } from '@/ui/primitives'
 
 /**
  * Réglages.
@@ -70,6 +70,44 @@ export default function Reglages() {
         loi="Suivre l’appareil est le choix par défaut : une installation qui n’a rien demandé ne décide pas à la place de son propriétaire."
       >
         <ChoixApparence />
+
+        {/* Les heures n’existent que pour le mode qui s’en sert. Les laisser
+            en permanence donnerait deux réglages là où l’utilisateur n’en a
+            choisi qu’un. */}
+        {reglages.apparence === 'schedule' ? (
+          <View style={{ marginTop: PAS[4], gap: PAS[3] }}>
+            <View style={{ flexDirection: 'row', gap: PAS[3] }}>
+              <Champ
+                etiquette="Clair dès"
+                valeur={reglages.clairDes}
+                surChangement={(v) => void majReglages({ clairDes: v })}
+                exemple="07:00"
+                horaire
+              />
+              <Champ
+                etiquette="Sombre dès"
+                valeur={reglages.sombreDes}
+                surChangement={(v) => void majReglages({ sombreDes: v })}
+                exemple="19:00"
+                horaire
+              />
+            </View>
+            <Texte ton="eteint" taille={12}>
+              {reglages.clairDes === reglages.sombreDes
+                ? 'Deux fois la même heure : il fera sombre en permanence.'
+                : `Sombre de ${reglages.sombreDes} à ${reglages.clairDes}, clair le reste du temps.`}
+            </Texte>
+          </View>
+        ) : null}
+      </Section>
+
+      <Section
+        titre="Introduction"
+        loi="Ne touche ni à tes engagements, ni à ton temps déclaré. Rejoue seulement le premier lancement."
+      >
+        <BoutonPlat onPress={() => void majReglages({ introductionFaite: false })}>
+          Revoir l’introduction
+        </BoutonPlat>
       </Section>
 
       <Section titre="Ce que Vethos garde">
