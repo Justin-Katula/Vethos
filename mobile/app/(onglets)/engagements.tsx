@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees, type Tache } from '@/donnees/magasin'
+import { useSeances } from '@/seances/magasin-seances'
 import { usePlan } from '@/plan/Plan'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { useJetons } from '@/theme/Theme'
@@ -40,8 +41,12 @@ export default function Engagements() {
 
   const [ajout, setAjout] = useState<'aucun' | 'tache' | 'objectif' | 'ancre'>('aucun')
 
+  const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const ouvertes = d.taches.filter((t) => !t.terminee)
   const faites = d.taches.filter((t) => t.terminee)
+  // Le compte affiche les RACINES, pas les lignes : une tache decoupee en
+  // cinq parties reste une tache a faire, pas cinq.
+  const groupes = grouperTaches(ouvertes, fait)
 
   return (
     <ScrollView
@@ -58,7 +63,7 @@ export default function Engagements() {
       <Section
         premiere
         titre="Tâches"
-        compte={ouvertes.length}
+        compte={groupes.length}
         loi="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
         action={<BoutonAjout ouvert={ajout === 'tache'} surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
       >
@@ -70,8 +75,8 @@ export default function Engagements() {
           </Texte>
         ) : null}
 
-        {ouvertes.map((t, i) => (
-          <LigneTache key={t.id} tache={t} premiere={i === 0} />
+        {groupes.map((g, i) => (
+          <GroupeTache key={g.racine.id} groupe={g} premiere={i === 0} />
         ))}
 
         {faites.length > 0 ? (
@@ -154,6 +159,129 @@ export default function Engagements() {
 }
 
 // ─── Lignes ────────────────────────────────────────────────────────────────
+
+/** B.5.2 : le pas de « il m'en faut plus », le meme que sur l'accueil. */
+const PAS_DE_TEMPS = 25
+
+type Groupe = {
+  racine: Tache
+  /** Vide si la tache n'a pas ete decoupee. */
+  parties: Tache[]
+  /** Ce qu'il y a a faire en tout, correction et temps accorde compris. */
+  prevu: number
+  /** Ce qui a ete REELLEMENT mesure. Jamais declare. */
+  mesure: number
+}
+
+/**
+ * Les parties sous leur tache d'origine, jamais a cote.
+ *
+ * Mises a plat, « Dossier », « Dossier — Partie 1 » et « Dossier — Partie 2 »
+ * se lisent comme trois travaux distincts, et le total de la liste compte deux
+ * fois le meme temps. Le regroupement n'est pas une commodite d'affichage : il
+ * dit ce qui est vrai.
+ */
+function grouperTaches(ouvertes: readonly Tache[], fait: Record<string, number>): Groupe[] {
+  const total = (t: Tache) => t.minutesRestantes + t.minutesSupplementaires
+  const racines = ouvertes.filter((t) => t.parentId === null)
+
+  return racines.map((racine) => {
+    const parties = ouvertes
+      .filter((t) => t.parentId === racine.id)
+      .sort((a, b) => (a.rangPartie ?? 0) - (b.rangPartie ?? 0))
+
+    if (parties.length === 0) {
+      return { racine, parties, prevu: total(racine), mesure: fait[racine.id] ?? 0 }
+    }
+    // La racine d'un groupe ne porte aucun travail propre : tout est passe aux
+    // parties. La compter reviendrait a la compter deux fois.
+    return {
+      racine,
+      parties,
+      prevu: parties.reduce((s, p) => s + total(p), 0),
+      mesure: parties.reduce((s, p) => s + (fait[p.id] ?? 0), 0),
+    }
+  })
+}
+
+/** Le titre d'une partie, sans repeter celui de sa tache. */
+function titreDePartie(partie: Tache, racine: Tache): string {
+  const prefixe = `${racine.titre} — `
+  if (partie.titre.startsWith(prefixe)) return partie.titre.slice(prefixe.length)
+  return partie.rangPartie !== null ? `Partie ${partie.rangPartie}` : partie.titre
+}
+
+function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean }) {
+  const j = useJetons()
+  const d = useDonnees()
+  const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
+  const { racine, parties, prevu, mesure } = groupe
+  const part = prevu > 0 ? Math.min(1, mesure / prevu) : 0
+
+  return (
+    <View style={{ borderTopWidth: premiere ? 0 : 1, borderTopColor: j.line, paddingVertical: PAS[3], gap: PAS[2] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[3] }}>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Texte>{racine.titre}</Texte>
+          <Texte ton="eteint" taille={12.5}>
+            {quandEcheance(racine.echeance)}
+            {parties.length > 0 ? ` · ${parties.length} parties` : ''}
+            {racine.minutesSupplementaires > 0 ? ` · +${duree(racine.minutesSupplementaires)}` : ''}
+          </Texte>
+        </View>
+
+        <View style={{ alignItems: 'flex-end' }}>
+          <Valeur ton={racine.importance >= 8 ? 'accent' : 'normal'}>{duree(prevu)}</Valeur>
+          <Valeur ton="doux" taille={11.5}>{racine.importance}/10</Valeur>
+        </View>
+
+        {/* B.5.2 : le seul geste qui touche encore a une tache. Il ne la
+            termine pas — il reconnait que l'estimation etait courte. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Accorder ${PAS_DE_TEMPS} minutes de plus à ${racine.titre}`}
+          onPress={() => void d.ajouterDuTemps(parties[0]?.id ?? racine.id, PAS_DE_TEMPS)}
+          hitSlop={8}
+          style={({ pressed }) => ({ minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}
+        >
+          <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2 }}>+{PAS_DE_TEMPS}</Text>
+        </Pressable>
+
+        <Supprimer surPression={() => void d.supprimerTache(racine.id)} />
+      </View>
+
+      {/* Ce qui a ete MESURE, pas ce qui a ete promis. La barre ne bouge
+          qu'apres un « Je commence » et une fenetre ecoulee. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
+        <View style={{ flex: 1, height: 2, backgroundColor: j.line }}>
+          <View style={{ width: `${part * 100}%`, height: 2, backgroundColor: j.accent }} />
+        </View>
+        <Text style={{ fontFamily: MONO.normal, fontSize: 10.5, color: j.text3, fontVariant: ['tabular-nums'] }}>
+          {duree(mesure)} faites
+        </Text>
+      </View>
+
+      {parties.map((p) => {
+        // B.5.1 : verrouillee tant qu'une soeur de rang anterieur est active.
+        const verrouillee = parties.some(
+          (s) => s.rangPartie !== null && p.rangPartie !== null && s.rangPartie < p.rangPartie,
+        )
+        return (
+          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2], paddingLeft: PAS[4] }}>
+            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: verrouillee ? j.text3 : j.accentEncre }} />
+            <Text style={{ flex: 1, fontFamily: GEIST.normal, fontSize: 12.5, color: verrouillee ? j.text3 : j.text2 }}>
+              {titreDePartie(p, racine)}
+              {verrouillee ? ' · en attente' : ''}
+            </Text>
+            <Text style={{ fontFamily: MONO.normal, fontSize: 11, color: j.text3, fontVariant: ['tabular-nums'] }}>
+              {duree(fait[p.id] ?? 0)} / {duree(p.minutesRestantes + p.minutesSupplementaires)}
+            </Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
 
 function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
   const j = useJetons()
@@ -376,18 +504,27 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
   const [nom, setNom] = useState('')
   const [heure, setHeure] = useState('12:30')
   const [minutes, setMinutes] = useState('60')
+  const [erreur, setErreur] = useState('')
 
   const valider = async () => {
     if (!nom.trim()) return
-    await d.ajouterAncre({
-      nom: nom.trim(),
-      declencheur: '',
-      couleur: j.blocAncre,
-      minuteAncrage: versMinuteSure(heure),
-      jours: [1, 2, 3, 4, 5],
-      dureeMinutes: Math.max(15, Number(minutes) || 60),
-    })
-    surFin()
+    setErreur('')
+    try {
+      await d.ajouterAncre({
+        nom: nom.trim(),
+        declencheur: '',
+        couleur: j.blocAncre,
+        minuteAncrage: versMinuteSure(heure),
+        jours: [1, 2, 3, 4, 5],
+        dureeMinutes: Math.max(15, Number(minutes) || 60),
+      })
+      surFin()
+    } catch (e) {
+      // D.3 : l'ancre est REFUSEE, jamais decalee en silence. Le refus doit
+      // donc se lire — une creation qui n'aboutit pas sans un mot passe pour
+      // une panne.
+      setErreur(e instanceof Error ? e.message : 'Création impossible.')
+    }
   }
 
   return (
@@ -397,6 +534,11 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
         <Champ valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
         <Champ valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
       </View>
+      {erreur ? (
+        <Text accessibilityRole="alert" style={{ fontFamily: GEIST.normal, fontSize: 12.5, lineHeight: 19, color: j.accentEncre }}>
+          {erreur}
+        </Text>
+      ) : null}
     </Formulaire>
   )
 }

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { z } from 'zod'
+import { findAncreConflict } from '@shared/planning/placement'
 import { preparerTache, type BrouillonTache } from './creation'
 
 /**
@@ -287,6 +288,48 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
     },
 
     async ajouterAncre(a) {
+      // D.3 : conflit d'heure ou de declencheur -> creation REFUSEE, sans
+      // exception. Pas de fusion, pas de decalage automatique. Decaler tout
+      // seul reviendrait a deplacer la seule chose de l'application qui a le
+      // droit de ne jamais bouger ; c'est a l'utilisateur de choisir une autre
+      // heure. La regle est celle du bureau, pas une copie.
+      //
+      // Les jours ne sont PAS convertis vers la convention du moteur ici, et
+      // c'est volontaire : la detection n'est qu'un test de recouvrement entre
+      // deux ensembles, et les deux cotes viennent du meme magasin, donc de la
+      // meme convention. Convertir ne changerait aucun resultat et ferait
+      // croire a une subtilite qui n'existe pas.
+      const conflit = findAncreConflict(
+        {
+          anchorMinute: a.minuteAncrage,
+          normalMaxMinutes: a.dureeMinutes,
+          daysOfWeek: a.jours,
+          trigger: a.declencheur || a.nom,
+        },
+        get().ancres.map((x) => ({
+          id: x.id,
+          name: x.nom,
+          plan: x.declencheur || x.nom,
+          color: x.couleur,
+          trigger: x.declencheur || x.nom,
+          anchorMinute: x.minuteAncrage,
+          daysOfWeek: x.jours,
+          normalMaxMinutes: x.dureeMinutes,
+          minimumMinutes: Math.max(20, Math.round(x.dureeMinutes * 0.4)),
+          appsToBlock: [],
+          createdAt: x.creeeLe,
+        })),
+      )
+      if (conflit) {
+        const memeDeclencheur =
+          conflit.trigger.trim().toLowerCase() === (a.declencheur || a.nom).trim().toLowerCase()
+        throw new Error(
+          memeDeclencheur
+            ? `« ${conflit.name} » utilise déjà le déclencheur « ${conflit.trigger} ».`
+            : `Conflit d’horaire avec « ${conflit.name} ». Choisis une autre heure.`,
+        )
+      }
+
       const ancre: Ancre = { ...a, id: identifiant(), creeeLe: new Date().toISOString() }
       await enregistrer({ ancres: [ancre, ...get().ancres] })
     },
