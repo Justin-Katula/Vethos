@@ -11,7 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
-    "audit:a11y": "node scripts/audit-accessibilite.mjs"
+    "audit:a11y": "node scripts/audit-accessibilite.mjs",
+    "telephone": "expo start --lan --clear",
+    "telephone:tunnel": "expo start --tunnel --clear",
+    "build:dev": "eas build --platform ios --profile development",
+    "build:preview": "eas build --platform ios --profile preview"
   },
   "dependencies": {
     "@expo-google-fonts/geist": "^0.4.2",

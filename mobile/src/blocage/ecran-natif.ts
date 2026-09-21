@@ -99,6 +99,14 @@ function creerPontNatif(): PontEcran {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const natif = require('react-native-device-activity') as typeof import('react-native-device-activity')
 
+  // `require` REUSSIT toujours, meme sans le module natif : le paquet appelle
+  // `requireOptionalNativeModule`, qui rend `null` au lieu de lever. Dans Expo
+  // Go, on obtenait donc un pont qui se disait REEL, dont chaque appel ne
+  // faisait rien en silence, et un ecran qui promettait un masquage qui
+  // n'arriverait jamais. Exactement le mensonge que cet ecran existe pour
+  // eviter. `isAvailable()` est le seul test qui distingue les deux.
+  if (!natif.isAvailable()) throw new Error('Temps d’écran absent de cette version')
+
   const traduire = (brut: string): EtatAutorisation => {
     if (brut === 'approved') return 'accordee'
     if (brut === 'denied') return 'refusee'
