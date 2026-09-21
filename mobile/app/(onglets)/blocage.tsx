@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
 import { decrireSelection } from '@/blocage/contrat'
+import { SelecteurApplications } from '@/blocage/SelecteurApplications'
 import { useJetons } from '@/theme/Theme'
 import { PAS } from '@/theme/jetons'
 import { enHeure } from '@/ui/Horloge'
@@ -36,8 +38,18 @@ export default function Blocage() {
   const choisir = useBlocage((e) => e.choisirApplications)
   const lever = useBlocage((e) => e.toutLever)
 
+  const [selecteurOuvert, setSelecteurOuvert] = useState(false)
+
   const maintenant = minuteCourante()
   const accordee = autorisation === 'accordee'
+  const enCours = plagesActives.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
+
+  // Le sélecteur d'Apple est une VUE, pas une fonction. Sur un vrai appareil on
+  // la monte ; dans le navigateur, le simulateur fait le travail tout seul.
+  const ouvrirSelecteur = () => {
+    if (simule) void choisir()
+    else setSelecteurOuvert(true)
+  }
 
   return (
     <ScrollView
@@ -108,13 +120,36 @@ export default function Blocage() {
           <Texte ton="doux">Rien de choisi.</Texte>
         )}
         <Espace h={4} />
-        <BoutonPlat onPress={() => void choisir()} desactive={occupe || !accordee}>
+        <BoutonPlat onPress={ouvrirSelecteur} desactive={occupe || !accordee}>
           {selection ? 'Changer ma sélection' : 'Choisir mes applications'}
         </BoutonPlat>
       </Section>
 
+      <Section
+        titre="Quand ça s’applique"
+        loi="Pendant une séance confirmée, et jamais autrement. Vethos n’a pas d’horaire de blocage à lui : c’est « Je commence » qui lève le bouclier, et la fin de la séance qui le baisse."
+        action={
+          enCours ? (
+            <Valeur ton="accent" taille={12}>
+              EN COURS
+            </Valeur>
+          ) : null
+        }
+      >
+        {enCours ? (
+          <Texte>
+            Levé jusqu’à {enHeure(enCours.finMinute)}. C’est la durée de la tâche que tu as
+            démarrée, pas celle de son ancien créneau.
+          </Texte>
+        ) : (
+          <Texte ton="doux">
+            Rien n’est écarté en ce moment. Le prochain « Je commence » s’en charge.
+          </Texte>
+        )}
+      </Section>
+
       {plagesActives.length > 0 ? (
-        <Section titre="Séances programmées" compte={plagesActives.length}>
+        <Section titre="Séances du jour" compte={plagesActives.length}>
           {plagesActives.map((p, i) => {
             const actif = maintenant >= p.debutMinute && maintenant < p.finMinute
             const passe = maintenant >= p.finMinute
@@ -147,6 +182,8 @@ export default function Blocage() {
           </BoutonPlat>
         </Section>
       ) : null}
+
+      <SelecteurApplications ouvert={selecteurOuvert} surFermeture={() => setSelecteurOuvert(false)} />
 
       <Section titre="Ce que Vethos ne peut pas faire">
         <Texte ton="doux">

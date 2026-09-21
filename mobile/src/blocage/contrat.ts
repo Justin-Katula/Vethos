@@ -47,6 +47,16 @@ export type EtatAutorisation = 'inconnue' | 'jamais_demandee' | 'accordee' | 're
  * choix de l'utilisateur. On peut donc écrire « 7 applications écartées », jamais
  * « Instagram écarté ».
  */
+/**
+ * L'identifiant sous lequel iOS range LA selection de Vethos.
+ *
+ * Un seul, fixe, et c'est deliberе : la selection persistee d'Apple se retrouve
+ * par cette cle au prochain lancement, meme apres un redemarrage du telephone.
+ * En generer un nouveau a chaque choix laisserait derriere soi des selections
+ * orphelines qu'aucun ecran ne montre plus et que rien ne vient nettoyer.
+ */
+export const IDENTIFIANT_SELECTION = 'vethos.ecarte'
+
 export const SelectionSchema = z.object({
   identifiant: z.string().min(1),
   nbApplications: z.number().int().min(0),

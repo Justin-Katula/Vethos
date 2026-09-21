@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { AppState } from 'react-native'
 import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
+import { useBlocage } from '@/blocage/etat'
+import { plageDeSeance } from '@/blocage/pont-seance'
 import { confirmer, seanceActive, tictac } from '@/seances/pendule'
 import { calculerPlan, cleDate } from './moteur'
 import { lireSemaine } from './lecture'
@@ -79,13 +81,24 @@ function useSourcePlan() {
     enAttente: tic?.enAttente ?? null,
     /** D.7 : ouvre une séance. Le retard se mesure à cet instant précis. */
     confirmer: async (bloc: NonNullable<ReturnType<typeof tictac>['enAttente']>) => {
-      const suivant = confirmer({
-        maintenant: new Date(),
-        bloc,
-        etat: { apprentissage, confirmations },
-      })
+      const instant = new Date()
+      const suivant = confirmer({ maintenant: instant, bloc, etat: { apprentissage, confirmations } })
       if (suivant.refuse) return { ok: false as const, raison: suivant.refuse }
       await poser({ apprentissage: suivant.apprentissage, confirmations: suivant.confirmations })
+
+      // D.8 : le bouclier se leve MAINTENANT, et pour la duree de la tache.
+      // Il n'existe aucune session de blocage autonome — sans ce geste-ci,
+      // rien ne se leve jamais. La mesure est deja rangee au-dessus : si le
+      // blocage echoue (autorisation retiree, selection absente), la seance
+      // reste ouverte et comptee. Perdre la mesure parce qu'iOS a dit non
+      // serait punir deux fois.
+      const blocage = useBlocage.getState()
+      const selectionId = blocage.selection?.identifiant
+      if (selectionId) {
+        const plage = plageDeSeance({ bloc, confirmeAMs: instant.getTime(), selectionId })
+        if (plage) await blocage.ouvrirSeance(plage)
+      }
+
       return { ok: true as const, retardMinutes: suivant.retardMinutes }
     },
   }

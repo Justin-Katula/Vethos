@@ -1,5 +1,5 @@
 import { Platform } from 'react-native'
-import type { EtatAutorisation, Plage, Selection } from './contrat'
+import { IDENTIFIANT_SELECTION, type EtatAutorisation, type Plage, type Selection } from './contrat'
 
 /**
  * La frontière entre Vethos et le Temps d'écran d'Apple.
@@ -62,7 +62,9 @@ export function creerPontSimule(): PontEcran {
       // dit pas de quelles applications il s'agit, et le simulateur non plus —
       // sans quoi on écrirait une interface impossible à tenir.
       return {
-        identifiant: `sim-${Date.now()}`,
+        // Le MEME identifiant que le vrai pont : ce qu'on regarde dans le
+        // navigateur doit se comporter comme ce qu'on aura sur l'appareil.
+        identifiant: IDENTIFIANT_SELECTION,
         nbApplications: 7,
         nbCategories: 2,
         nbSitesWeb: 0,
@@ -128,9 +130,31 @@ function creerPontNatif(): PontEcran {
       // avec un plan recalculé coûte plus cher que de tout reposer, et laisse
       // des boucliers orphelins au moindre écart.
       natif.stopMonitoring()
+
+      const maintenant = minuteCourante()
+
       for (const plage of plages) {
+        const activite = nomActivite(plage.blocId)
+
+        // Surveiller ne bloque RIEN. `startMonitoring` dit seulement à iOS de
+        // réveiller l'extension aux bornes de la fenêtre ; c'est ce qu'elle
+        // fait en se réveillant qui compte. Sans ces deux `configureActions`,
+        // les surveillances se programmaient correctement et aucun bouclier ne
+        // se levait jamais — une application de blocage qui ne bloque pas, et
+        // qui n'a pas une erreur à montrer pour l'expliquer.
+        natif.configureActions({
+          activityName: activite,
+          callbackName: 'intervalDidStart',
+          actions: [{ type: 'blockSelection', familyActivitySelectionId: plage.selectionId }],
+        })
+        natif.configureActions({
+          activityName: activite,
+          callbackName: 'intervalDidEnd',
+          actions: [{ type: 'resetBlocks' }],
+        })
+
         await natif.startMonitoring(
-          plage.blocId,
+          activite,
           {
             intervalStart: minuteVersComposantes(plage.debutMinute),
             intervalEnd: minuteVersComposantes(plage.finMinute),
@@ -139,17 +163,51 @@ function creerPontNatif(): PontEcran {
           [],
         )
       }
+
+      // `intervalDidStart` ne se déclenche qu'au FRANCHISSEMENT de la borne.
+      // Or une séance vient d'être confirmée : sa fenêtre a déjà commencé, la
+      // borne est derrière nous, et le rappel ne viendra jamais. Le bouclier
+      // de la séance en cours se lève donc ici, tout de suite. Celui-là est le
+      // seul qui compte vraiment — c'est maintenant qu'on travaille.
+      const enCours = plages.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
+      if (enCours) {
+        natif.blockSelection(
+          { activitySelectionId: enCours.selectionId },
+          `vethos:seance:${enCours.blocId}`,
+        )
+      } else {
+        // Aucune séance en cours : rien ne doit rester levé d'une précédente.
+        natif.resetBlocks('vethos:aucune-seance')
+      }
+
       return plages.length
     },
 
     async toutLever() {
       natif.stopMonitoring()
+      for (const activite of natif.getActivities()) natif.cleanUpAfterActivity(activite)
       // `resetBlocks` abaisse les boucliers déjà levés. Sans lui, arrêter la
       // surveillance laisserait l'utilisateur derrière un écran que plus rien ne
       // viendrait retirer.
       natif.resetBlocks('vethos:tout-lever')
     },
   }
+}
+
+/**
+ * Le nom d'activite d'un bloc.
+ *
+ * Prefixe, parce que `stopMonitoring()` sans argument arrete TOUT ce que
+ * l'application surveille : sans prefixe on ne saurait plus, en lisant
+ * `getActivities()`, ce qui vient de Vethos et ce qui vient d'ailleurs.
+ */
+function nomActivite(blocId: string): string {
+  return `vethos.${blocId}`
+}
+
+function minuteCourante(): number {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
 }
 
 /** Les composantes horaires qu'attend `DeviceActivitySchedule`. */
