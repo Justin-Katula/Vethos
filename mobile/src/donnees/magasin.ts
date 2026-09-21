@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { z } from 'zod'
+import { preparerTache, type BrouillonTache } from './creation'
 
 /**
  * Tout ce que l'utilisateur écrit, gardé sur le téléphone.
@@ -22,9 +23,23 @@ export const TacheSchema = z.object({
   intention: z.string().max(2000).default(''),
   echeance: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   importance: z.number().int().min(1).max(10).default(5),
-  /** Minutes estimées au départ, et ce qu'il en reste. */
+  /** Ce que l'utilisateur a annoncé. Gardé tel quel, pour mémoire. */
   minutesEstimees: z.number().int().min(5).max(10000).default(60),
-  minutesRestantes: z.number().int().min(0).max(10000).default(60),
+  /**
+   * B.1/B.4 : ce qu'il reste à faire, déjà CORRIGÉ à la création. Le plafond
+   * dépasse celui de l'estimation parce que la correction peut multiplier par
+   * 1,7 — un maximum identique rejetterait à la relecture une tâche que
+   * l'application vient elle-même d'écrire.
+   */
+  minutesRestantes: z.number().int().min(0).max(20000).default(60),
+  /** Le facteur retenu à la création. Conservé pour que le plan reste explicable. */
+  facteurCorrection: z.number().min(1).max(3).default(1.4),
+  /** B.5.2 : le temps accordé par « il m'en faut plus ». S'ajoute APRÈS le facteur. */
+  minutesSupplementaires: z.number().int().min(0).max(20000).default(0),
+  /** B.5 : la tâche d'origine quand celle-ci n'est qu'une de ses parties. */
+  parentId: z.string().nullable().default(null),
+  /** B.5.1 : le rang de la partie. C'est lui qui la verrouille tant qu'une sœur traîne. */
+  rangPartie: z.number().int().nullable().default(null),
   /** `nouveau` déclenche la marge de sécurité du moteur : on estime toujours trop bas. */
   nature: z.enum(['routine', 'nouveau']).default('routine'),
   terminee: z.boolean().default(false),
@@ -117,7 +132,16 @@ type EtatDonnees = Contenu & {
   chargees: boolean
   charger: () => Promise<void>
 
-  ajouterTache: (t: Omit<Tache, 'id' | 'creeeLe' | 'terminee' | 'minutesRestantes'>) => Promise<void>
+  ajouterTache: (
+    t: BrouillonTache,
+    /**
+     * Le plafond de travail qu'une journee peut absorber, lu dans le plan
+     * courant. Absent, le decoupage de B.5 ne se declenche pas : mieux vaut une
+     * tache entiere qu'un decoupage calcule sur une capacite inventee.
+     */
+    options?: { maxParJourMinutes?: number },
+  ) => Promise<void>
+  ajouterDuTemps: (id: string, minutes: number) => Promise<void>
   basculerTache: (id: string) => Promise<void>
   supprimerTache: (id: string) => Promise<void>
 
@@ -178,15 +202,44 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       }
     },
 
-    async ajouterTache(t) {
-      const tache: Tache = {
-        ...t,
-        id: identifiant(),
-        terminee: false,
-        minutesRestantes: t.minutesEstimees,
-        creeeLe: new Date().toISOString(),
-      }
-      await enregistrer({ taches: [tache, ...get().taches] })
+    async ajouterTache(t, options) {
+      // Les deux lois de creation — correction de l'estimation (B.1/B.4) et
+      // decoupage automatique (B.5) — vivent dans `creation.ts`, ou elles se
+      // verifient sans magasin ni AsyncStorage.
+      const creees = preparerTache(t, {
+        identifiant,
+        ...(options?.maxParJourMinutes !== undefined
+          ? { maxParJourMinutes: options.maxParJourMinutes }
+          : {}),
+      })
+      await enregistrer({ taches: [...creees, ...get().taches] })
+    },
+
+    /**
+     * B.5.2 : « il m'en faut plus ».
+     *
+     * Le temps accordé s'ajoute APRÈS le facteur, jamais avant : il est donné
+     * en minutes réelles par quelqu'un qui vient de constater que le temps
+     * prévu ne suffisait pas. Le corriger une seconde fois gonflerait un
+     * chiffre déjà vrai.
+     */
+    async ajouterDuTemps(id, minutes) {
+      const ajout = Math.max(0, Math.round(minutes))
+      if (ajout === 0) return
+      await enregistrer({
+        taches: get().taches.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                minutesSupplementaires: t.minutesSupplementaires + ajout,
+                // La tâche redevient active si l'horloge venait de la terminer.
+                // C'est précisément le cas que ce geste existe pour rattraper :
+                // le temps prévu était fait, le travail ne l'était pas.
+                terminee: false,
+              }
+            : t,
+        ),
+      })
     },
 
     async basculerTache(id) {

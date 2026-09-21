@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Text, View, useWindowDimensions } from 'react-native'
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg'
 import type { JourTemps } from '@/plan/lecture'
@@ -7,8 +8,15 @@ import { GEIST, MONO } from './primitives'
 import { couleurTemps } from './temps-visuel'
 export { duree, enHeure } from '@/plan/lecture'
 
-/** Cadran civil 24 h : les mêmes segments que Mon temps, sans horloge locale. */
-export function Horloge({ jour, minute }: { jour: JourTemps; minute: number }) {
+/**
+ * Cadran civil 24 h : les mêmes segments que Mon temps, sans horloge locale.
+ *
+ * Le centre se remplit du dehors. C'est la seule chose de l'écran qu'on
+ * REGARDE plutôt qu'on lit, et ce qu'elle doit montrer dépend de l'écran :
+ * « ce qu'il te reste » sur l'accueil, l'heure ailleurs. Le cadran ne décide
+ * pas de ça tout seul.
+ */
+export function Horloge({ jour, minute, centre }: { jour: JourTemps; minute: number; centre?: ReactNode }) {
   const j = useJetons()
   const { width, fontScale } = useWindowDimensions()
   const taille = Math.min(336, width - 56)
@@ -42,11 +50,13 @@ export function Horloge({ jour, minute }: { jour: JourTemps; minute: number }) {
         <Circle cx={repere.x} cy={repere.y} r={6} fill={j.accentEncre} stroke={j.bg} strokeWidth={3} />
       </Svg>
       <View style={{ pointerEvents: 'none', position: 'absolute', top: '32%', left: '20%', right: '20%', alignItems: 'center', gap: 8 }}>
-        <Text style={{ fontFamily: GEIST.normal, color: j.text, fontSize: 48 / Math.max(1, fontScale / 1.3),
-          letterSpacing: -1.5, fontVariant: ['tabular-nums'] }}>{enHeure(minute)}</Text>
-        <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2, textAlign: 'center' }}>
-          {actuel?.titre ?? 'Temps libre'}
-        </Text>
+        {centre ?? <>
+          <Text style={{ fontFamily: GEIST.normal, color: j.text, fontSize: 48 / Math.max(1, fontScale / 1.3),
+            letterSpacing: -1.5, fontVariant: ['tabular-nums'] }}>{enHeure(minute)}</Text>
+          <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2, textAlign: 'center' }}>
+            {actuel?.titre ?? 'Temps libre'}
+          </Text>
+        </>}
       </View>
     </View>
   )

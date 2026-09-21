@@ -22,6 +22,10 @@ const tache = (p: Partial<Tache> = {}): Tache => ({
   importance: p.importance ?? 5,
   minutesEstimees: p.minutesEstimees ?? 120,
   minutesRestantes: p.minutesRestantes ?? 120,
+  facteurCorrection: p.facteurCorrection ?? 1.4,
+  minutesSupplementaires: p.minutesSupplementaires ?? 0,
+  parentId: p.parentId ?? null,
+  rangPartie: p.rangPartie ?? null,
   nature: p.nature ?? 'routine',
   terminee: p.terminee ?? false,
   creeeLe: '2026-09-20T10:00:00.000Z',
@@ -63,6 +67,33 @@ describe('la traduction vers le moteur', () => {
   it('calcule une capacité pour chaque jour de l’horizon', () => {
     const r = appeler({ taches: [tache()] })
     expect(r.capacities).toHaveLength(7)
+  })
+
+  it('transmet le temps supplémentaire accordé', () => {
+    // B.5.2 : « il m'en faut plus » ajoute des minutes APRES le facteur. Si ce
+    // champ n'arrivait pas au moteur, le bouton existerait sans rien changer
+    // au plan — la pire des pannes, celle qui ne se voit pas.
+    const sans = appeler({ taches: [tache({ minutesRestantes: 120 })] })
+    const avec = appeler({ taches: [tache({ minutesRestantes: 120, minutesSupplementaires: 60 })] })
+
+    const pose = (r: typeof sans) => r.blocks.reduce((s, b) => s + b.workMinutes, 0)
+    expect(pose(avec)).toBe(pose(sans) + 60)
+  })
+
+  it('verrouille la partie 2 tant que la partie 1 est active', () => {
+    // B.5.1 : une partie de rang superieur ne se travaille pas avant sa soeur.
+    // Le moteur la pose quand meme, mais en APERCU — elle occupe la place sans
+    // etre creditee. Sans `partOrder`, les deux parties seraient travaillables
+    // le meme jour, dans un ordre arbitraire.
+    const r = appeler({
+      taches: [
+        tache({ id: 'p1', titre: 'Dossier — Partie 1', parentId: 'mere', rangPartie: 1, minutesEstimees: 300, minutesRestantes: 300 }),
+        tache({ id: 'p2', titre: 'Dossier — Partie 2', parentId: 'mere', rangPartie: 2, minutesEstimees: 300, minutesRestantes: 300 }),
+      ],
+    })
+    const deuxieme = r.blocks.filter((b) => b.refId === 'p2')
+    expect(deuxieme.length).toBeGreaterThan(0)
+    expect(deuxieme.every((b) => b.preview === true)).toBe(true)
   })
 })
 

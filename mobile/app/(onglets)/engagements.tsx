@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Pressable, ScrollView, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees, type Tache } from '@/donnees/magasin'
+import { usePlan } from '@/plan/Plan'
+import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { useJetons } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree, enHeure } from '@/ui/Horloge'
@@ -229,35 +231,113 @@ function BoutonAjout({ ouvert, surPression }: { ouvert: boolean; surPression: ()
 
 // ─── Formulaires ───────────────────────────────────────────────────────────
 
+/**
+ * Le formulaire de tache, celui du bureau.
+ *
+ * Deux champs y sont obligatoires, pas un : le titre **et le plan**. Le
+ * bureau l'exige parce qu'une tache sans plan est un vœu — « avancer sur le
+ * memoire » ne dit ni ou, ni quoi, ni comment commencer, et c'est exactement
+ * la forme qu'on ne demarre jamais.
+ *
+ * La nature se declare aussi, parce qu'elle change le chiffre : une premiere
+ * fois est majoree de 70 %, un travail connu de 40 % (B.1).
+ */
 function FormulaireTache({ surFin }: { surFin: () => void }) {
   const d = useDonnees()
+  const { resultat } = usePlan()
   const [titre, setTitre] = useState('')
+  const [intention, setIntention] = useState('')
   const [minutes, setMinutes] = useState('60')
   const [jours, setJours] = useState('7')
   const [importance, setImportance] = useState(5)
+  const [nature, setNature] = useState<Tache['nature']>('routine')
+
+  const complet = !!titre.trim() && !!intention.trim()
 
   const valider = async () => {
-    if (!titre.trim()) return
-    await d.ajouterTache({
-      titre: titre.trim(),
-      intention: '',
-      echeance: dansNJours(Number(jours) || 7),
-      importance,
-      minutesEstimees: Math.max(5, Number(minutes) || 60),
-      nature: 'routine',
-    })
+    if (!complet) return
+    await d.ajouterTache(
+      {
+        titre: titre.trim(),
+        intention: intention.trim(),
+        echeance: dansNJours(Number(jours) || 7),
+        importance,
+        minutesEstimees: Math.max(5, Number(minutes) || 60),
+        nature,
+      },
+      // B.5 : le decoupage a besoin de savoir ce qu'une journee absorbe. Ce
+      // plafond vient du plan courant, jamais d'une constante.
+      { maxParJourMinutes: maxTaskMinutesPerDay(resultat.capacities) },
+    )
     surFin()
   }
 
   return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={!!titre.trim()}>
+    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
       <Champ valeur={titre} surChangement={setTitre} exemple="Finir le dossier" premier />
+      <Champ
+        valeur={intention}
+        surChangement={setIntention}
+        exemple="Ce soir a mon bureau, je redige les trois premieres pages."
+        multiligne
+      />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
         <Champ valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
         <Champ valeur={jours} surChangement={setJours} exemple="7" suffixe="jours" numerique />
       </View>
+      <Bascule
+        valeur={nature}
+        surChangement={setNature}
+        choix={[
+          ['routine', 'Deja fait'],
+          ['nouveau', 'Premiere fois'],
+        ]}
+      />
       <Echelle valeur={importance} surChangement={setImportance} />
     </Formulaire>
+  )
+}
+
+/** Deux cibles exclusives, assez larges pour le pouce. */
+function Bascule<T extends string>({
+  valeur,
+  surChangement,
+  choix,
+}: {
+  valeur: T
+  surChangement: (v: T) => void
+  choix: readonly (readonly [T, string])[]
+}) {
+  const j = useJetons()
+  return (
+    <View style={{ flexDirection: 'row', gap: PAS[2] }}>
+      {choix.map(([cle, nom]) => {
+        const actif = cle === valeur
+        return (
+          <Pressable
+            key={cle}
+            accessibilityRole="button"
+            accessibilityState={{ selected: actif }}
+            onPress={() => surChangement(cle)}
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 40,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: RAYON.sm,
+              borderWidth: 1,
+              borderColor: actif ? j.accent : j.line,
+              backgroundColor: actif ? j.accentDoux : 'transparent',
+              transform: [{ translateY: pressed ? 1 : 0 }],
+            })}
+          >
+            <Texte ton={actif ? 'accent' : 'eteint'} taille={12.5}>
+              {nom}
+            </Texte>
+          </Pressable>
+        )
+      })}
+    </View>
   )
 }
 
@@ -362,6 +442,7 @@ function Champ({
   suffixe,
   numerique,
   premier,
+  multiligne,
 }: {
   valeur: string
   surChangement: (v: string) => void
@@ -369,6 +450,7 @@ function Champ({
   suffixe?: string
   numerique?: boolean
   premier?: boolean
+  multiligne?: boolean
 }) {
   const j = useJetons()
   return (
@@ -379,8 +461,11 @@ function Champ({
         placeholder={exemple}
         placeholderTextColor={j.text3}
         keyboardType={numerique ? 'number-pad' : 'default'}
+        multiline={multiligne}
+        numberOfLines={multiligne ? 3 : 1}
         style={{
           flex: 1,
+          ...(multiligne ? { minHeight: 68, textAlignVertical: 'top' as const } : {}),
           backgroundColor: j.champBg,
           borderWidth: 1,
           borderColor: j.lineForte,

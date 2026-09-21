@@ -63,13 +63,17 @@ export function calculerPlan({
         workKind: t.nature === 'nouveau' ? ('novel' as const) : ('routine' as const),
         estimatedMinutes: t.minutesEstimees,
         remainingMinutes: t.minutesRestantes,
-        // B.1 : le facteur de correction. 1,4 est le défaut du bureau — on
-        // estime toujours trop bas, et le moteur en tient compte dès la
-        // création plutôt que de constater le dépassement après coup.
-        correctionFactor: 1.4,
-        parentTaskId: null,
-        partOrder: null,
-        extraMinutes: 0,
+        // B.1 : le facteur retenu a la CREATION, pas recalcule ici. Le
+        // moteur lit `remainingMinutes`, deja corrige par le magasin ; ce
+        // champ ne sert qu'a garder le plan explicable.
+        correctionFactor: t.facteurCorrection,
+        // B.5/B.5.1 : le decoupage et le rang des parties viennent du magasin.
+        // Les mettre a `null` ici, comme avant, annulait le verrouillage
+        // sequentiel : les cinq parties d'une tache se placaient toutes dans
+        // la meme journee, dans un ordre arbitraire.
+        parentTaskId: t.parentId,
+        partOrder: t.rangPartie,
+        extraMinutes: t.minutesSupplementaires,
         appsToBlock: [],
         status: 'active' as const,
         createdAt: t.creeeLe,
