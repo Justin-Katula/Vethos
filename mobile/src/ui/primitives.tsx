@@ -66,6 +66,7 @@ export function Section({
   action,
   children,
   premiere,
+  enColonne,
 }: {
   titre: string
   /** Le nombre d'éléments, en chiffres qui s'alignent. */
@@ -76,15 +77,24 @@ export function Section({
   children: ReactNode
   /** La première section n'a pas de filet : rien ne la précède. */
   premiere?: boolean
+  /**
+   * Posée EN COLONNE, à côté d'une sœur plutôt qu'en dessous.
+   *
+   * Le filet du haut sépare ce qui se suit ; entre deux colonnes voisines il
+   * ne sépare plus rien et devient un trait de plus. C'est le même motif que
+   * `premiere`, pour la même raison.
+   */
+  enColonne?: boolean
 }) {
   const j = useJetons()
   return (
     <View
       style={{
-        borderTopWidth: premiere ? 0 : 1,
+        flex: enColonne ? 1 : undefined,
+        borderTopWidth: premiere || enColonne ? 0 : 1,
         borderTopColor: j.line,
-        paddingTop: premiere ? 0 : PAS[5],
-        marginTop: premiere ? 0 : PAS[6],
+        paddingTop: premiere || enColonne ? 0 : PAS[5],
+        marginTop: premiere || enColonne ? 0 : PAS[6],
       }}
     >
       <View

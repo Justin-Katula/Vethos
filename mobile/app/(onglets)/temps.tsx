@@ -12,6 +12,7 @@ import { Chevron, Croix, Plus } from '@/ui/icones'
 import { TableauCapacite } from '@/ui/Capacite'
 import { DemandeTemps } from '@/ui/DemandeTemps'
 import { Repliable } from '@/ui/Repliable'
+import { useLargeur } from '@/ui/largeur'
 import { GEIST, MONO } from '@/ui/primitives'
 
 /**
@@ -32,6 +33,7 @@ export default function MonTemps() {
   const [ajout, setAjout] = useState(false)
   const [gestion, setGestion] = useState(false)
   const [suppression, setSuppression] = useState<string | null>(null)
+  const large = useLargeur().deuxColonnes
   const jour = jours.find((x) => x.date === selection) ?? jours[0]
   if (!jour || !chargees) return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Chargement du planning" />
   const dernier = jours[jours.length - 1]!
@@ -67,58 +69,88 @@ export default function MonTemps() {
         </Text>
         <AgendaJour segments={jour.segments} {...(jour.date === aujourdHui ? { minute } : {})} />
       </View>
-      <View style={{ marginTop: 28, gap: 10 }}>
-        <Repliable titre="Le détail, jour par jour" resume="brute → dispo">
-          <TableauCapacite capacites={resultat.capacities} />
-        </Repliable>
-        <Repliable titre="Demander du temps libre">
-          <DemandeTemps capacites={resultat.capacities} aujourdHui={aujourdHui} />
-        </Repliable>
+      {/* Le bureau met ces deux replis COTE A COTE, et le sommeil plus les
+          obligations dans la colonne d'en face. Empiles, demander du temps
+          libre exige de faire defiler par-dessus le detail qu'on vient de
+          lire — or c'est ce detail qui dit si la demande a une chance. */}
+      <View style={large
+        ? { marginTop: 28, flexDirection: 'row', alignItems: 'flex-start', gap: 20 }
+        : { marginTop: 28, gap: 10 }}>
+        <View style={large ? { flex: 1, gap: 10 } : { gap: 10 }}>
+          <Repliable titre="Le détail, jour par jour" resume="brute → dispo">
+            <TableauCapacite capacites={resultat.capacities} />
+          </Repliable>
+          <Repliable titre="Demander du temps libre">
+            <DemandeTemps capacites={resultat.capacities} aujourdHui={aujourdHui} />
+          </Repliable>
+        </View>
+        {large ? <View style={{ flex: 1 }}><DeclarationsFixes /></View> : null}
       </View>
 
-      <View style={{ marginTop: 28, borderTopWidth: 1, borderTopColor: j.line }}>
-        <Pressable accessibilityRole="button" onPress={() => routeur.push('/reglages')}
-          style={({ pressed }) => ({ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 60, opacity: pressed ? 0.6 : 1 })}>
-          <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Sommeil</Text>
-          <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.reglages.coucher}–{d.reglages.lever}</Text>
-          <Chevron couleur={j.text2} taille={14} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: gestion }} onPress={() => setGestion(!gestion)}
-          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, borderTopWidth: 1, borderTopColor: j.line, opacity: pressed ? 0.6 : 1 })}>
-          <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Obligations fixes</Text>
-          <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.obligations.length}</Text>
-          <View style={{ transform: [{ rotate: gestion ? '90deg' : '0deg' }] }}><Chevron couleur={j.text2} taille={14} /></View>
-        </Pressable>
-        {gestion && <View>
-          {d.obligations.length === 0 && <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, paddingVertical: 12 }}>Ajoute tes cours, ton travail ou tes trajets.</Text>}
-          {[...d.obligations].sort((a, b) =>
-            (a.date ?? '').localeCompare(b.date ?? '') ||
-            ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7) ||
-            a.startMinute - b.startMinute).map((o) =>
-            <View key={o.id} style={{ paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{o.label}</Text>
-                <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>
-                  {CATEGORIE[o.categoryType]} · {o.date
-                    ? dateLocale(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-                    : JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}
-                  {o.date ? ' · une seule fois' : ''}
-                </Text>
-              </View>
-              <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirmer la suppression de ${o.label}` : `Supprimer ${o.label}`}
-                onPress={() => { if (suppression === o.id) { void d.supprimerObligation(o.id); setSuppression(null) } else setSuppression(o.id) }}
-                style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
-                {suppression === o.id ? <Text style={{ color: j.accentEncre, fontFamily: GEIST.moyen }}>Supprimer</Text> : <Croix couleur={j.text2} />}
-              </Pressable>
-              {suppression === o.id && <Pressable accessibilityRole="button" accessibilityLabel="Annuler la suppression" onPress={() => setSuppression(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} /></Pressable>}
-            </View>)}
-        </View>}
-      </View>
+      {large ? null : <DeclarationsFixes />}
     </ScrollView>
     <Modal visible={ajout} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAjout(false)}>
       <Formulaire surFin={() => setAjout(false)} jourInitial={dateLocale(jour.date).getDay()} />
     </Modal>
   </>
+}
+
+/**
+ * Le temps SUBI : le sommeil, et les obligations fixes.
+ *
+ * Un composant a part parce qu'il change de place selon la largeur. Sur un
+ * telephone il vient sous les replis ; des qu'il y a deux colonnes, il monte a
+ * cote — la ou le bureau le met. Ce qu'on declare ici et ce qu'on lit en face
+ * repondent a la meme question, et les separer par un defilement fait perdre
+ * le lien.
+ */
+function DeclarationsFixes() {
+  const j = useJetons()
+  const routeur = useRouter()
+  const d = useDonnees()
+  const [gestion, setGestion] = useState(false)
+  const [suppression, setSuppression] = useState<string | null>(null)
+
+  return (
+  <View style={{ borderTopWidth: 1, borderTopColor: j.line }}>
+      <Pressable accessibilityRole="button" onPress={() => routeur.push('/reglages')}
+        style={({ pressed }) => ({ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 60, opacity: pressed ? 0.6 : 1 })}>
+        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Sommeil</Text>
+        <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.reglages.coucher}–{d.reglages.lever}</Text>
+        <Chevron couleur={j.text2} taille={14} />
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: gestion }} onPress={() => setGestion(!gestion)}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, borderTopWidth: 1, borderTopColor: j.line, opacity: pressed ? 0.6 : 1 })}>
+        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Obligations fixes</Text>
+        <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.obligations.length}</Text>
+        <View style={{ transform: [{ rotate: gestion ? '90deg' : '0deg' }] }}><Chevron couleur={j.text2} taille={14} /></View>
+      </Pressable>
+      {gestion && <View>
+        {d.obligations.length === 0 && <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, paddingVertical: 12 }}>Ajoute tes cours, ton travail ou tes trajets.</Text>}
+        {[...d.obligations].sort((a, b) =>
+          (a.date ?? '').localeCompare(b.date ?? '') ||
+          ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7) ||
+          a.startMinute - b.startMinute).map((o) =>
+          <View key={o.id} style={{ paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{o.label}</Text>
+              <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>
+                {CATEGORIE[o.categoryType]} · {o.date
+                  ? dateLocale(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                  : JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}
+                {o.date ? ' · une seule fois' : ''}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirmer la suppression de ${o.label}` : `Supprimer ${o.label}`}
+              onPress={() => { if (suppression === o.id) { void d.supprimerObligation(o.id); setSuppression(null) } else setSuppression(o.id) }}
+              style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
+              {suppression === o.id ? <Text style={{ color: j.accentEncre, fontFamily: GEIST.moyen }}>Supprimer</Text> : <Croix couleur={j.text2} />}
+            </Pressable>
+            {suppression === o.id && <Pressable accessibilityRole="button" accessibilityLabel="Annuler la suppression" onPress={() => setSuppression(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} /></Pressable>}
+          </View>)}
+      </View>}
+    </View>
+  )
 }
 
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']

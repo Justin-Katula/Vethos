@@ -7,6 +7,7 @@ import { useSeances } from '@/seances/magasin-seances'
 import { usePlan } from '@/plan/Plan'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { useJetons } from '@/theme/Theme'
+import { useLargeur } from '@/ui/largeur'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree, enHeure } from '@/ui/Horloge'
 import { Coche, Croix, Plus } from '@/ui/icones'
@@ -41,6 +42,14 @@ export default function Engagements() {
   const d = useDonnees()
 
   const [ajout, setAjout] = useState<'aucun' | 'tache' | 'objectif' | 'ancre'>('aucun')
+  const largeur = useLargeur()
+  // Une colonne sous 760 points, deux jusqu'a 1100, trois au-dela — comme le
+  // bureau. La largeur est CALCULEE plutot que laissee a `flex: 1` : avec
+  // `flexWrap`, trois enfants extensibles se serrent sur une seule ligne quoi
+  // qu'il arrive, et on obtiendrait trois colonnes etranglees a 760.
+  const colonnes = largeur.troisColonnes ? 3 : largeur.deuxColonnes ? 2 : 1
+  const dispo = largeur.points - PAS[5] * 2
+  const largeurColonne = colonnes === 1 ? undefined : (dispo - PAS[10] * (colonnes - 1)) / colonnes
 
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const ouvertes = d.taches.filter((t) => !t.terminee)
@@ -61,8 +70,23 @@ export default function Engagements() {
     >
       <TitreEcran>Engagements</TitreEcran>
 
+      {/* Les trois natures COTE A COTE des qu'elles tiennent, comme sur le
+          bureau. Empilees, il faut faire defiler pour passer d'une loi a
+          l'autre — or c'est leur CONTRASTE que cet ecran doit enseigner, et un
+          contraste qu'on ne voit pas d'un coup d'œil n'en est plus un.
+
+          A trois colonnes le bureau les aligne toutes ; a deux, les taches
+          gardent la leur — ce sont elles qui portent le plus de lignes — et
+          objectifs et ancres partagent la seconde. */}
+      <View style={colonnes === 1 ? {} : {
+        flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start',
+        gap: PAS[10], marginTop: PAS[6],
+      }}>
+
+      <Colonne largeur={largeurColonne}>
       <Section
         premiere
+        enColonne={colonnes > 1}
         titre="Tâches"
         compte={groupes.length}
         loi="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
@@ -93,7 +117,11 @@ export default function Engagements() {
         ) : null}
       </Section>
 
+      </Colonne>
+
+      <Colonne largeur={largeurColonne}>
       <Section
+        enColonne={colonnes > 1}
         titre="Objectifs"
         compte={d.objectifs.length}
         loi="Une cible par semaine, jamais d’échéance. Gouverné par le rythme : il avance sans jamais être en retard."
@@ -122,7 +150,11 @@ export default function Engagements() {
         ))}
       </Section>
 
+      </Colonne>
+
+      <Colonne largeur={largeurColonne}>
       <Section
+        enColonne={colonnes > 1}
         titre="Ancres"
         compte={d.ancres.length}
         loi="Une heure fixe, choisie une fois. Gouvernée par la stabilité : elle ne bouge jamais d’un jour à l’autre."
@@ -155,8 +187,23 @@ export default function Engagements() {
           </Rangee>
         ))}
       </Section>
+      </Colonne>
+
+      </View>
     </ScrollView>
   )
+}
+
+/**
+ * Une colonne de la grille, ou rien du tout.
+ *
+ * Sans largeur — donc sur un telephone — elle disparait : un `View` de plus
+ * autour d'une section empilee ne ferait qu'ajouter un niveau a lire dans
+ * l'arbre d'accessibilite.
+ */
+function Colonne({ largeur, children }: { largeur: number | undefined; children: React.ReactNode }) {
+  if (largeur === undefined) return <>{children}</>
+  return <View style={{ width: largeur }}>{children}</View>
 }
 
 // ─── Lignes ────────────────────────────────────────────────────────────────

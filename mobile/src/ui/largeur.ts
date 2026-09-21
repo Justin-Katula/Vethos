@@ -20,9 +20,13 @@ import { useWindowDimensions } from 'react-native'
  *   dernière — « Disponible », la seule qu'on vient lire — sorte de l'écran.
  * - `deuxColonnes` : le cadran garde ses 400 points ET il reste de quoi lire
  *   à côté. En dessous, la colonne de droite devient une gouttière.
+ * - `troisColonnes` : les trois natures d'engagement tiennent côte à côte sans
+ *   qu'un titre de tâche se coupe. Le bureau les met à trois, et c'est ce qui
+ *   rend visible ce que cet écran doit enseigner — leurs lois diffèrent.
  */
 const SEUIL_TABLEAU = 600
 const SEUIL_DEUX_COLONNES = 760
+const SEUIL_TROIS_COLONNES = 1100
 
 export type Largeur = {
   /** Points logiques disponibles. */
@@ -31,6 +35,8 @@ export type Largeur = {
   tableau: boolean
   /** Assez large pour la composition en deux colonnes du bureau. */
   deuxColonnes: boolean
+  /** Assez large pour les trois sections d'engagements côte à côte. */
+  troisColonnes: boolean
 }
 
 export function useLargeur(): Largeur {
@@ -39,5 +45,6 @@ export function useLargeur(): Largeur {
     points: width,
     tableau: width >= SEUIL_TABLEAU,
     deuxColonnes: width >= SEUIL_DEUX_COLONNES,
+    troisColonnes: width >= SEUIL_TROIS_COLONNES,
   }
 }
