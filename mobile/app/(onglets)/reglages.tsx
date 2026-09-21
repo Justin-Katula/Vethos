@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
+import { minutesEveil } from '@/plan/moteur'
 import { useJetons, useModeApparence } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree } from '@/ui/Horloge'
@@ -18,7 +19,9 @@ export default function Reglages() {
   const j = useJetons()
   const { reglages, majReglages, taches, objectifs, ancres } = useDonnees()
 
-  const eveil = versMinute(reglages.coucher) - versMinute(reglages.lever)
+  // Deduit des MEMES plages que le moteur soustrait. Un calcul a part ici
+  // affichait « 16 h 30 » pendant que le moteur en retirait autre chose.
+  const eveil = minutesEveil(reglages)
 
   return (
     <ScrollView
@@ -36,7 +39,7 @@ export default function Reglages() {
         premiere
         titre="Sommeil"
         loi="La source unique de ta journée. La capacité se calcule entre ces deux heures, et rien ne se place dessus."
-        action={<Valeur ton="doux">{duree(eveil > 0 ? eveil : 0)}</Valeur>}
+        action={<Valeur ton="doux">{duree(eveil)} éveillé</Valeur>}
       >
         <View style={{ flexDirection: 'row', gap: PAS[3] }}>
           <Champ
@@ -180,11 +183,6 @@ function Champ({
       />
     </View>
   )
-}
-
-function versMinute(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number)
-  return (h ?? 0) * 60 + (m ?? 0)
 }
 
 /**

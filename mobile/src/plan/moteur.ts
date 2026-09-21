@@ -7,6 +7,7 @@ import type {
   TaskItem,
 } from '@shared/planning/types'
 import type { LearningState } from '@shared/schemas'
+import { sleepIntervals } from '@shared/sleep'
 import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/magasin'
 
 /**
@@ -188,32 +189,57 @@ function versJourMoteur(jourJavaScript: number): number {
   return (jourJavaScript + 6) % 7
 }
 
+/** Les heures de repli. Une nuit illisible ne doit jamais devenir une nuit absente. */
+const SOMMEIL_DEFAUT = { coucher: '23:30', lever: '07:00' } as const
+
+/**
+ * LES plages de sommeil, source unique du telephone.
+ *
+ * Tout ce qui parle de la nuit passe par ici : ce que le moteur soustrait de
+ * la capacite, ce que le cadran peint, ce que la semaine montre, la duree
+ * d'eveil affichee dans les reglages. Chacun de ces endroits avait recalcule
+ * la decoupe tout seul — trois versions de la meme nuit, dont deux pouvaient
+ * se tromper en silence sur l'autre.
+ *
+ * La decoupe elle-meme vient de `@shared/sleep`. Le repli sur les heures par
+ * defaut est propre au telephone : le champ des reglages est un TextInput
+ * libre, et pendant qu'on tape « 2 » avant « 23:30 », `parseHHMM` rend `null`.
+ * Sans repli, la nuit disparaitrait du calcul a cet instant-la et le moteur
+ * poserait du travail a 3 h du matin. Une heure illisible est une heure qu'on
+ * n'a pas encore fini d'ecrire, jamais l'absence de nuit.
+ */
+export function plagesSommeil(reglages: Reglages): ReturnType<typeof sleepIntervals> {
+  const plages = sleepIntervals(reglages.coucher, reglages.lever)
+  if (plages.length > 0) return plages
+  return sleepIntervals(SOMMEIL_DEFAUT.coucher, SOMMEIL_DEFAUT.lever)
+}
+
+/** Minutes d'eveil dans une journee, deduites des memes plages. */
+export function minutesEveil(reglages: Reglages): number {
+  return 1440 - plagesSommeil(reglages).reduce((s, p) => s + (p.endMinute - p.startMinute), 0)
+}
+
 /**
  * Le sommeil, traduit en obligations quotidiennes.
  *
- * Une nuit qui franchit minuit — 23h30 → 07h00 — ne tient pas dans une seule
- * entrée : `endMinute` ne peut pas être plus petit que `startMinute`. On la
- * coupe donc en deux, le soir puis le matin suivant, ce que le bureau fait
- * aussi. Sans cette coupure, la nuit disparaîtrait du calcul et le moteur
- * croirait la journée deux fois plus longue.
+ * La découpe — une nuit qui franchit minuit ne tient pas dans une seule entrée,
+ * `endMinute` ne pouvant pas être plus petit que `startMinute` — vient de
+ * `@shared/sleep`, la source unique du bureau. La réécrire ici donnait deux
+ * définitions du sommeil, et une de trop.
+ *
+ * Le repli sur les heures par défaut est en revanche propre au téléphone, et
+ * il est nécessaire : le champ des réglages est un TextInput libre, et pendant
+ * qu'on tape « 2 » avant « 23:30 », `parseHHMM` rend `null`. Sans repli, la
+ * nuit disparaîtrait du calcul à cet instant-là et le moteur poserait du
+ * travail à 3 h du matin. Une heure illisible est une heure qu'on n'a pas
+ * encore finie d'écrire, jamais l'absence de nuit.
  */
 function sommeilEnObligations(reglages: Reglages): Obligation[] {
-  const coucher = versMinute(reglages.coucher)
-  const lever = versMinute(reglages.lever)
-  const sortie: Obligation[] = []
-
   // Sept jours identiques : la convention de numérotation n'a ici aucune
   // importance, puisque toutes les valeurs de 0 à 6 sont couvertes.
-  for (let jour = 0; jour < 7; jour++) {
-    if (coucher < lever) {
-      // Nuit entièrement dans la même journée : rare, mais légal.
-      sortie.push(obligationSommeil(jour, coucher, lever))
-      continue
-    }
-    if (coucher < 1440) sortie.push(obligationSommeil(jour, coucher, 1440))
-    if (lever > 0) sortie.push(obligationSommeil(jour, 0, lever))
-  }
-  return sortie
+  return Array.from({ length: 7 }, (_, jour) =>
+    plagesSommeil(reglages).map((p) => obligationSommeil(jour, p.startMinute, p.endMinute)),
+  ).flat()
 }
 
 function obligationSommeil(jour: number, debut: number, fin: number): Obligation {
@@ -226,11 +252,6 @@ function obligationSommeil(jour: number, debut: number, fin: number): Obligation
     label: 'Sommeil',
     color: '#2f2f2f',
   }
-}
-
-export function versMinute(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number)
-  return Math.min(1440, Math.max(0, (h ?? 0) * 60 + (m ?? 0)))
 }
 
 export function cleDate(d: Date): string {

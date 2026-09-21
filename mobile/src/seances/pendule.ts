@@ -8,7 +8,8 @@ import {
   pendingConfirmation,
   tasksToAutoComplete,
 } from '@shared/planning/clock'
-import type { ActiveSession, PlacedBlock } from '@shared/planning/types'
+import { activeConfirmedSession } from '@shared/planning/session'
+import type { PlacedBlock } from '@shared/planning/types'
 import type { LearningState, SessionConfirmationsState } from '@shared/schemas'
 import { versTachesMoteur } from '@/plan/moteur'
 import type { Tache } from '@/donnees/magasin'
@@ -63,30 +64,14 @@ export function minuteDuJour(d: Date): number {
 /**
  * D.7 : la séance confirmée EN COURS, lue AVANT le calcul du plan.
  *
- * Elle entre dans le moteur comme une contrainte : elle se produit déjà, donc
- * elle ne se replace pas. Sans elle, chaque recalcul reposait le bloc en cours
- * à « maintenant » et il glissait indéfiniment vers l'avant — 71 confirmations
- * pour un même objectif, une par minute, mesurées le 2026-08-23.
+ * Réexportée telle quelle depuis `@shared/planning/session`, et surtout PAS
+ * réécrite. Ce calcul décide de l'identifiant du bloc épinglé ; deux versions
+ * qui divergeraient d'une minute produiraient deux identifiants pour le même
+ * créneau, et « Je commence » répondrait « ce bloc ne fait plus partie du
+ * plan » alors qu'il est là, sous un autre nom. Défaut réel mesuré sur le
+ * bureau le 2026-08-23, exactement comme ça.
  */
-export function seanceActive(
-  confirmations: SessionConfirmationsState,
-  aujourdHui: string,
-  minute: number,
-): ActiveSession | null {
-  if (confirmations.date !== aujourdHui) return null
-  const observe = confirmations.observedPending
-  if (!observe) return null
-  if (!(observe.blockId in confirmations.confirmedAt)) return null
-  if (minute < observe.startMinute || minute >= observe.endMinute) return null
-  return {
-    blockId: observe.blockId,
-    kind: observe.kind,
-    refId: observe.refId,
-    startMinute: observe.startMinute,
-    endMinute: observe.endMinute,
-    workMinutes: observe.workMinutes ?? observe.endMinute - observe.startMinute,
-  }
-}
+export const seanceActive = activeConfirmedSession
 
 /** Remet l'état à zéro quand le jour a tourné. La veille n'est jamais héritée. */
 export function pourAujourdHui(

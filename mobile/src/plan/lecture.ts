@@ -1,6 +1,6 @@
 import type { PlanningResult } from '@shared/planning/types'
 import type { Obligation, Reglages } from '@/donnees/magasin'
-import { versMinute } from './moteur'
+import { plagesSommeil } from './moteur'
 import { noteDuBloc } from './signaux'
 import { dateLocale } from './format'
 
@@ -35,12 +35,13 @@ export function lireSemaine(
   obligations: readonly Obligation[],
   reglages: Reglages,
 ): JourTemps[] {
-  const coucher = versMinute(reglages.coucher)
-  const lever = versMinute(reglages.lever)
-  const nuits = coucher < lever ? [[coucher, lever]] : [[0, lever], [coucher, 1440]]
+  // La MEME nuit que celle que le moteur a soustraite de la capacite. La
+  // recalculer ici donnerait une nuit peinte a l'ecran et une autre dans le
+  // calcul — et rien ne dirait laquelle est la bonne.
+  const nuits = plagesSommeil(reglages)
   return resultat.capacities.map((c) => {
-    const sommeil: SegmentTemps[] = nuits.filter(([a, b]) => b! > a!).map(([a, b], i) => ({
-      id: `nuit-${c.date}-${i}`, date: c.date, debut: a!, fin: b!,
+    const sommeil: SegmentTemps[] = nuits.map((n, i) => ({
+      id: `nuit-${c.date}-${i}`, date: c.date, debut: n.startMinute, fin: n.endMinute,
       titre: 'Sommeil', nature: 'sleep', travail: 0,
     }))
     const fixes: SegmentTemps[] = obligations

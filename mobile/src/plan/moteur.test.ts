@@ -122,6 +122,22 @@ describe('le sommeil, et la nuit qui franchit minuit', () => {
     }
   })
 
+  it('garde une nuit même quand l’heure est en train d’être tapée', () => {
+    // Le champ des reglages est un TextInput libre. Pendant qu'on efface
+    // « 23:30 » pour taper autre chose, il vaut « 2 », puis « 23 », puis
+    // « 23: » — et aucune de ces valeurs n'est une heure. Sans repli, la nuit
+    // disparaitrait du calcul a cet instant-la et le moteur poserait du
+    // travail a 3 h du matin, sur un ecran que l'utilisateur regarde.
+    for (const coucher of ['2', '23', '23:', '', 'nawak']) {
+      const r = appeler({
+        taches: [tache({ minutesEstimees: 2000, minutesRestantes: 2000 })],
+        reglages: { ...REGLAGES, coucher },
+      })
+      const nuit = r.blocks.filter((b) => b.startMinute >= 1 * 60 && b.endMinute <= 6 * 60)
+      expect(nuit, `coucher « ${coucher} » : ${nuit.length} blocs en pleine nuit`).toHaveLength(0)
+    }
+  })
+
   it('respecte une obligation déclarée', () => {
     // Un cours de 9 h à 12 h le lundi : rien ne doit s'y poser.
     const cours: Obligation = {
