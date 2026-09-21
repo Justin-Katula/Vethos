@@ -9,6 +9,9 @@ import { useJetons } from '@/theme/Theme'
 import { AgendaJour } from '@/ui/AgendaJour'
 import { CarteSemaine } from '@/ui/CarteSemaine'
 import { Chevron, Croix, Plus } from '@/ui/icones'
+import { TableauCapacite } from '@/ui/Capacite'
+import { DemandeTemps } from '@/ui/DemandeTemps'
+import { Repliable } from '@/ui/Repliable'
 import { GEIST, MONO } from '@/ui/primitives'
 
 /**
@@ -24,7 +27,7 @@ export default function MonTemps() {
   const marges = useSafeAreaInsets()
   const routeur = useRouter()
   const d = useDonnees()
-  const { jours, aujourdHui, minute, chargees } = usePlan()
+  const { jours, aujourdHui, minute, chargees, resultat } = usePlan()
   const [selection, setSelection] = useState<string | null>(null)
   const [ajout, setAjout] = useState(false)
   const [gestion, setGestion] = useState(false)
@@ -32,6 +35,8 @@ export default function MonTemps() {
   const jour = jours.find((x) => x.date === selection) ?? jours[0]
   if (!jour || !chargees) return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Chargement du planning" />
   const dernier = jours[jours.length - 1]!
+  const disponible = resultat.capacities.reduce((s, c) => s + c.effectiveCapacityMinutes, 0)
+
   const titreJour = jour.date === aujourdHui ? 'Aujourd’hui' : dateLocale(jour.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })
   return <>
     <ScrollView style={{ flex: 1, backgroundColor: j.bg }} contentContainerStyle={{ paddingTop: marges.top + 20, paddingBottom: 36, paddingHorizontal: 20 }}>
@@ -45,6 +50,15 @@ export default function MonTemps() {
       <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, marginTop: 5 }}>
         {dateLocale(jours[0]!.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} — {dateLocale(dernier.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
       </Text>
+
+      {/* Le chiffre de la page. Declarer du temps subi n'a d'interet que si
+          l'on voit tout de suite ce qu'il reste — sinon on declare a l'aveugle. */}
+      <View style={{ marginTop: 18, flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+        <Text style={{ fontFamily: MONO.demi, fontSize: 30, color: j.accentEncre, fontVariant: ['tabular-nums'], letterSpacing: -0.5 }}>
+          {duree(disponible)}
+        </Text>
+        <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text3 }}>disponibles sur sept jours</Text>
+      </View>
       <CarteSemaine jours={jours} selection={jour.date} surSelection={setSelection} aujourdHui={aujourdHui} minute={minute} />
       <View style={{ marginTop: 28, paddingTop: 24, borderTopWidth: 1, borderTopColor: j.line }}>
         <Text style={{ fontFamily: GEIST.demi, fontSize: 20, color: j.text, textTransform: 'capitalize' }}>{titreJour}</Text>
@@ -53,6 +67,15 @@ export default function MonTemps() {
         </Text>
         <AgendaJour segments={jour.segments} {...(jour.date === aujourdHui ? { minute } : {})} />
       </View>
+      <View style={{ marginTop: 28, gap: 10 }}>
+        <Repliable titre="Le détail, jour par jour" resume="brute → dispo">
+          <TableauCapacite capacites={resultat.capacities} />
+        </Repliable>
+        <Repliable titre="Demander du temps libre">
+          <DemandeTemps capacites={resultat.capacities} aujourdHui={aujourdHui} />
+        </Repliable>
+      </View>
+
       <View style={{ marginTop: 28, borderTopWidth: 1, borderTopColor: j.line }}>
         <Pressable accessibilityRole="button" onPress={() => routeur.push('/reglages')}
           style={({ pressed }) => ({ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 60, opacity: pressed ? 0.6 : 1 })}>
@@ -72,7 +95,7 @@ export default function MonTemps() {
             <View key={o.id} style={{ paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{o.label}</Text>
-                <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>{JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}</Text>
+                <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>{CATEGORIE[o.categoryType]} · {JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirmer la suppression de ${o.label}` : `Supprimer ${o.label}`}
                 onPress={() => { if (suppression === o.id) { void d.supprimerObligation(o.id); setSuppression(null) } else setSuppression(o.id) }}
@@ -92,6 +115,19 @@ export default function MonTemps() {
 
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
 const CATEGORIES = [ ['school', 'Cours'], ['work', 'Travail'], ['commute', 'Trajet'], ['commitment', 'Engagement'], ['custom', 'Autre'] ] as const
+
+/**
+ * La categorie, mot pour mot celle du bureau.
+ *
+ * Elle n'a PAS de couleur propre ici : sur une piste de 25 px, six gris
+ * voisins ne se distinguent pas, et une legende de six pastilles identiques
+ * ment plus qu'elle n'informe. La categorie se lit donc en toutes lettres,
+ * la ou elle sert vraiment — sur la ligne de l'obligation.
+ */
+const CATEGORIE: Record<Obligation['categoryType'], string> = {
+  sleep: 'Sommeil', school: 'École', work: 'Travail',
+  commute: 'Trajet', commitment: 'Engagement', custom: 'Autre',
+}
 
 function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: number }) {
   const j = useJetons()
