@@ -89,6 +89,16 @@ export const ObligationSchema = z.object({
   categoryType: z.enum(['sleep', 'school', 'work', 'commute', 'commitment', 'custom']),
   label: z.string().min(1).max(60),
   color: z.string(),
+  /**
+   * Occurrence UNIQUE (AAAA-MM-JJ). Absent = recurrente chaque semaine sur
+   * `dayOfWeek`, le defaut. Presente = cette seule date, jamais repetee la
+   * semaine suivante.
+   *
+   * Sans elle, un examen ou un rendez-vous ne pouvait se declarer que comme
+   * une obligation hebdomadaire — et amputait la capacite de toutes les
+   * semaines suivantes jusqu'a ce qu'on pense a la supprimer.
+   */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
 export type Obligation = z.infer<typeof ObligationSchema>
 

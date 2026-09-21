@@ -18,6 +18,41 @@ describe('lecture commune du cercle et de la semaine', () => {
     expect(segmentActuel(semaine[0]!.segments, 60)).toBeUndefined()
     expect(segmentActuel(semaine[0]!.segments, 180)?.nature).toBe('sleep')
   })
+  it('ne montre une occurrence unique qu’à sa date', () => {
+    // Un examen le mardi 22 ne doit pas reapparaitre tous les mardis. Filtrer
+    // sur le seul jour de semaine le ferait afficher chaque semaine pendant
+    // que le moteur, lui, ne le soustrairait qu'une fois — l'ecran et le
+    // calcul diraient deux choses differentes, sans que rien ne le signale.
+    const examen = {
+      id: 'examen', label: 'Examen', dayOfWeek: 2, startMinute: 540, endMinute: 720,
+      categoryType: 'school' as const, color: '#777777', date: '2026-09-22',
+    }
+    const plan = calculerPlan({ taches: [], objectifs: [], ancres: [], obligations: [examen], reglages, maintenant: new Date(2026, 8, 21, 8) })
+    const semaine = lireSemaine(plan, [examen], reglages)
+    const jours = semaine.filter((j) => j.segments.some((s) => s.id === 'examen'))
+    expect(jours.map((j) => j.date)).toEqual(['2026-09-22'])
+  })
+
+  it('empêche le moteur de poser du travail pendant une occurrence unique', () => {
+    // Le champ ne sert a rien s'il ne franchit pas la traduction vers le moteur.
+    const examen = {
+      id: 'examen', label: 'Examen', dayOfWeek: 2, startMinute: 540, endMinute: 720,
+      categoryType: 'school' as const, color: '#777777', date: '2026-09-22',
+    }
+    const tache = {
+      id: 't1', titre: 'Réviser', intention: '', echeance: '2026-09-25', importance: 5,
+      minutesEstimees: 600, minutesRestantes: 600, facteurCorrection: 1.4,
+      minutesSupplementaires: 0, parentId: null, rangPartie: null,
+      nature: 'routine' as const, terminee: false, creeeLe: '2026-09-20T10:00:00.000Z',
+    }
+    const plan = calculerPlan({ taches: [tache], objectifs: [], ancres: [], obligations: [examen], reglages, maintenant: new Date(2026, 8, 21, 8) })
+    const duMardi = plan.blocks.filter((x) => x.date === '2026-09-22')
+    expect(duMardi.length, 'le mardi doit porter du travail, sinon le test ne prouve rien').toBeGreaterThan(0)
+    for (const b of duMardi) {
+      expect(b.startMinute < 720 && b.endMinute > 540, `${b.label} chevauche l’examen`).toBe(false)
+    }
+  })
+
   it('préserve exactement les blocs du moteur, pauses comprises', () => {
     const entree = { taches: [], objectifs: [{ id: 'piano', nom: 'Piano', intention: '', couleur: '#777777', cibleHebdoMinutes: 350, creeLe: '2026-09-20' }], ancres: [], obligations, reglages, maintenant: new Date(2026, 8, 21, 8) }
     const plan = calculerPlan(entree)

@@ -91,11 +91,19 @@ export default function MonTemps() {
         </Pressable>
         {gestion && <View>
           {d.obligations.length === 0 && <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, paddingVertical: 12 }}>Ajoute tes cours, ton travail ou tes trajets.</Text>}
-          {[...d.obligations].sort((a, b) => ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7) || a.startMinute - b.startMinute).map((o) =>
+          {[...d.obligations].sort((a, b) =>
+            (a.date ?? '').localeCompare(b.date ?? '') ||
+            ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7) ||
+            a.startMinute - b.startMinute).map((o) =>
             <View key={o.id} style={{ paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{o.label}</Text>
-                <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>{CATEGORIE[o.categoryType]} · {JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}</Text>
+                <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>
+                  {CATEGORIE[o.categoryType]} · {o.date
+                    ? dateLocale(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                    : JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}
+                  {o.date ? ' · une seule fois' : ''}
+                </Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirmer la suppression de ${o.label}` : `Supprimer ${o.label}`}
                 onPress={() => { if (suppression === o.id) { void d.supprimerObligation(o.id); setSuppression(null) } else setSuppression(o.id) }}
@@ -114,6 +122,13 @@ export default function MonTemps() {
 }
 
 const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
+
+/** La date par defaut d'une occurrence unique : dans une semaine. */
+function dansNJours(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 const CATEGORIES = [ ['school', 'Cours'], ['work', 'Travail'], ['commute', 'Trajet'], ['commitment', 'Engagement'], ['custom', 'Autre'] ] as const
 
 /**
@@ -138,6 +153,8 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
   const [debut, setDebut] = useState('09:00')
   const [fin, setFin] = useState('12:00')
   const [jours, setJours] = useState([jourInitial])
+  const [recurrence, setRecurrence] = useState<'hebdo' | 'unique'>('hebdo')
+  const [dateUnique, setDateUnique] = useState(dansNJours(7))
   const [erreur, setErreur] = useState('')
   const [enCours, setEnCours] = useState(false)
   const heure = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s) ? Number(s.slice(0, 2)) * 60 + Number(s.slice(3)) : NaN
@@ -146,10 +163,25 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
     const b = fin === '24:00' ? 1440 : heure(fin)
     if (!nom.trim()) { setErreur('Donne un nom à cette obligation.'); return }
     if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) { setErreur('Indique des heures valides, avec une fin après le début.'); return }
+    const commun = { label: nom.trim(), startMinute: a, endMinute: b, categoryType: categorie, color: j.text3 }
+    if (recurrence === 'unique') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateUnique) || Number.isNaN(dateLocale(dateUnique).getTime())) {
+        setErreur('Indique une date au format AAAA-MM-JJ.'); return
+      }
+      setEnCours(true)
+      try {
+        // Une occurrence unique porte son propre jour, derive de sa DATE — pas
+        // du jour qu'on avait ouvert, qui ne servait qu'a parcourir.
+        await ajouter({ ...commun, dayOfWeek: dateLocale(dateUnique).getDay(), date: dateUnique })
+        surFin()
+      } catch { setErreur('Enregistrement impossible. Réessaie.') }
+      finally { setEnCours(false) }
+      return
+    }
     if (!jours.length) { setErreur('Choisis au moins un jour.'); return }
     setEnCours(true)
     try {
-      for (const dayOfWeek of jours) await ajouter({ label: nom.trim(), dayOfWeek, startMinute: a, endMinute: b, categoryType: categorie, color: j.text3 })
+      for (const dayOfWeek of jours) await ajouter({ ...commun, dayOfWeek })
       surFin()
     } catch { setErreur('Enregistrement impossible. Réessaie.') }
     finally { setEnCours(false) }
@@ -171,10 +203,26 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
         <View style={{ flex: 1 }}><Text style={label}>Début</Text><TextInput accessibilityLabel="Heure de début, heures et minutes" value={debut} onChangeText={setDebut} maxLength={5} style={champ} /></View>
         <View style={{ flex: 1 }}><Text style={label}>Fin</Text><TextInput accessibilityLabel="Heure de fin, heures et minutes" value={fin} onChangeText={setFin} maxLength={5} style={champ} /></View>
       </View>
-      <View><Text style={label}>Répéter</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[1, 2, 3, 4, 5, 6, 0].map((n) => <Pressable key={n} accessibilityRole="button" accessibilityLabel={JOURS[n]} accessibilityState={{ selected: jours.includes(n) }} onPress={() => setJours((liste) => liste.includes(n) ? liste.filter((v) => v !== n) : [...liste, n])}
-        style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 6, backgroundColor: jours.includes(n) ? j.text : j.surface2, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.7 : 1 })}>
-        <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: jours.includes(n) ? j.bg : j.text }}>{JOURS[n]}</Text>
-      </Pressable>)}</View></View>
+      <View><Text style={label}>Répéter</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          {([['hebdo', 'Chaque semaine'], ['unique', 'Une seule fois']] as const).map(([cle, texte]) =>
+            <Pressable key={cle} accessibilityRole="button" accessibilityState={{ selected: recurrence === cle }} onPress={() => setRecurrence(cle)}
+              style={({ pressed }) => ({ flex: 1, minHeight: 44, borderRadius: 6, justifyContent: 'center', alignItems: 'center', backgroundColor: recurrence === cle ? j.text : j.surface2, opacity: pressed ? 0.7 : 1 })}>
+              <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: recurrence === cle ? j.bg : j.text }}>{texte}</Text>
+            </Pressable>)}
+        </View>
+        {recurrence === 'unique'
+          ? <>
+              <TextInput accessibilityLabel="Date, année mois jour" value={dateUnique} onChangeText={setDateUnique} maxLength={10} placeholder="2026-09-28" placeholderTextColor={j.text2} style={{ ...champ, fontFamily: MONO.normal }} />
+              <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2, marginTop: 8 }}>
+                Ce jour-là seulement. La semaine suivante reste intacte.
+              </Text>
+            </>
+          : <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[1, 2, 3, 4, 5, 6, 0].map((n) => <Pressable key={n} accessibilityRole="button" accessibilityLabel={JOURS[n]} accessibilityState={{ selected: jours.includes(n) }} onPress={() => setJours((liste) => liste.includes(n) ? liste.filter((v) => v !== n) : [...liste, n])}
+              style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 6, backgroundColor: jours.includes(n) ? j.text : j.surface2, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.7 : 1 })}>
+              <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: jours.includes(n) ? j.bg : j.text }}>{JOURS[n]}</Text>
+            </Pressable>)}</View>}
+      </View>
       {erreur ? <Text accessibilityRole="alert" style={{ fontFamily: GEIST.normal, color: j.accentEncre, fontSize: 14 }}>{erreur}</Text> : null}
       <Pressable accessibilityRole="button" disabled={enCours} accessibilityState={{ disabled: enCours, busy: enCours }} onPress={() => void sauver()}
         style={({ pressed }) => ({ minHeight: 52, borderRadius: 8, backgroundColor: j.text, alignItems: 'center', justifyContent: 'center', opacity: enCours || pressed ? 0.6 : 1 })}>

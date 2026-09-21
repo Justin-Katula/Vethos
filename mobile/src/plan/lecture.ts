@@ -44,8 +44,13 @@ export function lireSemaine(
       id: `nuit-${c.date}-${i}`, date: c.date, debut: n.startMinute, fin: n.endMinute,
       titre: 'Sommeil', nature: 'sleep', travail: 0,
     }))
+    // La MEME regle que `scheduleEntriesForDate` du moteur : une occurrence
+    // unique ne vaut QUE pour sa date, et son jour de semaine ne compte plus.
+    // Filtrer ici sur le seul jour de semaine ferait apparaitre un examen du
+    // mardi 23 tous les mardis de l'ecran, pendant que le moteur, lui, ne le
+    // soustrairait qu'une fois.
     const fixes: SegmentTemps[] = obligations
-      .filter((o) => o.dayOfWeek === dateLocale(c.date).getDay())
+      .filter((o) => (o.date ? o.date === c.date : o.dayOfWeek === dateLocale(c.date).getDay()))
       .map((o) => ({ id: o.id, date: c.date, debut: o.startMinute, fin: o.endMinute,
         titre: o.label, nature: o.categoryType === 'sleep' ? 'sleep' : 'fixed', travail: 0 }))
     const places: SegmentTemps[] = resultat.blocks.filter((b) => b.date === c.date)
