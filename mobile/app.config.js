@@ -15,6 +15,22 @@
  */
 module.exports = ({ config }) => {
   const equipe = process.env.APPLE_TEAM_ID?.trim()
-  if (!equipe) return config
+
+  if (!equipe) {
+    // Pendant une compilation, l'absence n'est plus un detail : les trois
+    // extensions natives ont besoin d'une equipe pour etre signees, et sans
+    // elle l'echec arrive bien plus loin, dans Xcode, sous une forme qui ne
+    // nomme pas la cause. Le greffon signale deja l'absence ; on dit ici
+    // quoi faire, parce que c'est le seul endroit qui le sait.
+    if (process.env.EAS_BUILD === 'true') {
+      console.warn(
+        '\n[vethos] APPLE_TEAM_ID absent de cette compilation.' +
+          '\n         Pose-le une fois pour toutes :' +
+          '\n         npx eas-cli secret:create --scope project --name APPLE_TEAM_ID --value XXXXXXXXXX\n',
+      )
+    }
+    return config
+  }
+
   return { ...config, ios: { ...config.ios, appleTeamId: equipe } }
 }

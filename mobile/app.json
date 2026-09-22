@@ -15,7 +15,7 @@
       "supportsTablet": true,
       "deploymentTarget": "16.0",
       "infoPlist": {
-        "NSFamilyControlsUsageDescription": "Vethos utilise le Temps d'écran pour masquer les applications que tu as toi-même choisi d'écarter pendant tes séances de travail. Rien n'est envoyé nulle part : iOS ne nous dit même pas de quelles applications il s'agit.",
+        "NSFamilyControlsUsageDescription": "Vethos uses Screen Time to set aside the apps you picked yourself, for the length of a session you started. Nothing leaves your phone — iOS never tells Vethos which apps they are.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "processing"
