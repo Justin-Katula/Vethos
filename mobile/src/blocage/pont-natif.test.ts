@@ -101,6 +101,7 @@ describe('programmer une plage', () => {
 
     expect(appels).toEqual([
       'stopMonitoring',
+      'disableBlockAllMode',
       'viderGardee',
       'configureActions:intervalDidStart:blockSelection',
       'configureActions:intervalDidEnd:resetBlocks',
@@ -172,6 +173,27 @@ describe('le mode profond', () => {
     expect(appels).toContain('configureActions:intervalDidStart:enableBlockAllMode')
     expect(appels.at(-1)).toBe('enableBlockAllMode')
     expect(appels.some((a) => a.startsWith('blockSelection'))).toBe(false)
+  })
+
+  it('n’enferme jamais pendant qu’il reconstruit la liste gardée', async () => {
+    // Il n'existe pas de « poser la liste » atomique : on vide, puis on
+    // ajoute. Entre les deux la liste est vide, et « tout sauf rien » veut
+    // dire TOUT — Vethos compris. Changer sa liste gardée pendant une séance
+    // profonde enfermait l'utilisateur hors de l'application qui aurait pu
+    // l'en sortir, sans autre issue que les Réglages d'iOS.
+    const { natif, appels } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage()], {
+      mode: 'profond',
+      gardeeId: 'vethos.garde',
+      maintenant: 9 * 60 + 15,
+    })
+
+    const vide = appels.indexOf('viderGardee')
+    const eteint = appels.indexOf('disableBlockAllMode')
+    expect(eteint, 'le mode profond doit tomber avant que la liste soit vidée').toBeLessThan(vide)
+
+    // Et il se rallume : le trou se referme dans le même geste.
+    expect(appels.at(-1)).toBe('enableBlockAllMode')
   })
 
   it('pose la liste gardée AVANT la première surveillance', async () => {

@@ -135,6 +135,20 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       // des boucliers orphelins au moindre écart.
       natif.stopMonitoring()
 
+      // Le mode profond s'éteint AVANT qu'on touche à la liste gardée.
+      //
+      // Il n'existe pas de « poser la liste » atomique : on vide, puis on
+      // ajoute. Entre les deux, la liste est vide — et tant que le mode
+      // profond tient, « tout sauf rien » veut dire TOUT, Vethos compris.
+      // Changer sa liste gardée pendant une séance profonde enfermait donc
+      // l'utilisateur hors de l'application qui aurait pu l'en sortir.
+      //
+      // La fenêtre est brève dans les deux sens, mais elle n'est pas
+      // symétrique : perdre le bouclier pendant un battement alors qu'on a
+      // Vethos sous les yeux ne coûte rien, être enfermé dehors coûte un
+      // passage par les Réglages d'iOS. On choisit le trou, pas la serrure.
+      natif.disableBlockAllMode('vethos:reconstruction')
+
       // La liste gardée est reposée AVANT toute surveillance : en mode profond
       // elle est le seul « sauf », et `enableBlockAllMode` la lit telle qu'il
       // la trouve. Posée après, la première fenêtre à s'ouvrir écarterait tout
