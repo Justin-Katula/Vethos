@@ -1,5 +1,10 @@
-import type { Deficit, PlanningResult, PlanningSignal, TensionWarning } from '@shared/planning/types'
+import type { Deficit, PlanningResult, TensionWarning } from '@shared/planning/types'
+import { blockNote, signalSentences, signalSentence } from '@shared/phrases'
 import { dateLocale, duree } from './format'
+
+// Les phrases vivent dans `@shared/phrases` : le bureau les affiche aussi, et
+// deux copies du meme constat finissent par ne plus dire la meme chose.
+export { signalSentence as texteSignal } from '@shared/phrases'
 
 /**
  * Ce que le moteur a remarqué, mis en phrases.
@@ -17,46 +22,11 @@ import { dateLocale, duree } from './format'
 /** Un fait de la semaine, prêt à être posé à l'écran. */
 export type Remarque = { cle: string; texte: string }
 
-/**
- * C.3.4 : la liste est FERMÉE — quatre signaux, pas un de plus.
- *
- * `density_deficit` ne produit volontairement aucune phrase ici : la carte de
- * déficit le montre déjà, avec ses options chiffrées. Le répéter en dessous
- * donnerait deux fois le même fait, dont une fois sans rien à en faire.
- */
-export function texteSignal(
-  signal: PlanningSignal,
-  nomDe: (id: string) => string | undefined,
-): string | null {
-  const d = signal.data
-  const nombre = (cle: string): number => (typeof d[cle] === 'number' ? (d[cle] as number) : 0)
-  const chaine = (cle: string): string => (typeof d[cle] === 'string' ? (d[cle] as string) : '')
-
-  switch (signal.type) {
-    case 'anchor_missed_3x': {
-      const nom = nomDe(chaine('ancreId')) ?? 'This anchor'
-      return `${nom} — missed ${nombre('missedCount')} times in a row, never started.`
-    }
-    case 'objective_stalled': {
-      const nom = chaine('name') || 'This goal'
-      return `${nom} — no progress for ${nombre('daysSinceLastService')} days.`
-    }
-    case 'delay_repeated': {
-      const nom = nomDe(chaine('refId')) ?? 'This block'
-      return `${nom} — late again, ${nombre('consecutiveDelays')} times in a row.`
-    }
-    default:
-      return null
-  }
-}
-
 export function remarques(
   resultat: PlanningResult,
   nomDe: (id: string) => string | undefined,
 ): Remarque[] {
-  return resultat.signals
-    .map((s) => ({ cle: s.subject, texte: texteSignal(s, nomDe) }))
-    .filter((r): r is Remarque => r.texte !== null)
+  return signalSentences(resultat.signals, nomDe).map((s) => ({ cle: s.key, texte: s.text }))
 }
 
 /**
@@ -125,23 +95,7 @@ export function travailDevantToi(
     }, 0)
 }
 
-/**
- * La note d'un bloc : ce que le moteur a dû faire pour le poser là.
- *
- * Un bloc normal n'en a pas. Une note n'apparaît que lorsqu'il s'est passé
- * quelque chose — un plafond dépassé, une ancre réduite, une pause incluse.
- * L'ordre compte : `capOverride` et `reducedToMinimum` sont des décisions du
- * moteur sous contrainte, et priment sur le simple rappel d'une pause.
- *
- * L'heure n'entre pas ici. « En cours » est un fait d'horloge que l'agenda
- * établit déjà tout seul ; le redire dans la note ferait dépendre du temps une
- * valeur qui n'en dépend pas, et obligerait à recalculer toute la semaine à
- * chaque minute.
- */
+/** La note d'un bloc, dans les mots partages avec le bureau. */
 export function noteDuBloc(bloc: PlanningResult['blocks'][number]): string | undefined {
-  if (bloc.preview) return 'preview — locked by the previous part'
-  if (bloc.capOverride) return 'over the daily cap'
-  if (bloc.reducedToMinimum) return 'reduced to its minimum'
-  if (bloc.breakMinutes > 0) return `includes a ${duree(bloc.breakMinutes)} break`
-  return undefined
+  return blockNote(bloc, duree)
 }

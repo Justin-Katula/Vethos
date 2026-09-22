@@ -64,7 +64,7 @@ function createBrowserStub(): NexusApi {
         },
       ]
     : []
-  console.warn('[nexus] preload absent — réserve mémoire de développement active.')
+  console.warn('[nexus] preload missing — in-memory development store active.')
 
   // `?demo` ouvre l'application déjà connectée, pour regarder les écrans sans
   // passer par l'inscription. Ce compte n'existe que dans cette page : aucun
@@ -74,7 +74,7 @@ function createBrowserStub(): NexusApi {
     memory.set('auth', {
       account: {
         id: '00000000-0000-4000-8000-000000000000',
-        name: 'Démo',
+        name: 'Demo',
         email: 'demo@local',
         passwordHash: 'demo-non-utilisable',
         passwordSalt: 'demo-non-utilisable',
@@ -116,11 +116,11 @@ function createBrowserStub(): NexusApi {
       tasks: [
         {
           id: '11111111-1111-4111-8111-111111111111',
-          title: 'Rendu de mathématiques',
-          plan: 'Résoudre les exercices 4 à 8, puis relire les erreurs dans le cahier.',
+          title: 'Maths assignment',
+          plan: 'Solve exercises 4 to 8, then reread the mistakes in the notebook.',
           deadline: localDate(3),
           importance: 8,
-          category: 'école',
+          category: 'school',
           workKind: 'novel',
           estimatedMinutes: 150,
           remainingMinutes: 210,
@@ -134,11 +134,11 @@ function createBrowserStub(): NexusApi {
         },
         {
           id: '22222222-2222-4222-8222-222222222222',
-          title: 'Montage vidéo',
-          plan: 'Assembler les trois premières minutes, corriger le son et exporter un brouillon.',
+          title: 'Video edit',
+          plan: 'Assemble the first three minutes, fix the sound and export a draft.',
           deadline: localDate(5),
           importance: 6,
-          category: 'création',
+          category: 'creative',
           workKind: 'routine',
           estimatedMinutes: 120,
           remainingMinutes: 150,
@@ -157,7 +157,7 @@ function createBrowserStub(): NexusApi {
         {
           id: '33333333-3333-4333-8333-333333333333',
           name: 'Programmation',
-          plan: 'Construire le projet personnel par sessions profondes de 45 minutes.',
+          plan: 'Build the personal project in deep 45-minute sessions.',
           color: '#55585c',
           weeklyTargetMinutes: 240,
           appsToBlock: ['Discord.exe'],
@@ -170,7 +170,7 @@ function createBrowserStub(): NexusApi {
         {
           id: '44444444-4444-4444-8444-444444444444',
           name: 'Lecture',
-          plan: 'Lire sans téléphone avant le coucher.',
+          plan: 'Read without a phone before bed.',
           color: '#253047',
           trigger: 'lecture',
           anchorMinute: 21 * 60,
@@ -239,7 +239,7 @@ function createBrowserStub(): NexusApi {
       onSessionChange: () => () => undefined,
       getAppKnowledgeBase: async () => ({ profiles: {} }),
       decideIntelligentBlocking: async () => ({ blockedApps: [], allowedApps: [], decisionState: 'RESOLVED' as const }),
-      reviewBlockModification: async () => ({ accepted: true, reason: 'Accordé (mode démo/dev).' }),
+      reviewBlockModification: async () => ({ accepted: true, reason: 'Granted (demo/dev mode).' }),
       onProgress: () => () => undefined,
     },
     planning: {

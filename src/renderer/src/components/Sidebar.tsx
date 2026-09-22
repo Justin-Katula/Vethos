@@ -9,11 +9,11 @@ import { useAuthStore } from '@/store/auth.store'
 /** Navigation principale : un rail stable, pas un panneau décoratif. */
 
 const DESTINATIONS = [
-  { to: '/', label: 'Aujourd’hui', Icon: Home },
-  { to: '/temps', label: 'Mon temps', Icon: CalendarDays },
-  { to: '/engagements', label: 'Mes engagements', Icon: SlidersHorizontal },
-  { to: '/blocage', label: 'Blocage', Icon: Shield },
-  { to: '/settings', label: 'Réglages', Icon: Sliders },
+  { to: '/', label: 'Today', Icon: Home },
+  { to: '/temps', label: 'My time', Icon: CalendarDays },
+  { to: '/engagements', label: 'My commitments', Icon: SlidersHorizontal },
+  { to: '/blocage', label: 'Blocking', Icon: Shield },
+  { to: '/settings', label: 'Settings', Icon: Sliders },
 ]
 
 export function Sidebar() {
@@ -86,7 +86,7 @@ export function Sidebar() {
               onClick={() => void signOut()}
               className="text-[11px] text-fg-3 underline-offset-4 transition-colors hover:text-fg-2 hover:underline"
             >
-              Se déconnecter
+              Sign out
             </button>
             <span className="font-mono text-[10.5px] text-fg-3">
               {version ? `v${version}` : ''}

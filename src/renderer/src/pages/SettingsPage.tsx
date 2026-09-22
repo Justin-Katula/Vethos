@@ -73,9 +73,9 @@ export default function SettingsPage() {
     <PageTransition>
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
         <header className="mb-12">
-          <h1 className="text-3xl font-semibold text-fg">Paramètres</h1>
+          <h1 className="text-3xl font-semibold text-fg">Settings</h1>
           <p className="mt-1.5 max-w-xl text-sm text-fg-3">
-            Tout se sauvegarde en écrivant. Il n{'’'}y a rien à valider.
+            Everything saves as you type. There is nothing to confirm.
           </p>
         </header>
 
@@ -86,7 +86,7 @@ export default function SettingsPage() {
           className="grid flex-1 items-start gap-x-20 gap-y-12 lg:grid-cols-2"
         >
           <motion.section variants={item} className="space-y-8">
-            <Row label="Nom" hint="Utilisé pour te saluer, nulle part ailleurs.">
+            <Row label="Name" hint="Used to greet you, nowhere else.">
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -94,7 +94,7 @@ export default function SettingsPage() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
-                  placeholder="Ton prénom"
+                  placeholder="Your first name"
                   className="field w-full max-w-xs text-sm"
                 />
                 <button
@@ -109,12 +109,12 @@ export default function SettingsPage() {
               {savedAt && !dirty && (
                 <p className="mt-2 flex items-center gap-1.5 text-[11px] text-fg-3">
                   <Check size={12} />
-                  Enregistré le {new Date(savedAt).toLocaleString('fr-FR')}
+                  Saved at {new Date(savedAt).toLocaleString('en-GB')}
                 </p>
               )}
             </Row>
 
-            <Row label="Sommeil" hint="Se règle avec le reste de ce qui prend ton temps.">
+            <Row label="Sleep" hint="Set alongside everything else that takes your time.">
               <p className="text-sm text-fg-2">
                 <span className="font-mono">
                   {sleepStart} {'→'} {sleepEnd}
@@ -123,12 +123,12 @@ export default function SettingsPage() {
                   to="/temps"
                   className="ml-3 text-sm text-fg-3 underline-offset-4 transition-colors hover:text-fg hover:underline"
                 >
-                  Modifier dans Mon temps
+                  Change it in My time
                 </Link>
               </p>
             </Row>
 
-            <Row label="Apparence" hint="S'applique tout de suite, partout, y compris aux overlays.">
+            <Row label="Appearance" hint="Applies at once, everywhere, overlays included.">
               <ThemeChoice
                 mode={theme}
                 onChange={(next) => void updateSettings({ theme: next })}
@@ -149,20 +149,20 @@ export default function SettingsPage() {
                   >
                     <div className="flex flex-wrap items-end gap-x-6 gap-y-3 pt-4">
                       <TimeField
-                        label="Clair dès"
+                        label="Light from"
                         value={themeLightAt}
                         onChange={(v) => void updateSettings({ themeLightAt: v })}
                       />
                       <TimeField
-                        label="Sombre dès"
+                        label="Dark from"
                         value={themeDarkAt}
                         onChange={(v) => void updateSettings({ themeDarkAt: v })}
                       />
                     </div>
                     <p className="mt-3 text-xs text-fg-3">
                       {themeLightAt === themeDarkAt
-                        ? 'Deux fois la même heure : il fera sombre en permanence.'
-                        : `Sombre de ${themeDarkAt} à ${themeLightAt}, clair le reste du temps.`}
+                        ? 'The same hour twice: it will stay dark all the time.'
+                        : `Dark from ${themeDarkAt} to ${themeLightAt}, light the rest of the time.`}
                     </p>
                   </motion.div>
                 )}
@@ -172,8 +172,8 @@ export default function SettingsPage() {
 
           <motion.section variants={item} className="space-y-8">
             <Row
-              label="Clé DeepSeek"
-              hint="Facultative. Vethos reconnaît tes applications sans elle — hors ligne et sans rien envoyer."
+              label="DeepSeek key"
+              hint="Optional. Vethos recognises your apps without it — offline, sending nothing."
             >
               <input
                 type="password"
@@ -187,23 +187,23 @@ export default function SettingsPage() {
               />
               <p className="mt-3 text-xs text-fg-3">
                 {deepseekApiKey
-                  ? 'Ta clé est enregistrée, chiffrée, et ne sort jamais de cette machine sauf vers DeepSeek.'
-                  : 'Sans clé, seul le jugement par IA est désactivé. Rien d’autre ne change.'}
+                  ? 'Your key is stored, encrypted, and never leaves this machine except towards DeepSeek.'
+                  : 'Without a key, only the AI judgement is off. Nothing else changes.'}
               </p>
             </Row>
 
-            <Row label="Journal" hint="Ce que l'application a fait, dans l'ordre, avec l'heure.">
+            <Row label="Log" hint="What the app did, in order, with the time.">
               <button
                 type="button"
                 onClick={() => void nexus.app.openLogs()}
                 className="inline-flex items-center gap-2 rounded border border-line px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
               >
                 <FileText size={14} />
-                Ouvrir le journal
+                Open the log
               </button>
             </Row>
 
-            <Row label="Introduction" hint="Ne touche ni à tes règles, ni à tes objectifs.">
+            <Row label="Introduction" hint="Touches neither your rules nor your goals.">
               <button
                 type="button"
                 onClick={() => void handleRestart()}
@@ -235,10 +235,10 @@ export default function SettingsPage() {
  * l'ordinateur » se comprend sans savoir ce qu'est un thème système.
  */
 const THEME_LABELS: Record<ThemeMode, { title: string; hint: string; Icon: typeof Sun }> = {
-  system: { title: 'Ordinateur', hint: 'Comme Windows', Icon: Monitor },
-  light: { title: 'Clair', hint: 'Toujours', Icon: Sun },
-  dark: { title: 'Sombre', hint: 'Toujours', Icon: Moon },
-  schedule: { title: 'À l’heure', hint: 'Jour / nuit', Icon: Clock4 },
+  system: { title: 'Device', hint: 'Follow Windows', Icon: Monitor },
+  light: { title: 'Light', hint: 'Always', Icon: Sun },
+  dark: { title: 'Dark', hint: 'Always', Icon: Moon },
+  schedule: { title: 'On a clock', hint: 'Day / night', Icon: Clock4 },
 }
 
 function ThemeChoice({
@@ -251,7 +251,7 @@ function ThemeChoice({
   return (
     <div
       role="radiogroup"
-      aria-label="Apparence"
+      aria-label="Appearance"
       className="grid max-w-md grid-cols-4 overflow-hidden rounded border border-line-strong"
     >
       {THEME_MODES.map((option, i) => {

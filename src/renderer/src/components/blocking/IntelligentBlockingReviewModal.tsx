@@ -17,7 +17,7 @@ interface IntelligentBlockingReviewModalProps {
   open: boolean
   title: string
   plan: string
-  kindLabel?: string // 'tâche' | 'objectif' | 'ancre'
+  kindLabel?: string // 'task' | 'goal' | 'anchor'
   onConfirm: (blockedApps: string[]) => void
   onCancel: () => void
 }
@@ -26,7 +26,7 @@ export function IntelligentBlockingReviewModal({
   open,
   title,
   plan,
-  kindLabel = 'tâche',
+  kindLabel = 'task',
   onConfirm,
   onCancel,
 }: IntelligentBlockingReviewModalProps) {
@@ -115,13 +115,13 @@ export function IntelligentBlockingReviewModal({
 
     nexus.blocking
       .decideIntelligentBlocking({
-        title: title.trim() || 'Sans titre',
+        title: title.trim() || 'Untitled',
         plan: plan.trim(),
       })
       .then((res) => {
         if (!isMounted) return
         if (res.decisionState === 'BLOCK_DECISION_AI_FAILED') {
-          setAnalysisError("La liste de tes applications n'a pas pu être établie. Réessaie.")
+          setAnalysisError('Your app list could not be built. Try again.')
           return
         }
         if (res.blockedApps) {
@@ -151,7 +151,7 @@ export function IntelligentBlockingReviewModal({
         }
       })
       .catch((err) => {
-        console.error('[intelligent-blocking] Erreur décision:', err)
+        console.error('[intelligent-blocking] decision error:', err)
         if (isMounted) {
           setAnalysisError(err instanceof Error ? err.message : "Erreur lors de l'analyse.")
         }
@@ -193,7 +193,7 @@ export function IntelligentBlockingReviewModal({
 
     try {
       const res = await nexus.blocking.reviewBlockModification({
-        title: title.trim() || 'Sans titre',
+        title: title.trim() || 'Untitled',
         plan: plan.trim(),
         identifiant: app.identifiant,
         action: 'remove',
@@ -211,7 +211,7 @@ export function IntelligentBlockingReviewModal({
         setAllowedApps((prev) => {
           const exists = prev.some((a) => a.identifiant.toLowerCase() === app.identifiant.toLowerCase())
           if (exists) return prev
-          return [...prev, { ...app, raison: res.reason || 'Débloquée suite à réévaluation.' }]
+          return [...prev, { ...app, raison: res.reason || 'Unblocked after re-evaluation.' }]
         })
         setActiveActionId(null)
         setJustification('')
@@ -220,7 +220,7 @@ export function IntelligentBlockingReviewModal({
       setReviewFeedback({
         id: app.identifiant,
         accepted: false,
-        reason: err instanceof Error ? err.message : 'Erreur lors de la réévaluation.',
+        reason: err instanceof Error ? err.message : 'Error during re-evaluation.',
       })
     } finally {
       setIsReviewing(false)
@@ -234,7 +234,7 @@ export function IntelligentBlockingReviewModal({
 
     try {
       const res = await nexus.blocking.reviewBlockModification({
-        title: title.trim() || 'Sans titre',
+        title: title.trim() || 'Untitled',
         plan: plan.trim(),
         identifiant: app.identifiant,
         action: 'add',
@@ -252,7 +252,7 @@ export function IntelligentBlockingReviewModal({
         setBlockedApps((prev) => {
           const exists = prev.some((b) => b.identifiant.toLowerCase() === app.identifiant.toLowerCase())
           if (exists) return prev
-          return [...prev, { ...app, raison: res.reason || 'Bloquée suite à réévaluation.' }]
+          return [...prev, { ...app, raison: res.reason || 'Blocked after re-evaluation.' }]
         })
         setActiveActionId(null)
         setJustification('')
@@ -261,7 +261,7 @@ export function IntelligentBlockingReviewModal({
       setReviewFeedback({
         id: app.identifiant,
         accepted: false,
-        reason: err instanceof Error ? err.message : 'Erreur lors de la réévaluation.',
+        reason: err instanceof Error ? err.message : 'Error during re-evaluation.',
       })
     } finally {
       setIsReviewing(false)
@@ -273,7 +273,7 @@ export function IntelligentBlockingReviewModal({
       open={open}
       onClose={onCancel}
       title="Blocage intelligent"
-      description="Tes applications installées, à toi de désigner celles qui t'écarteraient de cette tâche. Rien n'est bloqué sans ton accord."
+      description="Your installed apps — pick the ones that would pull you away from this task. Nothing is blocked without your say-so."
     >
       <div className="space-y-4">
         {/* Rappel du plan */}
@@ -282,7 +282,7 @@ export function IntelligentBlockingReviewModal({
             <FileText size={14} className="text-accent" />
             <span>Plan d{"'"}action de la {kindLabel}</span>
           </div>
-          <p className="mt-1 font-semibold text-fg-2">{title || 'Sans titre'}</p>
+          <p className="mt-1 font-semibold text-fg-2">{title || 'Untitled'}</p>
           <p className="mt-0.5 italic text-fg-3">« {plan} »</p>
         </div>
 
@@ -294,7 +294,7 @@ export function IntelligentBlockingReviewModal({
               <span>
                 {streamProgress?.currentCategory
                   ? `Analyse en cours : ${streamProgress.currentCategory}`
-                  : 'Lecture de tes applications installées...'}
+                  : 'Reading your installed apps...'}
               </span>
             </div>
             {streamProgress && (
@@ -309,9 +309,9 @@ export function IntelligentBlockingReviewModal({
         {isAnalyzing && blockedApps.length === 0 && allowedApps.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Loader2 size={32} className="animate-spin text-accent" />
-            <p className="mt-3 text-sm font-medium text-fg">Lecture de tes applications installées...</p>
+            <p className="mt-3 text-sm font-medium text-fg">Reading your installed apps...</p>
             <p className="mt-1 text-xs text-fg-3">
-              Rien n{"'"}est bloqué d{"'"}office : à toi de désigner ce qui te distrait.
+              Nothing is blocked by default: it is up to you to name what distracts you.
             </p>
           </div>
         )}
@@ -322,7 +322,7 @@ export function IntelligentBlockingReviewModal({
             <div className="flex items-start gap-2.5 text-red-700 dark:text-red-400">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-semibold">La liste n{"'"}a pas pu être établie</p>
+                <p className="font-semibold">The list could not be built</p>
                 <p className="text-fg-2">{analysisError}</p>
               </div>
             </div>
@@ -333,7 +333,7 @@ export function IntelligentBlockingReviewModal({
                 className="pressable inline-flex items-center gap-1.5 rounded border border-line bg-surface px-3 py-1.5 text-xs font-medium text-fg hover:border-fg-3"
               >
                 <RotateCcw size={12} />
-                <span>Réessayer l{"'"}analyse</span>
+                <span>Run the analysis again</span>
               </button>
             </div>
           </div>
@@ -360,7 +360,7 @@ export function IntelligentBlockingReviewModal({
                 )}
               >
                 <ShieldAlert size={13} className={activeTab === 'blocked' ? 'text-warn' : 'text-fg-3'} />
-                <span>Distractions bloquées</span>
+                <span>Blocked distractions</span>
                 <span
                   className={cn(
                     'rounded px-1.5 py-0.5 text-[10.5px] font-mono font-semibold',
@@ -390,7 +390,7 @@ export function IntelligentBlockingReviewModal({
                   size={13}
                   className={activeTab === 'allowed' ? 'text-emerald-700 dark:text-emerald-400' : 'text-fg-3'}
                 />
-                <span>Applications débloquées</span>
+                <span>Unblocked apps</span>
                 <span
                   className={cn(
                     'rounded px-1.5 py-0.5 text-[10.5px] font-mono font-semibold',
@@ -418,8 +418,8 @@ export function IntelligentBlockingReviewModal({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={
                     activeTab === 'blocked'
-                      ? 'Rechercher une application à débloquer...'
-                      : 'Rechercher une application autorisée...'
+                      ? 'Search for an app to unblock...'
+                      : 'Search an allowed app...'
                   }
                   className="field w-full py-2 pl-9 pr-8 text-xs placeholder:text-fg-3"
                 />
@@ -427,7 +427,7 @@ export function IntelligentBlockingReviewModal({
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    aria-label="Effacer la recherche"
+                    aria-label="Clear the search"
                     className="pressable absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-3 hover:text-fg"
                   >
                     <X size={13} />
@@ -443,9 +443,9 @@ export function IntelligentBlockingReviewModal({
                   <>
                     <ShieldCheck size={20} className="shrink-0 text-emerald-700 dark:text-emerald-400" />
                     <div>
-                      <p className="font-medium text-fg">Aucune distraction identifiée</p>
+                      <p className="font-medium text-fg">No distraction identified</p>
                       <p className="mt-0.5 text-fg-3">
-                        Aucune application bloquée pour l{"'"}instant. Passe à l{"'"}onglet « autorisées » pour désigner ce qui te distrait.
+                        No app is blocked yet. Switch to the “allowed” tab to name what distracts you.
                       </p>
                       {allowedApps.length > 0 && (
                         <button
@@ -453,7 +453,7 @@ export function IntelligentBlockingReviewModal({
                           onClick={() => setActiveTab('allowed')}
                           className="pressable mt-2 text-xs font-medium text-accent hover:underline"
                         >
-                          Voir les {allowedApps.length} application(s) débloquée(s) →
+                          See the {allowedApps.length} unblocked app(s) →
                         </button>
                       )}
                     </div>
@@ -462,9 +462,9 @@ export function IntelligentBlockingReviewModal({
                   <>
                     <ShieldAlert size={20} className="shrink-0 text-warn" />
                     <div>
-                      <p className="font-medium text-fg">Aucune application débloquée</p>
+                      <p className="font-medium text-fg">No app unblocked</p>
                       <p className="mt-0.5 text-fg-3">
-                        Toutes les applications analysées figurent actuellement sur la liste de blocage.
+                        Every analysed app is currently on the blocking list.
                       </p>
                       {blockedApps.length > 0 && (
                         <button
@@ -472,7 +472,7 @@ export function IntelligentBlockingReviewModal({
                           onClick={() => setActiveTab('blocked')}
                           className="pressable mt-2 text-xs font-medium text-accent hover:underline"
                         >
-                          Voir les {blockedApps.length} distraction(s) bloquée(s) →
+                          See the {blockedApps.length} blocked distraction(s) →
                         </button>
                       )}
                     </div>
@@ -481,7 +481,7 @@ export function IntelligentBlockingReviewModal({
               </div>
             ) : filteredApps.length === 0 && searchQuery ? (
               <div className="rounded border border-dashed border-line p-6 text-center text-xs text-fg-3">
-                Aucune application {activeTab === 'blocked' ? 'bloquée' : 'débloquée'} ne correspond à « {searchQuery} ».
+                No {activeTab === 'blocked' ? 'blocked' : 'unblocked'} app matches “{searchQuery}”.
               </div>
             ) : (
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -555,7 +555,7 @@ export function IntelligentBlockingReviewModal({
                                 : 'border-line text-fg-2 hover:border-warn hover:text-warn',
                             )}
                           >
-                            {isBlockedView ? 'Débloquer' : 'Bloquer'}
+                            {isBlockedView ? 'Unblock' : 'Block'}
                           </button>
                         )}
                       </div>
@@ -566,7 +566,7 @@ export function IntelligentBlockingReviewModal({
                           <p className="text-[11px] text-fg-2">
                             {isBlockedView ? (
                               <>
-                                Pourquoi as-tu besoin de <strong>{app.nom_affiche}</strong> pour cette tâche ?
+                                Why do you need <strong>{app.nom_affiche}</strong> for this task?
                               </>
                             ) : (
                               <>
@@ -656,7 +656,7 @@ export function IntelligentBlockingReviewModal({
               Annuler
             </button>
             <span className="text-[11px] text-fg-3">
-              {blockedApps.length} bloquée{blockedApps.length > 1 ? 's' : ''} · {allowedApps.length} débloquée{allowedApps.length > 1 ? 's' : ''}
+              {blockedApps.length} blocked · {allowedApps.length} unblocked
             </span>
           </div>
 

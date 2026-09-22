@@ -100,7 +100,7 @@ export default function BlockingPage(): JSX.Element {
     if (nonClassees.length) {
       visibles.push({
         categorie: 'unresolved',
-        label: 'Non classées',
+        label: 'Unsorted',
         color: 'border-warn/40 bg-warn/10 text-warn',
         apps: nonClassees,
       })
@@ -160,8 +160,8 @@ export default function BlockingPage(): JSX.Element {
         <header>
           <h1 className="text-2xl font-semibold text-fg">Blocage</h1>
           <p className="mt-1 text-sm text-fg-2">
-            Gère ici le catalogue. Le blocage démarre avec « Je commence » et dure exactement
-            le temps de la tâche.
+            Manage the catalogue here. Blocking starts with “I’m starting” and lasts exactly
+            as long as the task.
           </p>
         </header>
 
@@ -179,14 +179,14 @@ export default function BlockingPage(): JSX.Element {
             {session.active ? (
               <>
                 <p className="text-sm font-medium text-accent">
-                  Tâche en cours · {session.blockedAppIds.length} application
-                  {session.blockedAppIds.length > 1 ? 's' : ''} bloquée
+                  Task running · {session.blockedAppIds.length} app
+                  {session.blockedAppIds.length > 1 ? 's' : ''} blocked
                   {session.blockedAppIds.length > 1 ? 's' : ''}
                 </p>
                 <p className="mt-0.5 text-xs text-accent/70">
                   {session.endsAt === null
-                    ? 'Sans échéance connue'
-                    : `Se termine dans ${resteAvant(session.endsAt, maintenant)}`}
+                    ? 'No known end'
+                    : `Ends in ${resteAvant(session.endsAt, maintenant)}`}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {session.blockedAppIds.map((id) => {
@@ -207,8 +207,8 @@ export default function BlockingPage(): JSX.Element {
               </>
             ) : (
               <p className="text-sm text-fg-2">
-                Aucun blocage en cours. Les applications choisies sur la prochaine tâche seront
-                bloquées pendant sa durée.
+                Nothing is blocked right now. The apps chosen on the next task will be blocked
+                for its duration.
               </p>
             )}
           </div>
@@ -217,7 +217,7 @@ export default function BlockingPage(): JSX.Element {
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-sm font-medium text-fg">
-              Applications installées
+              Installed apps
               <span className="ml-2 text-fg-3">{chargementApps ? '…' : apps.length}</span>
             </h2>
             <div className="flex items-center gap-2">
@@ -225,11 +225,11 @@ export default function BlockingPage(): JSX.Element {
                 type="button"
                 onClick={() => void rafraichir()}
                 disabled={rafraichissement || chargementApps}
-                title="Relancer le scan des applications installées"
+                title="Re-scan installed apps"
                 className="flex items-center gap-1.5 rounded border border-line px-3 py-2 text-xs text-fg-2 transition hover:border-line-strong hover:text-fg disabled:opacity-40"
               >
                 <RefreshCw size={13} className={rafraichissement ? 'animate-spin' : ''} />
-                {rafraichissement ? 'Scan…' : 'Rafraîchir'}
+                {rafraichissement ? 'Scanning…' : 'Refresh'}
               </button>
               <div className="relative">
                 <Search
@@ -241,9 +241,9 @@ export default function BlockingPage(): JSX.Element {
                   name="app-search"
                   value={recherche}
                   onChange={(event) => setRecherche(event.target.value)}
-                  placeholder="Rechercher une application…"
+                  placeholder="Search for an app…"
                   className="field w-64 py-2 pl-8 pr-3 text-xs"
-                  aria-label="Rechercher une application"
+                  aria-label="Search for an app"
                 />
               </div>
             </div>
@@ -252,14 +252,14 @@ export default function BlockingPage(): JSX.Element {
           {(chargementApps || rafraichissement) && (
             <p className="rounded border border-line/70 bg-surface/30 p-6 text-center text-sm text-fg-3">
               {rafraichissement
-                ? 'Scan complet : menu Démarrer, registre, App Paths, Program Files, winget, Store…'
-                : 'Chargement du catalogue…'}
+                ? 'Full scan: Start menu, registry, App Paths, Program Files, winget, Store…'
+                : 'Loading the catalogue…'}
             </p>
           )}
 
           {!chargementApps && groupes.length === 0 && (
             <p className="rounded border border-dashed border-line p-8 text-center text-sm text-fg-3">
-              Aucune application ne correspond à cette recherche.
+              No app matches that search.
             </p>
           )}
 
@@ -288,7 +288,7 @@ export default function BlockingPage(): JSX.Element {
                       {label}
                     </span>
                     <span className="text-xs text-fg-3">
-                      ({appsDuGroupe.length} élément{appsDuGroupe.length > 1 ? 's' : ''})
+                      ({appsDuGroupe.length} item{appsDuGroupe.length > 1 ? 's' : ''})
                     </span>
                   </button>
 
@@ -296,7 +296,7 @@ export default function BlockingPage(): JSX.Element {
                     <div className="flex flex-col gap-1 pb-2 pl-11 pr-2 pt-1">
                       {appsDuGroupe.length === 0 ? (
                         <p className="py-2.5 text-xs text-fg-3 italic">
-                          Aucune application installée dans cette catégorie.
+                          No installed app in this category.
                         </p>
                       ) : (
                         appsDuGroupe.map((app) => (
@@ -330,12 +330,12 @@ export default function BlockingPage(): JSX.Element {
                                 }
                               }}
                               className="cursor-pointer rounded border border-line bg-surface-2 px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none"
-                              title="Changer la catégorie de cette application"
-                              aria-label={`Catégorie de ${app.name}`}
+                              title="Change this app’s category"
+                              aria-label={`Category of ${app.name}`}
                             >
                               {app.category === null && (
                                 <option value="unresolved" disabled>
-                                  Non classée
+                                  Unsorted
                                 </option>
                               )}
                               {APP_CATEGORIES.map((candidate) => (
@@ -344,7 +344,7 @@ export default function BlockingPage(): JSX.Element {
                                 </option>
                               ))}
                               {app.classificationSource === 'USER_OVERRIDE' && (
-                                <option value="reset">↺ Réinitialiser l&apos;auto</option>
+                                <option value="reset">↺ Reset to automatic</option>
                               )}
                             </select>
                           </div>

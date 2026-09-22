@@ -34,10 +34,10 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertOctagon size={28} />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-fg">{'Quelque chose a planté.'}</h1>
+            <h1 className="text-xl font-semibold text-fg">{'Something crashed.'}</h1>
             <p className="mt-2 max-w-md text-sm text-fg-2">
               {
-                "L'app a rencontré une erreur inattendue. Tes données sont en sécurité. Recharge pour continuer."
+                'The app hit an unexpected error. Your data is safe. Reload to continue.'
               }
             </p>
           </div>

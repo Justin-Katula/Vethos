@@ -102,13 +102,13 @@ function isSessionValid(account: AuthAccount | null, session: AuthSession | null
 
 function validateIdentity(name: string, email: string, password: string): void {
   if (!name.trim()) {
-    throw new Error('Indique un nom pour ton compte.')
+    throw new Error('Give your account a name.')
   }
   if (!EMAIL_REGEX.test(email)) {
-    throw new Error('Entre une adresse email valide.')
+    throw new Error('Enter a valid email address.')
   }
   if (password.length < PASSWORD_MIN_LENGTH) {
-    throw new Error(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`)
+    throw new Error(`The password must be at least ${PASSWORD_MIN_LENGTH} characters.`)
   }
 }
 
@@ -121,7 +121,7 @@ function validateSignIn(email: string, password: string): void {
 function notifyPersistError(err: unknown): void {
   useToastStore.getState().push({
     variant: 'error',
-    title: 'Sauvegarde auth échouée',
+    title: 'Auth save failed',
     description: err instanceof Error ? err.message : String(err),
   })
 }
@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     validateIdentity(name, normalizedEmail, password)
 
     if (get().account) {
-      throw new Error('Un compte existe déjà sur cette installation.')
+      throw new Error('An account already exists on this install.')
     }
 
     const now = new Date().toISOString()
@@ -189,7 +189,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     const account = get().account
     if (!account) {
-      throw new Error("Crée d'abord ton compte Vethos.")
+      throw new Error('Create your Vethos account first.')
     }
     if (account.email !== normalizedEmail) {
       throw new Error('Email ou mot de passe incorrect.')

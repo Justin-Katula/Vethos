@@ -28,7 +28,7 @@ type EtatFermeture = 'inactif' | 'confirmation'
 
 export default function BlockOverlay(): JSX.Element {
   const [params] = useSearchParams()
-  const appName = params.get('app') ?? 'cette application'
+  const appName = params.get('app') ?? 'this app'
   const type = params.get('type') ?? 'app'
   const token = params.get('token') ?? ''
   const windowId = params.get('window') ?? ''
@@ -52,9 +52,9 @@ export default function BlockOverlay(): JSX.Element {
     setEnCours(true)
     try {
       const ok = await nexus.blocking.minimizeAppWindow({ token, windowId })
-      if (!ok) setErreur('Windows a refusé de minimiser cette fenêtre.')
+      if (!ok) setErreur('Windows refused to minimise this window.')
     } catch {
-      setErreur('La minimisation a échoué.')
+      setErreur('Minimising failed.')
     } finally {
       setEnCours(false)
     }
@@ -65,9 +65,9 @@ export default function BlockOverlay(): JSX.Element {
     setEnCours(true)
     try {
       const ok = await nexus.blocking.closeAppWindow({ token, windowId })
-      if (!ok) setErreur('Windows a refusé de fermer cette fenêtre.')
+      if (!ok) setErreur('Windows refused to close this window.')
     } catch {
-      setErreur('La fermeture a échoué.')
+      setErreur('Closing failed.')
     } finally {
       setEnCours(false)
       setFermeture('inactif')
@@ -81,7 +81,7 @@ export default function BlockOverlay(): JSX.Element {
           type="button"
           onClick={() => void minimiser()}
           disabled={enCours || windowId === ''}
-          aria-label="Minimiser"
+          aria-label="Minimise"
           className="pressable flex h-9 w-9 items-center justify-center rounded border border-white/20 text-white/60 transition hover:border-white/40 hover:text-white disabled:opacity-30"
         >
           <Minus size={16} />
@@ -105,15 +105,15 @@ export default function BlockOverlay(): JSX.Element {
 
         <div className="max-w-md">
           <h1 className="text-[26px] font-medium leading-tight text-white">
-            {type === 'site' ? 'Ce site est bloqué' : `${appName} est bloquée`}
+            {type === 'site' ? 'This site is blocked' : `${appName} is blocked`}
           </h1>
           <p className="mt-3 text-[14px] leading-relaxed text-white/70">
             {focusLabel !== null && focusLabel.length > 0
-              ? `Une session « ${focusLabel} » est en cours.`
-              : 'Une session de blocage est en cours.'}{' '}
+              ? `A “${focusLabel}” session is running.`
+              : 'A blocking session is running.'}{' '}
             {type === 'site'
-              ? 'Le reste de ton navigateur reste utilisable.'
-              : "L'application tourne toujours. Elle n'a pas été fermée de force."}
+              ? 'The rest of your browser stays usable.'
+              : 'The app is still running. It was not force-closed.'}
           </p>
         </div>
 
@@ -121,8 +121,8 @@ export default function BlockOverlay(): JSX.Element {
           <div className="w-full max-w-md rounded border border-warn/40 bg-white/[0.04] p-5 text-left">
             <p className="text-[14px] font-medium text-warn">Fermer {appName} ?</p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60">
-              Tu ne vois pas la fenêtre réelle, donc tu ne verrais pas non plus son propre
-              avertissement de sauvegarde. Du travail non enregistré pourrait être perdu.
+              You cannot see the real window, so you would not see its own save prompt
+              either. Unsaved work could be lost.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -138,7 +138,7 @@ export default function BlockOverlay(): JSX.Element {
                 disabled={enCours}
                 className="pressable rounded bg-warn px-4 py-2 text-[12.5px] font-medium text-black transition hover:brightness-110 disabled:opacity-50"
               >
-                Fermer quand même
+                Close anyway
               </button>
             </div>
           </div>

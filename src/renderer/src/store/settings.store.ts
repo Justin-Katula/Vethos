@@ -95,7 +95,7 @@ let pendingUsernameResolvers: Array<{
 function notifyPersistError(err: unknown): void {
   useToastStore.getState().push({
     variant: 'error',
-    title: 'Sauvegarde paramètres échouée',
+    title: 'Settings save failed',
     description: err instanceof Error ? err.message : String(err),
   })
 }

@@ -14,8 +14,8 @@ export function DonePage(): JSX.Element {
     <div className="flex min-h-[420px] w-full flex-col items-center justify-center">
       <div className="w-full max-w-md">
         <div className="flex items-baseline justify-between border-b border-line pb-3">
-          <span className="font-mono text-[13px] text-fg-3">Départ</span>
-          <span className="font-mono text-[13px] text-accent">à l’heure</span>
+          <span className="font-mono text-[13px] text-fg-3">Departure</span>
+          <span className="font-mono text-[13px] text-accent">on time</span>
         </div>
 
         {/* La barre se remplit : c'est le seul mouvement, et il dit que le
@@ -29,10 +29,10 @@ export function DonePage(): JSX.Element {
           />
         </div>
 
-        <h1 className="mt-8 text-3xl font-medium text-fg">Le tableau est en service.</h1>
+        <h1 className="mt-8 text-3xl font-medium text-fg">The board is in service.</h1>
         <p className="mt-3 text-[15px] leading-relaxed text-fg-2">
-          Déclare ton temps une fois dans « Mon temps ». À partir de là, l’application place le
-          travail elle-même et ne te demande plus rien.
+          Declare your time once in “My time”. From there, the app places the work itself
+          and asks you nothing more.
         </p>
       </div>
     </div>

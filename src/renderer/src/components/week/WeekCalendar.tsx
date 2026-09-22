@@ -61,9 +61,9 @@ function duration(minutes: number): string {
 }
 
 const KIND_LABEL: Record<PlacedBlock['kind'], string> = {
-  task: 'Tâche',
-  objective: 'Objectif',
-  ancre: 'Ancre',
+  task: 'Task',
+  objective: 'Goal',
+  ancre: 'Anchor',
 }
 
 /**
@@ -73,37 +73,37 @@ const KIND_LABEL: Record<PlacedBlock['kind'], string> = {
 function explain(block: PlacedBlock, showBreak: boolean): string[] {
   const lines: string[] = []
   if (block.kind === 'task') {
-    lines.push('Placé par échéance : ce qui est dû en premier est servi en premier.')
+    lines.push('Placed by deadline: whatever is due first is served first.')
   } else if (block.kind === 'objective') {
-    lines.push('Quota de la semaine, réparti selon ce que chaque jour peut réellement porter.')
+    lines.push('The week’s quota, spread by what each day can actually carry.')
   } else {
-    lines.push('Heure fixe, choisie une fois. Elle ne bouge jamais d’un jour à l’autre.')
+    lines.push('A fixed hour, chosen once. It never moves from one day to the next.')
   }
   if (block.cognitiveWindow === 'PROFONDE') {
-    lines.push('Posé sur un créneau où tu termines habituellement ce que tu commences.')
+    lines.push('Put on a slot where you usually finish what you start.')
   } else if (block.cognitiveWindow === 'BASSE') {
-    lines.push('Créneau peu fiable d’après tes propres relevés : rien d’exigeant n’y va.')
+    lines.push('An unreliable slot by your own measurements: nothing demanding goes here.')
   }
   if (block.breakMinutes > 0 && showBreak) {
     lines.push(
-      `Travail jusqu’à ${clock(breakStartMinute(block))}, puis ${block.breakMinutes} min de pause : ` +
-        'elles sont comprises dans le bloc, pas ajoutées après.',
+      `Work until ${clock(breakStartMinute(block))}, then a ${block.breakMinutes} min break: ` +
+        'it is inside the block, not added after it.',
     )
   }
   // B.5.1 : dit en premier ce qui décide de tout le reste — ce bloc n'est pas
   // encore à toi, et pourquoi.
   if (block.preview) {
     lines.push(
-      'Aperçu : cette partie attend que la précédente soit terminée. Elle montre ' +
-        'seulement où elle tombera — elle ne démarrera aucune session et ne bloquera ' +
-        'aucune application tant que son tour n’est pas venu.',
+      'Preview: this part is waiting for the previous one to finish. It only shows ' +
+        'where it will land — it starts no session and blocks no app until its turn ' +
+        'comes.',
     )
   }
   if (block.capOverride) {
-    lines.push('Dépasse le plafond de 40 % du jour : crise de deadline prouvée.')
+    lines.push('Over the 40 % daily cap: a proven deadline crisis.')
   }
   if (block.reducedToMinimum) {
-    lines.push('Réduite à sa version minimale parce que la journée était saturée.')
+    lines.push('Cut back to its minimum because the day was saturated.')
   }
   return lines
 }
@@ -291,7 +291,7 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
                       }}
                       title={
                         showBreak
-                          ? `${b.label} · ${clock(b.startMinute)} → ${clock(b.endMinute)} · pause dès ${clock(breakStartMinute(b))}`
+                          ? `${b.label} · ${clock(b.startMinute)} → ${clock(b.endMinute)} · break from ${clock(breakStartMinute(b))}`
                           : `${b.label} · ${clock(b.startMinute)} → ${clock(visualEnd)}`
                       }
                     >

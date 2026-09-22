@@ -75,10 +75,10 @@ export default function TimePage() {
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto px-14 pb-14 pt-12">
         <header className="mb-8 flex flex-wrap items-end justify-between gap-8">
           <div>
-            <h1 className="text-[30px] font-semibold text-fg">Mon temps</h1>
+            <h1 className="text-[30px] font-semibold text-fg">My time</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-3">
-              Déclare le temps déjà pris. Vethos calcule ensuite ce qui reste disponible sur la
-              semaine.
+              Declare the time already taken. Vethos then works out what is left across the
+              week.
             </p>
           </div>
 
@@ -93,7 +93,7 @@ export default function TimePage() {
               format={(n) => duration(Math.round(n))}
               className="num iris-text block text-[38px] leading-none"
             />
-            <p className="mt-2.5 text-[11.5px] text-fg-3">disponibles sur sept jours</p>
+            <p className="mt-2.5 text-[11.5px] text-fg-3">available across seven days</p>
           </motion.div>
         </header>
 
@@ -126,12 +126,12 @@ export default function TimePage() {
           <div className="space-y-3">
             <Disclosure
               index={0}
-              title="Sommeil"
+              title="Sleep"
               summary={`${sleepStart} → ${sleepEnd} · ${duration(sleepMinutes)}`}
             >
               <div className="flex flex-wrap items-center gap-5">
                 <label className="flex items-center gap-2 text-sm text-fg-2">
-                  Coucher
+                  Bedtime
                   <input
                     type="time"
                     name="sleep-start"
@@ -141,7 +141,7 @@ export default function TimePage() {
                   />
                 </label>
                 <label className="flex items-center gap-2 text-sm text-fg-2">
-                  Lever
+                  Wake-up
                   <input
                     type="time"
                     name="sleep-end"
@@ -152,18 +152,18 @@ export default function TimePage() {
                 </label>
               </div>
               <p className="mt-3 text-[11px] text-fg-3">
-                Jamais compté comme du travail, et aucune notification n{'’'}est émise pendant ces
-                heures. C{'’'}est aussi ce qui décide des heures affichées sur la grille.
+                Never counted as work, and no notification is sent during these hours. It is
+                also what decides which hours the grid shows.
               </p>
             </Disclosure>
 
             <Disclosure
               index={1}
-              title="Obligations fixes"
+              title="Fixed commitments"
               summary={
                 schedule.length === 0
-                  ? 'rien de déclaré'
-                  : `${schedule.length} créneau${schedule.length > 1 ? 'x' : ''} sur la semaine`
+                  ? 'nothing declared'
+                  : `${schedule.length} slot${schedule.length > 1 ? 's' : ''} across the week`
               }
             >
               <ScheduleEditor
@@ -175,7 +175,7 @@ export default function TimePage() {
 
           <div className="space-y-3">
             {plan && (
-              <Disclosure index={2} title="Le détail, jour par jour" summary="brute → disponible">
+              <Disclosure index={2} title="Day by day" summary="raw → available">
                 <CapacityTable plan={plan} />
               </Disclosure>
             )}
@@ -183,8 +183,8 @@ export default function TimePage() {
             {plan && (
               <Disclosure
                 index={3}
-                title="Demander du temps libre"
-                summary="l’application répond avec des chiffres"
+                title="Ask for free time"
+                summary="the app answers with numbers"
               >
                 <RequestPanel plan={plan} today={today} />
               </Disclosure>

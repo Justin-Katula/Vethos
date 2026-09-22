@@ -32,10 +32,10 @@ export function UsernameStep(): JSX.Element {
 
       <div>
         <h1 className="text-3xl font-bold">
-          {trimmed ? `Bienvenue, ${trimmed}.` : 'Comment tu t’appelles ?'}
+          {trimmed ? `Welcome, ${trimmed}.` : 'What should I call you?'}
         </h1>
         <p className="mt-2 text-sm text-fg-2">
-          {'Ton prénom apparaît dans l’interface. Tu peux le laisser vide.'}
+          {'Your first name shows up in the interface. You can leave it empty.'}
         </p>
       </div>
 

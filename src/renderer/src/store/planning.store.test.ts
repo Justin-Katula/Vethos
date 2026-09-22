@@ -129,7 +129,7 @@ describe('CRITÈRE 6 — deux ancres ne peuvent jamais occuper le même créneau
       usePlanningStore
         .getState()
         .addAncre(ancreDraft({ name: 'Lecture', trigger: 'lecture', anchorMinute: 1110 })),
-    ).rejects.toThrow(/Conflit d'horaire/)
+    ).rejects.toThrow(/Time clash/)
     expect(usePlanningStore.getState().ancres).toHaveLength(1)
   })
 
@@ -139,7 +139,7 @@ describe('CRITÈRE 6 — deux ancres ne peuvent jamais occuper le même créneau
       usePlanningStore
         .getState()
         .addAncre(ancreDraft({ name: 'Sport du soir', anchorMinute: 420, daysOfWeek: [1] })),
-    ).rejects.toThrow(/déclencheur/)
+    ).rejects.toThrow(/trigger/)
   })
 
   it('un autre créneau, un autre déclencheur : accepté', async () => {

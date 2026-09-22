@@ -103,7 +103,7 @@ export function TaskHierarchyList({
   const groups = useMemo(() => groupTasks(tasks, worked), [tasks, worked])
 
   if (groups.length === 0) {
-    return <div className="py-6 text-center text-xs text-fg-3">Rien à rendre pour l’instant.</div>
+    return <div className="py-6 text-center text-xs text-fg-3">Nothing due right now.</div>
   }
 
   return (
@@ -156,7 +156,7 @@ function TaskCard({
               </span>
             )}
 
-            {category !== 'général' && (
+            {category !== 'general' && (
               <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-fg-3">
                 {category}
               </span>
@@ -165,7 +165,7 @@ function TaskCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-fg-3">
             <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5">
-              Échéance{' '}
+              Due{' '}
               <span className="font-mono tabular-nums">{deadline.slice(5).replace('-', '.')}</span>
             </span>
             <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5">
@@ -186,7 +186,7 @@ function TaskCard({
               type="button"
               onClick={() => onAddMoreTime(root.id)}
               className="border border-line px-2 py-0.5 text-[11px] text-fg-3 opacity-80 transition-all hover:border-line-strong hover:text-fg hover:opacity-100"
-              title={`Ajouter ${stepMinutes} min à ${root.title}`}
+              title={`Add ${stepMinutes} min to ${root.title}`}
             >
               +{stepMinutes} min
             </button>
@@ -250,7 +250,7 @@ function TaskCard({
 
                     {locked && !isDone && (
                       <span className="shrink-0 text-[10px] text-fg-3 italic">
-                        (en attente de la précédente)
+                        (waiting for the previous one)
                       </span>
                     )}
 
@@ -271,7 +271,7 @@ function TaskCard({
                         type="button"
                         onClick={() => onAddMoreTime(p.id)}
                         className="border border-line px-1.5 py-0.5 text-[10px] text-fg-3 opacity-0 transition-all hover:border-line-strong hover:text-fg focus-visible:opacity-100 group-hover/part:opacity-100"
-                        title={`Ajouter ${stepMinutes} minutes à cette partie`}
+                        title={`Add ${stepMinutes} minutes to this part`}
                       >
                         +{stepMinutes}
                       </button>
@@ -282,7 +282,7 @@ function TaskCard({
                         type="button"
                         onClick={() => onDelete(p.id)}
                         className="text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover/part:opacity-100"
-                        title="Supprimer cette partie"
+                        title="Delete this part"
                         aria-label={`Supprimer ${p.title}`}
                       >
                         <Trash2 size={12} />

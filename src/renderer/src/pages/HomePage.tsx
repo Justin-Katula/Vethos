@@ -16,22 +16,23 @@ import { addDays, dateKey, dayOfWeek } from '@shared/planning/dates'
 import { scheduleEntriesForDate } from '@shared/planning/capacity'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { sleepScheduleEntries } from '@shared/sleep'
-import type { AncreItem, ObjectiveItem, PlanningSignal, TaskItem } from '@shared/planning/types'
+import { signalSentences } from '@shared/phrases'
+import type { AncreItem, ObjectiveItem, TaskItem } from '@shared/planning/types'
 
-const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const MONTHS = [
-  'janvier',
-  'février',
-  'mars',
-  'avril',
-  'mai',
-  'juin',
-  'juillet',
-  'août',
-  'septembre',
-  'octobre',
-  'novembre',
-  'décembre',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 function hhmm(minute: number): string {
@@ -59,56 +60,6 @@ function splitDuration(minutes: number): { value: string; unit?: string } {
   return { value: `${h} h ${String(m).padStart(2, '0')}` }
 }
 
-function resolveRefName(
-  refId: string,
-  tasks: TaskItem[],
-  objectives: ObjectiveItem[],
-  ancres: AncreItem[],
-): string {
-  return (
-    tasks.find((t) => t.id === refId)?.title ??
-    objectives.find((o) => o.id === refId)?.name ??
-    ancres.find((a) => a.id === refId)?.name ??
-    'Ce bloc'
-  )
-}
-
-/**
- * C.3.4 : traduit un signal en une phrase factuelle, jamais un jugement — le
- * moteur produit des faits chiffrés (F), cette fonction ne fait que les
- * rendre lisibles. `density_deficit` n'est pas traité ici : la carte de
- * déficit juste au-dessus le montre déjà, avec ses options de résolution.
- */
-function signalText(
-  signal: PlanningSignal,
-  tasks: TaskItem[],
-  objectives: ObjectiveItem[],
-  ancres: AncreItem[],
-): string | null {
-  const data = signal.data
-  switch (signal.type) {
-    case 'anchor_missed_3x': {
-      const ancreId = typeof data['ancreId'] === 'string' ? data['ancreId'] : ''
-      const count = typeof data['missedCount'] === 'number' ? data['missedCount'] : 0
-      const name = ancres.find((a) => a.id === ancreId)?.name ?? 'Cette ancre'
-      return `${name} — ratée ${count} fois de suite, jamais confirmée.`
-    }
-    case 'objective_stalled': {
-      const name = typeof data['name'] === 'string' ? data['name'] : 'Cet objectif'
-      const days =
-        typeof data['daysSinceLastService'] === 'number' ? data['daysSinceLastService'] : 0
-      return `${name} — n'a pas avancé depuis ${days} jours.`
-    }
-    case 'delay_repeated': {
-      const refId = typeof data['refId'] === 'string' ? data['refId'] : ''
-      const count = typeof data['consecutiveDelays'] === 'number' ? data['consecutiveDelays'] : 0
-      const name = resolveRefName(refId, tasks, objectives, ancres)
-      return `${name} — retard répété, ${count} fois de suite.`
-    }
-    default:
-      return null
-  }
-}
 
 export default function HomePage() {
   const [now, setNow] = useState(() => new Date())
@@ -192,9 +143,12 @@ export default function HomePage() {
   // C.3.4 : signaux passifs — jamais une question, jamais une action
   // automatique. `density_deficit` est déjà couvert par la carte de déficit
   // ci-dessous, avec ses options de résolution ; inutile de le répéter ici.
-  const otherSignals = (plan?.signals ?? [])
-    .map((s) => ({ signal: s, text: signalText(s, tasks, objectives, ancres) }))
-    .filter((s): s is { signal: PlanningSignal; text: string } => s.text !== null)
+  const nameOf = (id: string): string | undefined =>
+    tasks.find((t) => t.id === id)?.title ??
+    objectives.find((o) => o.id === id)?.name ??
+    ancres.find((a) => a.id === id)?.name
+
+  const otherSignals = signalSentences(plan?.signals ?? [], nameOf)
 
   return (
     <PageTransition>
@@ -206,7 +160,7 @@ export default function HomePage() {
           </h1>
           <button type="button" onClick={() => setAdding(true)} className="btn-iris pressable">
             <Plus size={15} />
-            Ajouter une tâche
+            Add a task
           </button>
         </header>
 
@@ -243,7 +197,7 @@ export default function HomePage() {
                 <>
                   <span className="num text-[48px] leading-none text-fg-2">{hhmm(nowMinute)}</span>
                   <span className="mt-2.5 text-[12.5px] text-fg-3">
-                    {todayBlocks.length === 0 ? 'rien au tableau' : 'plus rien avant demain'}
+                    {todayBlocks.length === 0 ? 'nothing on the board' : 'nothing left before tomorrow'}
                   </span>
                 </>
               )}
@@ -260,25 +214,25 @@ export default function HomePage() {
                 >
                   <MetricPill
                     icon={<Gauge size={15} strokeWidth={2} />}
-                    label="Capacité"
+                    label="Capacity"
                     tone="quiet"
                     {...splitDuration(todayCapacity.effectiveCapacityMinutes)}
                   />
                   <MetricPill
                     icon={<Hourglass size={15} strokeWidth={2} />}
-                    label="Engagé"
+                    label="Committed"
                     {...splitDuration(plannedToday)}
                   />
                   <MetricPill
                     icon={<Leaf size={15} strokeWidth={2} />}
-                    label="Repos"
+                    label="Rest"
                     tone="quiet"
                     {...splitDuration(todayCapacity.restReservedMinutes)}
                   />
                   {delayToday > 0 && (
                     <MetricPill
                       icon={<TimerReset size={15} strokeWidth={2} />}
-                      label="Retard"
+                      label="Late"
                       tone="warn"
                       {...splitDuration(delayToday)}
                     />
@@ -292,10 +246,10 @@ export default function HomePage() {
               besoin : ce qui est prévu aujourd'hui, ce que l'application a
               remarqué sur la semaine, puis les tâches ouvertes. */}
           <div className="min-w-0 space-y-6">
-            <Board columns={['Heure', 'Engagement', 'Durée']}>
+            <Board columns={['Time', 'Commitment', 'Duration']}>
               {todayBlocks.length === 0 ? (
                 <BoardEmpty>
-                  Le tableau se remplit tout seul dès que l’application connaît ton temps.
+                  The board fills itself in as soon as the app knows your time.
                 </BoardEmpty>
               ) : (
                 todayBlocks.map((b) => {
@@ -307,24 +261,24 @@ export default function HomePage() {
 
                   let noteText: string | undefined = undefined
                   if (isMissed) {
-                    noteText = 'jamais confirmé'
+                    noteText = 'never started'
                   } else if (isNow && isConfirmed) {
-                    noteText = 'en cours · confirmée'
+                    noteText = 'running · started'
                   } else if (isNow && !isConfirmed) {
-                    noteText = 'en attente de démarrage'
+                    noteText = 'waiting to be started'
                   } else if (b.capOverride) {
-                    noteText = 'au-delà du plafond'
+                    noteText = 'over the daily cap'
                   } else if (b.reducedToMinimum) {
-                    noteText = 'version minimale'
+                    noteText = 'reduced to its minimum'
                   } else if (b.breakMinutes > 0) {
-                    noteText = `dont ${b.breakMinutes} min de pause`
+                    noteText = `includes a ${b.breakMinutes} min break`
                   }
 
                   let valueText = duration(b.workMinutes)
                   if (isNow) {
                     const elapsed = Math.max(0, nowMinute - b.startMinute)
                     const remainingWork = Math.max(0, b.workMinutes - elapsed)
-                    valueText = `reste ${duration(remainingWork)}`
+                    valueText = `${duration(remainingWork)} left`
                   }
 
                   return (
@@ -343,14 +297,14 @@ export default function HomePage() {
 
             {schedule.length === 0 && (
               <p className="text-[13px] text-fg-2">
-                L’application ne connaît que tes heures de sommeil.{' '}
+                Vethos only knows your sleep hours so far.{' '}
                 <Link
                   to="/temps"
                   className="text-fg underline decoration-line-strong hover:decoration-fg"
                 >
-                  Déclare tes cours, ton travail et tes trajets
+                  Declare your classes, your work and your commutes
                 </Link>{' '}
-                une seule fois : tout le reste s’en déduit.
+                once — everything else follows from them.
               </p>
             )}
 
@@ -362,9 +316,9 @@ export default function HomePage() {
               {worstDeficit && (
                 <GlowCard glow className="space-y-3">
                   <p className="text-[13px] leading-relaxed text-fg">
-                    Avant le {worstDeficit.deadline}, il manque{' '}
+                    Before {worstDeficit.deadline}, you are{' '}
                     <span className="num text-accent">{duration(worstDeficit.deficitMinutes)}</span>
-                    , soit {Math.round(worstDeficit.deficitRatio * 100)} % du travail demandé.
+                    {' '}short — {Math.round(worstDeficit.deficitRatio * 100)} % of the work you asked for.
                   </p>
                   <ul className="space-y-1.5 border-t border-line pt-3">
                     {worstDeficit.options.map((o) => (
@@ -386,9 +340,9 @@ export default function HomePage() {
                 action automatique. */}
               {otherSignals.length > 0 && (
                 <GlowCard className="space-y-2.5">
-                  {otherSignals.map(({ signal, text }) => (
+                  {otherSignals.map(({ key, text }) => (
                     <p
-                      key={signal.subject}
+                      key={key}
                       className="border-l-2 border-warn/50 pl-3 text-[13px] leading-relaxed text-fg-2"
                     >
                       {text}
@@ -402,8 +356,8 @@ export default function HomePage() {
                 qu'il n'y a précisément rien à faire. */}
               {worstTension && (
                 <p className="px-1 text-[12px] leading-relaxed text-fg-3">
-                  Avant le {worstTension.deadline}, {Math.round(worstTension.tensionRatio * 100)} %
-                  du temps disponible est déjà pris — encore de la marge, mais ça se resserre.
+                  Before {worstTension.deadline}, {Math.round(worstTension.tensionRatio * 100)} % of
+                  your available time is already taken — still room, but it is tightening.
                 </p>
               )}
             </div>
@@ -412,9 +366,9 @@ export default function HomePage() {
             {openTasks.length > 0 && (
               <div className="space-y-3 pt-2">
                 <div className="flex items-baseline justify-between border-b border-line pb-2">
-                  <h2 className="text-sm font-semibold text-fg">Mes tâches en cours</h2>
+                  <h2 className="text-sm font-semibold text-fg">Tasks in progress</h2>
                   <p className="text-[11px] text-fg-3">
-                    Complétion automatique au temps réel fait · « +25 min » si besoin
+                    Completed automatically on real time done · “+25 min” if needed
                   </p>
                 </div>
 
@@ -462,7 +416,7 @@ function AddTaskModal({
     plan: '',
     deadline: addDays(dateKey(new Date()), 7),
     importance: 5,
-    category: 'général',
+    category: 'general',
     workKind: 'routine' as 'routine' | 'novel',
     minutes: 60,
   }))
@@ -476,7 +430,7 @@ function AddTaskModal({
       plan: draft.plan.trim(),
       deadline: draft.deadline,
       importance: draft.importance,
-      category: draft.category.trim() || 'général',
+      category: draft.category.trim() || 'general',
       workKind: draft.workKind,
       estimatedMinutes: draft.minutes,
       remainingMinutes: draft.minutes,
@@ -491,35 +445,35 @@ function AddTaskModal({
       <Modal
         open={open && !pendingDraft}
         onClose={onClose}
-        title="Ajouter une tâche"
-        description="L’IA décide intelligemment des applications à bloquer à partir de ce que tu écris dans ton plan."
+        title="Add a task"
+        description="The AI works out which apps to block from what you write in your plan."
       >
         <div className="space-y-6">
-          <Field label="Quoi (Titre libre)">
+          <Field label="What (free title)">
             <input
               autoFocus
               type="text"
               name="task-title"
               value={draft.title}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              placeholder="Ce qu’il y a à faire"
+              placeholder="What there is to do"
               className="field w-full text-[15px]"
             />
           </Field>
 
-          <Field label="En quoi consiste concrètement ce que tu vas faire ? (Plan obligatoire)">
+          <Field label="What will this concretely involve? (plan required)">
             <textarea
               rows={2}
               name="task-plan"
               value={draft.plan}
               onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
-              placeholder="Ce soir à mon bureau, je vais monter les 3 premières minutes de la vidéo dans Premiere."
+              placeholder="Tonight at my desk, I edit the first 3 minutes of the video in Premiere."
               className="field w-full resize-none text-[13px]"
             />
           </Field>
 
         <div className="grid grid-cols-2 gap-6">
-          <Field label="Pour quand">
+          <Field label="Due when">
             <input
               type="date"
               name="task-deadline"
@@ -528,7 +482,7 @@ function AddTaskModal({
               className="field w-full font-mono text-[13px]"
             />
           </Field>
-          <Field label="Combien de temps">
+          <Field label="How long">
             <div className="flex items-baseline gap-2">
               <input
                 type="number"
@@ -550,7 +504,7 @@ function AddTaskModal({
           onClick={() => setDetailed((v) => !v)}
           className="text-[12px] text-fg-3 underline-offset-4 transition-colors hover:text-fg-2 hover:underline"
         >
-          {detailed ? 'Masquer' : 'Importance, catégorie, nature du travail'}
+          {detailed ? 'Hide' : 'Importance, category, kind of work'}
         </button>
 
         {detailed && (
@@ -566,7 +520,7 @@ function AddTaskModal({
                 className="field w-full font-mono text-[13px]"
               />
             </Field>
-            <Field label="Catégorie">
+            <Field label="Category">
               <input
                 type="text"
                 name="task-category"
@@ -575,7 +529,7 @@ function AddTaskModal({
                 className="field w-full text-[13px]"
               />
             </Field>
-            <Field label="Nature">
+            <Field label="Kind">
               <select
                 value={draft.workKind}
                 name="task-work-kind"
@@ -584,8 +538,8 @@ function AddTaskModal({
                 }
                 className="field w-full bg-surface text-[13px]"
               >
-                <option value="routine">Connu</option>
-                <option value="novel">Nouveau</option>
+                <option value="routine">Done before</option>
+                <option value="novel">First time</option>
               </select>
             </Field>
           </div>
@@ -593,7 +547,7 @@ function AddTaskModal({
 
         <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
           <p className="text-[11px] text-fg-3">
-            L’importance et le plan se déclarent à la création.
+            Importance and the plan are declared at creation.
           </p>
           <button
             type="button"
@@ -602,7 +556,7 @@ function AddTaskModal({
             className="btn-iris pressable shrink-0"
           >
             <Plus size={15} />
-            Ajouter
+            Add
           </button>
         </div>
       </div>
@@ -613,7 +567,7 @@ function AddTaskModal({
         open={true}
         title={pendingDraft.title}
         plan={pendingDraft.plan}
-        kindLabel="tâche"
+        kindLabel="task"
         onConfirm={(blockedApps) => {
           void onAdd({
             ...pendingDraft,

@@ -62,7 +62,7 @@ export function VisionBoard({
         <div>
           <h2 className="text-sm font-semibold text-fg">Projection</h2>
           <p className="text-[11.5px] text-fg-3">
-            Ce que les rythmes déclarés représentent quand ils se cumulent.
+            What the rhythms you declared add up to over time.
           </p>
         </div>
 
@@ -76,7 +76,7 @@ export function VisionBoard({
               horizon === 'month' ? 'bg-fg text-surface' : 'text-fg-3 hover:bg-surface-2 hover:text-fg-2',
             )}
           >
-            1 mois
+            1 month
           </button>
           <button
             type="button"
@@ -86,7 +86,7 @@ export function VisionBoard({
               horizon === 'year' ? 'bg-fg text-surface' : 'text-fg-3 hover:bg-surface-2 hover:text-fg-2',
             )}
           >
-            1 an
+            1 year
           </button>
         </div>
       </div>
@@ -104,7 +104,7 @@ export function VisionBoard({
           )}
           aria-pressed={pillar === 'objectives'}
         >
-          <span>Objectifs</span>
+          <span>Goals</span>
           <span className="font-mono text-[11px] tabular-nums opacity-60">
             {hoursLabel(totalObjectiveHours)}
           </span>
@@ -121,7 +121,7 @@ export function VisionBoard({
           )}
           aria-pressed={pillar === 'tasks'}
         >
-          <span>Tâches</span>
+          <span>Tasks</span>
           <span className="font-mono text-[11px] tabular-nums opacity-60">
             {activeRootTasks.length} projet{activeRootTasks.length > 1 ? 's' : ''}
           </span>
@@ -138,7 +138,7 @@ export function VisionBoard({
           )}
           aria-pressed={pillar === 'ancres'}
         >
-          <span>Ancres & Rituels</span>
+          <span>Anchors & rituals</span>
           <span className="font-mono text-[11px] tabular-nums opacity-60">
             {hoursLabel(totalAnchorHours)}
           </span>
@@ -159,9 +159,9 @@ export function VisionBoard({
             >
               {objectives.length === 0 ? (
                 <EmptyPillar
-                  title="Aucun objectif à long terme déclaré"
-                  desc="Un objectif n'a pas d'échéance : c'est un quota régulier, par exemple 4 h de guitare ou 5 h de programmation par semaine."
-                  linkText="Définir mon premier objectif"
+                  title="No long-term goal declared"
+                  desc="A goal has no deadline: it is a steady quota — 4 h of guitar or 5 h of coding a week, say."
+                  linkText="Set my first goal"
                   linkTo="/engagements"
                 />
               ) : (
@@ -172,11 +172,11 @@ export function VisionBoard({
                         <CountUp value={totalObjectiveHours} format={(n) => hoursLabel(n)} />
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
-                        prévues sur tes objectifs {horizonLabel}
+                        planned across your goals {horizonLabel}
                       </span>
                     </div>
                     <div className="text-right text-[11.5px] text-fg-3 font-mono">
-                      {hoursLabel(weeklyObjectiveHours)} / semaine
+                      {hoursLabel(weeklyObjectiveHours)} / week
                     </div>
                   </div>
 
@@ -211,9 +211,9 @@ export function VisionBoard({
                           </div>
 
                           <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2 text-[10.5px] text-fg-3">
-                            <span>{hoursLabel(objWeeklyHours)}/semaine</span>
+                            <span>{hoursLabel(objWeeklyHours)}/week</span>
                             <span className="font-mono font-medium text-fg-2">
-                              {hoursLabel(yearlyHours)} / an
+                              {hoursLabel(yearlyHours)} / year
                             </span>
                           </div>
                         </div>
@@ -236,9 +236,9 @@ export function VisionBoard({
             >
               {activeTasks.length === 0 ? (
                 <EmptyPillar
-                  title="Toutes tes tâches sont accomplies"
-                  desc="Quand une nouvelle tâche est déclarée, elle apparaît ici avec le temps restant à servir."
-                  linkText="Ajouter une tâche"
+                  title="Every task is done"
+                  desc="When a new task is declared, it shows up here with the time left to serve."
+                  linkText="Add a task"
                   linkTo="/engagements"
                 />
               ) : (
@@ -249,20 +249,20 @@ export function VisionBoard({
                         {activeRootTasks.length}
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
-                        projet{activeRootTasks.length > 1 ? 's' : ''} en cours (
-                        {hoursLabel(totalTaskHours)} restant)
+                        project{activeRootTasks.length > 1 ? 's' : ''} in progress (
+                        {hoursLabel(totalTaskHours)} left)
                       </span>
                     </div>
                     <span className="rounded border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-fg-2">
-                      échéances actives
+                      active deadlines
                     </span>
                   </div>
 
                   <div className="rounded border border-line bg-surface p-4 text-xs leading-relaxed text-fg-2">
-                    <p className="font-medium text-fg">Lecture du reste à faire</p>
+                    <p className="font-medium text-fg">Reading what is left</p>
                     <p className="mt-1.5 leading-relaxed text-fg-3">
-                      Le moteur place ces minutes dans les jours où elles peuvent tenir, après le
-                      sommeil, les obligations fixes et les marges de repos.
+                      The engine places these minutes on the days where they can fit, after
+                      sleep, fixed commitments and rest margins.
                     </p>
                   </div>
                 </>
@@ -281,9 +281,9 @@ export function VisionBoard({
             >
               {ancres.length === 0 ? (
                 <EmptyPillar
-                  title="Aucun rituel ancré pour l’instant"
-                  desc="Une ancre est un rendez-vous fixe avec toi-même qui ne bouge jamais, par exemple sport à 18 h ou lecture à 21 h."
-                  linkText="Créer une ancre"
+                  title="No ritual anchored yet"
+                  desc="An anchor is a fixed appointment with yourself that never moves — sport at 6 pm, reading at 9 pm."
+                  linkText="Create an anchor"
                   linkTo="/engagements"
                 />
               ) : (
@@ -294,11 +294,11 @@ export function VisionBoard({
                         <CountUp value={totalAnchorHours} format={(n) => hoursLabel(n)} />
                       </span>
                       <span className="ml-2 text-xs text-fg-3">
-                        prévues par tes ancres {horizonLabel}
+                        planned by your anchors {horizonLabel}
                       </span>
                     </div>
                     <span className="text-[11.5px] font-mono text-fg-3">
-                      {hoursLabel(weeklyAnchorHours)} / semaine
+                      {hoursLabel(weeklyAnchorHours)} / week
                     </span>
                   </div>
 
@@ -330,10 +330,10 @@ export function VisionBoard({
 
                           <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2 text-[10.5px] text-fg-3">
                             <span>
-                              {ancre.daysOfWeek.length} j / semaine · {ancre.normalMaxMinutes} min
+                              {ancre.daysOfWeek.length} d / week · {ancre.normalMaxMinutes} min
                             </span>
                             <span className="font-mono font-medium text-fg-2">
-                              {hoursLabel(yearlyHours)} / an
+                              {hoursLabel(yearlyHours)} / year
                             </span>
                           </div>
                         </div>

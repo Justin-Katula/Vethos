@@ -22,9 +22,9 @@ import { cn } from '@/lib/cn'
  */
 
 const KIND_LABEL: Record<string, string> = {
-  task: 'Tâche',
-  objective: 'Objectif',
-  ancre: 'Ancre',
+  task: 'Task',
+  objective: 'Goal',
+  ancre: 'Anchor',
 }
 
 function hhmm(minute: number): string {
@@ -68,7 +68,7 @@ export default function SessionStartOverlay(): JSX.Element {
       // Sur succès, l'overlay se ferme depuis le processus principal — rien à
       // faire ici : fermer la fenêtre soi-même dupliquerait cette décision.
     } catch {
-      setErreur('La confirmation a échoué. Réessaie.')
+      setErreur('Could not start. Try again.')
     } finally {
       setConfirming(false)
     }
@@ -83,7 +83,7 @@ export default function SessionStartOverlay(): JSX.Element {
       </div>
 
       <p className="mt-8 font-mono text-[12.5px] text-white/50">
-        {KIND_LABEL[kind] ?? 'Bloc'} · prévu à {hhmm(startMinute)}
+        {KIND_LABEL[kind] ?? 'Block'} · planned for {hhmm(startMinute)}
       </p>
       <h1 className="mt-3 max-w-2xl text-[30px] font-medium leading-tight text-white">{label}</h1>
 
@@ -95,10 +95,10 @@ export default function SessionStartOverlay(): JSX.Element {
       >
         {delayMinutes > 0 ? (
           <>
-            En retard de <span className="num text-[17px]">{delayMinutes}</span> min
+            <span className="num text-[17px]">{delayMinutes}</span> min late
           </>
         ) : (
-          "C'est l'heure"
+          'It’s time'
         )}
       </p>
 
@@ -106,8 +106,8 @@ export default function SessionStartOverlay(): JSX.Element {
         <div className="mt-7 flex items-center gap-2 rounded border border-white/20 px-4 py-2 text-[12.5px] text-white/70">
           <ShieldBan size={14} className="shrink-0 text-white/50" />
           <span>
-            {apps.length === 1 ? apps[0] : `${apps.length} applications`} bloquée
-            {apps.length > 1 ? 's' : ''} pendant cette session
+            {apps.length === 1 ? apps[0] : `${apps.length} apps`} blocked
+            {apps.length > 1 ? '' : ''} during this session
           </span>
         </div>
       )}
@@ -118,7 +118,7 @@ export default function SessionStartOverlay(): JSX.Element {
         disabled={confirming || blockId === ''}
         className="pressable mt-10 min-w-[260px] rounded border border-accent bg-accent px-10 py-4 text-[16px] font-semibold text-white hover:brightness-110 disabled:bg-accent/35 disabled:text-white/70"
       >
-        {confirming ? 'Confirmation…' : 'Je commence'}
+        {confirming ? 'Starting…' : 'I’m starting'}
       </button>
 
       {erreur !== null && <p className="mt-5 text-[12.5px] text-warn">{erreur}</p>}

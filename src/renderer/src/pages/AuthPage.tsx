@@ -41,8 +41,8 @@ export default function AuthPage(): JSX.Element {
     if (account?.email) setEmail(account.email)
   }, [account?.email, hasAccount])
 
-  const title = mode === 'sign-up' ? 'Créer ton compte' : 'Connexion'
-  const submitLabel = mode === 'sign-up' ? 'Créer le compte' : 'Se connecter'
+  const title = mode === 'sign-up' ? 'Create your account' : 'Sign in'
+  const submitLabel = mode === 'sign-up' ? 'Create the account' : 'Sign in'
   const SubmitIcon = mode === 'sign-up' ? UserPlus : LogIn
 
   const canSwitchMode = useMemo(() => {
@@ -54,7 +54,7 @@ export default function AuthPage(): JSX.Element {
     setError(null)
 
     if (mode === 'sign-up' && password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.')
+      setError('The passwords do not match.')
       return
     }
 
@@ -89,11 +89,11 @@ export default function AuthPage(): JSX.Element {
             Ton temps reste local. Le plan reste lisible.
           </h1>
           <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-fg-2">
-            Vethos calcule tes plages de travail depuis tes engagements réels et protège les
+            Vethos works out your work windows from your real commitments and protects the
             sessions quand elles commencent.
           </p>
         </div>
-        <p className="text-[12px] text-fg-3">Tout reste sur cette machine.</p>
+        <p className="text-[12px] text-fg-3">Everything stays on this machine.</p>
       </section>
 
       <main className="flex min-h-0 items-center justify-center px-5 py-8 sm:px-10">
@@ -106,10 +106,10 @@ export default function AuthPage(): JSX.Element {
             <h1 className="mt-2.5 text-[28px] font-semibold leading-tight">{title}</h1>
             <p className="mt-2.5 text-[14px] leading-relaxed text-fg-2">
               {mode === 'sign-up'
-                ? 'Crée un accès pour protéger ton espace local.'
+                ? 'Create a sign-in to protect your local space.'
                 : account?.name
                   ? `Bon retour, ${account.name}.`
-                  : 'Entre tes identifiants pour continuer.'}
+                  : 'Enter your credentials to continue.'}
             </p>
           </header>
 
@@ -153,7 +153,7 @@ export default function AuthPage(): JSX.Element {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
-                placeholder="8 caractères minimum"
+                placeholder="8 characters minimum"
               />
               <button
                 type="button"
@@ -162,7 +162,7 @@ export default function AuthPage(): JSX.Element {
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 <span className="sr-only">
-                  {showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  {showPassword ? 'Hide the password' : 'Show the password'}
                 </span>
               </button>
             </AuthField>
@@ -176,7 +176,7 @@ export default function AuthPage(): JSX.Element {
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
-                  placeholder="Répète le mot de passe"
+                  placeholder="Repeat the password"
                 />
               </AuthField>
             )}
@@ -193,13 +193,13 @@ export default function AuthPage(): JSX.Element {
               className="btn-iris pressable mt-2 h-12 w-full"
             >
               <SubmitIcon size={17} />
-              {submitting ? 'Traitement…' : submitLabel}
+              {submitting ? 'Working…' : submitLabel}
             </button>
           </form>
 
           <div className="mt-7 flex items-center justify-between gap-3 text-[13.5px]">
             <span className="text-fg-3">
-              {mode === 'sign-up' ? 'Déjà un compte ?' : 'Pas encore de compte ?'}
+              {mode === 'sign-up' ? 'Already have an account?' : 'No account yet?'}
             </span>
             <button
               type="button"
@@ -210,7 +210,7 @@ export default function AuthPage(): JSX.Element {
                 canSwitchMode ? 'text-accent hover:brightness-110' : 'cursor-not-allowed text-fg-3',
               )}
             >
-              {mode === 'sign-up' ? 'Se connecter' : 'Créer un compte'}
+              {mode === 'sign-up' ? 'Sign in' : 'Create an account'}
             </button>
           </div>
         </div>

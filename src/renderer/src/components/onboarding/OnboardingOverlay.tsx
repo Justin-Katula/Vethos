@@ -8,9 +8,9 @@ import { UsernameStep } from './UsernameStep'
 import { DonePage } from './DonePage'
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
-  welcome: 'Bienvenue',
-  username: 'Toi',
-  done: 'Terminé',
+  welcome: 'Welcome',
+  username: 'You',
+  done: 'Done',
 }
 
 const VISIBLE_STEPS: OnboardingStep[] = ONBOARDING_STEPS.filter(
@@ -51,12 +51,12 @@ export function OnboardingOverlay(): JSX.Element {
       className="fixed inset-0 z-[100] flex flex-col bg-base"
       role="dialog"
       aria-modal="true"
-      aria-label="Configuration initiale"
+      aria-label="First-time setup"
     >
       {!isDone && (
         <header className="flex items-center justify-between gap-6 border-b border-line px-10 py-5">
           <div className="flex flex-1 items-center gap-3">
-            <span className="text-xs font-semibold text-fg-3">Configuration</span>
+            <span className="text-xs font-semibold text-fg-3">Setup</span>
             <div className="flex flex-1 items-center gap-1.5">
               {VISIBLE_STEPS.map((s, i) => {
                 const reached = i <= currentIdx
@@ -80,7 +80,7 @@ export function OnboardingOverlay(): JSX.Element {
             className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium text-fg-2 hover:bg-surface hover:text-fg"
           >
             <X size={14} />
-            Passer
+            Skip
           </button>
         </header>
       )}
@@ -116,7 +116,7 @@ export function OnboardingOverlay(): JSX.Element {
             )}
           >
             <ArrowLeft size={16} />
-            Précédent
+            Back
           </button>
 
           <span className="text-xs text-fg-3">
@@ -128,11 +128,11 @@ export function OnboardingOverlay(): JSX.Element {
             {isLastVisible ? (
               <>
                 <Check size={16} strokeWidth={3} />
-                Terminer
+                Finish
               </>
             ) : (
               <>
-                Suivant
+                Next
                 <ArrowRight size={16} />
               </>
             )}

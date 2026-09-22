@@ -33,14 +33,14 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
         className="flex flex-col gap-3"
       >
         <div className="inline-flex items-center justify-center self-center rounded border border-line bg-surface px-3.5 py-1.5 text-[10px] font-semibold text-fg-3">
-          Premier lancement
+          First launch
         </div>
         <h1 className="text-[42px] font-bold leading-tight text-fg sm:text-5xl">
-          Bienvenue dans Vethos.
+          Welcome to Vethos.
         </h1>
         <p className="mx-auto max-w-xl text-base leading-relaxed text-fg-2">
           {
-            'En quelques minutes, tu poses ton emploi du temps, tes engagements protégés et ton premier objectif.'
+            'In a few minutes, you lay down your timetable, your protected commitments and your first goal.'
           }
         </p>
       </motion.div>
@@ -54,7 +54,7 @@ export function WelcomeStep({ onContinue }: Props): JSX.Element {
         whileHover={{ y: -1 }}
         className="btn-iris pressable px-8 py-3.5 text-[15px]"
       >
-        Commencer
+        Start
         <ArrowRight size={18} />
       </motion.button>
     </div>

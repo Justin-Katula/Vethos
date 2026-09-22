@@ -50,10 +50,10 @@ export default function CommitmentsPage() {
     <PageTransition>
       <div className="mx-auto flex h-full w-full max-w-[1560px] flex-col overflow-y-auto overflow-x-hidden px-8 pb-14 pt-12 xl:px-14">
         <header className="mb-10">
-          <h1 className="text-3xl font-semibold text-fg">Mes engagements</h1>
+          <h1 className="text-3xl font-semibold text-fg">My commitments</h1>
           <p className="mt-1.5 max-w-2xl text-sm text-fg-3">
-            Tu déclares ce que tu veux faire. L{'’'}application décide quand, en fonction du temps
-            qui te reste réellement.
+            You declare what you want to do. The app decides when, based on the time you
+            actually have left.
           </p>
         </header>
 
@@ -61,8 +61,8 @@ export default function CommitmentsPage() {
           <Section
             index={0}
             reduce={reduce}
-            title="Tâches"
-            law="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
+            title="Tasks"
+            law="A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first."
             count={activeRoots.length}
           >
             <TasksEditor
@@ -77,8 +77,8 @@ export default function CommitmentsPage() {
           <Section
             index={1}
             reduce={reduce}
-            title="Objectifs"
-            law="Une cible par semaine, jamais d’échéance. Gouverné par le rythme : il avance sans jamais être en retard."
+            title="Goals"
+            law="A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late."
             count={objectives.length}
           >
             <ObjectivesEditor
@@ -91,8 +91,8 @@ export default function CommitmentsPage() {
           <Section
             index={2}
             reduce={reduce}
-            title="Ancres"
-            law="Une heure fixe, choisie une fois. Gouvernée par la stabilité : elle ne bouge jamais d’un jour à l’autre."
+            title="Anchors"
+            law="A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next."
             count={ancres.length}
           >
             <AncresEditor
@@ -103,7 +103,7 @@ export default function CommitmentsPage() {
                 } catch (err) {
                   // D.3 : la création est refusée, jamais décalée en silence.
                   toast.error({
-                    title: 'Ancre refusée',
+                    title: 'Anchor refused',
                     description: err instanceof Error ? err.message : String(err),
                   })
                 }
@@ -177,7 +177,7 @@ function TasksEditor({
     deadline: addDays(dateKey(new Date()), 7),
     minutes: 60,
     importance: 5,
-    category: 'général',
+    category: 'general',
     workKind: 'routine' as 'routine' | 'novel',
   }))
   const [detailed, setDetailed] = useState(false)
@@ -190,7 +190,7 @@ function TasksEditor({
       plan: draft.plan.trim(),
       deadline: draft.deadline,
       importance: draft.importance,
-      category: draft.category.trim() || 'général',
+      category: draft.category.trim() || 'general',
       workKind: draft.workKind,
       estimatedMinutes: draft.minutes,
       // Le store applique le facteur de correction : l'estimation brute
@@ -219,7 +219,7 @@ function TasksEditor({
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="Ce qu’il y a à faire…"
+          placeholder="What there is to do…"
           className={cn(inputClass, 'w-full')}
         />
         <input
@@ -227,7 +227,7 @@ function TasksEditor({
           name="commitment-task-plan"
           value={draft.plan}
           onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
-          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Ce soir à mon bureau...)"
+          placeholder="What will this concretely involve? (e.g. tonight at my desk...)"
           className={cn(inputClass, 'w-full')}
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -257,7 +257,7 @@ function TasksEditor({
             onClick={submit}
             className="pressable ml-auto inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
-            <Plus size={14} /> Ajouter
+            <Plus size={14} /> Add
           </button>
         </div>
 
@@ -266,7 +266,7 @@ function TasksEditor({
           onClick={() => setDetailed((v) => !v)}
           className="text-[11px] text-fg-3 underline-offset-2 transition-colors hover:text-fg-2 hover:underline"
         >
-          {detailed ? 'Masquer' : 'Importance, catégorie, nature du travail'}
+          {detailed ? 'Hide' : 'Importance, category, kind of work'}
         </button>
 
         {detailed && (
@@ -284,7 +284,7 @@ function TasksEditor({
               />
             </label>
             <label className="text-[11px] text-fg-3">
-              Catégorie
+              Category
               <input
                 type="text"
                 name="commitment-task-category"
@@ -311,8 +311,7 @@ function TasksEditor({
         )}
 
         <p className="pt-1 text-[11px] text-fg-3">
-          L{'’'}importance se déclare une seule fois, à la création. Elle n{'’'}est jamais
-          recalculée.
+          Importance is declared once, at creation. It is never recomputed.
         </p>
       </div>
 
@@ -321,7 +320,7 @@ function TasksEditor({
           open={true}
           title={pendingDraft.title}
           plan={pendingDraft.plan}
-          kindLabel="tâche"
+          kindLabel="task"
           onConfirm={(blockedApps) => {
             void onAdd({
               ...pendingDraft,

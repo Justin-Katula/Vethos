@@ -133,7 +133,7 @@ export function ScheduleEditor({
       <div className="mt-4 space-y-1">
         {dayEntries.length === 0 ? (
           <p className="py-4 text-center text-xs text-fg-3">
-            Rien de fixe le {DAYS[day]?.toLowerCase()}. La journée entière compte comme disponible.
+            Nothing fixed on {DAYS[day]?.toLowerCase()}. The whole day counts as available.
           </p>
         ) : (
           dayEntries.map((entry, i) => (
@@ -152,7 +152,7 @@ export function ScheduleEditor({
               {entry.date && (
                 <span
                   className="shrink-0 rounded-sm border border-line px-1 py-0.5 font-mono text-[9.5px] text-fg-3"
-                  title="Occurrence unique, jamais répétée la semaine suivante"
+                  title="One-off, never repeated the following week"
                 >
                   {entry.date.slice(5).replace('-', '.')}
                 </span>
@@ -164,7 +164,7 @@ export function ScheduleEditor({
                 type="button"
                 onClick={() => onChange(entries.filter((e) => e !== entry))}
                 className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label="Supprimer"
+                aria-label="Delete"
               >
                 <Trash2 size={13} />
               </button>
@@ -185,7 +185,7 @@ export function ScheduleEditor({
                 draft.recurrence === r ? 'bg-surface-2 text-fg' : 'text-fg-3 hover:text-fg-2',
               )}
             >
-              {r === 'weekly' ? 'Toutes les semaines' : 'Une seule fois'}
+              {r === 'weekly' ? 'Every week' : 'Once only'}
             </button>
           ))}
         </div>
@@ -237,7 +237,7 @@ export function ScheduleEditor({
           onClick={add}
           className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2"
         >
-          <Plus size={14} /> Ajouter
+          <Plus size={14} /> Add
         </button>
         {dayEntries.some((e) => !e.date) && day <= 4 && (
           <button
@@ -245,14 +245,14 @@ export function ScheduleEditor({
             onClick={copyToWeekdays}
             className="inline-flex items-center gap-1.5 text-[11px] text-fg-3 transition-colors hover:text-fg-2"
           >
-            <Copy size={12} /> copier sur la semaine
+            <Copy size={12} /> copy across the week
           </button>
         )}
       </div>
       {draft.recurrence === 'once' && (
         <p className="mt-2 text-[11px] text-fg-3">
-          Cette occurrence ne comptera que le {draft.date.slice(5).replace('-', '.')} — jamais
-          répétée la semaine suivante.
+          This one counts only on {draft.date.slice(5).replace('-', '.')} — never repeated the
+          following week.
         </p>
       )}
     </>
@@ -310,7 +310,7 @@ export function AncresEditor({
       <div className="space-y-1">
         {ancres.length === 0 ? (
           <p className="py-4 text-center text-xs text-fg-3">
-            Le sport à 18 h, la lecture à 21 h. Un rendez-vous avec toi-même qui ne bouge jamais.
+            Sport at 6 pm, reading at 9 pm. An appointment with yourself that never moves.
           </p>
         ) : (
           ancres.map((a) => (
@@ -331,7 +331,7 @@ export function AncresEditor({
                 type="button"
                 onClick={() => onDelete(a.id)}
                 className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label="Supprimer"
+                aria-label="Delete"
               >
                 <Trash2 size={13} />
               </button>
@@ -346,7 +346,7 @@ export function AncresEditor({
           name="ancre-name"
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          placeholder="Sport, lecture, méditation…"
+          placeholder="Sport, reading, meditation…"
           className={cn(inputClass, 'w-full')}
         />
         <input
@@ -354,7 +354,7 @@ export function AncresEditor({
           name="ancre-plan"
           value={draft.plan}
           onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
-          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Ce soir à la salle...)"
+          placeholder="What will this concretely involve? (e.g. tonight at the gym...)"
           className={cn(inputClass, 'w-full')}
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -373,7 +373,7 @@ export function AncresEditor({
             step={5}
             value={draft.minutes}
             onChange={(e) => setDraft({ ...draft, minutes: Number(e.target.value) })}
-            title="Durée normale, en minutes"
+            title="Normal duration, in minutes"
             className={cn(inputClass, 'w-20')}
           />
           <div className="flex gap-0.5">
@@ -401,13 +401,13 @@ export function AncresEditor({
             onClick={submit}
             className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
-            <Plus size={14} /> Ancrer
+            <Plus size={14} /> Anchor it
           </button>
         </div>
       </div>
       <p className="mt-3 text-[11px] text-fg-3">
-        Deux ancres ne peuvent jamais occuper le même créneau : la seconde est refusée, jamais
-        décalée à ta place.
+        Two anchors can never hold the same slot: the second is refused, never moved on your
+        behalf.
       </p>
 
       {pendingDraft && (
@@ -448,7 +448,7 @@ export function ObjectivesEditor({
       <div className="space-y-1">
         {objectives.length === 0 ? (
           <p className="py-4 text-center text-xs text-fg-3">
-            « Guitare, 4 h par semaine ». Ce qui avance sans jamais être en retard.
+            “Guitar, 4 h a week.” What moves forward without ever being late.
           </p>
         ) : (
           objectives.map((o) => (
@@ -465,7 +465,7 @@ export function ObjectivesEditor({
                 type="button"
                 onClick={() => onDelete(o.id)}
                 className="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-warn focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label="Supprimer"
+                aria-label="Delete"
               >
                 <Trash2 size={13} />
               </button>
@@ -488,7 +488,7 @@ export function ObjectivesEditor({
           name="objective-plan"
           value={draft.plan}
           onChange={(e) => setDraft({ ...draft, plan: e.target.value })}
-          placeholder="En quoi consiste concrètement ce que tu vas faire ? (ex: Tous les soirs au studio...)"
+          placeholder="What will this concretely involve? (e.g. every evening at the studio...)"
           className={cn(inputClass, 'w-full')}
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -519,13 +519,12 @@ export function ObjectivesEditor({
             }}
             className="pressable ml-auto inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2 disabled:opacity-40"
           >
-            <Plus size={14} /> Ajouter
+            <Plus size={14} /> Add
           </button>
         </div>
       </div>
       <p className="mt-3 text-[11px] text-fg-3">
-        Un objectif ne peut jamais recevoir de deadline. Il ne se dégrade pas non plus avec le temps
-        qui passe.
+        A goal can never be given a deadline. Nor does it decay as time passes.
       </p>
 
       {pendingDraft && (
@@ -553,12 +552,12 @@ export function CapacityTable({ plan }: { plan: NonNullable<ReturnType<typeof us
     <table className="w-full text-xs">
       <thead className="text-left text-[10px] text-fg-3">
         <tr>
-          <th className="pb-2 font-medium">Jour</th>
-          <th className="pb-2 text-right font-medium">Brute</th>
-          <th className="pb-2 text-right font-medium">Inutilisable</th>
-          <th className="pb-2 text-right font-medium">Repos</th>
+          <th className="pb-2 font-medium">Day</th>
+          <th className="pb-2 text-right font-medium">Raw</th>
+          <th className="pb-2 text-right font-medium">Unusable</th>
+          <th className="pb-2 text-right font-medium">Rest</th>
           <th className="pb-2 text-right font-medium">Fatigue</th>
-          <th className="pb-2 text-right font-medium">Disponible</th>
+          <th className="pb-2 text-right font-medium">Available</th>
         </tr>
       </thead>
       <tbody className="font-mono text-fg-3">
@@ -602,7 +601,7 @@ export function RequestPanel({
     <>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-fg-2">
-          Je veux
+          I want
           <input
             type="number"
             name="free-time-request-minutes"
@@ -613,7 +612,7 @@ export function RequestPanel({
             onChange={(e) => setMinutes(Number(e.target.value))}
             className={cn(inputClass, 'w-24')}
           />
-          min de libre aujourd’hui
+          min free today
         </label>
         <button
           type="button"
@@ -634,7 +633,7 @@ export function RequestPanel({
           }
           className="inline-flex items-center gap-1.5 rounded border border-line-strong px-3 py-2 text-sm text-fg transition-colors hover:bg-surface-2"
         >
-          Demander
+          Ask
         </button>
       </div>
 
@@ -642,10 +641,10 @@ export function RequestPanel({
         <div className="mt-4 border-t border-line pt-4">
           <p className="text-sm font-medium text-fg">
             {verdict.status === 'granted'
-              ? `Accordé, ${verdict.grantedMinutes} min.`
+              ? `Granted — ${verdict.grantedMinutes} min.`
               : verdict.status === 'partial'
-                ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
-                : 'Refusé.'}
+                ? `${verdict.grantedMinutes} min fit, not ${minutes}.`
+                : 'Denied.'}
           </p>
           <p className="mt-1 text-xs text-fg-3">{verdict.reason}</p>
         </div>

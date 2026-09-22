@@ -59,10 +59,10 @@ export default function App(): JSX.Element {
     })
     const offUpdateReady = nexus.app.onUpdateDownloaded((info) => {
       toast.info({
-        title: 'Mise à jour prête',
+        title: 'Update ready',
         description: info.version
-          ? `Vethos ${info.version} sera installé au prochain redémarrage.`
-          : 'Elle sera installée au prochain redémarrage.',
+          ? `Vethos ${info.version} will install on the next restart.`
+          : 'It will install on the next restart.',
       })
     })
     // D.7/D.8 : l'horloge de planification (processus main) écrit du retard,

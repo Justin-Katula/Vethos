@@ -272,8 +272,8 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
     if (conflict) {
       throw new Error(
         conflict.trigger.trim().toLowerCase() === input.trigger.trim().toLowerCase()
-          ? `« ${conflict.name} » utilise déjà le déclencheur « ${conflict.trigger} ».`
-          : `Conflit d'horaire avec « ${conflict.name} ». Choisis une autre heure.`,
+          ? `“${conflict.name}” already uses the trigger “${conflict.trigger}”.`
+          : `Time clash with “${conflict.name}”. Pick another hour.`,
       )
     }
 
