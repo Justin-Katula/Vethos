@@ -273,6 +273,35 @@ describe('le bouclier', () => {
     )
   })
 
+  it('rapporte la valeur BRUTE à côté de sa lecture, jamais à sa place', () => {
+    // Ce blocage ne se verifie depuis aucune machine de developpement : il
+    // n'existe que sur un iPhone, dans une compilation signee, pendant une
+    // vraie seance. Quand quelque chose n'y marche pas, il n'y a ni console
+    // ni erreur — juste l'impression que ca ne marche pas.
+    //
+    // D'ou ces deux champs cote a cote. Un diagnostic qui n'afficherait que
+    // la lecture aurait affiche « jamais demandee » pendant tout le temps ou
+    // le pont lisait mal l'entier 2, avec en plus l'autorite d'un outil de
+    // diagnostic. La valeur brute est la pour qu'un desaccord se VOIE.
+    const { natif } = moduleEspion()
+    ;(natif.getAuthorizationStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      AuthorizationStatus.approved,
+    )
+    ;(natif.getActivities as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      'vethos.b1',
+      'vethos.b2',
+      'autre.chose',
+    ])
+
+    const d = creerPontDepuis(natif).diagnostic()
+    expect(d.autorisationBrute).toBe(AuthorizationStatus.approved)
+    expect(d.autorisationLue).toBe('accordee')
+    expect(d.moduleReel).toBe(true)
+    // Seulement les nôtres : compter celles des autres ferait croire à des
+    // surveillances que « Lift everything now » ne lèverait jamais.
+    expect(d.surveillances).toBe(2)
+  })
+
   it('rend ce qu’iOS répond, et pas ce que Vethos a demandé', async () => {
     // Toute la différence entre « programmé » et « bloque vraiment ». Les deux
     // ont déjà divergé en silence : dans Expo Go, chaque appel réussissait et

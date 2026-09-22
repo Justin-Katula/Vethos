@@ -79,6 +79,21 @@ export function creerPontSimule(): PontEcran {
       return bouclierLeve
     },
 
+    diagnostic() {
+      // `moduleReel: false` est LA ligne importante de ce diagnostic-ci : elle
+      // dit qu'aucun des chiffres en dessous ne vient du systeme. Un
+      // simulateur qui se presenterait comme reel serait pire qu'aucun
+      // diagnostic — c'est exactement le mensonge qu'Expo Go a deja produit.
+      return {
+        moduleReel: false,
+        autorisationBrute: autorisation,
+        autorisationLue: autorisation,
+        surveillances: programmees,
+        bouclierLeve,
+        filtreWebActif: false,
+      }
+    },
+
     async programmer(plages, options = {}) {
       await attendre(220)
       programmees = plages.length

@@ -4,7 +4,10 @@
     "slug": "vethos",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": ["vethos", "device-activity"],
+    "scheme": [
+      "vethos",
+      "device-activity"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -40,6 +43,51 @@
     "web": {
       "bundler": "metro",
       "output": "single"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.vethos.app.ShieldConfiguration",
+                  "targetName": "ShieldConfiguration",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.vethos.app"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.vethos.app.ShieldAction",
+                  "targetName": "ShieldAction",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.vethos.app"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.vethos.app.ActivityMonitorExtension",
+                  "targetName": "ActivityMonitorExtension",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.vethos.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "862f46d8-f1a7-404e-8ea9-cd20027d21fd"
+      }
+    },
+    "owner": "justin-katula"
   }
 }

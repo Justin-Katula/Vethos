@@ -254,6 +254,20 @@ export type OptionsProgrammation = {
 /** L'identifiant de la liste gardée en mode profond. Fixe, comme l'autre. */
 export const IDENTIFIANT_GARDEE = 'vethos.garde'
 
+/** L'état réel du Temps d'écran, tel que le système le rend. */
+export type Diagnostic = {
+  /** Faux dans Expo Go et dans le navigateur : aucun appel ne fait rien. */
+  moduleReel: boolean
+  /** Ce qu'iOS rend, sans traduction. Un entier sur l'appareil. */
+  autorisationBrute: unknown
+  /** Ce que Vethos en comprend. Doit concorder avec la valeur brute. */
+  autorisationLue: EtatAutorisation
+  /** Surveillances portant notre préfixe, actuellement enregistrées. */
+  surveillances: number
+  bouclierLeve: boolean
+  filtreWebActif: boolean
+}
+
 export type PontEcran = {
   /** Ce que le système fournit vraiment, par opposition au simulateur. */
   estReel: boolean
@@ -277,6 +291,21 @@ export type PontEcran = {
    * qu'iOS fait. Les deux ont déjà divergé en silence une fois.
    */
   bouclierActif: () => boolean
+  /**
+   * Ce que le système répond, en brut, sans interprétation.
+   *
+   * Ce blocage ne peut pas se vérifier depuis une machine de développement :
+   * il n'existe que sur un iPhone, dans une compilation signée, pendant une
+   * vraie séance. Quand quelque chose n'y marche pas, il n'y a ni console, ni
+   * capture, ni erreur — juste une impression que « ça ne marche pas ».
+   *
+   * Ceci est la réponse à ça. Et surtout : `autorisationBrute` porte la
+   * valeur telle qu'iOS la rend, PAS notre lecture. C'est exactement cette
+   * traduction qui a menti pendant tout ce temps — un diagnostic qui
+   * n'afficherait que le résultat traduit répéterait le même mensonge, avec
+   * en plus l'autorité d'un outil de diagnostic.
+   */
+  diagnostic: () => Diagnostic
   /** Programme les plages du jour. Rend le nombre réellement programmé. */
   programmer: (plages: readonly Plage[], options?: OptionsProgrammation) => Promise<number>
   /** Lève tout : aucun bouclier ne doit survivre à un arrêt. */

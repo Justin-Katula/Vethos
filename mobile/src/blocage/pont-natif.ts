@@ -173,6 +173,21 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       return natif.isShieldActive()
     },
 
+    diagnostic() {
+      return {
+        moduleReel: true,
+        // La valeur BRUTE, pas notre traduction. C'est précisément la
+        // traduction qui a menti pendant tout ce temps — un diagnostic qui
+        // n'affiche que le résultat traduit aurait répété le mensonge avec
+        // l'autorité d'un outil de diagnostic.
+        autorisationBrute: natif.getAuthorizationStatus(),
+        autorisationLue: traduireAutorisation(natif.getAuthorizationStatus()),
+        surveillances: natif.getActivities().filter((a) => a.startsWith('vethos.')).length,
+        bouclierLeve: natif.isShieldActive(),
+        filtreWebActif: natif.isWebContentFilterPolicyActive(),
+      }
+    },
+
     async programmer(plages, options = {}) {
       const maintenant = options.maintenant ?? minuteCourante()
       const profond = options.mode === 'profond'

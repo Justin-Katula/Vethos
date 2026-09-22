@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
-import { AppState, Linking, Pressable, ScrollView, View } from 'react-native'
+import { AppState, Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
-import { decrireSelection, selectionEstVide, type ModeBlocage } from '@/blocage/contrat'
+import {
+  decrireSelection,
+  selectionEstVide,
+  type Diagnostic,
+  type ModeBlocage,
+} from '@/blocage/contrat'
 import { SelecteurApplications, type RoleSelecteur } from '@/blocage/SelecteurApplications'
 import { useJetons, useNomTheme } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
@@ -13,6 +18,7 @@ import {
   Espace,
   Rangee,
   Section,
+  MONO,
   Texte,
   TitreEcran,
   Valeur,
@@ -36,7 +42,7 @@ export default function Blocage() {
 
   const {
     autorisation, selection, gardee, mode, filtrerLeWeb,
-    plagesActives, ecartees, occupe, simule, verifie,
+    plagesActives, ecartees, occupe, simule, verifie, diagnostic,
   } = useBlocage()
   const demander = useBlocage((e) => e.demanderAutorisation)
   const relire = useBlocage((e) => e.relireAutorisation)
@@ -276,6 +282,7 @@ export default function Blocage() {
 
         <Espace h={4} />
         <Preuve attendu={enCours !== undefined} verifie={verifie} />
+        {diagnostic ? <Brut d={diagnostic} /> : null}
         <Espace h={3} />
         <BoutonPlat onPress={() => void verifier()} desactive={occupe}>
           Check with iOS now
@@ -372,6 +379,50 @@ function Preuve({
         ? `Vethos asked for a shield; iOS says none is up. Checked at ${a}.`
         : `A shield is still up, and no session is running. Checked at ${a}.`}
     </Texte>
+  )
+}
+
+/**
+ * Ce que le système répond, en brut.
+ *
+ * Ce blocage-là ne se vérifie depuis aucune machine de développement : il
+ * n'existe que sur un iPhone, dans une compilation signée, pendant une vraie
+ * séance. Quand quelque chose n'y marche pas, il n'y a ni console, ni erreur,
+ * ni capture — juste l'impression que « ça ne marche pas ». Cinq lignes
+ * suffisent à remplacer cette impression par des faits.
+ *
+ * `auth` porte la valeur telle qu'iOS la rend À CÔTÉ de ce que Vethos en
+ * comprend, et pas à la place. Ces deux-là ont déjà divergé pendant tout le
+ * développement — l'entier 2 lu comme « jamais demandée » — et c'est
+ * précisément la traduction qui mentait. Un diagnostic qui n'afficherait que
+ * le résultat traduit répéterait le même mensonge, avec en plus l'autorité
+ * d'un outil de diagnostic.
+ */
+function Brut({ d }: { d: Diagnostic }) {
+  const j = useJetons()
+  const lignes = [
+    ['module', d.moduleReel ? 'native' : 'simulated'],
+    ['auth', `${String(d.autorisationBrute)} → ${d.autorisationLue}`],
+    ['monitors', String(d.surveillances)],
+    ['shield', d.bouclierLeve ? 'up' : 'down'],
+    ['web filter', d.filtreWebActif ? 'on' : 'off'],
+  ] as const
+
+  return (
+    <View style={{ marginTop: PAS[3], gap: 2 }}>
+      {lignes.map(([nom, valeur]) => (
+        <View key={nom} style={{ flexDirection: 'row', gap: PAS[3] }}>
+          <Text
+            style={{ color: j.text3, fontFamily: MONO.normal, fontSize: 11, width: 84 }}
+          >
+            {nom}
+          </Text>
+          <Text style={{ color: j.text2, fontFamily: MONO.normal, fontSize: 11 }}>
+            {valeur}
+          </Text>
+        </View>
+      ))}
+    </View>
   )
 }
 

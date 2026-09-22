@@ -6,6 +6,7 @@ import {
   fusionnerPlages,
   limiterAuxCapacitesIOS,
   selectionEstVide,
+  type Diagnostic,
   type EtatAutorisation,
   type ModeBlocage,
   type Plage,
@@ -61,6 +62,8 @@ type EtatBlocage = {
    * deux choses différentes, et les confondre ferait mentir l'écran.
    */
   verifie: { leve: boolean; aMs: number } | null
+  /** L'etat brut du systeme, a la derniere verification. */
+  diagnostic: Diagnostic | null
 
   initialiser: () => Promise<void>
   demanderAutorisation: () => Promise<void>
@@ -105,6 +108,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   occupe: false,
   simule: !pontEcran().estReel,
   verifie: null,
+  diagnostic: null,
 
   async initialiser() {
     const autorisation = await pontEcran().lireAutorisation()
@@ -216,9 +220,9 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   },
 
   verifier() {
-    const leve = pontEcran().bouclierActif()
-    set({ verifie: { leve, aMs: Date.now() } })
-    return leve
+    const d = pontEcran().diagnostic()
+    set({ verifie: { leve: d.bouclierLeve, aMs: Date.now() }, diagnostic: d })
+    return d.bouclierLeve
   },
 
   async ouvrirSeance(plage, contexte) {
