@@ -38,37 +38,52 @@ Le masquage demande `FamilyControls`, qui ne peut pas vivre dans Expo Go. Il
 faut une compilation à toi, signée avec ton compte Apple.
 
 Déjà fait, à ne pas refaire : le projet est lié à EAS
-(`@justin-katula/vethos`), `eas.json` porte les profils, et les trois
-extensions natives sont déclarées. Il reste **trois commandes**.
+(`@justin-katula/vethos`), `eas.json` porte les profils, les trois extensions
+natives sont déclarées, et EAS valide la configuration.
 
-```bash
-npx eas-cli secret:create --scope project --name APPLE_TEAM_ID --value XXXXXXXXXX
-npx eas-cli device:create
-npx eas-cli build -p ios --profile development
-```
+### L'ordre compte, et il n'est pas celui qu'on croit
 
-1. **Ton identifiant d'équipe**, dix caractères, lu sur l'espace développeur
-   Apple (Membership) ou dans Xcode. En *secret* et pas dans un fichier : il
-   identifie *une personne*, pas le produit, et n'a rien à faire dans le
-   dépôt. En local, la variable `APPLE_TEAM_ID` fait la même chose.
-2. **`device:create`** enregistre ton iPhone auprès d'Apple — une compilation
-   de développement ne s'installe que sur des appareils connus. Tu scannes un
-   QR code avec le téléphone.
-3. **`build`** demande ton identifiant Apple, fabrique les certificats et les
-   profils, compile dans le nuage (~15 min) et rend un lien d'installation.
+**La demande à Apple vient AVANT la première compilation, pas après.** Le
+greffon est formel : tant que les identifiants ne sont pas approuvés, *« you
+can't even build an Expo Dev Client »*. Commencer par `eas build` fait perdre
+les jours d'attente du formulaire.
 
-Ce qu'il faut savoir avant de payer les 99 $ :
+1. **L'abonnement Apple Developer** (99 $/an). Vérifié le 2026-09-22 : aucune
+   équipe Apple n'est encore rattachée au compte Expo.
+2. **Le formulaire Family Controls (Distribution)**, tout de suite après :
+   <https://developer.apple.com/contact/request/family-controls-distribution>
+   La réponse prend des jours. C'est le vrai chemin critique.
+3. **Une fois l'accord obtenu**, ajouter « Family Controls (Distribution) »
+   dans *Additional Capabilities* pour les **quatre** identifiants sur
+   developer.apple.com — l'application et ses trois extensions :
 
-- **Apple demande quatre identifiants**, pas un — l'application et ses trois
-  extensions : `com.vethos.app`, plus `.ActivityMonitorExtension`,
-  `.ShieldAction`, `.ShieldConfiguration`. EAS les crée tout seul.
-- **`family-controls` en développement** s'obtient avec l'abonnement, sans
-  formulaire. C'est la version **distribution** — celle de l'App Store — qui
-  se demande à Apple et prend des jours. Pour l'installer sur ton téléphone
-  et voir le blocage marcher, le développement suffit.
-- **Une compilation de développement expire au bout de 12 mois**, et elle a
-  besoin du serveur Metro pour charger le code — exactement comme Expo Go,
-  mais avec le Temps d'écran dedans.
+   ```
+   com.vethos.app
+   com.vethos.app.ShieldConfiguration
+   com.vethos.app.ShieldAction
+   com.vethos.app.ActivityMonitorExtension
+   ```
+
+   Une seule fois. Ensuite EAS s'occupe du provisionnement tout seul.
+4. **Puis les trois commandes :**
+
+   ```bash
+   npx eas-cli secret:create --scope project --name APPLE_TEAM_ID --value XXXXXXXXXX
+   npx eas-cli device:create
+   npx eas-cli build -p ios --profile development
+   ```
+
+   L'identifiant d'équipe fait dix caractères et se lit sur l'espace Apple
+   (Membership). En *secret* et pas dans un fichier : il identifie *une
+   personne*, pas le produit. `device:create` enregistre l'iPhone (un QR code
+   à scanner) ; `build` compile dans le nuage en ~15 min et rend un lien
+   d'installation.
+
+Sauter l'étape 3 donne « a lot of strange provisioning errors » — des erreurs
+qui ne nomment jamais l'entitlement manquant.
+
+La compilation obtenue a toujours besoin du serveur Metro pour charger le
+code, exactement comme Expo Go — mais avec le Temps d'écran dedans.
 
 ### Ce que la compilation apporte, et qu'Expo Go ne peut pas montrer
 
