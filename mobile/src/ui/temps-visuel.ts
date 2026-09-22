@@ -9,5 +9,5 @@ export function couleurTemps(nature: NatureTemps, j: Jetons): string {
   return j.text3
 }
 export const nomsTemps: Record<NatureTemps, string> = {
-  sleep: 'Sommeil', fixed: 'Fixe', task: 'Tâche', objective: 'Objectif', ancre: 'Ancre',
+  sleep: 'Sleep', fixed: 'Fixed', task: 'Task', objective: 'Goal', ancre: 'Anchor',
 }

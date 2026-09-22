@@ -60,52 +60,52 @@ export default function Blocage() {
         paddingHorizontal: PAS[5],
       }}
     >
-      <TitreEcran>Blocage</TitreEcran>
+      <TitreEcran>Blocking</TitreEcran>
 
       {simule ? (
         <>
           <Espace h={4} />
           <Texte ton="accent" taille={12.5}>
-            Simulé sur cet appareil. Le vrai masquage demande un iPhone, une version
-            compilée et l’autorisation d’Apple. Tout le reste de l’écran est réel.
+            Simulated on this device. Real shielding needs an iPhone, a compiled build and
+            Apple’s permission. Everything else on this screen is real.
           </Texte>
         </>
       ) : null}
 
       <Section
         premiere={!simule}
-        titre="Temps d’écran"
-        loi="L’autorisation d’Apple est ce qui permet de masquer une application. Elle se retire quand tu veux, depuis les Réglages."
+        titre="Screen Time"
+        loi="Apple’s permission is what lets an app be hidden. You can withdraw it whenever you want, from Settings."
         action={
           accordee ? (
             <Valeur ton="accent" taille={12}>
-              ACCORDÉE
+              GRANTED
             </Valeur>
           ) : null
         }
       >
         {accordee ? (
           <Texte ton="doux">
-            iOS ne dit jamais à Vethos quelles applications tu as choisies — seulement
-            combien. C’est une garantie du système, pas une promesse de notre part.
+            iOS never tells Vethos which apps you picked — only how many. That is a guarantee
+            of the system, not a promise of ours.
           </Texte>
         ) : (
           <>
             <Texte ton="doux">
-              Sans elle, Vethos ne peut que te montrer ton plan.
+              Without it, Vethos can only show you your plan.
             </Texte>
             <Espace h={4} />
             <BoutonIris onPress={() => void demander()} desactive={occupe}>
-              {occupe ? 'Un instant…' : 'Autoriser'}
+              {occupe ? 'One moment…' : 'Allow'}
             </BoutonIris>
           </>
         )}
       </Section>
 
       <Section
-        titre="Ce que tu écartes"
+        titre="What you set aside"
         compte={selection ? selection.nbApplications + selection.nbCategories : undefined}
-        loi="Tu désignes dans le sélecteur d’Apple. Lui seul sait de quoi il s’agit."
+        loi="You pick inside Apple’s own picker. It alone knows what they are."
       >
         {selection ? (
           <Rangee premiere>
@@ -117,39 +117,39 @@ export default function Blocage() {
             </View>
           </Rangee>
         ) : (
-          <Texte ton="doux">Rien de choisi.</Texte>
+          <Texte ton="doux">Nothing picked yet.</Texte>
         )}
         <Espace h={4} />
         <BoutonPlat onPress={ouvrirSelecteur} desactive={occupe || !accordee}>
-          {selection ? 'Changer ma sélection' : 'Choisir mes applications'}
+          {selection ? 'Change my selection' : 'Pick my apps'}
         </BoutonPlat>
       </Section>
 
       <Section
-        titre="Quand ça s’applique"
-        loi="Pendant une séance confirmée, et jamais autrement. Vethos n’a pas d’horaire de blocage à lui : c’est « Je commence » qui lève le bouclier, et la fin de la séance qui le baisse."
+        titre="When it applies"
+        loi="During a session you started, and never otherwise. Vethos has no blocking schedule of its own: “I’m starting” raises the shield, and the end of the session lowers it."
         action={
           enCours ? (
             <Valeur ton="accent" taille={12}>
-              EN COURS
+              ACTIVE
             </Valeur>
           ) : null
         }
       >
         {enCours ? (
           <Texte>
-            Levé jusqu’à {enHeure(enCours.finMinute)}. C’est la durée de la tâche que tu as
-            démarrée, pas celle de son ancien créneau.
+            Raised until {enHeure(enCours.finMinute)}. That is the duration of the task you
+            started, not of its former slot.
           </Texte>
         ) : (
           <Texte ton="doux">
-            Rien n’est écarté en ce moment. Le prochain « Je commence » s’en charge.
+            Nothing is set aside right now. The next “I’m starting” takes care of it.
           </Texte>
         )}
       </Section>
 
       {plagesActives.length > 0 ? (
-        <Section titre="Séances du jour" compte={plagesActives.length}>
+        <Section titre="Today’s sessions" compte={plagesActives.length}>
           {plagesActives.map((p, i) => {
             const actif = maintenant >= p.debutMinute && maintenant < p.finMinute
             const passe = maintenant >= p.finMinute
@@ -157,7 +157,7 @@ export default function Blocage() {
               <Rangee key={p.blocId} premiere={i === 0}>
                 <View style={{ flex: 1, opacity: passe ? 0.42 : 1 }}>
                   <Texte ton="doux">
-                    {passe ? 'passée' : actif ? 'en cours' : 'à venir'}
+                    {passe ? 'over' : actif ? 'active' : 'upcoming'}
                   </Texte>
                 </View>
                 <Valeur ton={actif ? 'accent' : 'normal'}>
@@ -178,18 +178,17 @@ export default function Blocage() {
 
           <Espace h={5} />
           <BoutonPlat onPress={() => void lever()} desactive={occupe}>
-            Tout lever maintenant
+            Lift everything now
           </BoutonPlat>
         </Section>
       ) : null}
 
       <SelecteurApplications ouvert={selecteurOuvert} surFermeture={() => setSelecteurOuvert(false)} />
 
-      <Section titre="Ce que Vethos ne peut pas faire">
+      <Section titre="What Vethos cannot do">
         <Texte ton="doux">
-          Le Temps d’écran se désactive depuis les Réglages d’iOS avec Face ID, et aucune
-          application ne peut l’empêcher. Vethos est un garde-fou, pas une prison — te
-          faire croire le contraire serait mentir.
+          Screen Time can be switched off from iOS Settings with Face ID, and no app can stop
+          that. Vethos is a guardrail, not a prison — telling you otherwise would be a lie.
         </Texte>
       </Section>
     </ScrollView>
@@ -211,9 +210,9 @@ function phraseEcartees({ courtes, plafond }: { courtes: number; plafond: number
   const bouts: string[] = []
   if (courtes > 0) {
     bouts.push(
-      `${courtes} séance${courtes > 1 ? 's' : ''} trop courte${courtes > 1 ? 's' : ''} pour qu’iOS la tienne`,
+      `${courtes} session${courtes > 1 ? 's' : ''} too short for iOS to hold`,
     )
   }
-  if (plafond > 0) bouts.push(`${plafond} au-delà des 20 qu’Apple autorise`)
-  return `${bouts.join(', et ')}. Les plus longues ont été gardées.`
+  if (plafond > 0) bouts.push(`${plafond} beyond the 20 Apple allows`)
+  return `${bouts.join(' and ')}. The longest ones were kept.`
 }

@@ -127,13 +127,13 @@ describe('ce que l’on dit d’une sélection', () => {
 
   it('assemble les trois natures avec un « et » final', () => {
     expect(decrireSelection({ ...base, nbApplications: 3, nbCategories: 1, nbSitesWeb: 2 })).toBe(
-      '3 applications, 1 catégorie et 2 sites',
+      '3 applications, 1 category and 2 sites',
     )
   })
 
   it('reconnaît une sélection vide', () => {
     expect(selectionEstVide(base)).toBe(true)
-    expect(decrireSelection(base)).toBe('Rien de sélectionné')
+    expect(decrireSelection(base)).toBe('Nothing selected')
     expect(selectionEstVide({ ...base, nbCategories: 1 })).toBe(false)
   })
 })

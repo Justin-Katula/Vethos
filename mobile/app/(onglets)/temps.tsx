@@ -35,22 +35,22 @@ export default function MonTemps() {
   const [suppression, setSuppression] = useState<string | null>(null)
   const large = useLargeur().deuxColonnes
   const jour = jours.find((x) => x.date === selection) ?? jours[0]
-  if (!jour || !chargees) return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Chargement du planning" />
+  if (!jour || !chargees) return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Loading your plan" />
   const dernier = jours[jours.length - 1]!
   const disponible = resultat.capacities.reduce((s, c) => s + c.effectiveCapacityMinutes, 0)
 
-  const titreJour = jour.date === aujourdHui ? 'Aujourd’hui' : dateLocale(jour.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })
+  const titreJour = jour.date === aujourdHui ? 'Today' : dateLocale(jour.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric' })
   return <>
     <ScrollView style={{ flex: 1, backgroundColor: j.bg }} contentContainerStyle={{ paddingTop: marges.top + 20, paddingBottom: 36, paddingHorizontal: 20 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ flex: 1, fontFamily: GEIST.demi, fontSize: 30, letterSpacing: -0.8, color: j.text }}>Mon temps</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Ajouter une obligation" onPress={() => setAjout(true)}
+        <Text style={{ flex: 1, fontFamily: GEIST.demi, fontSize: 30, letterSpacing: -0.8, color: j.text }}>My time</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Add a fixed commitment" onPress={() => setAjout(true)}
           style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 8, backgroundColor: j.surface2, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
           <Plus couleur={j.text} taille={20} />
         </Pressable>
       </View>
       <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, marginTop: 5 }}>
-        {dateLocale(jours[0]!.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} — {dateLocale(dernier.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+        {dateLocale(jours[0]!.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} — {dateLocale(dernier.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
       </Text>
 
       {/* Le chiffre de la page. Declarer du temps subi n'a d'interet que si
@@ -59,13 +59,13 @@ export default function MonTemps() {
         <Text style={{ fontFamily: MONO.demi, fontSize: 30, color: j.accentEncre, fontVariant: ['tabular-nums'], letterSpacing: -0.5 }}>
           {duree(disponible)}
         </Text>
-        <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text3 }}>disponibles sur sept jours</Text>
+        <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text3 }}>available across seven days</Text>
       </View>
       <CarteSemaine jours={jours} selection={jour.date} surSelection={setSelection} aujourdHui={aujourdHui} minute={minute} />
       <View style={{ marginTop: 28, paddingTop: 24, borderTopWidth: 1, borderTopColor: j.line }}>
         <Text style={{ fontFamily: GEIST.demi, fontSize: 20, color: j.text, textTransform: 'capitalize' }}>{titreJour}</Text>
         <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2, marginTop: 6 }}>
-          {duree(jour.travail)} planifiées · {duree(jour.capacite)} de capacité
+          {duree(jour.travail)} planned · {duree(jour.capacite)} of capacity
         </Text>
         <AgendaJour segments={jour.segments} {...(jour.date === aujourdHui ? { minute } : {})} />
       </View>
@@ -77,10 +77,10 @@ export default function MonTemps() {
         ? { marginTop: 28, flexDirection: 'row', alignItems: 'flex-start', gap: 20 }
         : { marginTop: 28, gap: 10 }}>
         <View style={large ? { flex: 1, gap: 10 } : { gap: 10 }}>
-          <Repliable titre="Le détail, jour par jour" resume="brute → dispo">
+          <Repliable titre="Day by day" resume="raw → free">
             <TableauCapacite capacites={resultat.capacities} />
           </Repliable>
-          <Repliable titre="Demander du temps libre">
+          <Repliable titre="Ask for free time">
             <DemandeTemps capacites={resultat.capacities} aujourdHui={aujourdHui} />
           </Repliable>
         </View>
@@ -115,18 +115,18 @@ function DeclarationsFixes() {
   <View style={{ borderTopWidth: 1, borderTopColor: j.line }}>
       <Pressable accessibilityRole="button" onPress={() => routeur.push('/reglages')}
         style={({ pressed }) => ({ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 60, opacity: pressed ? 0.6 : 1 })}>
-        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Sommeil</Text>
+        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Sleep</Text>
         <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.reglages.coucher}–{d.reglages.lever}</Text>
         <Chevron couleur={j.text2} taille={14} />
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: gestion }} onPress={() => setGestion(!gestion)}
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, borderTopWidth: 1, borderTopColor: j.line, opacity: pressed ? 0.6 : 1 })}>
-        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Obligations fixes</Text>
+        <Text style={{ flex: 1, fontFamily: GEIST.moyen, fontSize: 15, color: j.text }}>Fixed commitments</Text>
         <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{d.obligations.length}</Text>
         <View style={{ transform: [{ rotate: gestion ? '90deg' : '0deg' }] }}><Chevron couleur={j.text2} taille={14} /></View>
       </Pressable>
       {gestion && <View>
-        {d.obligations.length === 0 && <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, paddingVertical: 12 }}>Ajoute tes cours, ton travail ou tes trajets.</Text>}
+        {d.obligations.length === 0 && <Text style={{ fontFamily: GEIST.normal, fontSize: 14, color: j.text2, paddingVertical: 12 }}>Add your classes, your work or your commutes.</Text>}
         {[...d.obligations].sort((a, b) =>
           (a.date ?? '').localeCompare(b.date ?? '') ||
           ((a.dayOfWeek + 6) % 7) - ((b.dayOfWeek + 6) % 7) ||
@@ -136,24 +136,24 @@ function DeclarationsFixes() {
               <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{o.label}</Text>
               <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2 }}>
                 {CATEGORIE[o.categoryType]} · {o.date
-                  ? dateLocale(o.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                  ? dateLocale(o.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                   : JOURS[o.dayOfWeek]} · {enHeure(o.startMinute)}–{enHeure(o.endMinute)}
-                {o.date ? ' · une seule fois' : ''}
+                {o.date ? ' · once only' : ''}
               </Text>
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirmer la suppression de ${o.label}` : `Supprimer ${o.label}`}
+            <Pressable accessibilityRole="button" accessibilityLabel={suppression === o.id ? `Confirm deleting ${o.label}` : `Delete ${o.label}`}
               onPress={() => { if (suppression === o.id) { void d.supprimerObligation(o.id); setSuppression(null) } else setSuppression(o.id) }}
               style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
-              {suppression === o.id ? <Text style={{ color: j.accentEncre, fontFamily: GEIST.moyen }}>Supprimer</Text> : <Croix couleur={j.text2} />}
+              {suppression === o.id ? <Text style={{ color: j.accentEncre, fontFamily: GEIST.moyen }}>Delete</Text> : <Croix couleur={j.text2} />}
             </Pressable>
-            {suppression === o.id && <Pressable accessibilityRole="button" accessibilityLabel="Annuler la suppression" onPress={() => setSuppression(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} /></Pressable>}
+            {suppression === o.id && <Pressable accessibilityRole="button" accessibilityLabel="Cancel deletion" onPress={() => setSuppression(null)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} /></Pressable>}
           </View>)}
       </View>}
     </View>
   )
 }
 
-const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
+const JOURS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /** La date par defaut d'une occurrence unique : dans une semaine. */
 function dansNJours(n: number): string {
@@ -172,8 +172,8 @@ const CATEGORIES = [ ['school', 'Cours'], ['work', 'Travail'], ['commute', 'Traj
  * la ou elle sert vraiment — sur la ligne de l'obligation.
  */
 const CATEGORIE: Record<Obligation['categoryType'], string> = {
-  sleep: 'Sommeil', school: 'École', work: 'Travail',
-  commute: 'Trajet', commitment: 'Engagement', custom: 'Autre',
+  sleep: 'Sleep', school: 'School', work: 'Work',
+  commute: 'Commute', commitment: 'Commitment', custom: 'Other',
 }
 
 function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: number }) {
@@ -193,12 +193,12 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
   const sauver = async () => {
     const a = heure(debut)
     const b = fin === '24:00' ? 1440 : heure(fin)
-    if (!nom.trim()) { setErreur('Donne un nom à cette obligation.'); return }
-    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) { setErreur('Indique des heures valides, avec une fin après le début.'); return }
+    if (!nom.trim()) { setErreur('Give this commitment a name.'); return }
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) { setErreur('Enter valid times, with an end after the start.'); return }
     const commun = { label: nom.trim(), startMinute: a, endMinute: b, categoryType: categorie, color: j.text3 }
     if (recurrence === 'unique') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateUnique) || Number.isNaN(dateLocale(dateUnique).getTime())) {
-        setErreur('Indique une date au format AAAA-MM-JJ.'); return
+        setErreur('Enter a date as YYYY-MM-DD.'); return
       }
       setEnCours(true)
       try {
@@ -206,16 +206,16 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
         // du jour qu'on avait ouvert, qui ne servait qu'a parcourir.
         await ajouter({ ...commun, dayOfWeek: dateLocale(dateUnique).getDay(), date: dateUnique })
         surFin()
-      } catch { setErreur('Enregistrement impossible. Réessaie.') }
+      } catch { setErreur('Could not save. Try again.') }
       finally { setEnCours(false) }
       return
     }
-    if (!jours.length) { setErreur('Choisis au moins un jour.'); return }
+    if (!jours.length) { setErreur('Pick at least one day.'); return }
     setEnCours(true)
     try {
       for (const dayOfWeek of jours) await ajouter({ ...commun, dayOfWeek })
       surFin()
-    } catch { setErreur('Enregistrement impossible. Réessaie.') }
+    } catch { setErreur('Could not save. Try again.') }
     finally { setEnCours(false) }
   }
   const champ = { fontFamily: GEIST.normal, fontSize: 17, color: j.text, backgroundColor: j.surface2, borderRadius: 8, padding: 14, minHeight: 50 } as const
@@ -223,21 +223,21 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
   return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: j.bg }}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingTop: Math.max(24, marges.top + 12), paddingBottom: marges.bottom + 32, gap: 24 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ flex: 1, fontFamily: GEIST.demi, fontSize: 24, color: j.text }}>Nouvelle obligation</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={surFin} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} taille={20} /></Pressable>
+        <Text style={{ flex: 1, fontFamily: GEIST.demi, fontSize: 24, color: j.text }}>New fixed commitment</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={surFin} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Croix couleur={j.text2} taille={20} /></Pressable>
       </View>
-      <View><Text style={label}>Nom</Text><TextInput accessibilityLabel="Nom de l’obligation" value={nom} onChangeText={setNom} maxLength={60} placeholder="Cours de maths" placeholderTextColor={j.text2} style={champ} /></View>
-      <View><Text style={label}>Catégorie</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{CATEGORIES.map(([cle, texte]) => <Pressable key={cle} accessibilityRole="button" accessibilityState={{ selected: categorie === cle }} onPress={() => setCategorie(cle)}
+      <View><Text style={label}>Name</Text><TextInput accessibilityLabel="Name of the commitment" value={nom} onChangeText={setNom} maxLength={60} placeholder="Maths class" placeholderTextColor={j.text2} style={champ} /></View>
+      <View><Text style={label}>Category</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{CATEGORIES.map(([cle, texte]) => <Pressable key={cle} accessibilityRole="button" accessibilityState={{ selected: categorie === cle }} onPress={() => setCategorie(cle)}
         style={({ pressed }) => ({ minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 6, backgroundColor: categorie === cle ? j.text : j.surface2, opacity: pressed ? 0.7 : 1 })}>
         <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: categorie === cle ? j.bg : j.text }}>{texte}</Text>
       </Pressable>)}</View></View>
       <View style={{ flexDirection: 'row', gap: 16 }}>
-        <View style={{ flex: 1 }}><Text style={label}>Début</Text><TextInput accessibilityLabel="Heure de début, heures et minutes" value={debut} onChangeText={setDebut} maxLength={5} style={champ} /></View>
-        <View style={{ flex: 1 }}><Text style={label}>Fin</Text><TextInput accessibilityLabel="Heure de fin, heures et minutes" value={fin} onChangeText={setFin} maxLength={5} style={champ} /></View>
+        <View style={{ flex: 1 }}><Text style={label}>Start</Text><TextInput accessibilityLabel="Start time, hours and minutes" value={debut} onChangeText={setDebut} maxLength={5} style={champ} /></View>
+        <View style={{ flex: 1 }}><Text style={label}>End</Text><TextInput accessibilityLabel="End time, hours and minutes" value={fin} onChangeText={setFin} maxLength={5} style={champ} /></View>
       </View>
-      <View><Text style={label}>Répéter</Text>
+      <View><Text style={label}>Repeat</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          {([['hebdo', 'Chaque semaine'], ['unique', 'Une seule fois']] as const).map(([cle, texte]) =>
+          {([['hebdo', 'Every week'], ['unique', 'Once only']] as const).map(([cle, texte]) =>
             <Pressable key={cle} accessibilityRole="button" accessibilityState={{ selected: recurrence === cle }} onPress={() => setRecurrence(cle)}
               style={({ pressed }) => ({ flex: 1, minHeight: 44, borderRadius: 6, justifyContent: 'center', alignItems: 'center', backgroundColor: recurrence === cle ? j.text : j.surface2, opacity: pressed ? 0.7 : 1 })}>
               <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: recurrence === cle ? j.bg : j.text }}>{texte}</Text>
@@ -245,9 +245,9 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
         </View>
         {recurrence === 'unique'
           ? <>
-              <TextInput accessibilityLabel="Date, année mois jour" value={dateUnique} onChangeText={setDateUnique} maxLength={10} placeholder="2026-09-28" placeholderTextColor={j.text2} style={{ ...champ, fontFamily: MONO.normal }} />
+              <TextInput accessibilityLabel="Date, year month day" value={dateUnique} onChangeText={setDateUnique} maxLength={10} placeholder="2026-09-28" placeholderTextColor={j.text2} style={{ ...champ, fontFamily: MONO.normal }} />
               <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2, marginTop: 8 }}>
-                Ce jour-là seulement. La semaine suivante reste intacte.
+                That day only. The following week stays untouched.
               </Text>
             </>
           : <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[1, 2, 3, 4, 5, 6, 0].map((n) => <Pressable key={n} accessibilityRole="button" accessibilityLabel={JOURS[n]} accessibilityState={{ selected: jours.includes(n) }} onPress={() => setJours((liste) => liste.includes(n) ? liste.filter((v) => v !== n) : [...liste, n])}
@@ -258,7 +258,7 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
       {erreur ? <Text accessibilityRole="alert" style={{ fontFamily: GEIST.normal, color: j.accentEncre, fontSize: 14 }}>{erreur}</Text> : null}
       <Pressable accessibilityRole="button" disabled={enCours} accessibilityState={{ disabled: enCours, busy: enCours }} onPress={() => void sauver()}
         style={({ pressed }) => ({ minHeight: 52, borderRadius: 8, backgroundColor: j.text, alignItems: 'center', justifyContent: 'center', opacity: enCours || pressed ? 0.6 : 1 })}>
-        <Text style={{ fontFamily: GEIST.demi, color: j.bg, fontSize: 16 }}>{enCours ? 'Enregistrement…' : 'Ajouter'}</Text>
+        <Text style={{ fontFamily: GEIST.demi, color: j.bg, fontSize: 16 }}>{enCours ? 'Saving…' : 'Add'}</Text>
       </Pressable>
     </ScrollView>
   </KeyboardAvoidingView>

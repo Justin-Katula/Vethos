@@ -42,7 +42,7 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
   // faisait rien en silence, et un ecran qui promettait un masquage qui
   // n'arriverait jamais. Exactement le mensonge que cet ecran existe pour
   // eviter. `isAvailable()` est le seul test qui distingue les deux.
-  if (!natif.isAvailable()) throw new Error('Temps d’écran absent de cette version')
+  if (!natif.isAvailable()) throw new Error('Screen Time is missing from this build')
 
   const traduire = (brut: string): EtatAutorisation => {
     if (brut === 'approved') return 'accordee'

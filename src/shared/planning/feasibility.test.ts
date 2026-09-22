@@ -248,14 +248,14 @@ describe('C.3 — diagnostic quantitatif', () => {
     expect(deficit!.deficitMinutes).toBe(300)
     expect(deficit!.options.length).toBeGreaterThanOrEqual(2)
     expect(deficit!.options[0]).toEqual({
-      action: 'Repousser « Dossier » après le 2026-08-13',
+      action: 'Push “Dossier” past 2026-08-13',
       minutesFreed: 600,
     })
     expect(deficit!.options[1]).toEqual({
-      action: 'Réduire « Dossier » de moitié',
+      action: 'Halve “Dossier”',
       minutesFreed: 300,
     })
-    expect(deficit!.options[2]).toEqual({ action: 'Retirer « Révisions »', minutesFreed: 300 })
+    expect(deficit!.options[2]).toEqual({ action: 'Drop “Révisions”', minutesFreed: 300 })
   })
 
   it('aucun diagnostic quand la densité tient', () => {

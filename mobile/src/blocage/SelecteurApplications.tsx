@@ -68,7 +68,7 @@ export function SelecteurApplications({ ouvert, surFermeture }: {
         nbApplications: comptes.applicationCount,
         nbCategories: comptes.categoryCount,
         nbSitesWeb: comptes.webDomainCount,
-        libelle: 'Ce que j’écarte pendant une séance',
+        libelle: 'What I set aside during a session',
         creeeLe: new Date().toISOString(),
       })
     }
@@ -82,18 +82,18 @@ export function SelecteurApplications({ ouvert, surFermeture }: {
           <Feuille
             style={{ flex: 1 }}
             familyActivitySelectionId={IDENTIFIANT_SELECTION}
-            headerText="Ce que Vethos écarte pendant une séance"
-            footerText="Vethos ne voit que le nombre. Ni les noms, ni les icônes."
+            headerText="What Vethos sets aside during a session"
+            footerText="Vethos only sees the count. Not the names, not the icons."
             onSelectionChange={(e: { nativeEvent: Comptes }) => setComptes(e.nativeEvent)}
             onDismissRequest={() => void enregistrer()}
           />
         ) : (
           <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: PAS[6], gap: PAS[4] }}>
             <Texte ton="doux">
-              Le sélecteur d’Apple n’existe que sur un iPhone, dans une version compilée avec
-              l’autorisation Family Controls. Ici, la sélection est simulée.
+              Apple’s picker only exists on an iPhone, in a build signed with the Family
+              Controls entitlement. Here, the selection is simulated.
             </Texte>
-            <BoutonPlat onPress={surFermeture}>Fermer</BoutonPlat>
+            <BoutonPlat onPress={surFermeture}>Close</BoutonPlat>
           </View>
         )}
       </View>

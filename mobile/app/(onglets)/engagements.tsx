@@ -68,7 +68,7 @@ export default function Engagements() {
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <TitreEcran>Engagements</TitreEcran>
+      <TitreEcran>Commitments</TitreEcran>
 
       {/* Les trois natures COTE A COTE des qu'elles tiennent, comme sur le
           bureau. Empilees, il faut faire defiler pour passer d'une loi a
@@ -87,16 +87,16 @@ export default function Engagements() {
       <Section
         premiere
         enColonne={colonnes > 1}
-        titre="Tâches"
+        titre="Tasks"
         compte={groupes.length}
-        loi="Une échéance et une quantité finie de travail. Gouvernée par la marge : ce qui est dû en premier passe en premier."
-        action={<BoutonAjout ouvert={ajout === 'tache'} quoi="une tâche" surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
+        loi="A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first."
+        action={<BoutonAjout ouvert={ajout === 'tache'} quoi="a task" surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
       >
         {ajout === 'tache' ? <FormulaireTache surFin={() => setAjout('aucun')} /> : null}
 
         {ouvertes.length === 0 && ajout !== 'tache' ? (
           <Texte ton="doux">
-            Rien à finir. Une tâche a une fin et une date — le moteur décide quand la faire.
+            Nothing to finish. A task has an end and a date — the engine decides when to do it.
           </Texte>
         ) : null}
 
@@ -108,7 +108,7 @@ export default function Engagements() {
           <>
             <Espace h={4} />
             <Texte ton="eteint" taille={12.5}>
-              {faites.length} terminée{faites.length > 1 ? 's' : ''}
+              {faites.length} finished
             </Texte>
             {faites.map((t) => (
               <LigneTache key={t.id} tache={t} />
@@ -122,16 +122,16 @@ export default function Engagements() {
       <Colonne largeur={largeurColonne}>
       <Section
         enColonne={colonnes > 1}
-        titre="Objectifs"
+        titre="Goals"
         compte={d.objectifs.length}
-        loi="Une cible par semaine, jamais d’échéance. Gouverné par le rythme : il avance sans jamais être en retard."
-        action={<BoutonAjout ouvert={ajout === 'objectif'} quoi="un objectif" surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')} />}
+        loi="A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late."
+        action={<BoutonAjout ouvert={ajout === 'objectif'} quoi="a goal" surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')} />}
       >
         {ajout === 'objectif' ? <FormulaireObjectif surFin={() => setAjout('aucun')} /> : null}
 
         {d.objectifs.length === 0 && ajout !== 'objectif' ? (
           <Texte ton="doux">
-            Rien encore. Un objectif ne se termine pas : il se mesure en heures par semaine.
+            Nothing yet. A goal never finishes: it is measured in hours per week.
           </Texte>
         ) : null}
 
@@ -141,7 +141,7 @@ export default function Engagements() {
             <View style={{ flex: 1 }}>
               <Texte>{o.nom}</Texte>
               <Texte ton="eteint" taille={12.5}>
-                {duree(Math.round(o.cibleHebdoMinutes / 7))} par jour
+                {duree(Math.round(o.cibleHebdoMinutes / 7))} a day
               </Texte>
             </View>
             <Valeur>{duree(o.cibleHebdoMinutes)}</Valeur>
@@ -155,16 +155,16 @@ export default function Engagements() {
       <Colonne largeur={largeurColonne}>
       <Section
         enColonne={colonnes > 1}
-        titre="Ancres"
+        titre="Anchors"
         compte={d.ancres.length}
-        loi="Une heure fixe, choisie une fois. Gouvernée par la stabilité : elle ne bouge jamais d’un jour à l’autre."
-        action={<BoutonAjout ouvert={ajout === 'ancre'} quoi="une ancre" surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')} />}
+        loi="A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next."
+        action={<BoutonAjout ouvert={ajout === 'ancre'} quoi="an anchor" surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')} />}
       >
         {ajout === 'ancre' ? <FormulaireAncre surFin={() => setAjout('aucun')} /> : null}
 
         {d.ancres.length === 0 && ajout !== 'ancre' ? (
           <Texte ton="doux">
-            Rien encore. Une ancre est un rendez-vous que le plan contourne, jamais l’inverse.
+            Nothing yet. An anchor is an appointment the plan works around, never the other way.
           </Texte>
         ) : null}
 
@@ -256,7 +256,7 @@ function grouperTaches(ouvertes: readonly Tache[], fait: Record<string, number>)
 function titreDePartie(partie: Tache, racine: Tache): string {
   const prefixe = `${racine.titre} — `
   if (partie.titre.startsWith(prefixe)) return partie.titre.slice(prefixe.length)
-  return partie.rangPartie !== null ? `Partie ${partie.rangPartie}` : partie.titre
+  return partie.rangPartie !== null ? `Part ${partie.rangPartie}` : partie.titre
 }
 
 function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean }) {
@@ -273,7 +273,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
           <Texte>{racine.titre}</Texte>
           <Texte ton="eteint" taille={12.5}>
             {quandEcheance(racine.echeance)}
-            {parties.length > 0 ? ` · ${parties.length} parties` : ''}
+            {parties.length > 0 ? ` · ${parties.length} parts` : ''}
             {racine.minutesSupplementaires > 0 ? ` · +${duree(racine.minutesSupplementaires)}` : ''}
           </Texte>
         </View>
@@ -287,7 +287,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
             termine pas — il reconnait que l'estimation etait courte. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Accorder ${PAS_DE_TEMPS} minutes de plus à ${racine.titre}`}
+          accessibilityLabel={`Grant ${PAS_DE_TEMPS} more minutes to ${racine.titre}`}
           onPress={() => void d.ajouterDuTemps(parties[0]?.id ?? racine.id, PAS_DE_TEMPS)}
           hitSlop={8}
           style={({ pressed }) => ({ minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}
@@ -305,7 +305,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
           <View style={{ width: `${part * 100}%`, height: 2, backgroundColor: j.accent }} />
         </View>
         <Text style={{ fontFamily: MONO.normal, fontSize: 10.5, color: j.text3, fontVariant: ['tabular-nums'] }}>
-          {duree(mesure)} faites
+          {duree(mesure)} done
         </Text>
       </View>
 
@@ -319,7 +319,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
             <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: verrouillee ? j.text3 : j.accentEncre }} />
             <Text style={{ flex: 1, fontFamily: GEIST.normal, fontSize: 12.5, color: verrouillee ? j.text3 : j.text2 }}>
               {titreDePartie(p, racine)}
-              {verrouillee ? ' · en attente' : ''}
+              {verrouillee ? ' · waiting' : ''}
             </Text>
             <Text style={{ fontFamily: MONO.normal, fontSize: 11, color: j.text3, fontVariant: ['tabular-nums'] }}>
               {duree(fait[p.id] ?? 0)} / {duree(p.minutesRestantes + p.minutesSupplementaires)}
@@ -342,7 +342,7 @@ function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
           et une déclaration n'apprend rien au moteur. */}
       <View
         accessible
-        accessibilityLabel={tache.terminee ? 'Terminée' : 'En cours'}
+        accessibilityLabel={tache.terminee ? 'Finished' : 'In progress'}
         style={{
           width: 20,
           height: 20,
@@ -360,7 +360,7 @@ function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
       <View style={{ flex: 1, opacity: tache.terminee ? 0.45 : 1 }}>
         <Texte>{tache.titre}</Texte>
         <Texte ton="eteint" taille={12.5}>
-          {tache.terminee ? 'terminée — temps fait' : quandEcheance(tache.echeance)}
+          {tache.terminee ? 'finished — the time was done' : quandEcheance(tache.echeance)}
         </Texte>
       </View>
 
@@ -383,7 +383,7 @@ function Supprimer({ surPression, quoi }: { surPression: () => void; quoi: strin
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Supprimer ${quoi}`}
+      accessibilityLabel={`Delete ${quoi}`}
       onPress={surPression}
       hitSlop={12}
       style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
@@ -406,7 +406,7 @@ function BoutonAjout({ ouvert, quoi, surPression }: { ouvert: boolean; quoi: str
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={ouvert ? 'Fermer le formulaire' : `Ajouter ${quoi}`}
+      accessibilityLabel={ouvert ? 'Close the form' : `Add ${quoi}`}
       accessibilityState={{ expanded: ouvert }}
       onPress={surPression}
       hitSlop={10}
@@ -471,24 +471,24 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
 
   return (
     <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Titre de la tâche" valeur={titre} surChangement={setTitre} exemple="Finir le dossier" premier />
+      <Champ etiquette="Task title" valeur={titre} surChangement={setTitre} exemple="Finish the report" premier />
       <Champ
-        etiquette="Le plan : en quoi ça consiste concrètement"
+        etiquette="The plan: what this concretely involves"
         valeur={intention}
         surChangement={setIntention}
-        exemple="Ce soir à mon bureau, je rédige les trois premières pages."
+        exemple="Tonight at my desk, I write the first three pages."
         multiligne
       />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ etiquette="Durée estimée en minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
-        <Champ etiquette="Échéance, dans combien de jours" valeur={jours} surChangement={setJours} exemple="7" suffixe="jours" numerique />
+        <Champ etiquette="Estimated duration in minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
+        <Champ etiquette="Deadline, in how many days" valeur={jours} surChangement={setJours} exemple="7" suffixe="days" numerique />
       </View>
       <Bascule
         valeur={nature}
         surChangement={setNature}
         choix={[
-          ['routine', 'Deja fait'],
-          ['nouveau', 'Premiere fois'],
+          ['routine', 'Done before'],
+          ['nouveau', 'First time'],
         ]}
       />
       <Echelle valeur={importance} surChangement={setImportance} />
@@ -563,15 +563,15 @@ function FormulaireObjectif({ surFin }: { surFin: () => void }) {
 
   return (
     <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Nom de l’objectif" valeur={nom} surChangement={setNom} exemple="Guitare, sport, lecture…" premier />
+      <Champ etiquette="Goal name" valeur={nom} surChangement={setNom} exemple="Guitar, sport, reading…" premier />
       <Champ
-        etiquette="Le plan : en quoi ça consiste concrètement"
+        etiquette="The plan: what this concretely involves"
         valeur={intention}
         surChangement={setIntention}
-        exemple="En quoi ça consiste ? Ex. : tous les soirs au studio, une heure de gammes."
+        exemple="What does it involve? E.g. every evening at the studio, an hour of scales."
         multiligne
       />
-      <Champ etiquette="Heures par semaine" valeur={heures} surChangement={setHeures} exemple="5" suffixe="h / semaine" numerique />
+      <Champ etiquette="Hours per week" valeur={heures} surChangement={setHeures} exemple="5" suffixe="h / week" numerique />
     </Formulaire>
   )
 }
@@ -608,23 +608,23 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
       // D.3 : l'ancre est REFUSEE, jamais decalee en silence. Le refus doit
       // donc se lire — une creation qui n'aboutit pas sans un mot passe pour
       // une panne.
-      setErreur(e instanceof Error ? e.message : 'Création impossible.')
+      setErreur(e instanceof Error ? e.message : 'Could not create.')
     }
   }
 
   return (
     <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Nom de l’ancre" valeur={nom} surChangement={setNom} exemple="Sport, lecture, méditation…" premier />
+      <Champ etiquette="Anchor name" valeur={nom} surChangement={setNom} exemple="Sport, reading, meditation…" premier />
       <Champ
-        etiquette="Le plan : en quoi ça consiste concrètement"
+        etiquette="The plan: what this concretely involves"
         valeur={intention}
         surChangement={setIntention}
-        exemple="En quoi ça consiste ? Ex. : ce soir à la salle, 45 min de haut du corps."
+        exemple="What does it involve? E.g. tonight at the gym, 45 min upper body."
         multiligne
       />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ etiquette="Heure de l’ancre" valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
-        <Champ etiquette="Durée en minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
+        <Champ etiquette="Anchor time" valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
+        <Champ etiquette="Duration in minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
       </View>
       <ChoixJours valeur={jours} surChangement={setJours} />
       {erreur ? (
@@ -664,10 +664,10 @@ function Formulaire({
       {children}
       <View style={{ flexDirection: 'row', gap: PAS[2], marginTop: PAS[1] }}>
         <BoutonPlat onPress={surAnnuler} style={{ flex: 1 }}>
-          Annuler
+          Cancel
         </BoutonPlat>
         <BoutonIris onPress={surValider} desactive={!peutValider} style={{ flex: 1 }}>
-          Ajouter
+          Add
         </BoutonIris>
       </View>
     </View>
@@ -741,13 +741,13 @@ function Champ({
  */
 function ChoixJours({ valeur, surChangement }: { valeur: number[]; surChangement: (v: number[]) => void }) {
   const j = useJetons()
-  const noms = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
+  const noms = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const basculer = (n: number) =>
     surChangement(valeur.includes(n) ? valeur.filter((v) => v !== n) : [...valeur, n])
 
   return (
     <View style={{ gap: PAS[2] }}>
-      <Texte ton="eteint" taille={12.5}>Jours</Texte>
+      <Texte ton="eteint" taille={12.5}>Days</Texte>
       <View style={{ flexDirection: 'row', gap: 3 }}>
         {[1, 2, 3, 4, 5, 6, 0].map((n) => {
           const actif = valeur.includes(n)
@@ -801,7 +801,7 @@ function Echelle({ valeur, surChangement }: { valeur: number; surChangement: (v:
           <Pressable
             key={n}
             accessibilityRole="button"
-            accessibilityLabel={`Importance ${n} sur 10`}
+            accessibilityLabel={`Importance ${n} out of 10`}
             accessibilityState={{ selected: n === valeur }}
             onPress={() => surChangement(n)}
             style={{
@@ -830,17 +830,17 @@ function quandEcheance(iso: string): string {
   const auj = new Date()
   auj.setHours(0, 0, 0, 0)
   const jours = Math.round((cible.getTime() - auj.getTime()) / 86_400_000)
-  if (jours < 0) return `en retard de ${-jours} j`
-  if (jours === 0) return 'due aujourd’hui'
-  if (jours === 1) return 'due demain'
-  return `due dans ${jours} jours`
+  if (jours < 0) return `${-jours} d overdue`
+  if (jours === 0) return 'due today'
+  if (jours === 1) return 'due tomorrow'
+  return `due in ${jours} days`
 }
 
 function joursEnTexte(jours: readonly number[]): string {
-  const noms = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
-  if (jours.length === 7) return 'tous les jours'
-  if (jours.length === 5 && jours.every((n) => n >= 1 && n <= 5)) return 'en semaine'
-  if (jours.length === 2 && jours.includes(0) && jours.includes(6)) return 'le week-end'
+  const noms = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  if (jours.length === 7) return 'every day'
+  if (jours.length === 5 && jours.every((n) => n >= 1 && n <= 5)) return 'weekdays'
+  if (jours.length === 2 && jours.includes(0) && jours.includes(6)) return 'weekends'
   return jours.map((n) => noms[n]).join(' · ')
 }
 

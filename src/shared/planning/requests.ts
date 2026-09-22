@@ -124,7 +124,7 @@ export function evaluateRequest(args: {
       status: 'denied',
       grantedMinutes: 0,
       reason:
-        'Cette plage touche le sommeil ou une ancre — deux règles absolues. Voici la plage libre la plus proche.',
+        'This window touches sleep or an anchor — two absolute rules. Here is the nearest free window.',
       alternative: nearestFreeWindow({ request: args.request, daySchedule, dayAncres }),
     }
   }
@@ -138,7 +138,7 @@ export function evaluateRequest(args: {
     return {
       status: 'granted',
       grantedMinutes: args.request.minutes,
-      reason: 'Accordée — la faisabilité reste prouvée.',
+      reason: 'Granted — feasibility still holds.',
     }
   }
 
@@ -157,8 +157,8 @@ export function evaluateRequest(args: {
     grantedMinutes: low,
     reason:
       low > 0
-        ? `La demande complète ferait passer la densité au-dessus de 1 (déficit ${full.deficitMinutes} min). ${low} min tiennent sans entamer aucune marge.`
-        : `Aucune minute libre sans entamer une marge de sécurité prouvée (déficit ${full.deficitMinutes} min). La marge ne s'échange pas contre du confort.`,
+        ? `The full request would push density above 1 (short by ${full.deficitMinutes} min). ${low} min fit without touching any margin.`
+        : `Not one free minute without eating into a proven safety margin (short by ${full.deficitMinutes} min). Margin is not traded for comfort.`,
     deficitMinutes: full.deficitMinutes,
     safeVersion: low > 0 ? { ...args.request, minutes: low } : undefined,
   }

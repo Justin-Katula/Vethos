@@ -61,7 +61,7 @@ export function creerPontSimule(): PontEcran {
         nbApplications: 7,
         nbCategories: 2,
         nbSitesWeb: 0,
-        libelle: 'Ce qui me disperse',
+        libelle: 'What pulls me away',
         creeeLe: new Date().toISOString(),
       }
     },

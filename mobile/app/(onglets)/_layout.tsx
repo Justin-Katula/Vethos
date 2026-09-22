@@ -74,11 +74,11 @@ export default function Onglets() {
         tabBarItemStyle: { paddingTop: 8 },
       }}
     >
-      {ecran('index', 'Aujourd’hui')}
-      {ecran('temps', 'Mon temps')}
-      {ecran('engagements', 'Engagements')}
-      {ecran('blocage', 'Blocage')}
-      {ecran('reglages', 'Réglages')}
+      {ecran('index', 'Today')}
+      {ecran('temps', 'My time')}
+      {ecran('engagements', 'Commitments')}
+      {ecran('blocage', 'Blocking')}
+      {ecran('reglages', 'Settings')}
     </Tabs>
   )
 }

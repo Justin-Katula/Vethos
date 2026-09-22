@@ -86,15 +86,15 @@ export function decrireSelection(s: Selection): string {
     morceaux.push(`${s.nbApplications} application${s.nbApplications > 1 ? 's' : ''}`)
   }
   if (s.nbCategories > 0) {
-    morceaux.push(`${s.nbCategories} catégorie${s.nbCategories > 1 ? 's' : ''}`)
+    morceaux.push(`${s.nbCategories} categor${s.nbCategories > 1 ? 'ies' : 'y'}`)
   }
   if (s.nbSitesWeb > 0) {
     morceaux.push(`${s.nbSitesWeb} site${s.nbSitesWeb > 1 ? 's' : ''}`)
   }
-  if (morceaux.length === 0) return 'Rien de sélectionné'
+  if (morceaux.length === 0) return 'Nothing selected'
   if (morceaux.length === 1) return morceaux[0]!
   const dernier = morceaux.pop()!
-  return `${morceaux.join(', ')} et ${dernier}`
+  return `${morceaux.join(', ')} and ${dernier}`
 }
 
 /**

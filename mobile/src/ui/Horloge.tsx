@@ -28,7 +28,7 @@ export function Horloge({ jour, minute, centre }: { jour: JourTemps; minute: num
   })
   const repere = point(135, minute)
   return (
-    <View accessible accessibilityLabel={`${enHeure(minute)}. ${actuel?.titre ?? 'Temps libre'}. Cadran sur 24 heures.`}
+    <View accessible accessibilityLabel={`${enHeure(minute)}. ${actuel?.titre ?? 'Free time'}. 24-hour dial.`}
       style={{ alignItems: 'center', alignSelf: 'center', width: taille, marginVertical: 12 }}>
       <Svg width={taille} height={taille} viewBox="0 0 360 360">
         <Circle cx={180} cy={180} r={135} stroke={j.surface2} strokeWidth={14} fill="none" />
@@ -54,7 +54,7 @@ export function Horloge({ jour, minute, centre }: { jour: JourTemps; minute: num
           <Text style={{ fontFamily: GEIST.normal, color: j.text, fontSize: 48 / Math.max(1, fontScale / 1.3),
             letterSpacing: -1.5, fontVariant: ['tabular-nums'] }}>{enHeure(minute)}</Text>
           <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2, textAlign: 'center' }}>
-            {actuel?.titre ?? 'Temps libre'}
+            {actuel?.titre ?? 'Free time'}
           </Text>
         </>}
       </View>

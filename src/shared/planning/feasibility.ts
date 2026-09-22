@@ -157,20 +157,20 @@ export function diagnoseDeficit(
   const options: Deficit['options'] = []
   if (heaviest) {
     options.push({
-      action: `Repousser « ${heaviest.title} » après le ${point.deadline}`,
+      action: `Push “${heaviest.title}” past ${point.deadline}`,
       minutesFreed: heaviest.remainingMinutes,
     })
     options.push({
-      action: `Réduire « ${heaviest.title} » de moitié`,
+      action: `Halve “${heaviest.title}”`,
       minutesFreed: Math.round(heaviest.remainingMinutes / 2),
     })
   }
   if (second) {
-    options.push({ action: `Retirer « ${second.title} »`, minutesFreed: second.remainingMinutes })
+    options.push({ action: `Drop “${second.title}”`, minutesFreed: second.remainingMinutes })
   }
   if (options.length < 2) {
     options.push({
-      action: `Dégager ${deficit} min de capacité avant le ${point.deadline}`,
+      action: `Free up ${deficit} min of capacity before ${point.deadline}`,
       minutesFreed: deficit,
     })
   }

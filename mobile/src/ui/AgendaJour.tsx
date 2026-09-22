@@ -17,7 +17,7 @@ import { couleurTemps, nomsTemps } from './temps-visuel'
  * bloc là : un plafond franchi, une ancre réduite, une pause comprise dans
  * l'empreinte. Ce sont des faits sur le plan, pas sur la personne.
  */
-export function AgendaJour({ segments, minute, vide = 'Aucun engagement ce jour.' }: {
+export function AgendaJour({ segments, minute, vide = 'Nothing committed that day.' }: {
   segments: readonly SegmentTemps[]; minute?: number; vide?: string
 }) {
   const j = useJetons()
@@ -43,7 +43,7 @@ export function AgendaJour({ segments, minute, vide = 'Aucun engagement ce jour.
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={{ fontFamily: GEIST.moyen, fontSize: 16, color: j.text }}>{s.titre}</Text>
         <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: actif ? j.accentEncre : j.text2 }}>
-          {actif ? 'En cours' : nomsTemps[s.nature]} · {restant !== null ? `reste ${duree(restant)}` : duree(s.fin - s.debut)}
+          {actif ? 'Now' : nomsTemps[s.nature]} · {restant !== null ? `${duree(restant)} left` : duree(s.fin - s.debut)}
         </Text>
         {s.note ? (
           <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: j.text3 }}>{s.note}</Text>

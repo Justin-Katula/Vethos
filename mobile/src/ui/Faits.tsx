@@ -49,11 +49,11 @@ export function Faits({
           }}
         >
           <Text style={{ color: j.text, fontFamily: GEIST.normal, fontSize: 13.5, lineHeight: 21 }}>
-            Avant le {echeanceCourte(deficit.deadline)}, il manque{' '}
+            Before {echeanceCourte(deficit.deadline)}, you are{' '}
             <Text style={{ fontFamily: MONO.demi, color: j.accentEncre }}>
               {duree(deficit.deficitMinutes)}
-            </Text>
-            , soit {Math.round(deficit.deficitRatio * 100)} % du travail demandé.
+            </Text>{' '}
+            short — {Math.round(deficit.deficitRatio * 100)} % of the work you asked for.
           </Text>
 
           <View style={{ borderTopWidth: 1, borderTopColor: j.line, paddingTop: PAS[3], gap: PAS[2] }}>
@@ -111,8 +111,8 @@ export function Faits({
         <Text
           style={{ color: j.text3, fontFamily: GEIST.normal, fontSize: 12, lineHeight: 19, paddingHorizontal: PAS[1] }}
         >
-          Avant le {echeanceCourte(tension.deadline)}, {Math.round(tension.tensionRatio * 100)} % du
-          temps disponible est déjà pris — encore de la marge, mais ça se resserre.
+          Before {echeanceCourte(tension.deadline)}, {Math.round(tension.tensionRatio * 100)} % of your
+          available time is already taken — still room, but it is tightening.
         </Text>
       ) : null}
     </View>

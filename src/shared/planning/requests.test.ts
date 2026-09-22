@@ -112,7 +112,7 @@ describe('E.5 — recalcul de la semaine', () => {
     expect(verdict.status).toBe('denied')
     expect(verdict.grantedMinutes).toBe(0)
     expect(verdict.safeVersion).toBeUndefined()
-    expect(verdict.reason).toContain('marge')
+    expect(verdict.reason).toContain('margin')
   })
 
   it('CRITÈRE 4 : aucune version du verdict ne dépasse la marge prouvée', () => {

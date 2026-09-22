@@ -35,7 +35,7 @@ export default function Reglages() {
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <TitreEcran>Réglages</TitreEcran>
+      <TitreEcran>Settings</TitreEcran>
 
       {/* Deux colonnes des que l'ecran les permet, comme le bureau. Ce qui se
           REGLE a gauche — le sommeil, le prenom, l'apparence — et ce qui se
@@ -47,20 +47,20 @@ export default function Reglages() {
 
       <Section
         premiere
-        titre="Sommeil"
-        loi="La source unique de ta journée. La capacité se calcule entre ces deux heures, et rien ne se place dessus."
-        action={<Valeur ton="doux">{duree(eveil)} éveillé</Valeur>}
+        titre="Sleep"
+        loi="The single source of your day. Capacity is computed between these two hours, and nothing is ever placed on top of them."
+        action={<Valeur ton="doux">{duree(eveil)} awake</Valeur>}
       >
         <View style={{ flexDirection: 'row', gap: PAS[3] }}>
           <Champ
-            etiquette="Coucher"
+            etiquette="Bedtime"
             valeur={reglages.coucher}
             surChangement={(v) => void majReglages({ coucher: v })}
             exemple="23:30"
             horaire
           />
           <Champ
-            etiquette="Lever"
+            etiquette="Wake-up"
             valeur={reglages.lever}
             surChangement={(v) => void majReglages({ lever: v })}
             exemple="07:00"
@@ -69,18 +69,18 @@ export default function Reglages() {
         </View>
       </Section>
 
-      <Section titre="Toi" loi="Utilisé pour te saluer, nulle part ailleurs.">
+      <Section titre="You" loi="Used to greet you, nowhere else.">
         <Champ
-          etiquette="Prénom"
+          etiquette="First name"
           valeur={reglages.prenom}
           surChangement={(v) => void majReglages({ prenom: v })}
-          exemple="Ton prénom"
+          exemple="Your first name"
         />
       </Section>
 
       <Section
-        titre="Apparence"
-        loi="Suivre l’appareil est le choix par défaut : une installation qui n’a rien demandé ne décide pas à la place de son propriétaire."
+        titre="Appearance"
+        loi="Following the device is the default: an install that asked for nothing does not decide on its owner’s behalf."
       >
         <ChoixApparence />
 
@@ -91,14 +91,14 @@ export default function Reglages() {
           <View style={{ marginTop: PAS[4], gap: PAS[3] }}>
             <View style={{ flexDirection: 'row', gap: PAS[3] }}>
               <Champ
-                etiquette="Clair dès"
+                etiquette="Light from"
                 valeur={reglages.clairDes}
                 surChangement={(v) => void majReglages({ clairDes: v })}
                 exemple="07:00"
                 horaire
               />
               <Champ
-                etiquette="Sombre dès"
+                etiquette="Dark from"
                 valeur={reglages.sombreDes}
                 surChangement={(v) => void majReglages({ sombreDes: v })}
                 exemple="19:00"
@@ -107,8 +107,8 @@ export default function Reglages() {
             </View>
             <Texte ton="eteint" taille={12}>
               {reglages.clairDes === reglages.sombreDes
-                ? 'Deux fois la même heure : il fera sombre en permanence.'
-                : `Sombre de ${reglages.sombreDes} à ${reglages.clairDes}, clair le reste du temps.`}
+                ? 'The same hour twice: it will stay dark all the time.'
+                : `Dark from ${reglages.sombreDes} to ${reglages.clairDes}, light the rest of the time.`}
             </Texte>
           </View>
         ) : null}
@@ -120,33 +120,33 @@ export default function Reglages() {
       <Section
         premiere={large}
         titre="Introduction"
-        loi="Ne touche ni à tes engagements, ni à ton temps déclaré. Rejoue seulement le premier lancement."
+        loi="Touches neither your commitments nor the time you declared. It only replays the first launch."
       >
         <BoutonPlat onPress={() => void majReglages({ introductionFaite: false })}>
-          Revoir l’introduction
+          Replay the introduction
         </BoutonPlat>
       </Section>
 
-      <Section titre="Ce que Vethos garde">
+      <Section titre="What Vethos keeps">
         <Rangee premiere>
-          <Texte ton="doux">Tâches</Texte>
+          <Texte ton="doux">Tasks</Texte>
           <View style={{ flex: 1 }} />
           <Valeur>{String(taches.length)}</Valeur>
         </Rangee>
         <Rangee>
-          <Texte ton="doux">Objectifs</Texte>
+          <Texte ton="doux">Goals</Texte>
           <View style={{ flex: 1 }} />
           <Valeur>{String(objectifs.length)}</Valeur>
         </Rangee>
         <Rangee>
-          <Texte ton="doux">Ancres</Texte>
+          <Texte ton="doux">Anchors</Texte>
           <View style={{ flex: 1 }} />
           <Valeur>{String(ancres.length)}</Valeur>
         </Rangee>
         <Espace />
         <Texte ton="doux" taille={12.5}>
-          Tout reste sur ce téléphone. Rien n’est envoyé sur un serveur, et l’application
-          fonctionne sans réseau.
+          Everything stays on this phone. Nothing is sent to a server, and the app works
+          with no network at all.
         </Texte>
       </Section>
       </View>
@@ -217,10 +217,10 @@ function ChoixApparence() {
   const majReglages = useDonnees((d) => d.majReglages)
 
   const modes = [
-    { cle: 'system' as const, nom: 'Appareil' },
-    { cle: 'light' as const, nom: 'Clair' },
-    { cle: 'dark' as const, nom: 'Sombre' },
-    { cle: 'schedule' as const, nom: 'À l’heure' },
+    { cle: 'system' as const, nom: 'Device' },
+    { cle: 'light' as const, nom: 'Light' },
+    { cle: 'dark' as const, nom: 'Dark' },
+    { cle: 'schedule' as const, nom: 'On a clock' },
   ]
 
   return (

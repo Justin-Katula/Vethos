@@ -48,7 +48,7 @@ describe('les quatre signaux, mis en phrases', () => {
       signal({ type: 'anchor_missed_3x', data: { ancreId: 'a1', missedCount: 4 } }),
       (id) => (id === 'a1' ? 'Déjeuner' : undefined),
     )
-    expect(texte).toBe('Déjeuner — ratée 4 fois de suite, jamais confirmée.')
+    expect(texte).toBe('Déjeuner — missed 4 times in a row, never started.')
   })
 
   it('nomme l’objectif à l’arrêt avec le nom que le moteur donne', () => {
@@ -58,7 +58,7 @@ describe('les quatre signaux, mis en phrases', () => {
       signal({ type: 'objective_stalled', data: { name: 'Piano', daysSinceLastService: 5 } }),
       () => undefined,
     )
-    expect(texte).toBe('Piano — n’a pas avancé depuis 5 jours.')
+    expect(texte).toBe('Piano — no progress for 5 days.')
   })
 
   it('nomme le bloc en retard répété', () => {
@@ -66,7 +66,7 @@ describe('les quatre signaux, mis en phrases', () => {
       signal({ type: 'delay_repeated', data: { refId: 't1', consecutiveDelays: 3 } }),
       (id) => (id === 't1' ? 'Dossier' : undefined),
     )
-    expect(texte).toBe('Dossier — retard répété, 3 fois de suite.')
+    expect(texte).toBe('Dossier — late again, 3 times in a row.')
   })
 
   it('reste muet sur le déficit de densité', () => {
@@ -85,7 +85,7 @@ describe('les quatre signaux, mis en phrases', () => {
       signal({ type: 'anchor_missed_3x', data: { ancreId: 'fantome', missedCount: 3 } }),
       () => undefined,
     )
-    expect(texte).toBe('Cette ancre — ratée 3 fois de suite, jamais confirmée.')
+    expect(texte).toBe('This anchor — missed 3 times in a row, never started.')
   })
 
   it('laisse tomber les signaux sans phrase, et garde les autres', () => {
@@ -167,26 +167,22 @@ describe('la note du bloc', () => {
   })
 
   it('annonce la pause incluse dans l’empreinte', () => {
-    expect(noteDuBloc(bloc({ breakMinutes: 10 }))).toBe('dont 10 min de pause')
+    expect(noteDuBloc(bloc({ breakMinutes: 10 }))).toBe('includes a 10 min break')
   })
 
   it('fait primer le plafond dépassé sur la pause', () => {
     // Les deux sont vrais. Un plafond franchi est une décision du moteur sous
     // contrainte ; une pause est une mécanique ordinaire.
-    expect(noteDuBloc(bloc({ capOverride: true, breakMinutes: 10 }))).toBe(
-      'au-delà du plafond',
-    )
+    expect(noteDuBloc(bloc({ capOverride: true, breakMinutes: 10 }))).toBe('over the daily cap')
   })
 
   it('dit qu’une ancre a été réduite', () => {
-    expect(noteDuBloc(bloc({ reducedToMinimum: true }))).toBe('version minimale')
+    expect(noteDuBloc(bloc({ reducedToMinimum: true }))).toBe('reduced to its minimum')
   })
 
   it('marque un aperçu comme verrouillé', () => {
     // B.5.1 : il occupe la place, mais il ne se travaille pas encore.
-    expect(noteDuBloc(bloc({ preview: true }))).toBe(
-      'aperçu — verrouillé par la partie précédente',
-    )
+    expect(noteDuBloc(bloc({ preview: true }))).toBe('preview — locked by the previous part')
   })
 })
 

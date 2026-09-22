@@ -63,7 +63,7 @@ export function Projection() {
         <View style={{ gap: 3 }}>
           <Text style={{ fontFamily: GEIST.demi, fontSize: 14.5, color: j.text }}>Projection</Text>
           <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, lineHeight: 17, color: j.text3 }}>
-            Ce que les rythmes déclarés représentent quand ils se cumulent.
+            What the rhythms you declared add up to over time.
           </Text>
         </View>
 
@@ -98,7 +98,7 @@ export function Projection() {
                   color: horizon === h ? j.surface : j.text3,
                 }}
               >
-                {h === 'month' ? '1 mois' : '1 an'}
+                {h === 'month' ? '1 month' : '1 year'}
               </Text>
             </Pressable>
           ))}
@@ -107,19 +107,19 @@ export function Projection() {
 
       <View style={{ flexDirection: 'row', gap: PAS[2], marginTop: PAS[3] }}>
         <Onglet
-          nom="Objectifs"
+          nom="Goals"
           valeur={hoursLabel(hebdoObjectifs * semaines)}
           actif={pilier === 'objectifs'}
           onPress={() => setPilier('objectifs')}
         />
         <Onglet
-          nom="Tâches"
+          nom="Tasks"
           valeur={`${racines.length}`}
           actif={pilier === 'taches'}
           onPress={() => setPilier('taches')}
         />
         <Onglet
-          nom="Ancres"
+          nom="Anchors"
           valeur={hoursLabel(hebdoAncres * semaines)}
           actif={pilier === 'ancres'}
           onPress={() => setPilier('ancres')}
@@ -130,17 +130,17 @@ export function Projection() {
         {pilier === 'objectifs' ? (
           objectifs.length === 0 ? (
             <Vide
-              titre="Aucun objectif à long terme déclaré"
-              texte="Un objectif n’a pas d’échéance : c’est un quota régulier, par exemple 4 h de guitare ou 5 h de programmation par semaine."
-              lien="Définir mon premier objectif"
+              titre="No long-term goal declared"
+              texte="A goal has no deadline: it is a steady quota — 4 h of guitar or 5 h of coding a week, say."
+              lien="Set my first goal"
               onPress={() => routeur.push('/engagements')}
             />
           ) : (
             <>
               <Total
                 valeur={hoursLabel(hebdoObjectifs * semaines)}
-                texte={`prévues sur tes objectifs ${HORIZON_LABEL[horizon]}`}
-                cote={`${hoursLabel(hebdoObjectifs)} / semaine`}
+                texte={`planned across your goals ${HORIZON_LABEL[horizon]}`}
+                cote={`${hoursLabel(hebdoObjectifs)} / week`}
               />
               {objectifs.map((o) => {
                 const hebdo = o.cibleHebdoMinutes / 60
@@ -153,8 +153,8 @@ export function Projection() {
                     valeur={hoursLabel(hebdo * semaines)}
                     titre={palier.title}
                     texte={palier.desc}
-                    gauche={`${hoursLabel(hebdo)}/semaine`}
-                    droite={`${hoursLabel(an)} / an`}
+                    gauche={`${hoursLabel(hebdo)}/week`}
+                    droite={`${hoursLabel(an)} / year`}
                   />
                 )
               })}
@@ -165,25 +165,25 @@ export function Projection() {
         {pilier === 'taches' ? (
           ouvertes.length === 0 ? (
             <Vide
-              titre="Toutes tes tâches sont accomplies"
-              texte="Quand une nouvelle tâche est déclarée, elle apparaît ici avec le temps restant à servir."
-              lien="Ajouter une tâche"
+              titre="Every task is done"
+              texte="When a new task is declared, it shows up here with the time left to serve."
+              lien="Add a task"
               onPress={() => routeur.push('/engagements')}
             />
           ) : (
             <>
               <Total
                 valeur={String(racines.length)}
-                texte={`projet${racines.length > 1 ? 's' : ''} en cours (${hoursLabel(heuresTaches)} restant)`}
-                cote="échéances actives"
+                texte={`project${racines.length > 1 ? 's' : ''} in progress (${hoursLabel(heuresTaches)} left)`}
+                cote="active deadlines"
               />
               <View style={{ borderWidth: 1, borderColor: j.line, borderRadius: RAYON.md, padding: PAS[3], gap: PAS[1] }}>
                 <Text style={{ fontFamily: GEIST.moyen, fontSize: 12.5, color: j.text }}>
-                  Lecture du reste à faire
+                  Reading what is left
                 </Text>
                 <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, lineHeight: 18, color: j.text3 }}>
-                  Le moteur place ces minutes dans les jours où elles peuvent tenir, après le
-                  sommeil, les obligations fixes et les marges de repos.
+                  The engine places these minutes on the days where they can fit, after sleep,
+                  fixed commitments and rest margins.
                 </Text>
               </View>
             </>
@@ -193,17 +193,17 @@ export function Projection() {
         {pilier === 'ancres' ? (
           ancres.length === 0 ? (
             <Vide
-              titre="Aucun rituel ancré pour l’instant"
-              texte="Une ancre est un rendez-vous fixe avec toi-même qui ne bouge jamais, par exemple sport à 18 h ou lecture à 21 h."
-              lien="Créer une ancre"
+              titre="No ritual anchored yet"
+              texte="An anchor is a fixed appointment with yourself that never moves — sport at 6 pm, reading at 9 pm."
+              lien="Create an anchor"
               onPress={() => routeur.push('/engagements')}
             />
           ) : (
             <>
               <Total
                 valeur={hoursLabel(hebdoAncres * semaines)}
-                texte={`prévues par tes ancres ${HORIZON_LABEL[horizon]}`}
-                cote={`${hoursLabel(hebdoAncres)} / semaine`}
+                texte={`planned by your anchors ${HORIZON_LABEL[horizon]}`}
+                cote={`${hoursLabel(hebdoAncres)} / week`}
               />
               {ancres.map((a) => {
                 const hebdo = (a.dureeMinutes * a.jours.length) / 60
@@ -214,8 +214,8 @@ export function Projection() {
                     nom={a.nom}
                     valeur={hoursLabel(hebdo * semaines)}
                     texte={anchorInsight(a.nom, an)}
-                    gauche={`${a.jours.length} j / semaine · ${a.dureeMinutes} min`}
-                    droite={`${hoursLabel(an)} / an`}
+                    gauche={`${a.jours.length} d / week · ${a.dureeMinutes} min`}
+                    droite={`${hoursLabel(an)} / year`}
                   />
                 )
               })}

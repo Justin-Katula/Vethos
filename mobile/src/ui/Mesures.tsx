@@ -119,10 +119,10 @@ export function Mesures({ capacite, engage }: { capacite: DayCapacity; engage: n
     <View style={{ width: '100%', marginTop: PAS[1] }}>
       <Accolade branches={branches} />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Mesure etiquette="Capacité" ton="sourd" {...partsDuree(capacite.effectiveCapacityMinutes)} />
-        <Mesure etiquette="Engagé" ton="accent" {...partsDuree(engage)} />
-        <Mesure etiquette="Repos" ton="sourd" {...partsDuree(capacite.restReservedMinutes)} />
-        {retard > 0 ? <Mesure etiquette="Retard" ton="alerte" {...partsDuree(retard)} /> : null}
+        <Mesure etiquette="Capacity" ton="sourd" {...partsDuree(capacite.effectiveCapacityMinutes)} />
+        <Mesure etiquette="Committed" ton="accent" {...partsDuree(engage)} />
+        <Mesure etiquette="Rest" ton="sourd" {...partsDuree(capacite.restReservedMinutes)} />
+        {retard > 0 ? <Mesure etiquette="Late" ton="alerte" {...partsDuree(retard)} /> : null}
       </View>
     </View>
   )

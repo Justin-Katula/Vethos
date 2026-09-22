@@ -21,20 +21,22 @@ export type Horizon = 'month' | 'year'
 export const HORIZON_WEEKS: Record<Horizon, number> = { month: 4, year: 52 }
 
 export const HORIZON_LABEL: Record<Horizon, string> = {
-  month: 'sur 1 mois (4 semaines)',
-  year: 'sur 1 an (52 semaines)',
+  month: 'over 1 month (4 weeks)',
+  year: 'over 1 year (52 weeks)',
 }
 
 /**
- * « 4 h », « 4,5 h ». Une décimale au plus — deux ne se lisent pas.
+ * « 4 h », « 4.5 h ». Une décimale au plus — deux ne se lisent pas.
  *
- * La virgule, pas le point : tout le reste de l'application est en français,
- * et « 3.8 h » au milieu d'une phrase française se lit comme une coquille.
+ * Le point, pas la virgule. C'est le séparateur décimal de la langue dans
+ * laquelle l'application est écrite ; « 3,8 h » au milieu d'une phrase
+ * anglaise se lit comme une coquille, exactement comme « 3.8 h » se lisait
+ * ainsi en français.
  */
 export function hoursLabel(hours: number): string {
   const rounded = Math.round(hours * 10) / 10
   if (rounded === Math.floor(rounded)) return `${Math.floor(rounded)} h`
-  return `${String(rounded).replace('.', ',')} h`
+  return `${rounded} h`
 }
 
 export type Milestone = { title: string; desc: string }
@@ -48,31 +50,31 @@ export type Milestone = { title: string; desc: string }
 export function objectiveMilestone(yearlyHours: number): Milestone {
   if (yearlyHours < 40) {
     return {
-      title: 'Prise d’élan & Découverte',
-      desc: 'Suffisant pour acquérir les bases fondamentales et installer la curiosité.',
+      title: 'Getting started',
+      desc: 'Enough to pick up the fundamentals and let curiosity settle in.',
     }
   }
   if (yearlyHours < 100) {
     return {
-      title: 'Fondations solides',
-      desc: 'Une pratique régulière qui commence à donner des réflexes automatiques.',
+      title: 'Solid foundations',
+      desc: 'Regular practice, long enough for the reflexes to become automatic.',
     }
   }
   if (yearlyHours < 250) {
     return {
-      title: 'Autonomie & Aisance',
-      desc: 'Le niveau où l’on pratique avec plaisir sans bloquer sur la technique.',
+      title: 'Fluency',
+      desc: 'The level where you practise for pleasure without stalling on technique.',
     }
   }
   if (yearlyHours < 500) {
     return {
-      title: 'Expertise confirmée',
-      desc: 'L’équivalent de plusieurs cours universitaires ou d’un projet majeur mené à terme.',
+      title: 'Proven expertise',
+      desc: 'The equivalent of several university courses, or one major project seen through.',
     }
   }
   return {
-    title: 'Haut niveau de maîtrise',
-    desc: 'Un investissement exceptionnel qui place tes compétences dans le top niveau.',
+    title: 'High mastery',
+    desc: 'An exceptional investment that puts your skill at the top of the field.',
   }
 }
 
@@ -90,7 +92,7 @@ export function anchorInsight(name: string, yearlyHours: number): string {
   if (lower.includes('lect') || lower.includes('livre') || lower.includes('read')) {
     const books = Math.max(1, Math.round(yearlyHours / 8))
     const s = books > 1 ? 's' : ''
-    return `Soit environ ${books} livre${s} entier${s} dévoré${s} sur l’année (sur la base d’un livre de 250 pages toutes les 8 h).`
+    return `Around ${books} whole book${s} read over the year (on a 250-page book every 8 h).`
   }
 
   if (
@@ -102,14 +104,14 @@ export function anchorInsight(name: string, yearlyHours: number): string {
     lower.includes('yoga') ||
     lower.includes('fitness')
   ) {
-    return `Une transformation physique et cardiovasculaire majeure grâce à ${Math.round(yearlyHours)} h d’entraînement régulier.`
+    return `A major physical and cardiovascular change, built on ${Math.round(yearlyHours)} h of steady training.`
   }
 
   if (lower.includes('medit') || lower.includes('zen') || lower.includes('respir')) {
-    return 'Des centaines de séances de calme profond pour forger une stabilité émotionnelle et une concentration inébranlable.'
+    return 'Hundreds of sessions of deep calm, forging emotional steadiness and unshakeable focus.'
   }
 
-  return `${Math.round(yearlyHours)} heures de rituel inamovible : la discipline quotidienne qui transforme ta routine en force.`
+  return `${Math.round(yearlyHours)} hours of immovable ritual: the daily discipline that turns a routine into a strength.`
 }
 
 /**

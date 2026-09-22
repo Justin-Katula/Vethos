@@ -34,16 +34,16 @@ export function texteSignal(
 
   switch (signal.type) {
     case 'anchor_missed_3x': {
-      const nom = nomDe(chaine('ancreId')) ?? 'Cette ancre'
-      return `${nom} — ratée ${nombre('missedCount')} fois de suite, jamais confirmée.`
+      const nom = nomDe(chaine('ancreId')) ?? 'This anchor'
+      return `${nom} — missed ${nombre('missedCount')} times in a row, never started.`
     }
     case 'objective_stalled': {
-      const nom = chaine('name') || 'Cet objectif'
-      return `${nom} — n’a pas avancé depuis ${nombre('daysSinceLastService')} jours.`
+      const nom = chaine('name') || 'This goal'
+      return `${nom} — no progress for ${nombre('daysSinceLastService')} days.`
     }
     case 'delay_repeated': {
-      const nom = nomDe(chaine('refId')) ?? 'Ce bloc'
-      return `${nom} — retard répété, ${nombre('consecutiveDelays')} fois de suite.`
+      const nom = nomDe(chaine('refId')) ?? 'This block'
+      return `${nom} — late again, ${nombre('consecutiveDelays')} times in a row.`
     }
     default:
       return null
@@ -85,7 +85,7 @@ export function pireTension(resultat: PlanningResult): TensionWarning | undefine
 
 /** « 2026-09-25 » → « 25 sept. ». Une échéance se lit, elle ne se déchiffre pas. */
 export function echeanceCourte(cle: string): string {
-  return dateLocale(cle).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return dateLocale(cle).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 /**
@@ -139,9 +139,9 @@ export function travailDevantToi(
  * chaque minute.
  */
 export function noteDuBloc(bloc: PlanningResult['blocks'][number]): string | undefined {
-  if (bloc.preview) return 'aperçu — verrouillé par la partie précédente'
-  if (bloc.capOverride) return 'au-delà du plafond'
-  if (bloc.reducedToMinimum) return 'version minimale'
-  if (bloc.breakMinutes > 0) return `dont ${duree(bloc.breakMinutes)} de pause`
+  if (bloc.preview) return 'preview — locked by the previous part'
+  if (bloc.capOverride) return 'over the daily cap'
+  if (bloc.reducedToMinimum) return 'reduced to its minimum'
+  if (bloc.breakMinutes > 0) return `includes a ${duree(bloc.breakMinutes)} break`
   return undefined
 }

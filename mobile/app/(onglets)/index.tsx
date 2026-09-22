@@ -55,7 +55,7 @@ export default function Aujourdhui() {
 
   const jour = jours[0]
   if (!jour || !chargees) {
-    return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Chargement du planning" />
+    return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Loading your plan" />
   }
 
   const blocsDuJour = resultat.blocks.filter((b) => b.date === aujourdHui)
@@ -80,14 +80,14 @@ export default function Aujourdhui() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, gap: 5 }}>
-          <Text style={{ fontFamily: GEIST.demi, fontSize: 30, letterSpacing: -0.8, color: j.text }}>Aujourd’hui</Text>
+          <Text style={{ fontFamily: GEIST.demi, fontSize: 30, letterSpacing: -0.8, color: j.text }}>Today</Text>
           <Text style={{ fontFamily: GEIST.normal, color: j.text2, fontSize: 14 }}>
-            {maintenant.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {maintenant.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Ajouter un engagement"
+          accessibilityLabel="Add a commitment"
           onPress={() => routeur.push('/engagements')}
           style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 8, backgroundColor: j.surface2, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
         >
@@ -122,7 +122,7 @@ export default function Aujourdhui() {
             <Text style={{ fontFamily: GEIST.normal, color: j.accentEncre, fontSize: 44 / Math.max(1, fontScale / 1.3), letterSpacing: -1.4, fontVariant: ['tabular-nums'] }}>
               {duree(devant)}
             </Text>
-            <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>devant toi</Text>
+            <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>ahead of you</Text>
           </>
         ) : (
           <>
@@ -130,7 +130,7 @@ export default function Aujourdhui() {
               {enHeure(minute)}
             </Text>
             <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text3, textAlign: 'center' }}>
-              {blocsDuJour.length === 0 ? 'rien au tableau' : 'plus rien avant demain'}
+              {blocsDuJour.length === 0 ? 'nothing on the board' : 'nothing left before tomorrow'}
             </Text>
           </>
         )}
@@ -144,7 +144,7 @@ export default function Aujourdhui() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: j.accentEncre }} />
           <Text style={{ fontFamily: GEIST.moyen, fontSize: 12, color: j.text2 }}>
-            {actif === actuel ? 'En cours' : actif ? 'À suivre' : 'À ton rythme'}
+            {actif === actuel ? 'Now' : actif ? 'Up next' : 'Your own pace'}
           </Text>
           {actif ? (
             <Text style={{ marginLeft: 'auto', fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>
@@ -153,7 +153,7 @@ export default function Aujourdhui() {
           ) : null}
         </View>
         <Text style={{ fontFamily: GEIST.moyen, fontSize: 22, letterSpacing: -0.4, color: j.text }}>
-          {actif?.titre ?? (actuel?.nature === 'sleep' ? 'La nuit est à toi.' : 'Du temps pour toi.')}
+          {actif?.titre ?? (actuel?.nature === 'sleep' ? 'The night is yours.' : 'Time that’s yours.')}
         </Text>
       </View>
 
@@ -170,34 +170,34 @@ export default function Aujourdhui() {
           style={({ pressed }) => ({ marginTop: PAS[6], opacity: pressed ? 0.6 : 1 })}
         >
           <Text style={{ fontFamily: GEIST.normal, fontSize: 13, lineHeight: 20, color: j.text2 }}>
-            L’application ne connaît que tes heures de sommeil.{' '}
+            Vethos only knows your sleep hours so far.{' '}
             <Text style={{ color: j.text, textDecorationLine: 'underline' }}>
-              Déclare tes cours, ton travail et tes trajets
+              Declare your classes, your work and your commutes
             </Text>{' '}
-            une seule fois : tout le reste s’en déduit.
+            once — everything else follows from them.
           </Text>
         </Pressable>
       ) : null}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: PAS[8] }}>
-        <Text style={{ fontFamily: GEIST.demi, fontSize: 18, color: j.text }}>Ta journée</Text>
+        <Text style={{ fontFamily: GEIST.demi, fontSize: 18, color: j.text }}>Your day</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => routeur.push('/temps')}
           style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', gap: PAS[2], alignItems: 'center', opacity: pressed ? 0.5 : 1 })}
         >
-          <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>La semaine</Text>
+          <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>The week</Text>
           <Chevron couleur={j.text2} taille={14} />
         </Pressable>
       </View>
-      <AgendaJour segments={jour.segments} minute={minute} vide="Aucun engagement aujourd’hui." />
+      <AgendaJour segments={jour.segments} minute={minute} vide="Nothing committed today." />
 
       {ouvertes.length > 0 ? (
         <View style={{ marginTop: PAS[8] }}>
           <View style={{ borderBottomWidth: 1, borderBottomColor: j.line, paddingBottom: PAS[2], gap: PAS[1] }}>
-            <Text style={{ fontFamily: GEIST.demi, fontSize: 15, color: j.text }}>Mes tâches en cours</Text>
+            <Text style={{ fontFamily: GEIST.demi, fontSize: 15, color: j.text }}>Tasks in progress</Text>
             <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: j.text3 }}>
-              Le moteur les place tout seul · « +{PAS_DE_TEMPS} min » si le temps prévu ne suffit pas
+              The engine places them for you · “+{PAS_DE_TEMPS} min” if the planned time runs short
             </Text>
           </View>
           {ouvertes.map((t) => {
@@ -212,18 +212,18 @@ export default function Aujourdhui() {
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${t.titre}, voir dans les engagements`}
+                  accessibilityLabel={`${t.titre}, open in commitments`}
                   onPress={() => routeur.push('/engagements')}
                   style={({ pressed }) => ({ flex: 1, gap: 4, paddingVertical: PAS[1], opacity: pressed ? 0.6 : 1 })}
                 >
                   <Text numberOfLines={1} style={{ fontFamily: GEIST.moyen, fontSize: 14.5, color: j.text }}>{t.titre}</Text>
                   <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: verdict?.status === 'unplaced' ? j.alerte : j.text3 }}>
                     {verdict?.status === 'unplaced'
-                      ? 'aucune place trouvée cette semaine'
+                      ? 'no room found this week'
                       : verdict?.status === 'partial'
-                        ? `${duree(pose)} placées sur ${duree(t.minutesRestantes + t.minutesSupplementaires)}`
-                        : `${duree(pose)} placées cette semaine`}
-                    {t.minutesSupplementaires > 0 ? ` · +${duree(t.minutesSupplementaires)} accordées` : ''}
+                        ? `${duree(pose)} placed of ${duree(t.minutesRestantes + t.minutesSupplementaires)}`
+                        : `${duree(pose)} placed this week`}
+                    {t.minutesSupplementaires > 0 ? ` · +${duree(t.minutesSupplementaires)} granted` : ''}
                   </Text>
                 </Pressable>
                 <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2, fontVariant: ['tabular-nums'] }}>
@@ -235,7 +235,7 @@ export default function Aujourdhui() {
                     avant d'avoir commencé. */}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Accorder ${PAS_DE_TEMPS} minutes de plus à ${t.titre}`}
+                  accessibilityLabel={`Grant ${PAS_DE_TEMPS} more minutes to ${t.titre}`}
                   onPress={() => void ajouterDuTemps(t.id, PAS_DE_TEMPS)}
                   hitSlop={8}
                   style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}

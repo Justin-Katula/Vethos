@@ -33,9 +33,9 @@ import { GEIST, MONO } from '@/ui/primitives'
  */
 
 const NATURE: Record<string, string> = {
-  task: 'Tâche',
-  objective: 'Objectif',
-  ancre: 'Ancre',
+  task: 'Task',
+  objective: 'Goal',
+  ancre: 'Anchor',
 }
 
 export function JeCommence() {
@@ -56,7 +56,7 @@ export function JeCommence() {
       const r = await confirmer(enAttente)
       if (!r.ok) setErreur(r.raison)
     } catch {
-      setErreur('La confirmation a échoué. Réessaie.')
+      setErreur('Could not start. Try again.')
     } finally {
       setEncours(false)
     }
@@ -99,7 +99,7 @@ export function JeCommence() {
             fontVariant: ['tabular-nums'],
           }}
         >
-          {NATURE[enAttente.kind] ?? 'Bloc'} · prévu à {enHeure(enAttente.startMinute)}
+          {NATURE[enAttente.kind] ?? 'Block'} · planned for {enHeure(enAttente.startMinute)}
         </Text>
 
         <Text
@@ -125,12 +125,12 @@ export function JeCommence() {
             fontVariant: ['tabular-nums'],
           }}
         >
-          {retard > 0 ? `En retard de ${retard} min` : 'C’est l’heure'}
+          {retard > 0 ? `${retard} min late` : 'It’s time'}
         </Text>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Je commence ${enAttente.label}`}
+          accessibilityLabel={`Start ${enAttente.label}`}
           onPress={() => void valider()}
           disabled={encours}
           style={({ pressed }) => ({
@@ -148,7 +148,7 @@ export function JeCommence() {
           })}
         >
           <Text style={{ fontFamily: GEIST.demi, fontSize: 16, color: j.accentSur }}>
-            {encours ? 'Confirmation…' : 'Je commence'}
+            {encours ? 'Starting…' : 'I’m starting'}
           </Text>
         </Pressable>
 

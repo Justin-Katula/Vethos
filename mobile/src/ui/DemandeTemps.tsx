@@ -60,18 +60,18 @@ export function DemandeTemps({
   return (
     <View style={{ gap: PAS[4] }}>
       <Text style={{ fontFamily: GEIST.normal, fontSize: 13, color: j.text2 }}>
-        Je veux du temps libre aujourd’hui.
+        I want free time today.
       </Text>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[3] }}>
-        <Bouton etiquette="Moins" signe="−" onPress={() => regler(-PAS_MINUTES)} />
+        <Bouton etiquette="Less" signe="−" onPress={() => regler(-PAS_MINUTES)} />
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ fontFamily: MONO.demi, fontSize: 24, color: j.text, fontVariant: ['tabular-nums'] }}>
             {minutes}
           </Text>
           <Text style={{ fontFamily: GEIST.normal, fontSize: 11, color: j.text3 }}>minutes</Text>
         </View>
-        <Bouton etiquette="Plus" signe="+" onPress={() => regler(PAS_MINUTES)} />
+        <Bouton etiquette="More" signe="+" onPress={() => regler(PAS_MINUTES)} />
       </View>
 
       <Pressable
@@ -87,7 +87,7 @@ export function DemandeTemps({
           transform: [{ translateY: pressed ? 1 : 0 }],
         })}
       >
-        <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>Demander</Text>
+        <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>Ask</Text>
       </Pressable>
 
       {verdict ? (
@@ -103,10 +103,10 @@ export function DemandeTemps({
             }}
           >
             {verdict.status === 'granted'
-              ? `Accordé, ${verdict.grantedMinutes} min.`
+              ? `Granted — ${verdict.grantedMinutes} min.`
               : verdict.status === 'partial'
-                ? `${verdict.grantedMinutes} min tiennent, pas ${minutes}.`
-                : 'Refusé.'}
+                ? `${verdict.grantedMinutes} min fit, not ${minutes}.`
+                : 'Denied.'}
           </Text>
           <Text style={{ fontFamily: GEIST.normal, fontSize: 12, lineHeight: 19, color: j.text2 }}>
             {verdict.reason}

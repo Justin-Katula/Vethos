@@ -27,15 +27,15 @@ import { GEIST, MONO } from './primitives'
  * qui cache un chiffre n'est pas une adaptation, c'est une perte.
  */
 
-const JOURS_LONGS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-const JOURS_COURTS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim']
+const JOURS_LONGS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const JOURS_COURTS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 const COLONNES = [
-  { cle: 'brute', titre: 'Brute' },
-  { cle: 'inutilisable', titre: 'Inutilis.' },
-  { cle: 'repos', titre: 'Repos' },
+  { cle: 'brute', titre: 'Raw' },
+  { cle: 'inutilisable', titre: 'Unusable' },
+  { cle: 'repos', titre: 'Rest' },
   { cle: 'fatigue', titre: 'Fatigue' },
-  { cle: 'dispo', titre: 'Dispo' },
+  { cle: 'dispo', titre: 'Free' },
 ] as const
 
 export function TableauCapacite({ capacites }: { capacites: readonly DayCapacity[] }) {
@@ -50,7 +50,7 @@ function EnColonnes({ capacites }: { capacites: readonly DayCapacity[] }) {
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: PAS[2], paddingBottom: PAS[2] }}>
-        <Text style={{ width: 74, fontFamily: GEIST.moyen, fontSize: 10, color: j.text3 }}>Jour</Text>
+        <Text style={{ width: 74, fontFamily: GEIST.moyen, fontSize: 10, color: j.text3 }}>Day</Text>
         {COLONNES.map((c) => (
           <Text
             key={c.cle}
@@ -114,8 +114,8 @@ function EnLignes({ capacites }: { capacites: readonly DayCapacity[] }) {
       {capacites.map((c, i) => {
         const ampute = c.fatiguePenaltyMinutes + c.breathingReductionMinutes
         const retraits = [
-          c.unusableMinutes > 0 ? `−${duree(c.unusableMinutes)} inutilisable` : null,
-          c.restReservedMinutes > 0 ? `−${duree(c.restReservedMinutes)} repos` : null,
+          c.unusableMinutes > 0 ? `−${duree(c.unusableMinutes)} unusable` : null,
+          c.restReservedMinutes > 0 ? `−${duree(c.restReservedMinutes)} rest` : null,
           ampute > 0 ? `−${duree(ampute)} fatigue` : null,
         ].filter((t): t is string => t !== null)
 
@@ -123,7 +123,7 @@ function EnLignes({ capacites }: { capacites: readonly DayCapacity[] }) {
           <View
             key={c.date}
             accessible
-            accessibilityLabel={`${JOURS_LONGS[c.dayOfWeek]} ${c.date.slice(8)} : ${duree(c.effectiveCapacityMinutes)} disponibles`}
+            accessibilityLabel={`${JOURS_LONGS[c.dayOfWeek]} ${c.date.slice(8)}: ${duree(c.effectiveCapacityMinutes)} available`}
             style={{
               paddingVertical: PAS[2] + 2,
               borderTopWidth: i === 0 ? 0 : 1,
@@ -146,7 +146,7 @@ function EnLignes({ capacites }: { capacites: readonly DayCapacity[] }) {
             </View>
 
             <Text style={{ fontFamily: GEIST.normal, fontSize: 11, lineHeight: 17, color: j.text3 }}>
-              {duree(c.rawCapacityMinutes)} brute
+              {duree(c.rawCapacityMinutes)} raw
               {retraits.length > 0 ? ` · ${retraits.join(' · ')}` : ''}
             </Text>
           </View>

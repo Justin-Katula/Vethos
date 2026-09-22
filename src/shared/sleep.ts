@@ -10,7 +10,7 @@ import type { ScheduleEntry } from './schemas'
  */
 
 export const SLEEP_COLOR = '#4C566A'
-export const SLEEP_LABEL = 'Sommeil'
+export const SLEEP_LABEL = 'Sleep'
 
 /** « 23:30 » → 1410. Null si la chaîne n'est pas une heure valide. */
 export function parseHHMM(value: string | undefined | null): number | null {
