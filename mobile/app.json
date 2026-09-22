@@ -4,7 +4,7 @@
     "slug": "vethos",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "vethos",
+    "scheme": ["vethos", "device-activity"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import appJson from '../../app.json'
 import {
   NOM_APPLICATION,
+  SCHEMA_RETOUR,
   habillageBouclier,
   phraseBouclier,
   titrePourBouclier,
@@ -140,6 +142,22 @@ describe('les boutons du bouclier', () => {
     // est juste derrière.
     const { actions } = habillageBouclier({ theme: 'sombre', titreBloc: 'X', finMinute: 600 })
     expect(actions.secondary?.actions).toEqual([{ type: 'openApp' }])
+  })
+
+  it('déclare le schéma par lequel « Open Vethos » revient', () => {
+    // L'extension d'Apple ouvre une adresse écrite en dur dans le greffon :
+    // `device-activity://`. Aucun réglage ne la change. Si Vethos cesse de
+    // répondre à ce schéma, le bouton du bouclier n'ouvre plus rien — iOS ne
+    // résout vers aucune application, sans erreur et sans trace. Ce test
+    // existe pour qu'un nettoyage de `app.json` ne puisse pas passer.
+    const { actions } = habillageBouclier({ theme: 'sombre', titreBloc: 'X', finMinute: 600 })
+    if (actions.secondary?.actions?.[0]?.type !== 'openApp') return
+
+    const schemas = appJson.expo.scheme
+    expect(
+      Array.isArray(schemas) ? schemas : [schemas],
+      'app.json doit garder le schéma que l’extension ouvre en dur',
+    ).toContain(SCHEMA_RETOUR)
   })
 
   it('en mode profond, sort SANS passer par une application peut-être bloquée', () => {

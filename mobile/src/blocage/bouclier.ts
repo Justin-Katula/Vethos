@@ -191,3 +191,21 @@ function sortieDuBouclier(profond: boolean): { libelle: string; action: ActionBo
     action: { behavior: 'close', actions: [{ type: 'openApp' }] },
   }
 }
+
+/**
+ * Le schéma d'URL par lequel le bouclier rouvre Vethos.
+ *
+ * **Il n'est pas de notre choix.** L'action `openApp` est exécutée par
+ * l'extension d'Apple, dans son processus, et elle ouvre une adresse écrite
+ * en dur dans le greffon : `device-activity://`. Il n'existe aucun réglage
+ * pour la changer — la source porte un `// todo` à cet endroit précis.
+ *
+ * Vethos répond donc AUSSI à ce schéma (`app.json`, champ `scheme`). Sans
+ * cette deuxième entrée, le bouton « Open Vethos » du bouclier ne ferait
+ * rien du tout : iOS ne résoudrait l'adresse vers aucune application, sans
+ * erreur, sans trace, et sans que rien dans Vethos puisse s'en apercevoir.
+ *
+ * C'est exactement le genre de ligne qu'un nettoyage de configuration
+ * supprime — d'où le test qui l'épingle juste à côté de celui du bouton.
+ */
+export const SCHEMA_RETOUR = 'device-activity'
