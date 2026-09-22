@@ -30,7 +30,7 @@ import { GEIST, MONO } from './primitives'
 
 type Pilier = 'objectifs' | 'taches' | 'ancres'
 
-export function Projection() {
+export function Projection({ sansMarge = false }: { sansMarge?: boolean } = {}) {
   const j = useJetons()
   const routeur = useRouter()
   const { taches, objectifs, ancres } = useDonnees()
@@ -51,7 +51,7 @@ export function Projection() {
   return (
     <View
       style={{
-        marginTop: PAS[10],
+        marginTop: sansMarge ? 0 : PAS[10],
         borderWidth: 1,
         borderColor: j.line,
         borderRadius: RAYON.lg,

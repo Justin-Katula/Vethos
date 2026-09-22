@@ -74,7 +74,31 @@ export const BREAK_SEAM = 'var(--break-seam)'
  * Les teintes d'engagement vivent dans `@shared/teintes` : le téléphone en a
  * besoin des MÊMES, et deux listes finiraient par ne plus se ressembler.
  */
-export { TEINTES as CHOOSABLE_SHADES, teinteSuivante as nextShade } from '@shared/teintes'
+export {
+  TEINTES as CHOOSABLE_SHADES,
+  teinteSuivante as nextShade,
+  PALETTE_OBJECTIFS,
+  PALETTE_TACHES,
+  PALETTE_ANCRES,
+  PALETTE_ENCRE,
+  COULEUR_OBJECTIF,
+  COULEUR_TACHE,
+  COULEUR_ANCRE,
+  COULEUR_ENCRE,
+  couleurObjectif,
+  couleurTache,
+  couleurAncre,
+  couleurEncre,
+  couleurElement,
+  variantesType,
+  estCouleurDansFamille,
+  assainirCouleur,
+  allouerCouleurDisponible,
+  allouerCouleurTache,
+  allouerCouleurObjectif,
+  allouerCouleurAncre,
+} from '@shared/teintes'
+
 
 // ─── Adaptation d'une couleur stockée au thème en cours ────────────────────
 

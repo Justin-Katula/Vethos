@@ -3,7 +3,16 @@ import { Plus, Trash2, Copy } from 'lucide-react'
 import { usePlanning } from '@/lib/use-planning'
 import { usePlanningStore, type Creatable } from '@/store/planning.store'
 import { evaluateRequest, type RequestVerdict } from '@shared/planning/requests'
-import { CATEGORY_COLOR, CATEGORY_LABEL, entryMark, nextShade } from '@/lib/palette'
+import {
+  CATEGORY_COLOR,
+  CATEGORY_LABEL,
+  couleurAncre,
+  couleurObjectif,
+  allouerCouleurAncre,
+  allouerCouleurObjectif,
+  entryMark,
+  nextShade,
+} from '@/lib/palette'
 import { useResolvedTheme } from '@/lib/use-theme'
 import { cn } from '@/lib/cn'
 import { addDays, dateKey, dayOfWeek as dayOfWeekOfDate } from '@shared/planning/dates'
@@ -19,8 +28,8 @@ import { IntelligentBlockingReviewModal } from '@/components/blocking/Intelligen
  * ils sont ici : un editeur ne doit pas savoir sur quelle page il est rendu.
  */
 
-export const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-export const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 /**
  * Un champ, partout le même. Le style vit dans `.field` (globals.css) : la
@@ -296,7 +305,7 @@ export function AncresEditor({
       name: draft.name.trim(),
       plan: draft.plan.trim(),
       trigger: draft.name.trim().toLowerCase(),
-      color: nextShade(ancres.length),
+      color: allouerCouleurAncre(ancres),
       anchorMinute: minute,
       daysOfWeek: draft.days,
       normalMaxMinutes: draft.minutes,
@@ -512,7 +521,7 @@ export function ObjectivesEditor({
               setPendingDraft({
                 name: draft.name.trim(),
                 plan: draft.plan.trim(),
-                color: nextShade(objectives.length),
+                color: allouerCouleurObjectif(objectives),
                 weeklyTargetMinutes: Math.round(draft.hoursPerWeek * 60),
                 appsToBlock: [],
               })

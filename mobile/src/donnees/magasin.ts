@@ -2,6 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { z } from 'zod'
 import { findAncreConflict } from '@shared/planning/placement'
+import {
+  allouerCouleurAncre,
+  allouerCouleurObjectif,
+  allouerCouleurTache,
+  assainirCouleur,
+  estCouleurDansFamille,
+} from '@shared/palettes'
 import { preparerTache, type BrouillonTache } from './creation'
 
 /**
@@ -22,6 +29,7 @@ export const TacheSchema = z.object({
   titre: z.string().min(1).max(100),
   /** Ce que la tâche veut dire, dans les mots de l'utilisateur. */
   intention: z.string().max(2000).default(''),
+  couleur: z.string().optional(),
   echeance: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   importance: z.number().int().min(1).max(10).default(5),
   /** Ce que l'utilisateur a annoncé. Gardé tel quel, pour mémoire. */
@@ -228,7 +236,49 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
         // empêcher l'application de s'ouvrir. On repart de vide plutôt que de
         // planter — et l'utilisateur voit une application neuve, pas un écran noir.
         const lu = ContenuSchema.safeParse(JSON.parse(brut))
-        set(lu.success ? { ...lu.data, chargees: true } : { ...VIDE, chargees: true })
+        if (!lu.success) {
+          set({ ...VIDE, chargees: true })
+          return
+        }
+
+        // Assainissement immédiat des couleurs des engagements :
+        // 1. Les objectifs DOIVENT être dans PALETTE_OBJECTIFS (rouge).
+        // 2. Les tâches DOIVENT être dans PALETTE_TACHES (gris).
+        // 3. Les ancres DOIVENT être dans PALETTE_ANCRES (bleu froid).
+        let modifie = false
+        const objectifs = lu.data.objectifs.map((o, i) => {
+          const propre = assainirCouleur('objective', o.couleur, i)
+          if (propre !== o.couleur) modifie = true
+          return { ...o, couleur: propre }
+        })
+        const ancres = lu.data.ancres.map((a, i) => {
+          const propre = assainirCouleur('ancre', a.couleur, i)
+          if (propre !== a.couleur) modifie = true
+          return { ...a, couleur: propre }
+        })
+        const taches = lu.data.taches.map((t, i) => {
+          const propre = assainirCouleur('task', t.couleur, i)
+          if (propre !== t.couleur) modifie = true
+          return { ...t, couleur: propre }
+        })
+
+        set({
+          ...lu.data,
+          objectifs,
+          ancres,
+          taches,
+          chargees: true,
+        })
+
+        if (modifie) {
+          void ecrire({
+            taches,
+            objectifs,
+            ancres,
+            obligations: lu.data.obligations,
+            reglages: lu.data.reglages,
+          })
+        }
       } catch {
         set({ ...VIDE, chargees: true })
       }
@@ -238,12 +288,20 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       // Les deux lois de creation — correction de l'estimation (B.1/B.4) et
       // decoupage automatique (B.5) — vivent dans `creation.ts`, ou elles se
       // verifient sans magasin ni AsyncStorage.
-      const creees = preparerTache(t, {
-        identifiant,
-        ...(options?.maxParJourMinutes !== undefined
-          ? { maxParJourMinutes: options.maxParJourMinutes }
-          : {}),
-      })
+      const couleur =
+        t.couleur && estCouleurDansFamille('task', t.couleur)
+          ? t.couleur
+          : allouerCouleurTache(get().taches.filter((x) => !x.terminee))
+
+      const creees = preparerTache(
+        { ...t, couleur },
+        {
+          identifiant,
+          ...(options?.maxParJourMinutes !== undefined
+            ? { maxParJourMinutes: options.maxParJourMinutes }
+            : {}),
+        },
+      )
       await enregistrer({ taches: [...creees, ...get().taches] })
     },
 
@@ -295,7 +353,16 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
     },
 
     async ajouterObjectif(o) {
-      const objectif: Objectif = { ...o, id: identifiant(), creeLe: new Date().toISOString() }
+      const couleur =
+        o.couleur && estCouleurDansFamille('objective', o.couleur)
+          ? o.couleur
+          : allouerCouleurObjectif(get().objectifs)
+      const objectif: Objectif = {
+        ...o,
+        couleur,
+        id: identifiant(),
+        creeLe: new Date().toISOString(),
+      }
       await enregistrer({ objectifs: [objectif, ...get().objectifs] })
     },
 
@@ -346,7 +413,11 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
         )
       }
 
-      const ancre: Ancre = { ...a, id: identifiant(), creeeLe: new Date().toISOString() }
+      const couleur =
+        a.couleur && estCouleurDansFamille('ancre', a.couleur)
+          ? a.couleur
+          : allouerCouleurAncre(get().ancres)
+      const ancre: Ancre = { ...a, couleur, id: identifiant(), creeeLe: new Date().toISOString() }
       await enregistrer({ ancres: [ancre, ...get().ancres] })
     },
 

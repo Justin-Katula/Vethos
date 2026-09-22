@@ -88,11 +88,11 @@
      * par calcul (`lib/palette.ts`). Ci-dessous, seulement ce qui est purement
      * décoratif — ce que le moteur dessine, et que personne ne stocke.
      */
-    --block-task: #c1121f;
-    --block-objective: #55585c;
+    --block-task: #55585c;
+    --block-objective: #c1121f;
     --block-ancre: #253047;
-    --block-ink-task: #fff7f5;
-    --block-ink-objective: #f8f8f8;
+    --block-ink-task: #f8f8f8;
+    --block-ink-objective: #fff7f5;
     --block-ink-ancre: #f8f9ff;
 
     --break-veil: rgba(24, 24, 24, 0.2);
@@ -187,11 +187,11 @@
     --scrollbar: rgba(242, 242, 242, 0.22);
     --scrollbar-hover: rgba(242, 242, 242, 0.38);
 
-    --block-task: #c62330;
-    --block-objective: #474b50;
+    --block-task: #505359;
+    --block-objective: #e03131;
     --block-ancre: #2c3a56;
-    --block-ink-task: #fff2f2;
-    --block-ink-objective: #f2f2f2;
+    --block-ink-task: #f2f2f2;
+    --block-ink-objective: #fff2f2;
     --block-ink-ancre: #eef2f8;
 
     --break-veil: rgba(0, 0, 0, 0.34);

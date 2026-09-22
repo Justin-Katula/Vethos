@@ -46,6 +46,68 @@ export function isBreakVisible(
   return nextOccupiedMinute - block.endMinute < BREAK_HIDDEN_IF_FREE_MINUTES
 }
 
+/**
+ * Premier instant occupé (obligation fixe ou autre bloc) à partir de `after`,
+ * ce jour-là. Sert à savoir si la pause d'un bloc se heurte vraiment à
+ * quelque chose, ou si le temps libre qui suit joue déjà ce rôle.
+ */
+export function nextOccupiedMinute(
+  after: number,
+  excludeBlockId: string,
+  entries: Array<{ startMinute?: number; debut?: number }>,
+  blocks: Array<{ id: string; startMinute: number }>,
+): number | null {
+  const starts = [
+    ...entries.map((e) => (e.startMinute !== undefined ? e.startMinute : (e.debut ?? 0))),
+    ...blocks.filter((b) => b.id !== excludeBlockId).map((b) => b.startMinute),
+  ].filter((m) => m >= after)
+  return starts.length > 0 ? Math.min(...starts) : null
+}
+
+function formatClock(minute: number): string {
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+}
+
+/**
+ * Pourquoi ce bloc est ici. Chaque phrase vient d'un fait que le moteur a
+ * produit : rien n'est deviné, et rien n'est inventé pour meubler.
+ */
+export function explainBlock(block: PlacedBlock, showBreak: boolean): string[] {
+  const lines: string[] = []
+  if (block.kind === 'task') {
+    lines.push('Placed by deadline: whatever is due first is served first.')
+  } else if (block.kind === 'objective') {
+    lines.push('The week’s quota, spread by what each day can actually carry.')
+  } else {
+    lines.push('A fixed hour, chosen once. It never moves from one day to the next.')
+  }
+  if (block.cognitiveWindow === 'PROFONDE') {
+    lines.push('Put on a slot where you usually finish what you start.')
+  } else if (block.cognitiveWindow === 'BASSE') {
+    lines.push('An unreliable slot by your own measurements: nothing demanding goes here.')
+  }
+  if (block.breakMinutes > 0 && showBreak) {
+    lines.push(
+      `Work until ${formatClock(breakStartMinute(block))}, then a ${block.breakMinutes} min break: ` +
+        'it is inside the block, not added after it.',
+    )
+  }
+  if (block.preview) {
+    lines.push(
+      'Preview: this part is waiting for the previous one to finish. It only shows ' +
+        'where it will land — it starts no session and blocks no app until its turn ' +
+        'comes.',
+    )
+  }
+  if (block.capOverride) {
+    lines.push('Over the 40 % daily cap: a proven deadline crisis.')
+  }
+  if (block.reducedToMinimum) {
+    lines.push('Cut back to its minimum because the day was saturated.')
+  }
+  return lines
+}
+
 /** E.2 : plancher quotidien = 20 % de la capacité brute, jamais moins d'une heure. */
 export const REST_FLOOR_PERCENT = 0.2
 export const REST_FLOOR_ABSOLUTE_MINUTES = 60

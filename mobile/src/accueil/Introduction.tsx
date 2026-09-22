@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics'
 import { useDonnees } from '@/donnees/magasin'
 import { useJetons } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
+import { FondRoutage } from '@/ui/MouvementVethos'
 import { GEIST } from '@/ui/primitives'
 import { SuiteIntroduction } from './SuiteIntroduction'
 
@@ -67,9 +68,10 @@ const CONSEQUENCES: Record<Priorite, string> = {
 const COURBE_ENTREE = Easing.bezier(0.23, 1, 0.32, 1)
 const COURBE_DEPLACEMENT = Easing.bezier(0.77, 0, 0.175, 1)
 // L'onboarding est une experience rare et explicative : a la demande du
-// produit, sa vitesse cible est volontairement fixee a 50 % du rythme initial.
-const FACTEUR_RYTHME = 2
-const FACTEUR_LETTRES = 2.6
+// Apres essai sur appareil, le rythme est environ 15 % plus vif que la version
+// "50 %" : toujours contemplatif, sans donner l'impression d'attendre.
+const FACTEUR_RYTHME = 1.72
+const FACTEUR_LETTRES = 2.25
 const auRythme = (millisecondes: number) => Math.round(millisecondes * FACTEUR_RYTHME)
 const auRythmeDesLettres = (millisecondes: number) =>
   Math.round(millisecondes * FACTEUR_LETTRES)
@@ -258,6 +260,7 @@ export function Introduction() {
             paddingBottom: marges.bottom + PAS[5],
           }}
         >
+          <FondRoutage intensite="faible" />
           {estQuestion ? <EnteteQuestion rang={rangQuestion} /> : null}
 
           <Animated.View
@@ -673,7 +676,9 @@ function Choix({
   const j = useJetons()
   return (
     <Apparition
-      delai={1000 + apparitionIndex * 160}
+      // Le titre reste volontairement lent, mais une liste doit se révéler
+      // comme un seul groupe : 69 ms réels entre choix au rythme actuel.
+      delai={1000 + apparitionIndex * 40}
       mouvementReduit={mouvementReduit}
       style={style}
     >
@@ -685,21 +690,31 @@ function Choix({
           width: '100%',
           minHeight: 56,
           justifyContent: 'center',
-          backgroundColor: selectionne ? j.text : j.champBg,
-          borderWidth: 1,
-          borderColor: selectionne ? j.text : j.lineForte,
-          borderRadius: RAYON.xl,
-          paddingHorizontal: PAS[4],
+          backgroundColor: selectionne || pressed ? j.surface2 : 'transparent',
+          borderBottomWidth: 1,
+          borderBottomColor: selectionne ? j.text : j.lineForte,
+          paddingLeft: PAS[6],
+          paddingRight: PAS[3],
           opacity: pressed ? 0.68 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
+          transform: [{ translateX: pressed ? 3 : 0 }],
         })}
       >
+        <View
+          style={{
+            position: 'absolute',
+            left: 2,
+            width: 7,
+            height: 7,
+            borderRadius: 4,
+            backgroundColor: selectionne ? j.accentEncre : j.lineForte,
+          }}
+        />
         <Text
           style={{
             fontFamily: selectionne ? GEIST.demi : GEIST.normal,
             fontSize: 15.5,
-            color: selectionne ? j.surface : j.text,
-            textAlign: 'center',
+            color: j.text,
+            textAlign: 'left',
           }}
         >
           {children}

@@ -13,7 +13,12 @@ import {
   entryFill,
 } from '@/lib/palette'
 import { useResolvedTheme } from '@/lib/use-theme'
-import { breakStartMinute, isBreakVisible } from '@shared/planning/rest'
+import {
+  breakStartMinute,
+  explainBlock,
+  isBreakVisible,
+  nextOccupiedMinute,
+} from '@shared/planning/rest'
 import { scheduleEntriesForDate } from '@shared/planning/capacity'
 import {
   minuteToYPx,
@@ -37,7 +42,7 @@ import type { PlacedBlock, ScheduleEntry } from '@shared/planning/types'
  */
 
 const HOUR_HEIGHT = 40
-const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const GUTTER = 46
 
 type Props = {
@@ -66,65 +71,7 @@ const KIND_LABEL: Record<PlacedBlock['kind'], string> = {
   ancre: 'Anchor',
 }
 
-/**
- * Pourquoi ce bloc est ici. Chaque phrase vient d'un fait que le moteur a
- * produit : rien n'est deviné, et rien n'est inventé pour meubler.
- */
-function explain(block: PlacedBlock, showBreak: boolean): string[] {
-  const lines: string[] = []
-  if (block.kind === 'task') {
-    lines.push('Placed by deadline: whatever is due first is served first.')
-  } else if (block.kind === 'objective') {
-    lines.push('The week’s quota, spread by what each day can actually carry.')
-  } else {
-    lines.push('A fixed hour, chosen once. It never moves from one day to the next.')
-  }
-  if (block.cognitiveWindow === 'PROFONDE') {
-    lines.push('Put on a slot where you usually finish what you start.')
-  } else if (block.cognitiveWindow === 'BASSE') {
-    lines.push('An unreliable slot by your own measurements: nothing demanding goes here.')
-  }
-  if (block.breakMinutes > 0 && showBreak) {
-    lines.push(
-      `Work until ${clock(breakStartMinute(block))}, then a ${block.breakMinutes} min break: ` +
-        'it is inside the block, not added after it.',
-    )
-  }
-  // B.5.1 : dit en premier ce qui décide de tout le reste — ce bloc n'est pas
-  // encore à toi, et pourquoi.
-  if (block.preview) {
-    lines.push(
-      'Preview: this part is waiting for the previous one to finish. It only shows ' +
-        'where it will land — it starts no session and blocks no app until its turn ' +
-        'comes.',
-    )
-  }
-  if (block.capOverride) {
-    lines.push('Over the 40 % daily cap: a proven deadline crisis.')
-  }
-  if (block.reducedToMinimum) {
-    lines.push('Cut back to its minimum because the day was saturated.')
-  }
-  return lines
-}
-
-/**
- * Premier instant occupé (obligation fixe ou autre bloc) à partir de `after`,
- * ce jour-là. Sert à savoir si la pause d'un bloc se heurte vraiment à
- * quelque chose, ou si le temps libre qui suit joue déjà ce rôle.
- */
-function nextOccupiedMinute(
-  after: number,
-  excludeBlockId: string,
-  dayEntries: ScheduleEntry[],
-  dayBlocks: PlacedBlock[],
-): number | null {
-  const starts = [
-    ...dayEntries.map((e) => e.startMinute),
-    ...dayBlocks.filter((b) => b.id !== excludeBlockId).map((b) => b.startMinute),
-  ].filter((m) => m >= after)
-  return starts.length > 0 ? Math.min(...starts) : null
-}
+const explain = explainBlock
 
 export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowMinute }: Props) {
   const [explained, setExplained] = useState<{ block: PlacedBlock; showBreak: boolean } | null>(
@@ -175,7 +122,7 @@ export function WeekCalendar({ weekDates, viewport, entries, blocks, today, nowM
           {columns.map((c) => (
             <div key={c.date} className="flex items-baseline gap-1.5 px-1">
               <span className={cn('text-[11px] font-medium', c.isToday ? 'text-fg' : 'text-fg-3')}>
-                {DAYS_FR[c.dayOfWeek]}
+                {DAYS_SHORT[c.dayOfWeek]}
               </span>
               <span
                 className={cn(

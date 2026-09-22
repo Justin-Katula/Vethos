@@ -9,6 +9,8 @@ import {
   countConsecutiveHighDays,
   FATIGUE_CRISIS_FLOOR_PERCENT,
   isBreakVisible,
+  nextOccupiedMinute,
+  explainBlock,
   shouldResetFatigue,
 } from './rest'
 
@@ -49,6 +51,38 @@ describe('E.1 — micro-repos inclus dans le bloc', () => {
 
   it('sans pause dans l’empreinte, il n’y a rien à montrer, quoi qu’il arrive ensuite', () => {
     expect(isBreakVisible({ endMinute: 560, breakMinutes: 0 }, 560)).toBe(false)
+  })
+
+  it('trouve le prochain instant occupé à partir de la fin du bloc', () => {
+    const entries = [{ startMinute: 600 }]
+    const blocks = [{ id: 'b1', startMinute: 500 }, { id: 'b2', startMinute: 580 }]
+    expect(nextOccupiedMinute(560, 'b1', entries, blocks)).toBe(580)
+    expect(nextOccupiedMinute(590, 'b1', entries, blocks)).toBe(600)
+    expect(nextOccupiedMinute(650, 'b1', entries, blocks)).toBeNull()
+  })
+
+  it('explainBlock formule l’explication de pause quand elle est visible', () => {
+    const block = {
+      id: 'manger',
+      date: '2026-09-21',
+      startMinute: 450, // 07:30
+      endMinute: 560,   // 09:20
+      durationMinutes: 110,
+      breakMinutes: 20,
+      workMinutes: 90,
+      kind: 'objective' as const,
+      refId: 'obj1',
+      label: 'Manger',
+      color: '#474b50',
+      cognitiveWindow: 'NORMALE' as const,
+    }
+    const linesVisible = explainBlock(block, true)
+    expect(linesVisible).toContain('The week’s quota, spread by what each day can actually carry.')
+    expect(linesVisible).toContain('Work until 09:00, then a 20 min break: it is inside the block, not added after it.')
+
+    const linesHidden = explainBlock(block, false)
+    expect(linesHidden).toContain('The week’s quota, spread by what each day can actually carry.')
+    expect(linesHidden.some((l) => l.includes('break'))).toBe(false)
   })
 })
 

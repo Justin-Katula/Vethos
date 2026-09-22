@@ -85,7 +85,7 @@ export function computeCorrectionFactor(args: {
       factor: fallback,
       confidence: ratios.length === 0 ? 'none' : 'low',
       sampleSize: ratios.length,
-      reason: `Défaut ${args.workKind === 'novel' ? 'travail nouveau/créatif' : 'travail routinier connu'} — ${ratios.length}/5 tâches mesurées.`,
+      reason: `Default for ${args.workKind === 'novel' ? 'new or creative work' : 'known routine work'} — ${ratios.length}/5 tasks measured.`,
     }
   }
 

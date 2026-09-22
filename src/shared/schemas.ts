@@ -126,7 +126,7 @@ export const ScheduleEntrySchema = z
     date: z.string().regex(DATE_REGEX).optional(),
   })
   .refine((e) => e.endMinute > e.startMinute, {
-    message: 'La fin doit être postérieure au début.',
+    message: 'The end must come after the start.',
     path: ['endMinute'],
   })
 export type ScheduleEntry = z.infer<typeof ScheduleEntrySchema>
@@ -252,6 +252,7 @@ export const TaskSchema = z.object({
    * globale héritée de l'horaire fixe.
    */
   appsToBlock: z.array(z.string().min(1)).max(200).default([]),
+  color: z.string().optional(),
   status: z.enum(['active', 'history']),
   createdAt: z.string().datetime(),
 })
@@ -378,7 +379,7 @@ export const BlockSessionSchema = z
     blockedSites: z.array(z.string().min(1)).max(500).default([]),
   })
   .refine((session) => session.endsAt > session.startedAt, {
-    message: 'La fin doit être postérieure au début.',
+    message: 'The end must come after the start.',
     path: ['endsAt'],
   })
 

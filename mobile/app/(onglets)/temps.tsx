@@ -4,16 +4,18 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees, type Obligation } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
-import { dateLocale, duree, enHeure } from '@/plan/lecture'
+import { dateLocale, duree, enHeure, type SegmentTemps } from '@/plan/lecture'
 import { useJetons } from '@/theme/Theme'
 import { AgendaJour } from '@/ui/AgendaJour'
 import { CarteSemaine } from '@/ui/CarteSemaine'
+import { FicheDetailEngagement } from '@/ui/FicheDetailEngagement'
 import { Chevron, Croix, Plus } from '@/ui/icones'
 import { TableauCapacite } from '@/ui/Capacite'
 import { DemandeTemps } from '@/ui/DemandeTemps'
 import { Repliable } from '@/ui/Repliable'
 import { useLargeur } from '@/ui/largeur'
 import { GEIST, MONO } from '@/ui/primitives'
+import { ChargementVethos } from '@/ui/MouvementVethos'
 
 /**
  * THESIS: le temps se voit avant de se lire. Une sélection relie semaine et jour.
@@ -26,16 +28,14 @@ import { GEIST, MONO } from '@/ui/primitives'
 export default function MonTemps() {
   const j = useJetons()
   const marges = useSafeAreaInsets()
-  const routeur = useRouter()
   const d = useDonnees()
   const { jours, aujourdHui, minute, chargees, resultat } = usePlan()
   const [selection, setSelection] = useState<string | null>(null)
   const [ajout, setAjout] = useState(false)
-  const [gestion, setGestion] = useState(false)
-  const [suppression, setSuppression] = useState<string | null>(null)
+  const [segmentDetail, setSegmentDetail] = useState<SegmentTemps | null>(null)
   const large = useLargeur().deuxColonnes
   const jour = jours.find((x) => x.date === selection) ?? jours[0]
-  if (!jour || !chargees) return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Loading your plan" />
+  if (!jour || !chargees) return <ChargementVethos pleinEcran libelle="Vethos is mapping your week." />
   const dernier = jours[jours.length - 1]!
   const disponible = resultat.capacities.reduce((s, c) => s + c.effectiveCapacityMinutes, 0)
 
@@ -61,13 +61,26 @@ export default function MonTemps() {
         </Text>
         <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text3 }}>available across seven days</Text>
       </View>
-      <CarteSemaine jours={jours} selection={jour.date} surSelection={setSelection} aujourdHui={aujourdHui} minute={minute} />
-      <View style={{ marginTop: 28, paddingTop: 24, borderTopWidth: 1, borderTopColor: j.line }}>
+      <CarteSemaine
+        jours={jours}
+        selection={jour.date}
+        surSelection={setSelection}
+        aujourdHui={aujourdHui}
+        minute={minute}
+        lever={d.reglages.lever}
+        coucher={d.reglages.coucher}
+        surChoisirSegment={setSegmentDetail}
+      />
+      <View style={{ marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: j.line }}>
         <Text style={{ fontFamily: GEIST.demi, fontSize: 20, color: j.text, textTransform: 'capitalize' }}>{titreJour}</Text>
         <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2, marginTop: 6 }}>
           {duree(jour.travail)} planned · {duree(jour.capacite)} of capacity
         </Text>
-        <AgendaJour segments={jour.segments} {...(jour.date === aujourdHui ? { minute } : {})} />
+        <AgendaJour
+          segments={jour.segments}
+          {...(jour.date === aujourdHui ? { minute } : {})}
+          surChoisirSegment={setSegmentDetail}
+        />
       </View>
       {/* Le bureau met ces deux replis COTE A COTE, et le sommeil plus les
           obligations dans la colonne d'en face. Empiles, demander du temps
@@ -92,6 +105,7 @@ export default function MonTemps() {
     <Modal visible={ajout} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAjout(false)}>
       <Formulaire surFin={() => setAjout(false)} jourInitial={dateLocale(jour.date).getDay()} />
     </Modal>
+    <FicheDetailEngagement segment={segmentDetail} fermer={() => setSegmentDetail(null)} />
   </>
 }
 

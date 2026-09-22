@@ -59,6 +59,11 @@ export type Jetons = {
   voile: string
   /** Le voile derrière une feuille modale. */
   rideau: string
+
+  /** Repos (Loi E.1) : l'empreinte effacée/hachurée en fin de bloc. */
+  pauseVoile: string
+  pauseBordure: string
+  pauseHachure: string
 }
 
 const CLAIR: Jetons = {
@@ -80,11 +85,11 @@ const CLAIR: Jetons = {
   accentDoux: 'rgba(193, 18, 31, 0.08)',
   alerte: '#8d5b00',
 
-  blocTache: '#c1121f',
-  blocObjectif: '#55585c',
+  blocTache: '#55585c',
+  blocObjectif: '#c1121f',
   blocAncre: '#253047',
-  blocEncreTache: '#fff7f5',
-  blocEncreObjectif: '#f8f8f8',
+  blocEncreTache: '#f8f8f8',
+  blocEncreObjectif: '#fff7f5',
   blocEncreAncre: '#f8f9ff',
 
   champBg: '#f8f8f8',
@@ -93,6 +98,10 @@ const CLAIR: Jetons = {
 
   voile: 'rgba(24, 24, 24, 0.12)',
   rideau: 'rgba(0, 0, 0, 0.75)',
+
+  pauseVoile: 'rgba(24, 24, 24, 0.2)',
+  pauseBordure: 'rgba(24, 24, 24, 0.32)',
+  pauseHachure: 'rgba(24, 24, 24, 0.24)',
 }
 
 const SOMBRE: Jetons = {
@@ -117,11 +126,11 @@ const SOMBRE: Jetons = {
   accentDoux: 'rgba(240, 82, 95, 0.14)',
   alerte: '#d69b3a',
 
-  blocTache: '#c62330',
-  blocObjectif: '#474b50',
+  blocTache: '#505359',
+  blocObjectif: '#e03131',
   blocAncre: '#2c3a56',
-  blocEncreTache: '#fff2f2',
-  blocEncreObjectif: '#f2f2f2',
+  blocEncreTache: '#f2f2f2',
+  blocEncreObjectif: '#fff2f2',
   blocEncreAncre: '#eef2f8',
 
   champBg: '#141414',
@@ -130,6 +139,10 @@ const SOMBRE: Jetons = {
 
   voile: 'rgba(0, 0, 0, 0.5)',
   rideau: 'rgba(0, 0, 0, 0.82)',
+
+  pauseVoile: 'rgba(0, 0, 0, 0.34)',
+  pauseBordure: 'rgba(0, 0, 0, 0.55)',
+  pauseHachure: 'rgba(0, 0, 0, 0.42)',
 }
 
 export const THEMES: Record<NomTheme, Jetons> = { clair: CLAIR, sombre: SOMBRE }

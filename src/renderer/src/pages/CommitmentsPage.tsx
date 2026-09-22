@@ -303,8 +303,8 @@ function TasksEditor({
                 }
                 className={cn(inputClass, 'mt-1 w-full')}
               >
-                <option value="routine">Connu</option>
-                <option value="novel">Nouveau</option>
+                <option value="routine">Done before</option>
+                <option value="novel">First time</option>
               </select>
             </label>
           </div>

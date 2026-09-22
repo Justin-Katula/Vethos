@@ -86,11 +86,11 @@ export default function AuthPage(): JSX.Element {
         <div>
           <div className="mb-6 h-[2px] w-28 bg-accent" />
           <h1 className="max-w-sm text-[30px] font-semibold leading-tight text-fg">
-            Ton temps reste local. Le plan reste lisible.
+            Your time stays local. The plan stays readable.
           </h1>
           <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-fg-2">
-            Vethos works out your work windows from your real commitments and protects the
-            sessions quand elles commencent.
+            Vethos works out your work windows from your real commitments, and protects the
+            sessions once they start.
           </p>
         </div>
         <p className="text-[12px] text-fg-3">Everything stays on this machine.</p>
@@ -120,7 +120,7 @@ export default function AuthPage(): JSX.Element {
             }}
           >
             {mode === 'sign-up' && (
-              <AuthField label="Nom" icon={<User size={16} />}>
+              <AuthField label="Name" icon={<User size={16} />}>
                 <input
                   type="text"
                   name="name"
@@ -128,7 +128,7 @@ export default function AuthPage(): JSX.Element {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
-                  placeholder="Ton nom"
+                  placeholder="Your name"
                 />
               </AuthField>
             )}
@@ -141,11 +141,11 @@ export default function AuthPage(): JSX.Element {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-3"
-                placeholder="toi@example.com"
+                placeholder="you@example.com"
               />
             </AuthField>
 
-            <AuthField label="Mot de passe" icon={<Lock size={16} />}>
+            <AuthField label="Password" icon={<Lock size={16} />}>
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
@@ -168,7 +168,7 @@ export default function AuthPage(): JSX.Element {
             </AuthField>
 
             {mode === 'sign-up' && (
-              <AuthField label="Confirmer le mot de passe" icon={<Lock size={16} />}>
+              <AuthField label="Confirm the password" icon={<Lock size={16} />}>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="confirm-password"

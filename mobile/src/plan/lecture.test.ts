@@ -59,7 +59,19 @@ describe('lecture commune du cercle et de la semaine', () => {
     expect(plan.blocks.length).toBeGreaterThan(0)
     const semaine = lireSemaine(plan, obligations, reglages)
     for (const b of plan.blocks) {
-      expect(semaine.find((j) => j.date === b.date)!.segments.find((s) => s.id === b.id)).toMatchObject({ debut: b.startMinute, fin: b.endMinute, travail: b.workMinutes, nature: b.kind })
+      const seg = semaine.find((j) => j.date === b.date)!.segments.find((s) => s.id === b.id)!
+      expect(seg).toMatchObject({
+        debut: b.startMinute,
+        finEmpreinte: b.endMinute,
+        travail: b.workMinutes,
+        pause: b.breakMinutes,
+        nature: b.kind,
+      })
+      if (!seg.pauseVisible) {
+        expect(seg.fin).toBe(b.endMinute - b.breakMinutes)
+      } else {
+        expect(seg.fin).toBe(b.endMinute)
+      }
     }
   })
 })

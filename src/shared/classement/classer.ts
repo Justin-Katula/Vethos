@@ -99,7 +99,7 @@ export function classer(p: PreuvesApplication): Classement {
     }
   }
   for (const [a, exts] of parActivite) {
-    justifications.push(`${a} : ouvre ${exts.slice(0, 5).join(' ')}`)
+    justifications.push(`${a}: opens ${exts.slice(0, 5).join(' ')}`)
   }
 
   // --- Preuve : les protocoles qu'elle déclare ---
@@ -107,13 +107,13 @@ export function classer(p: PreuvesApplication): Classement {
     const cibles = PROTOCOLE_VERS_ACTIVITES[String(prot).toLowerCase()]
     if (!cibles) continue
     for (const a of cibles) activites.add(a)
-    justifications.push(`${cibles.join(', ')} : déclare le protocole ${prot}://`)
+    justifications.push(`${cibles.join(', ')}: declares the ${prot}:// protocol`)
   }
 
   // --- Preuve : installée dans une bibliothèque de jeux ---
   if (p.dansDossierJeu) {
     activites.add('JOUER')
-    justifications.push('JOUER : installée dans une bibliothèque de jeux')
+    justifications.push('JOUER: installed in a games library')
   }
 
   // --- Preuve : embarque un pilote noyau ---
@@ -122,7 +122,7 @@ export function classer(p: PreuvesApplication): Classement {
   // part ce qu'il fait, mais livre `driververifyx64` et `WdfCoinstaller01009`.
   if (p.piloteEmbarque) {
     activites.add('CONFIGURER_UN_PERIPHERIQUE')
-    justifications.push('CONFIGURER_UN_PERIPHERIQUE : installe un pilote de périphérique')
+    justifications.push('CONFIGURER_UN_PERIPHERIQUE: installs a device driver')
   }
 
   // --- Preuve : héberge d'autres programmes ---
@@ -131,10 +131,10 @@ export function classer(p: PreuvesApplication): Classement {
   if (p.programmesHeberges >= 2) {
     if (activites.has('JOUER')) {
       activites.add('GERER_SA_LUDOTHEQUE')
-      justifications.push(`GERER_SA_LUDOTHEQUE : héberge ${p.programmesHeberges} programmes`)
+      justifications.push(`GERER_SA_LUDOTHEQUE: hosts ${p.programmesHeberges} programs`)
     } else {
       activites.add('INSTALLER_UN_LOGICIEL')
-      justifications.push(`INSTALLER_UN_LOGICIEL : héberge ${p.programmesHeberges} programmes`)
+      justifications.push(`INSTALLER_UN_LOGICIEL: hosts ${p.programmesHeberges} programs`)
     }
   }
 
@@ -142,7 +142,7 @@ export function classer(p: PreuvesApplication): Classement {
     return {
       activites: [],
       niveau: 'INCONNU',
-      justifications: ['aucune preuve locale : ni association de fichiers, ni protocole, ni emplacement révélateur'],
+      justifications: ['no local evidence: no file association, no protocol, no telling location'],
       // Règle d'or : ne pas savoir n'autorise pas à bloquer.
       bloquable: false,
     }

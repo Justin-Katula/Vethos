@@ -44,19 +44,83 @@ export function Horloge({ jour, minute, centre }: { jour: JourTemps; minute: num
           return <SvgText key={m} x={p.x} y={p.y + 4} textAnchor="middle"
             fill={j.text2} fontFamily={MONO.normal} fontSize={11}>{String(m / 60).padStart(2, '0')}</SvgText>
         })}
-        {jour.segments.map((s) => <Path key={`${s.nature}-${s.id}`} d={arc(180, 135, angle(s.debut), angle(s.fin))}
-          stroke={couleurTemps(s.nature, j)} strokeWidth={s.nature === 'sleep' ? 6 : 14}
-          strokeLinecap="butt" fill="none" opacity={s.fin <= minute ? 0.5 : 1} />)}
+        {jour.segments.flatMap((s) => {
+          const base = (
+            <Path
+              key={`${s.nature}-${s.id}`}
+              d={arc(180, 135, angle(s.debut), angle(s.fin))}
+              stroke={couleurTemps(s.nature, j)}
+              strokeWidth={s.nature === 'sleep' ? 6 : 14}
+              strokeLinecap="butt"
+              fill="none"
+              opacity={s.fin <= minute ? 0.5 : 1}
+            />
+          )
+          if (!s.pauseVisible || !s.pause || s.pause <= 0) return [base]
+          return [
+            base,
+            <Path
+              key={`pause-veil-${s.id}`}
+              d={arc(180, 135, angle(s.fin - s.pause), angle(s.fin))}
+              stroke={j.pauseVoile}
+              strokeWidth={14}
+              strokeLinecap="butt"
+              fill="none"
+            />,
+            <Path
+              key={`pause-hatch-${s.id}`}
+              d={arc(180, 135, angle(s.fin - s.pause), angle(s.fin))}
+              stroke={j.text3}
+              strokeWidth={14}
+              strokeLinecap="butt"
+              strokeDasharray="2, 4"
+              fill="none"
+              opacity={0.65}
+            />,
+          ]
+        })}
         <Circle cx={repere.x} cy={repere.y} r={6} fill={j.accentEncre} stroke={j.bg} strokeWidth={3} />
       </Svg>
-      <View style={{ pointerEvents: 'none', position: 'absolute', top: '32%', left: '20%', right: '20%', alignItems: 'center', gap: 8 }}>
-        {centre ?? <>
-          <Text style={{ fontFamily: GEIST.normal, color: j.text, fontSize: 48 / Math.max(1, fontScale / 1.3),
-            letterSpacing: -1.5, fontVariant: ['tabular-nums'] }}>{enHeure(minute)}</Text>
-          <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2, textAlign: 'center' }}>
-            {actuel?.titre ?? 'Free time'}
-          </Text>
-        </>}
+      <View
+        style={{
+          pointerEvents: 'none',
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: '15%',
+          gap: 6,
+        }}
+      >
+        {centre ?? (
+          <>
+            <Text
+              style={{
+                fontFamily: GEIST.normal,
+                color: j.text,
+                fontSize: 48 / Math.max(1, fontScale / 1.3),
+                letterSpacing: -1.5,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {enHeure(minute)}
+            </Text>
+            <Text
+              numberOfLines={2}
+              style={{
+                fontFamily: GEIST.moyen,
+                fontSize: 14,
+                color: j.text2,
+                textAlign: 'center',
+              }}
+            >
+              {actuel?.titre ?? 'Free time'}
+            </Text>
+          </>
+        )}
       </View>
     </View>
   )

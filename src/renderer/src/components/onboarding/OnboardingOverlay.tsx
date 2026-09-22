@@ -120,7 +120,7 @@ export function OnboardingOverlay(): JSX.Element {
           </button>
 
           <span className="text-xs text-fg-3">
-            Étape {currentIdx + 1} sur {VISIBLE_STEPS.length} ·{' '}
+            Step {currentIdx + 1} of {VISIBLE_STEPS.length} ·{' '}
             <span className="text-fg-2">{STEP_LABELS[step]}</span>
           </span>
 

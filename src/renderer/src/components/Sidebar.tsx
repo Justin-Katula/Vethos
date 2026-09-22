@@ -37,7 +37,7 @@ export function Sidebar() {
       <div className="glass flex flex-1 flex-col px-3 py-4">
         <div className="mb-7 border-b border-line px-2 pb-4">
           <NexusLogo size={24} />
-          <p className="mt-2 text-[11px] text-fg-3">Focus, par design.</p>
+          <p className="mt-2 text-[11px] text-fg-3">Focus, by design.</p>
         </div>
 
         <nav

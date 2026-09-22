@@ -82,7 +82,7 @@ export async function atomicRead<T>(filePath: string, coffre?: Coffre): Promise<
     if (!estEnveloppe(brut)) return brut as T
     if (!coffre) {
       // Chiffré, mais plus personne pour le déchiffrer.
-      throw new SyntaxError('Fichier chiffré et aucun coffre disponible.')
+      throw new SyntaxError('Encrypted file and no vault available.')
     }
     try {
       return JSON.parse(coffre.dechiffrer(brut.charge)) as T
@@ -90,7 +90,7 @@ export async function atomicRead<T>(filePath: string, coffre?: Coffre): Promise<
       // Déchiffrement impossible : fichier copié depuis une autre machine ou un
       // autre compte Windows. On le traite comme un fichier corrompu — l'appelant
       // le met de côté en `.bak` et repart à zéro plutôt que de planter.
-      throw new SyntaxError('Déchiffrement impossible : ce fichier vient d’ailleurs.')
+      throw new SyntaxError('Cannot decrypt: this file came from somewhere else.')
     }
   } catch (err) {
     if (isNoEntryError(err)) {

@@ -24,6 +24,7 @@ import {
   minutesUntilEndOf,
   startOfWeek,
 } from './dates'
+import { COULEUR_TACHE } from '../palettes'
 import { isPartLocked } from './estimation'
 import {
   buildFeasibilityResult,
@@ -380,7 +381,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
           kind: session.kind,
           refId: session.refId,
           label: 'title' in source ? source.title : source.name,
-          color: 'color' in source ? source.color : '#E8E8E8',
+          color: 'color' in source && typeof source.color === 'string' ? source.color : COULEUR_TACHE,
           cognitiveWindow: windowAt(Math.floor(session.startMinute / 60)),
           confirmed: true,
           appsToBlock: source.appsToBlock,
@@ -612,9 +613,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
           kind: 'task',
           refId: task.id,
           label: task.title,
-          // Le travail à échéance est ce qu'il y a de plus clair à l'écran :
-          // c'est ce qui t'appartient vraiment.
-          color: '#E8E8E8',
+          color: 'color' in task && typeof task.color === 'string' ? task.color : COULEUR_TACHE,
           cognitiveWindow: slot.cognitiveWindow,
           capOverride: capOverride || undefined,
           neverConfirmed: neverConfirmed(date, 'task', task.id) || undefined,

@@ -15,6 +15,13 @@ import {
   type LearningState,
   type SessionConfirmationsState,
 } from '@shared/schemas'
+import {
+  allouerCouleurAncre,
+  allouerCouleurObjectif,
+  allouerCouleurTache,
+  assainirCouleur,
+  estCouleurDansFamille,
+} from '@shared/palettes'
 
 /**
  * Store unique du planning : réalité fixe, objectifs, ancres, tâches, mesures.
@@ -133,11 +140,28 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
       ],
     )
 
+    const rawTasks = TasksStateSchema.safeParse(tasks).data?.tasks ?? []
+    const rawObjectives = ObjectivesStateSchema.safeParse(objectives).data?.objectives ?? []
+    const rawAncres = AncresStateSchema.safeParse(ancres).data?.ancres ?? []
+
+    const cleanTasks = rawTasks.map((t, i) => ({
+      ...t,
+      color: assainirCouleur('task', t.color, i),
+    }))
+    const cleanObjectives = rawObjectives.map((o, i) => ({
+      ...o,
+      color: assainirCouleur('objective', o.color, i),
+    }))
+    const cleanAncres = rawAncres.map((a, i) => ({
+      ...a,
+      color: assainirCouleur('ancre', a.color, i),
+    }))
+
     set({
       loaded: true,
-      tasks: TasksStateSchema.safeParse(tasks).data?.tasks ?? [],
-      objectives: ObjectivesStateSchema.safeParse(objectives).data?.objectives ?? [],
-      ancres: AncresStateSchema.safeParse(ancres).data?.ancres ?? [],
+      tasks: cleanTasks,
+      objectives: cleanObjectives,
+      ancres: cleanAncres,
       schedule: ScheduleStateSchema.safeParse(schedule).data?.entries ?? [],
       learning: LearningStateSchema.safeParse(learning).data ?? EMPTY_LEARNING,
       sessionConfirmations:
@@ -159,8 +183,15 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
     const createdAt = new Date().toISOString()
     const id = crypto.randomUUID()
 
+    const activeTasks = get().tasks.filter((t) => t.status === 'active')
+    const color =
+      input.color && estCouleurDansFamille('task', input.color)
+        ? input.color
+        : allouerCouleurTache(activeTasks)
+
     const task: TaskItem = {
       ...input,
+      color,
       appsToBlock: input.appsToBlock ?? [],
       correctionFactor: factor.factor,
       remainingMinutes: planned,
@@ -247,8 +278,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async addObjective(input) {
+    const color =
+      input.color && estCouleurDansFamille('objective', input.color)
+        ? input.color
+        : allouerCouleurObjectif(get().objectives)
+
     const objective: ObjectiveItem = {
       ...input,
+      color,
       appsToBlock: input.appsToBlock ?? [],
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
@@ -277,8 +314,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
       )
     }
 
+    const color =
+      input.color && estCouleurDansFamille('ancre', input.color)
+        ? input.color
+        : allouerCouleurAncre(get().ancres)
+
     const ancre: AncreItem = {
       ...input,
+      color,
       appsToBlock: input.appsToBlock ?? [],
       id: crypto.randomUUID(),
       minimumMinutes: computeAncreMinimum(input.normalMaxMinutes),

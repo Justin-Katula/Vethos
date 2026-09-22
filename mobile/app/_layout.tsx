@@ -17,6 +17,7 @@ import { useDonnees } from '@/donnees/magasin'
 import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
 import { Introduction } from '@/accueil/Introduction'
+import { ChargementVethos } from '@/ui/MouvementVethos'
 
 // On garde l'écran de lancement jusqu'à ce que les polices soient là. Sans cela
 // la première image s'affiche en police système puis saute vers Geist — et ce
@@ -28,12 +29,17 @@ function Coque() {
   const nom = useNomTheme()
   const initialiser = useBlocage((e) => e.initialiser)
   const charger = useDonnees((e) => e.charger)
+  const donneesPretes = useDonnees((e) => e.chargees)
 
   useEffect(() => {
     // Les données d'abord : l'écran d'accueil les lit dès son premier rendu.
     void charger()
     void initialiser()
   }, [charger, initialiser])
+
+  if (!donneesPretes) {
+    return <ChargementVethos pleinEcran libelle="Vethos is reading your time." />
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: jetons.bg }}>

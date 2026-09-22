@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { teinteSuivante } from '@shared/teintes'
+import {
+  allouerCouleurAncre,
+  allouerCouleurObjectif,
+  allouerCouleurTache,
+  assainirCouleur,
+  couleurAncre,
+  couleurObjectif,
+  couleurTache,
+} from '@shared/palettes'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { usePlan } from '@/plan/Plan'
@@ -137,7 +145,7 @@ export default function Engagements() {
 
         {d.objectifs.map((o, i) => (
           <Rangee key={o.id} premiere={i === 0}>
-            <Marque couleur={o.couleur} />
+            <Marque couleur={assainirCouleur('objective', o.couleur, i)} />
             <View style={{ flex: 1 }}>
               <Texte>{o.nom}</Texte>
               <Texte ton="eteint" taille={12.5}>
@@ -170,7 +178,7 @@ export default function Engagements() {
 
         {d.ancres.map((a, i) => (
           <Rangee key={a.id} premiere={i === 0}>
-            <Marque couleur={a.couleur} />
+            <Marque couleur={assainirCouleur('ancre', a.couleur, i)} />
             <View style={{ flex: 1 }}>
               <Texte>{a.nom}</Texte>
               <Texte ton="eteint" taille={12.5}>
@@ -269,6 +277,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
   return (
     <View style={{ borderTopWidth: premiere ? 0 : 1, borderTopColor: j.line, paddingVertical: PAS[3], gap: PAS[2] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[3] }}>
+        <Marque couleur={assainirCouleur('task', racine.couleur, 0)} />
         <View style={{ flex: 1, gap: 3 }}>
           <Texte>{racine.titre}</Texte>
           <Texte ton="eteint" taille={12.5}>
@@ -316,7 +325,7 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
         )
         return (
           <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2], paddingLeft: PAS[4] }}>
-            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: verrouillee ? j.text3 : j.accentEncre }} />
+            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: verrouillee ? j.text3 : j.text2 }} />
             <Text style={{ flex: 1, fontFamily: GEIST.normal, fontSize: 12.5, color: verrouillee ? j.text3 : j.text2 }}>
               {titreDePartie(p, racine)}
               {verrouillee ? ' · waiting' : ''}
@@ -453,10 +462,12 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
 
   const valider = async () => {
     if (!complet) return
+    const couleur = allouerCouleurTache(d.taches.filter((x) => !x.terminee))
     await d.ajouterTache(
       {
         titre: titre.trim(),
         intention: intention.trim(),
+        couleur,
         echeance: dansNJours(Number(jours) || 7),
         importance,
         minutesEstimees: Math.max(5, Number(minutes) || 60),
@@ -552,10 +563,7 @@ function FormulaireObjectif({ surFin }: { surFin: () => void }) {
     await d.ajouterObjectif({
       nom: nom.trim(),
       intention: intention.trim(),
-      // La teinte est ATTRIBUEE par rang de creation, jamais choisie. Un
-      // selecteur de couleur transformerait la liste des engagements en
-      // decoration personnelle, et rien de ce temps-la n'avance le plan.
-      couleur: teinteSuivante(d.objectifs.length),
+      couleur: allouerCouleurObjectif(d.objectifs),
       cibleHebdoMinutes: Math.max(0, Math.round((Number(heures) || 5) * 60)),
     })
     surFin()
@@ -594,11 +602,9 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
     try {
       await d.ajouterAncre({
         nom: nom.trim(),
-        // D.3 : le declencheur derive du NOM, comme sur le bureau. Deux ancres
-        // qui s'appellent pareil sont la meme ancre, et le conflit doit le dire.
         declencheur: nom.trim().toLowerCase(),
         intention: intention.trim(),
-        couleur: j.blocAncre,
+        couleur: allouerCouleurAncre(d.ancres),
         minuteAncrage: versMinuteSure(heure),
         jours,
         dureeMinutes: Math.max(15, Number(minutes) || 60),

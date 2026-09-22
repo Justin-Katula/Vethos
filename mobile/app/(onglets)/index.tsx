@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -7,7 +7,7 @@ import { usePlan } from '@/plan/Plan'
 import { duree, enHeure, segmentActuel } from '@/plan/lecture'
 import { travailDevantToi } from '@/plan/signaux'
 import { useJetons } from '@/theme/Theme'
-import { PAS } from '@/theme/jetons'
+import { PAS, RAYON } from '@/theme/jetons'
 import { Horloge } from '@/ui/Horloge'
 import { AgendaJour } from '@/ui/AgendaJour'
 import { Faits } from '@/ui/Faits'
@@ -16,6 +16,7 @@ import { Projection } from '@/ui/Projection'
 import { Chevron, Plus } from '@/ui/icones'
 import { useLargeur } from '@/ui/largeur'
 import { GEIST, MONO } from '@/ui/primitives'
+import { ChargementVethos } from '@/ui/MouvementVethos'
 
 /**
  * B.5.2 : le pas de « il m'en faut plus ». Vingt-cinq minutes, comme sur le
@@ -39,8 +40,17 @@ export default function Aujourdhui() {
   const j = useJetons()
   const marges = useSafeAreaInsets()
   const routeur = useRouter()
-  const { fontScale } = useWindowDimensions()
+  const { width: largeurFenetre, fontScale } = useWindowDimensions()
   const large = useLargeur().deuxColonnes
+  const largeurSlide = large ? 400 : Math.max(300, largeurFenetre - PAS[5] * 2)
+  const [vueHero, setVueHero] = useState<0 | 1>(0)
+  const scrollHeroRef = useRef<ScrollView>(null)
+
+  const changerSlide = (index: 0 | 1) => {
+    setVueHero(index)
+    scrollHeroRef.current?.scrollTo({ x: index * largeurSlide, animated: true })
+  }
+
   const { resultat, jours, minute, maintenant, aujourdHui, chargees } = usePlan()
   const { taches, objectifs, ancres, obligations, ajouterDuTemps } = useDonnees()
 
@@ -55,7 +65,7 @@ export default function Aujourdhui() {
 
   const jour = jours[0]
   if (!jour || !chargees) {
-    return <View style={{ flex: 1, backgroundColor: j.bg }} accessibilityLabel="Loading your plan" />
+    return <ChargementVethos pleinEcran libelle="Vethos is placing your day." />
   }
 
   const blocsDuJour = resultat.blocks.filter((b) => b.date === aujourdHui)
@@ -76,67 +86,269 @@ export default function Aujourdhui() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: j.bg }}
-      contentContainerStyle={{ paddingTop: marges.top + PAS[5], paddingBottom: PAS[10], paddingHorizontal: PAS[5] }}
+      contentContainerStyle={{ paddingTop: marges.top + PAS[2], paddingBottom: PAS[10], paddingHorizontal: PAS[5] }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, gap: 5 }}>
-          <Text style={{ fontFamily: GEIST.demi, fontSize: 30, letterSpacing: -0.8, color: j.text }}>Today</Text>
-          <Text style={{ fontFamily: GEIST.normal, color: j.text2, fontSize: 14 }}>
-            {maintenant.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add a commitment"
-          onPress={() => routeur.push('/engagements')}
-          style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 8, backgroundColor: j.surface2, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
-        >
-          <Plus couleur={j.text} taille={20} />
-        </Pressable>
-      </View>
-
       {/* ── LA COMPOSITION ────────────────────────────────────────────────
           Deux colonnes des que l'ecran les permet — l'objet qu'on REGARDE a
-          gauche, tout ce qui se LIT a droite — et une seule en dessous.
-
-          C'est la composition du bureau, et son commentaire dit pourquoi :
-          centre, le cadran laissait « cinq cents pixels de noir mort de chaque
-          cote, la mise en page d'un telephone etiree sur un ecran large ».
-          L'inverse gaspille exactement autant : cette meme colonne unique,
-          imposee a un iPad ou a un iPhone tourne, laisse la moitie de l'ecran
-          vide. Vethos ne choisit donc pas entre les deux — il prend celle que
-          la largeur permet. */}
+          gauche, tout ce qui se LIT a droite — et une seule en dessous. */}
       <View style={large
-        ? { flexDirection: 'row', alignItems: 'flex-start', gap: PAS[10], marginTop: PAS[6] }
+        ? { flexDirection: 'row', alignItems: 'flex-start', gap: PAS[10], marginTop: PAS[2] }
         : {}}>
-      <View style={large ? { width: 400 } : {}}>
-      {/* Au centre du cadran : ce qu'il te RESTE, pas l'heure. L'heure, le
-          téléphone l'affiche déjà en haut de son propre écran ; la répéter au
-          plus grand corps de l'application reviendrait à donner la place
-          d'honneur à ce qu'on sait déjà. */}
-      <Horloge
-        jour={jour}
-        minute={minute}
-        centre={devant > 0 ? (
-          <>
-            <Text style={{ fontFamily: GEIST.normal, color: j.accentEncre, fontSize: 44 / Math.max(1, fontScale / 1.3), letterSpacing: -1.4, fontVariant: ['tabular-nums'] }}>
-              {duree(devant)}
+      <View style={large ? { width: 400 } : { width: '100%', alignItems: 'center' }}>
+        {/* Sélecteur de vue : Today vs Projection */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            marginBottom: PAS[3],
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: vueHero === 0 }}
+            accessibilityLabel="Show Today clock"
+            onPress={() => changerSlide(0)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 16,
+              backgroundColor: vueHero === 0 ? j.surface2 : 'transparent',
+              borderWidth: 1,
+              borderColor: vueHero === 0 ? j.lineForte : 'transparent',
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            })}
+          >
+            <View
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 2.5,
+                backgroundColor: vueHero === 0 ? j.accentEncre : j.text3,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: GEIST.demi,
+                fontSize: 12,
+                color: vueHero === 0 ? j.text : j.text3,
+              }}
+            >
+              Today
             </Text>
-            <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>ahead of you</Text>
-          </>
-        ) : (
-          <>
-            <Text style={{ fontFamily: GEIST.normal, color: j.text2, fontSize: 44 / Math.max(1, fontScale / 1.3), letterSpacing: -1.4, fontVariant: ['tabular-nums'] }}>
-              {enHeure(minute)}
-            </Text>
-            <Text numberOfLines={2} style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text3, textAlign: 'center' }}>
-              {blocsDuJour.length === 0 ? 'nothing on the board' : 'nothing left before tomorrow'}
-            </Text>
-          </>
-        )}
-      />
+          </Pressable>
 
-      {capacite ? <Mesures capacite={capacite} engage={engage} /> : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: vueHero === 1 }}
+            accessibilityLabel="Show Projection"
+            onPress={() => changerSlide(1)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 16,
+              backgroundColor: vueHero === 1 ? j.surface2 : 'transparent',
+              borderWidth: 1,
+              borderColor: vueHero === 1 ? j.lineForte : 'transparent',
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            })}
+          >
+            <View
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 2.5,
+                backgroundColor: vueHero === 1 ? j.accentEncre : j.text3,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: GEIST.demi,
+                fontSize: 12,
+                color: vueHero === 1 ? j.text : j.text3,
+              }}
+            >
+              Projection
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Carrousel horizontal : Swipe entre Horloge et Projection */}
+        <ScrollView
+          ref={scrollHeroRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          onMomentumScrollEnd={(e) => {
+            const x = e.nativeEvent.contentOffset.x
+            const index = Math.round(x / (largeurSlide || 1))
+            if (index === 0 || index === 1) {
+              setVueHero(index)
+            }
+          }}
+          style={{ width: largeurSlide }}
+          contentContainerStyle={{ width: largeurSlide * 2 }}
+        >
+          {/* Slide 0 : L'Horloge (Cadran 24h) + Mesures + Action */}
+          <View style={{ width: largeurSlide }}>
+            <Horloge
+              jour={jour}
+              minute={minute}
+              centre={
+                <View style={{ alignItems: 'center', gap: 4 }}>
+                  {/* Tag Today / Date */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingHorizontal: 9,
+                      paddingVertical: 3,
+                      borderRadius: 10,
+                      backgroundColor: j.surface2,
+                      borderWidth: 1,
+                      borderColor: j.lineForte,
+                    }}
+                  >
+                    <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: j.accentEncre }} />
+                    <Text
+                      style={{
+                        fontFamily: GEIST.demi,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        textTransform: 'uppercase',
+                        color: j.text2,
+                      }}
+                    >
+                      Today · {maintenant.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </Text>
+                  </View>
+
+                  {/* Heure courante */}
+                  <Text
+                    style={{
+                      fontFamily: GEIST.demi,
+                      color: j.text,
+                      fontSize: 38 / Math.max(1, fontScale / 1.3),
+                      letterSpacing: -1,
+                      fontVariant: ['tabular-nums'],
+                      lineHeight: 42 / Math.max(1, fontScale / 1.3),
+                    }}
+                  >
+                    {enHeure(minute)}
+                  </Text>
+
+                  {/* Statut / travail devant soi */}
+                  {devant > 0 ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                      <Text
+                        style={{
+                          fontFamily: MONO.demi,
+                          fontSize: 13,
+                          color: j.accentEncre,
+                          fontVariant: ['tabular-nums'],
+                        }}
+                      >
+                        {duree(devant)}
+                      </Text>
+                      <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: j.text3 }}>
+                        ahead
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontFamily: GEIST.moyen,
+                        fontSize: 12,
+                        color: j.text3,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {blocsDuJour.length === 0 ? 'Free day' : 'All done'}
+                    </Text>
+                  )}
+                </View>
+              }
+            />
+
+            {capacite ? <Mesures capacite={capacite} engage={engage} /> : null}
+
+            {/* Bouton d'action principal : dans la zone naturelle du pouce (Thumb Zone) */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add a commitment"
+              onPress={() => routeur.push('/engagements')}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: PAS[2],
+                backgroundColor: pressed ? j.lineForte : j.surface2,
+                borderWidth: 1,
+                borderColor: j.lineForte,
+                borderBottomWidth: 2,
+                borderBottomColor: j.accent,
+                borderRadius: RAYON.md,
+                paddingVertical: 12,
+                paddingHorizontal: PAS[5],
+                marginTop: PAS[5],
+                alignSelf: 'center',
+                width: '100%',
+                maxWidth: 320,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              })}
+            >
+              <Plus couleur={j.accentEncre} taille={16} />
+              <Text style={{ fontFamily: GEIST.demi, fontSize: 13.5, color: j.text, letterSpacing: -0.2 }}>
+                Add a commitment
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Slide 1 : La Projection (accessible par swipe ou tap) */}
+          <View style={{ width: largeurSlide }}>
+            <Projection sansMarge />
+          </View>
+        </ScrollView>
+
+        {/* Indicateurs de pagination discrets (dots) */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            marginTop: PAS[3],
+          }}
+        >
+          <View
+            style={{
+              width: vueHero === 0 ? 16 : 5,
+              height: 5,
+              borderRadius: 2.5,
+              backgroundColor: vueHero === 0 ? j.accentEncre : j.lineForte,
+            }}
+          />
+          <View
+            style={{
+              width: vueHero === 1 ? 16 : 5,
+              height: 5,
+              borderRadius: 2.5,
+              backgroundColor: vueHero === 1 ? j.accentEncre : j.lineForte,
+            }}
+          />
+        </View>
       </View>
 
       <View style={large ? { flex: 1, minWidth: 0 } : {}}>
@@ -159,23 +371,35 @@ export default function Aujourdhui() {
 
       <Faits resultat={resultat} nomDe={nomDe} />
 
-      {/* Tant que la semaine n'est pas déclarée, le moteur travaille sur une
-          journée de 24 h moins le sommeil — c'est-à-dire sur une journée qui
-          n'existe pas. Le dire une fois vaut mieux que de laisser croire au
-          plan. */}
+      {/* Raccourci vers la déclaration des cours et obligations */}
       {obligations.length === 0 ? (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Declare your schedule in My time"
           onPress={() => routeur.push('/temps')}
-          style={({ pressed }) => ({ marginTop: PAS[6], opacity: pressed ? 0.6 : 1 })}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: PAS[3],
+            marginTop: PAS[5],
+            padding: PAS[3] + 2,
+            borderRadius: 8,
+            backgroundColor: j.surface2,
+            borderWidth: 1,
+            borderColor: j.lineForte,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+          })}
         >
-          <Text style={{ fontFamily: GEIST.normal, fontSize: 13, lineHeight: 20, color: j.text2 }}>
-            Vethos only knows your sleep hours so far.{' '}
-            <Text style={{ color: j.text, textDecorationLine: 'underline' }}>
-              Declare your classes, your work and your commutes
-            </Text>{' '}
-            once — everything else follows from them.
-          </Text>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontFamily: GEIST.demi, fontSize: 13, color: j.text }}>
+              Declare your schedule
+            </Text>
+            <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: j.text3 }}>
+              Fixed classes, work and commutes in My time
+            </Text>
+          </View>
+          <Chevron couleur={j.text2} taille={14} />
         </Pressable>
       ) : null}
 
@@ -183,22 +407,31 @@ export default function Aujourdhui() {
         <Text style={{ fontFamily: GEIST.demi, fontSize: 18, color: j.text }}>Your day</Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open week view"
           onPress={() => routeur.push('/temps')}
-          style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', gap: PAS[2], alignItems: 'center', opacity: pressed ? 0.5 : 1 })}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 6,
+            backgroundColor: pressed ? j.line : j.surface2,
+            borderWidth: 1,
+            borderColor: j.lineForte,
+            transform: [{ scale: pressed ? 0.96 : 1 }],
+          })}
         >
-          <Text style={{ fontFamily: GEIST.moyen, fontSize: 13, color: j.text2 }}>The week</Text>
-          <Chevron couleur={j.text2} taille={14} />
+          <Text style={{ fontFamily: GEIST.moyen, fontSize: 12, color: j.text2 }}>The week</Text>
+          <Chevron couleur={j.text2} taille={12} />
         </Pressable>
       </View>
       <AgendaJour segments={jour.segments} minute={minute} vide="Nothing committed today." />
 
       {ouvertes.length > 0 ? (
         <View style={{ marginTop: PAS[8] }}>
-          <View style={{ borderBottomWidth: 1, borderBottomColor: j.line, paddingBottom: PAS[2], gap: PAS[1] }}>
+          <View style={{ borderBottomWidth: 1, borderBottomColor: j.line, paddingBottom: PAS[2] }}>
             <Text style={{ fontFamily: GEIST.demi, fontSize: 15, color: j.text }}>Tasks in progress</Text>
-            <Text style={{ fontFamily: GEIST.normal, fontSize: 11.5, color: j.text3 }}>
-              The engine places them for you · “+{PAS_DE_TEMPS} min” if the planned time runs short
-            </Text>
           </View>
           {ouvertes.map((t) => {
             const pose = resultat.blocks
@@ -229,18 +462,27 @@ export default function Aujourdhui() {
                 <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2, fontVariant: ['tabular-nums'] }}>
                   {t.echeance.slice(8)}/{t.echeance.slice(5, 7)}
                 </Text>
-                {/* B.5.2 : le seul geste qui touche encore à une tâche. Il ne
-                    la termine pas et ne la reporte pas — il reconnaît que
-                    l'estimation était courte, ce que personne ne peut savoir
-                    avant d'avoir commencé. */}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Grant ${PAS_DE_TEMPS} more minutes to ${t.titre}`}
                   onPress={() => void ajouterDuTemps(t.id, PAS_DE_TEMPS)}
-                  hitSlop={8}
-                  style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}
+                  hitSlop={4}
+                  style={({ pressed }) => ({
+                    minHeight: 30,
+                    paddingHorizontal: 9,
+                    borderRadius: 6,
+                    backgroundColor: pressed ? j.lineForte : j.surface2,
+                    borderWidth: 1,
+                    borderColor: j.lineForte,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transform: [{ scale: pressed ? 0.94 : 1 }],
+                  })}
                 >
-                  <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2 }}>+{PAS_DE_TEMPS}</Text>
+                  <Text style={{ fontFamily: MONO.demi, fontSize: 11.5, color: j.text, fontVariant: ['tabular-nums'] }}>
+                    +{PAS_DE_TEMPS}m
+                  </Text>
                 </Pressable>
               </View>
             )
@@ -250,12 +492,6 @@ export default function Aujourdhui() {
 
       </View>
       </View>
-
-      {/* La derniere section, et la seule qui regarde loin. En haut, elle
-          repousserait la journee — or c'est la journee qu'on ouvre
-          l'application pour voir. Pleine largeur : c'est ce que le bureau fait
-          aussi, sous ses deux colonnes. */}
-      <Projection />
     </ScrollView>
   )
 }
