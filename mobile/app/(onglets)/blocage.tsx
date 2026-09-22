@@ -131,8 +131,17 @@ export default function Blocage() {
           <Rangee premiere>
             <View style={{ flex: 1 }}>
               <Texte>{decrireSelection(selection)}</Texte>
+              {/*
+                Décrit, pas relu. Cette ligne affichait `selection.libelle` —
+                une étiquette que Vethos écrit lui-même et range avec la
+                sélection. Le jour où l'application est passée à l'anglais,
+                les sélections déjà enregistrées ont continué d'afficher leur
+                phrase française, sur un écran que plus aucune relecture du
+                code ne pouvait corriger. Un texte affiché ne vient pas du
+                stockage.
+              */}
               <Texte ton="eteint" taille={12.5}>
-                {selection.libelle}
+                Set aside during a session
               </Texte>
             </View>
           </Rangee>

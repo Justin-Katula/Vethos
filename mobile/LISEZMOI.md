@@ -38,15 +38,17 @@ Le masquage demande `FamilyControls`, qui ne peut pas vivre dans Expo Go. Il
 faut une compilation à toi, signée avec ton compte Apple.
 
 ```bash
-npm run build:dev
+APPLE_TEAM_ID=XXXXXXXXXX npm run build:dev
 ```
 
 Trois choses sont nécessaires avant, et aucune ne dépend du code :
 
 1. **Un compte Apple Developer** (99 $/an). C'est lui qui signe.
-2. **`ios.appleTeamId` dans `app.json`.** Il se lit dans Xcode ou sur
-   l'espace développeur Apple. Sans lui, la compilation échoue — le
-   serveur de développement le signale déjà à chaque démarrage.
+2. **Ton identifiant d'équipe**, dix caractères, qui se lit sur l'espace
+   développeur Apple (Membership) ou dans Xcode. Il se passe en variable
+   plutôt qu'en fichier : il identifie *une personne*, pas le produit, et
+   n'a donc rien à faire dans le dépôt. Sans lui, le serveur le signale à
+   chaque démarrage — c'est la bonne façon de s'en apercevoir.
 3. **L'entitlement `com.apple.developer.family-controls` en distribution.**
    Apple ne l'accorde pas automatiquement : il se demande par un formulaire,
    et la réponse prend des jours. Il est déjà déclaré dans `app.json` ; c'est
@@ -55,6 +57,24 @@ Trois choses sont nécessaires avant, et aucune ne dépend du code :
 Tant que le point 3 n'est pas obtenu, une compilation s'installe et tourne,
 mais le Temps d'écran refuse l'autorisation — l'écran Blocage restera sur
 « Autoriser » sans effet.
+
+### Ce que la compilation apporte, et qu'Expo Go ne peut pas montrer
+
+Quatre mécanismes ne s'allument que sur une version compilée. Tout est déjà
+écrit et testé ; c'est l'accès au Temps d'écran qui manque, pas le code.
+
+| | Ce qui se passe |
+|---|---|
+| **Le bouclier** | L'écran qu'on voit en ouvrant une application écartée. Il porte le thème de Vethos, le nom de l'application — substitué par l'extension, jamais lu par l'application — et le bloc en cours avec son heure de fin. |
+| **Écarter** | Seule la sélection est masquée. Applications, catégories **et sites web** : un site laissé de côté reste à un geste. |
+| **Focus profond** | Tout est masqué sauf une liste gardée. Garde Vethos dedans, sinon la seule sortie passe par les Réglages d'iOS. |
+| **Le filtre web** | Celui d'Apple, pas une liste à nous : une liste qu'on maintient vieillit et laisse passer ce qu'elle promet d'écarter. |
+
+L'écran Blocage porte aussi un bouton **« Check with iOS now »**. C'est la
+seule ligne qui ne soit pas une déclaration d'intention : tout le reste dit
+ce que Vethos a *demandé* à iOS, celle-ci rapporte ce qu'iOS *fait*. Les deux
+ont déjà divergé en silence — dans Expo Go, chaque appel réussissait et aucun
+bouclier ne se levait jamais.
 
 ---
 

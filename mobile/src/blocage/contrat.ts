@@ -63,7 +63,16 @@ export const SelectionSchema = z.object({
   nbApplications: z.number().int().min(0),
   nbCategories: z.number().int().min(0),
   nbSitesWeb: z.number().int().min(0),
-  /** Nom donné par l'utilisateur : « Réseaux sociaux », « Jeux ». */
+  /**
+   * Réservé au jour où l'utilisateur pourra nommer sa sélection lui-même.
+   *
+   * **Aucun écran ne l'affiche, et c'est délibéré.** Il a porté un temps une
+   * étiquette que Vethos écrivait pour lui ; au passage à l'anglais, les
+   * sélections déjà enregistrées ont continué d'afficher leur phrase
+   * française — sur un écran qu'aucune relecture du code ne pouvait plus
+   * corriger, puisque le texte venait du stockage. Un nom écrit par
+   * l'utilisateur, lui, aura le droit d'être affiché : c'est le sien.
+   */
   libelle: z.string().max(60),
   creeeLe: z.string().datetime(),
 })
