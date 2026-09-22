@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { AppState, Linking, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
-import { decrireSelection, type ModeBlocage } from '@/blocage/contrat'
+import { decrireSelection, selectionEstVide, type ModeBlocage } from '@/blocage/contrat'
 import { SelecteurApplications, type RoleSelecteur } from '@/blocage/SelecteurApplications'
 import { useJetons, useNomTheme } from '@/theme/Theme'
 import { PAS, RAYON } from '@/theme/jetons'
@@ -39,6 +39,7 @@ export default function Blocage() {
     plagesActives, ecartees, occupe, simule, verifie,
   } = useBlocage()
   const demander = useBlocage((e) => e.demanderAutorisation)
+  const relire = useBlocage((e) => e.relireAutorisation)
   const choisir = useBlocage((e) => e.choisirApplications)
   const choisirMode = useBlocage((e) => e.choisirMode)
   const basculerFiltreWeb = useBlocage((e) => e.basculerFiltreWeb)
@@ -63,6 +64,19 @@ export default function Blocage() {
     // ne doit jamais effacer le nom du bloc que le bouclier porte.
     habiller({ theme, finMinute: enCours.finMinute })
   }, [theme, enCours, habiller])
+
+  // L'autorisation appartient à iOS, qui peut la retirer pendant que
+  // l'application dort — et qui la RE-accorde depuis les Réglages, sans que
+  // Vethos redémarre. La relire au seul lancement laissait donc l'écran figé
+  // sur « Open Settings » après un aller-retour qui avait pourtant marché :
+  // le seul geste que l'écran propose paraissait sans effet.
+  useEffect(() => {
+    void relire()
+    const abonnement = AppState.addEventListener('change', (etat) => {
+      if (etat === 'active') void relire()
+    })
+    return () => abonnement.remove()
+  }, [relire])
 
   // Le sélecteur d'Apple est une VUE, pas une fonction. Sur un vrai appareil on
   // la monte ; dans le navigateur, le simulateur fait le travail tout seul.
@@ -101,6 +115,10 @@ export default function Blocage() {
             <Valeur ton="accent" taille={12}>
               GRANTED
             </Valeur>
+          ) : autorisation === 'refusee' ? (
+            <Valeur ton="doux" taille={12}>
+              DECLINED
+            </Valeur>
           ) : null
         }
       >
@@ -109,10 +127,30 @@ export default function Blocage() {
             iOS never tells Vethos which apps you picked — only how many. That is a guarantee
             of the system, not a promise of ours.
           </Texte>
+        ) : autorisation === 'refusee' ? (
+          <>
+            {/*
+              iOS ne redemande PAS. Une fois refusée, la feuille système ne
+              réapparaît plus : `requestAuthorization` lève aussitôt, sans rien
+              afficher. Laisser le bouton « Allow » ici donnerait un bouton qui
+              ne fait plus jamais rien — le seul chemin restant passe par les
+              Réglages, alors autant le dire et y mener.
+            */}
+            <Texte ton="doux">
+              iOS will not ask twice. Turn it back on in Settings › Screen Time › Apps with
+              Screen Time Access, then come back — Vethos re-reads it on its own.
+            </Texte>
+            <Espace h={4} />
+            <BoutonIris onPress={() => void ouvrirReglages()} desactive={occupe}>
+              Open Settings
+            </BoutonIris>
+          </>
         ) : (
           <>
             <Texte ton="doux">
-              Without it, Vethos can only show you your plan.
+              {autorisation === 'inconnue'
+                ? 'Vethos could not read what iOS answered. Asking again is safe — it changes nothing if permission is already granted.'
+                : 'Without it, Vethos can only show you your plan.'}
             </Texte>
             <Espace h={4} />
             <BoutonIris onPress={() => void demander()} desactive={occupe}>
@@ -130,7 +168,11 @@ export default function Blocage() {
         {selection ? (
           <Rangee premiere>
             <View style={{ flex: 1 }}>
-              <Texte>{decrireSelection(selection)}</Texte>
+              <Texte ton={selectionEstVide(selection) ? 'accent' : 'normal'}>
+                {selectionEstVide(selection)
+                  ? 'Nothing selected — a session will shield nothing.'
+                  : decrireSelection(selection)}
+              </Texte>
               {/*
                 Décrit, pas relu. Cette ligne affichait `selection.libelle` —
                 une étiquette que Vethos écrit lui-même et range avec la
@@ -386,6 +428,23 @@ function ChoixMode({
 function minuteCourante(): number {
   const d = new Date()
   return d.getHours() * 60 + d.getMinutes()
+}
+
+/**
+ * Les Réglages d'iOS, et seulement par la porte publique.
+ *
+ * `openSettings()` ouvre la fiche de Vethos. Il existe des adresses internes
+ * qui mènent droit au Temps d'écran (`App-Prefs:…`) — elles marchent, et elles
+ * font refuser une application à la revue. La phrase au-dessus du bouton
+ * indique donc le chemin en toutes lettres : deux touches de plus, aucun
+ * risque de voir l'application rejetée pour un raccourci.
+ */
+async function ouvrirReglages(): Promise<void> {
+  try {
+    await Linking.openSettings()
+  } catch {
+    // Rien à faire de plus : l'utilisateur garde le chemin écrit au-dessus.
+  }
 }
 
 /**

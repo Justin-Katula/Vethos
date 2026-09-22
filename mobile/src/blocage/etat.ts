@@ -5,6 +5,7 @@ import {
   SelectionSchema,
   fusionnerPlages,
   limiterAuxCapacitesIOS,
+  selectionEstVide,
   type EtatAutorisation,
   type ModeBlocage,
   type Plage,
@@ -63,6 +64,14 @@ type EtatBlocage = {
 
   initialiser: () => Promise<void>
   demanderAutorisation: () => Promise<void>
+  /**
+   * Relit ce qu'iOS dit de l'autorisation, sans rien demander.
+   *
+   * Distincte de `demanderAutorisation` a dessein : une fois refusee, la
+   * feuille systeme ne reapparait plus jamais, et redemander ne ferait que
+   * lever une exception. Le retour des Reglages passe donc par ici.
+   */
+  relireAutorisation: () => Promise<void>
   choisirApplications: () => Promise<void>
   /** Enregistre une selection venue du selecteur natif, qui est une VUE. */
   poserSelection: (s: Selection) => Promise<void>
@@ -135,6 +144,22 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     }
   },
 
+  async relireAutorisation() {
+    // Pas de `occupe` : cette lecture se declenche a chaque retour au premier
+    // plan, et faire clignoter tous les boutons de l'ecran a chaque fois
+    // qu'on revient dans l'application serait pire que de ne rien montrer.
+    const avant = get().autorisation
+    const apres = await pontEcran().lireAutorisation()
+    if (apres === avant) return
+    set({
+      autorisation: apres,
+      // Une autorisation qui tombe emporte ce qu'elle tenait. Laisser les
+      // plages affichees donnerait une liste de seances « programmees » que
+      // plus rien ne protege — le mensonge le plus facile a eviter.
+      ...(apres === 'accordee' ? {} : { plagesActives: [], titreSeance: null }),
+    })
+  },
+
   async choisirApplications() {
     set({ occupe: true })
     try {
@@ -199,7 +224,15 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   async ouvrirSeance(plage, contexte) {
     // Sans selection, il n'y a rien a ecarter. On ne leve pas un bouclier vide
     // « au cas ou » : ce serait un ecran noir sans raison.
-    if (!get().selection) return
+    //
+    // VIDE compte comme absente, et ce n'est pas un detail : quand on
+    // decoche tout dans le selecteur, iOS RETIRE la selection rangee sous
+    // notre identifiant (`removeFamilyActivitySelectionById`). Vethos gardait
+    // pourtant un objet avec des comptes a zero, passait cette garde, et
+    // programmait un bouclier sur une selection que le systeme n'a plus.
+    // L'ecran affichait « ACTIVE » au-dessus de rien du tout.
+    const selection = get().selection
+    if (!selection || selectionEstVide(selection)) return
     // L'habillage AVANT la programmation : c'est ce que l'extension lira au
     // reveil. Depose apres, la premiere ouverture d'une application ecartee
     // montrerait le bouclier de la seance PRECEDENTE — le mauvais titre, la

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { creerPontDepuis, type ModuleEcran } from './pont-natif'
+// La constante du GREFFON, pas une copie. Si le module change ses valeurs, ce
+// fichier tombe — ce qui est exactement ce qu'on veut de lui.
+import { AuthorizationStatus } from 'react-native-device-activity/build/ReactNativeDeviceActivity.types.js'
+import { AUTORISATION_IOS, creerPontDepuis, type ModuleEcran } from './pont-natif'
 import type { Plage } from './contrat'
 import { habillageBouclier } from './bouclier'
 
@@ -24,7 +27,10 @@ function moduleEspion(disponible = true) {
   const appels: string[] = []
   const natif = {
     isAvailable: vi.fn(() => disponible),
-    getAuthorizationStatus: vi.fn(() => 'approved'),
+    // La vraie valeur du greffon — un ENTIER. L'ancienne doublure rendait
+    // 'approved', une chaine qui n'existe nulle part dans le module, et
+    // validait ainsi le defaut qu'elle aurait du attraper.
+    getAuthorizationStatus: vi.fn(() => AuthorizationStatus.approved),
     requestAuthorization: vi.fn(async () => undefined),
     configureActions: vi.fn((a: { activityName: string; callbackName: string; actions: unknown[] }) => {
       const types = a.actions.map((x) => (x as { type?: string }).type ?? '?').join('+')
@@ -301,14 +307,42 @@ describe('tout lever', () => {
 })
 
 describe('l’autorisation', () => {
-  it('traduit ce qu’Apple répond, sans l’interpréter', async () => {
-    const { natif } = moduleEspion()
-    const pont = creerPontDepuis(natif)
-    expect(await pont.lireAutorisation()).toBe('accordee')
+  it('lit les valeurs que le greffon rend VRAIMENT, pas celles qu’on imaginait', async () => {
+    // Ce test est ancré sur la constante exportée par le greffon lui-même.
+    // Le defaut le plus cher de tout le blocage a vecu ici : le pont
+    // comparait la reponse aux chaines 'approved' / 'denied', qui n'existent
+    // nulle part dans le module. Swift rend `status.rawValue` — 0, 1 ou 2 —
+    // et les TROIS etats retombaient donc sur « jamais demandee ».
+    //
+    // Sur l'appareil : on accorde le Temps d'ecran, et Vethos affiche
+    // « Allow » pour toujours. Le bouton du selecteur reste desactive,
+    // aucune application ne peut etre designee, rien ne peut etre masque.
+    //
+    // Et l'ancien test PASSAIT, parce que sa doublure rendait 'approved' —
+    // ce qu'on croyait. Une doublure ecrite d'apres une croyance ne verifie
+    // que la croyance.
+    expect(AUTORISATION_IOS.accordee).toBe(AuthorizationStatus.approved)
+    expect(AUTORISATION_IOS.refusee).toBe(AuthorizationStatus.denied)
+    expect(AUTORISATION_IOS.indetermine).toBe(AuthorizationStatus.notDetermined)
 
-    const refus = moduleEspion()
-    ;(refus.natif.getAuthorizationStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue('denied')
-    expect(await creerPontDepuis(refus.natif).lireAutorisation()).toBe('refusee')
+    const lirePour = async (valeur: unknown) => {
+      const { natif } = moduleEspion()
+      ;(natif.getAuthorizationStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(valeur)
+      return creerPontDepuis(natif).lireAutorisation()
+    }
+
+    expect(await lirePour(AuthorizationStatus.approved)).toBe('accordee')
+    expect(await lirePour(AuthorizationStatus.denied)).toBe('refusee')
+    expect(await lirePour(AuthorizationStatus.notDetermined)).toBe('jamais_demandee')
+  })
+
+  it('dit « inconnue » plutôt que d’inventer un état plausible', async () => {
+    // L'ancien repli traduisait l'incomprehension en « jamais demandee », un
+    // etat credible qui faisait afficher un bouton faux sans que rien ne
+    // signale quoi que ce soit. Un etat qui ne se lit pas doit se voir.
+    const { natif } = moduleEspion()
+    ;(natif.getAuthorizationStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue('approved')
+    expect(await creerPontDepuis(natif).lireAutorisation()).toBe('inconnue')
   })
 
   it('relit le statut APRÈS la demande, au lieu de supposer un oui', async () => {
@@ -318,5 +352,21 @@ describe('l’autorisation', () => {
     const { natif } = moduleEspion()
     await creerPontDepuis(natif).demanderAutorisation()
     expect(natif.getAuthorizationStatus).toHaveBeenCalled()
+  })
+
+  it('traite un refus comme une réponse, pas comme une panne', async () => {
+    // `requestAuthorization` LÈVE quand on referme la feuille sans accorder,
+    // et leve aussi — sans rien afficher — quand on a deja refuse une fois.
+    // Sans filet, ce refus partait en rejet non attrape : l'ecran restait
+    // sur « Allow » et retaper ne produisait plus jamais rien.
+    const { natif } = moduleEspion()
+    ;(natif.requestAuthorization as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('The operation couldn’t be completed.'),
+    )
+    ;(natif.getAuthorizationStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      AuthorizationStatus.denied,
+    )
+
+    await expect(creerPontDepuis(natif).demanderAutorisation()).resolves.toBe('refusee')
   })
 })

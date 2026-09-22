@@ -77,6 +77,50 @@ export type ModuleEcran = {
   isWebContentFilterPolicyActive: () => boolean
 }
 
+/**
+ * Ce qu'`AuthorizationCenter` rend vraiment : un ENTIER.
+ *
+ * Le défaut le plus cher de tout le blocage a vécu ici. Le pont comparait la
+ * réponse aux chaînes `'approved'` et `'denied'` — des valeurs qui n'existent
+ * nulle part dans le greffon. Swift rend `status.rawValue`, c'est-à-dire 0, 1
+ * ou 2. **Les trois états retombaient donc sur « jamais demandée ».**
+ *
+ * Sur l'appareil, cela donnait ceci : on accorde le Temps d'écran, iOS
+ * enregistre l'accord, et Vethos continue d'afficher « Allow » pour toujours.
+ * Le bouton du sélecteur restait désactivé, aucune application ne pouvait
+ * être désignée, et rien ne pouvait jamais être masqué. Une application de
+ * blocage bloquée par sa propre lecture d'une réponse.
+ *
+ * Et les tests passaient : l'espion rendait `'approved'`, c'est-à-dire ce
+ * qu'on CROYAIT que le module rend. Un doublure écrite d'après une croyance
+ * ne vérifie que la croyance. Celle du test s'ancre maintenant sur la
+ * constante exportée par le greffon lui-même.
+ */
+export const AUTORISATION_IOS = { indetermine: 0, refusee: 1, accordee: 2 } as const
+
+/**
+ * Une valeur qu'on ne reconnaît pas rend `'inconnue'`, jamais
+ * « jamais demandée ».
+ *
+ * C'est le coeur de la leçon. L'ancien repli traduisait l'incompréhension en
+ * un état plausible, et l'écran affichait tranquillement un bouton faux. Un
+ * état qui ne se lit pas doit se voir.
+ */
+export function traduireAutorisation(brut: unknown): EtatAutorisation {
+  const valeur =
+    typeof brut === 'number' ? brut : typeof brut === 'string' ? Number(brut) : Number.NaN
+  switch (valeur) {
+    case AUTORISATION_IOS.accordee:
+      return 'accordee'
+    case AUTORISATION_IOS.refusee:
+      return 'refusee'
+    case AUTORISATION_IOS.indetermine:
+      return 'jamais_demandee'
+    default:
+      return 'inconnue'
+  }
+}
+
 /** Le pont, à partir d'un module donné. La seule forme testable. */
 export function creerPontDepuis(natif: ModuleEcran): PontEcran {
   // `require` REUSSIT toujours, meme sans le module natif : le paquet appelle
@@ -87,22 +131,26 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
   // eviter. `isAvailable()` est le seul test qui distingue les deux.
   if (!natif.isAvailable()) throw new Error('Screen Time is missing from this build')
 
-  const traduire = (brut: string): EtatAutorisation => {
-    if (brut === 'approved') return 'accordee'
-    if (brut === 'denied') return 'refusee'
-    return 'jamais_demandee'
-  }
-
   return {
     estReel: true,
 
     async lireAutorisation() {
-      return traduire(String(natif.getAuthorizationStatus()))
+      return traduireAutorisation(natif.getAuthorizationStatus())
     },
 
     async demanderAutorisation() {
-      await natif.requestAuthorization('individual')
-      return traduire(String(natif.getAuthorizationStatus()))
+      try {
+        await natif.requestAuthorization('individual')
+      } catch {
+        // iOS LÈVE quand l'utilisateur referme la feuille système sans
+        // accorder — et il lève aussi, sans rien afficher, quand il a déjà
+        // refusé une fois. Dans les deux cas la réponse est le STATUT, pas
+        // l'exception : la relire ci-dessous dit la vérité, la laisser
+        // remonter ne dit rien à personne. Sans ce filet, un refus partait
+        // en rejet non attrapé, l'écran restait sur « Allow », et retaper
+        // ne produisait plus jamais rien.
+      }
+      return traduireAutorisation(natif.getAuthorizationStatus())
     },
 
     async choisirApplications() {
