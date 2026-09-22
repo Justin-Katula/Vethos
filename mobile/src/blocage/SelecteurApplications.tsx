@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal, Platform, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from './etat'
-import { IDENTIFIANT_SELECTION } from './contrat'
+import { IDENTIFIANT_GARDEE, IDENTIFIANT_SELECTION } from './contrat'
 import { pontEcran } from './ecran-natif'
 import { useJetons } from '@/theme/Theme'
 import { PAS } from '@/theme/jetons'
@@ -47,15 +47,41 @@ function chargerFeuille(): React.ComponentType<Record<string, unknown>> | null {
   }
 }
 
-export function SelecteurApplications({ ouvert, surFermeture }: {
+/**
+ * Les deux listes, et pourquoi elles passent par le même sélecteur.
+ *
+ * `ecarte` : ce qu'une séance masque. `garde` : ce qu'une séance PROFONDE
+ * laisse passer quand tout le reste est masqué. Même feuille d'Apple, même
+ * ignorance de notre côté — seul l'identifiant sous lequel iOS range le jeton
+ * change, et c'est lui seul que Vethos manipule.
+ */
+export type RoleSelecteur = 'ecarte' | 'garde'
+
+const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied: string }> = {
+  ecarte: {
+    identifiant: IDENTIFIANT_SELECTION,
+    entete: 'What Vethos sets aside during a session',
+    pied: 'Vethos only sees the count. Not the names, not the icons.',
+  },
+  garde: {
+    identifiant: IDENTIFIANT_GARDEE,
+    entete: 'What stays reachable in deep focus',
+    pied: 'Everything else is set aside. Keep Vethos itself here, or you will have to lift from iOS Settings.',
+  },
+}
+
+export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte' }: {
   ouvert: boolean
   surFermeture: () => void
+  role?: RoleSelecteur
 }) {
   const j = useJetons()
   const marges = useSafeAreaInsets()
   const poserSelection = useBlocage((e) => e.poserSelection)
+  const poserGardee = useBlocage((e) => e.poserGardee)
   const [comptes, setComptes] = useState<Comptes | null>(null)
 
+  const textes = TEXTES[role]
   const Feuille = chargerFeuille()
   if (!ouvert) return null
 
@@ -63,12 +89,14 @@ export function SelecteurApplications({ ouvert, surFermeture }: {
     // Rien de choisi : on referme sans toucher à la sélection précédente.
     // L'effacer parce que l'utilisateur a hésité serait une punition.
     if (comptes) {
-      await poserSelection({
-        identifiant: IDENTIFIANT_SELECTION,
+      const poser = role === 'garde' ? poserGardee : poserSelection
+      await poser({
+        identifiant: textes.identifiant,
         nbApplications: comptes.applicationCount,
         nbCategories: comptes.categoryCount,
         nbSitesWeb: comptes.webDomainCount,
-        libelle: 'What I set aside during a session',
+        libelle:
+          role === 'garde' ? 'What I keep in deep focus' : 'What I set aside during a session',
         creeeLe: new Date().toISOString(),
       })
     }
@@ -81,9 +109,13 @@ export function SelecteurApplications({ ouvert, surFermeture }: {
         {Feuille ? (
           <Feuille
             style={{ flex: 1 }}
-            familyActivitySelectionId={IDENTIFIANT_SELECTION}
-            headerText="What Vethos sets aside during a session"
-            footerText="Vethos only sees the count. Not the names, not the icons."
+            familyActivitySelectionId={textes.identifiant}
+            // Sans ce drapeau, une CATÉGORIE cochée dans la liste gardée est
+            // ignorée : le mode profond masquerait alors tout ce que
+            // l'utilisateur croyait s'être gardé, sans un mot pour le dire.
+            includeEntireCategory={role === 'garde'}
+            headerText={textes.entete}
+            footerText={textes.pied}
             onSelectionChange={(e: { nativeEvent: Comptes }) => setComptes(e.nativeEvent)}
             onDismissRequest={() => void enregistrer()}
           />

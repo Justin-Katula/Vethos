@@ -1,4 +1,5 @@
 import type { EtatAutorisation, Plage, PontEcran } from './contrat'
+import type { ActionsBouclier, ConfigurationBouclier } from './bouclier'
 
 /**
  * Ce que Vethos demande au Temps d'écran d'Apple, et rien de plus.
@@ -13,6 +14,26 @@ import type { EtatAutorisation, Plage, PontEcran } from './contrat'
  * l'entitlement que seul Apple accorde.
  */
 
+/** Ce qu'une surveillance doit faire en se réveillant, à l'une ou l'autre borne. */
+export type ActionNative =
+  | { type: 'blockSelection'; familyActivitySelectionId: string }
+  | { type: 'enableBlockAllMode' }
+  | { type: 'disableBlockAllMode' }
+  | { type: 'setWebContentFilterPolicy'; policy: PolitiqueWeb }
+  | { type: 'clearWebContentFilterPolicy' }
+  | { type: 'resetBlocks' }
+
+/**
+ * Ce qu'iOS sait filtrer du web, et rien de plus.
+ *
+ * `auto` est le filtre d'Apple lui-même : il n'a pas de liste à tenir à jour,
+ * donc rien à laisser vieillir. `all` écarte tout sauf les exceptions.
+ */
+export type PolitiqueWeb =
+  | { type: 'none' }
+  | { type: 'auto'; exceptDomains?: string[] }
+  | { type: 'all'; exceptDomains?: string[] }
+
 export type ModuleEcran = {
   isAvailable: () => boolean
   getAuthorizationStatus: () => unknown
@@ -20,7 +41,7 @@ export type ModuleEcran = {
   configureActions: (a: {
     activityName: string
     callbackName: 'intervalDidStart' | 'intervalDidEnd'
-    actions: ({ type: 'blockSelection'; familyActivitySelectionId: string } | { type: 'resetBlocks' })[]
+    actions: ActionNative[]
   }) => void
   startMonitoring: (
     nom: string,
@@ -32,6 +53,28 @@ export type ModuleEcran = {
   resetBlocks: (declenchePar?: string) => void
   getActivities: () => string[]
   cleanUpAfterActivity: (nom: string) => void
+
+  /** Dépose l'habillage du bouclier pour l'extension, qui le lira sans nous. */
+  updateShield: (
+    configuration: ConfigurationBouclier,
+    actions: ActionsBouclier,
+    declenchePar?: string,
+  ) => void
+  /** La seule question à laquelle iOS répond vraiment : un bouclier est-il levé ? */
+  isShieldActive: () => boolean
+
+  /** Mode profond : tout est écarté, sauf la liste gardée. */
+  enableBlockAllMode: (declenchePar?: string) => void
+  disableBlockAllMode: (declenchePar?: string) => void
+  addSelectionToWhitelistAndUpdateBlock: (
+    selection: { activitySelectionId: string },
+    declenchePar?: string,
+  ) => void
+  clearWhitelistAndUpdateBlock: (declenchePar?: string) => void
+
+  setWebContentFilterPolicy: (politique: PolitiqueWeb, declenchePar?: string) => void
+  clearWebContentFilterPolicy: (declenchePar?: string) => void
+  isWebContentFilterPolicyActive: () => boolean
 }
 
 /** Le pont, à partir d'un module donné. La seule forme testable. */
@@ -70,11 +113,39 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       return null
     },
 
-    async programmer(plages, maintenant = minuteCourante()) {
+    habillerBouclier(habillage) {
+      // Une simple écriture dans le groupe d'applications : l'extension la
+      // relira toute seule, dans son processus, sans que Vethos tourne.
+      natif.updateShield(habillage.configuration, habillage.actions, 'vethos:habillage')
+    },
+
+    bouclierActif() {
+      // La seule vérification qui ne se raconte pas d'histoire. Tout le reste
+      // de l'écran décrit ce que Vethos a DEMANDÉ ; ceci dit ce qu'iOS FAIT.
+      return natif.isShieldActive()
+    },
+
+    async programmer(plages, options = {}) {
+      const maintenant = options.maintenant ?? minuteCourante()
+      const profond = options.mode === 'profond'
+      const politique = options.filtrerLeWeb === true ? FILTRE_WEB : null
+
       // On repart toujours de zéro : réconcilier des surveillances existantes
       // avec un plan recalculé coûte plus cher que de tout reposer, et laisse
       // des boucliers orphelins au moindre écart.
       natif.stopMonitoring()
+
+      // La liste gardée est reposée AVANT toute surveillance : en mode profond
+      // elle est le seul « sauf », et `enableBlockAllMode` la lit telle qu'il
+      // la trouve. Posée après, la première fenêtre à s'ouvrir écarterait tout
+      // sans exception — y compris ce que l'utilisateur avait gardé.
+      natif.clearWhitelistAndUpdateBlock('vethos:liste-gardee')
+      if (profond && options.gardeeId) {
+        natif.addSelectionToWhitelistAndUpdateBlock(
+          { activitySelectionId: options.gardeeId },
+          'vethos:liste-gardee',
+        )
+      }
 
       for (const plage of plages) {
         const activite = nomActivite(plage.blocId)
@@ -88,12 +159,26 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         natif.configureActions({
           activityName: activite,
           callbackName: 'intervalDidStart',
-          actions: [{ type: 'blockSelection', familyActivitySelectionId: plage.selectionId }],
+          actions: [
+            profond
+              ? { type: 'enableBlockAllMode' }
+              : { type: 'blockSelection', familyActivitySelectionId: plage.selectionId },
+            ...(politique ? [{ type: 'setWebContentFilterPolicy' as const, policy: politique }] : []),
+          ],
         })
         natif.configureActions({
           activityName: activite,
           callbackName: 'intervalDidEnd',
-          actions: [{ type: 'resetBlocks' }],
+          actions: [
+            // `resetBlocks` seul NE défait PAS le mode profond : celui-ci vit
+            // dans son propre drapeau, que rien d'autre ne retire. Sans cette
+            // première action, une séance profonde ne se terminait jamais —
+            // et comme Vethos peut être derrière son propre bouclier, il
+            // n'était plus possible de la lever depuis l'application.
+            ...(profond ? [{ type: 'disableBlockAllMode' as const }] : []),
+            ...(politique ? [{ type: 'clearWebContentFilterPolicy' as const }] : []),
+            { type: 'resetBlocks' },
+          ],
         })
 
         await natif.startMonitoring(
@@ -114,12 +199,14 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       // seul qui compte vraiment — c'est maintenant qu'on travaille.
       const enCours = plages.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
       if (enCours) {
-        natif.blockSelection(
-          { activitySelectionId: enCours.selectionId },
-          `vethos:seance:${enCours.blocId}`,
-        )
+        const parQui = `vethos:seance:${enCours.blocId}`
+        if (profond) natif.enableBlockAllMode(parQui)
+        else natif.blockSelection({ activitySelectionId: enCours.selectionId }, parQui)
+        if (politique) natif.setWebContentFilterPolicy(politique, parQui)
       } else {
         // Aucune séance en cours : rien ne doit rester levé d'une précédente.
+        natif.disableBlockAllMode('vethos:aucune-seance')
+        natif.clearWebContentFilterPolicy('vethos:aucune-seance')
         natif.resetBlocks('vethos:aucune-seance')
       }
 
@@ -129,6 +216,13 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
     async toutLever() {
       natif.stopMonitoring()
       for (const activite of natif.getActivities()) natif.cleanUpAfterActivity(activite)
+      // Trois verrous distincts, et lever le premier ne lève pas les autres.
+      // « Tout lever » qui laisse le mode profond debout serait le pire
+      // mensonge de cet écran : le bouton le plus rassurant, et celui qui ne
+      // fait rien là où on en a le plus besoin.
+      natif.disableBlockAllMode('vethos:tout-lever')
+      natif.clearWhitelistAndUpdateBlock('vethos:tout-lever')
+      natif.clearWebContentFilterPolicy('vethos:tout-lever')
       // `resetBlocks` abaisse les boucliers déjà levés. Sans lui, arrêter la
       // surveillance laisserait l'utilisateur derrière un écran que plus rien ne
       // viendrait retirer.
@@ -136,6 +230,17 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
     },
   }
 }
+
+/**
+ * Le filtre web de Vethos : celui d'Apple, sans liste à nous.
+ *
+ * Tenir notre propre liste de domaines voudrait dire la maintenir — et une
+ * liste de blocage qui vieillit laisse passer exactement ce qu'elle promet
+ * d'écarter, sans jamais le dire. Les sites que l'utilisateur désigne
+ * lui-même, eux, passent par le sélecteur d'Apple et sont déjà écartés avec
+ * ses applications.
+ */
+const FILTRE_WEB = { type: 'auto' } as const
 
 /**
  * Le nom d'activite d'un bloc.

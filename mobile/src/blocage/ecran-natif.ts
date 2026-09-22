@@ -33,6 +33,10 @@ const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export function creerPontSimule(): PontEcran {
   let autorisation: EtatAutorisation = 'jamais_demandee'
   let programmees = 0
+  // Le simulateur tient le MÊME état que l'appareil : sans ça, l'écran
+  // affichait « vérifié » dans le navigateur quoi qu'il arrive, et la seule
+  // ligne qui prouve quelque chose devenait la seule qui ne prouvait rien.
+  let bouclierLeve = false
 
   return {
     estReel: false,
@@ -66,20 +70,36 @@ export function creerPontSimule(): PontEcran {
       }
     },
 
-    // `maintenant` ne sert qu'au vrai pont, qui doit savoir quelle plage a
-    // deja commence pour lever son bouclier tout de suite. Le simulateur n'a
-    // pas de bouclier a lever : il se contente de compter.
-    async programmer(plages) {
+    habillerBouclier() {
+      // Rien a deposer : aucune extension ne viendra lire. L'habillage se
+      // verifie par ses tests, pas par le navigateur.
+    },
+
+    bouclierActif() {
+      return bouclierLeve
+    },
+
+    async programmer(plages, options = {}) {
       await attendre(220)
       programmees = plages.length
+      const maintenant = options.maintenant ?? minuteLocale()
+      bouclierLeve = plages.some(
+        (p) => maintenant >= p.debutMinute && maintenant < p.finMinute,
+      )
       return programmees
     },
 
     async toutLever() {
       await attendre(120)
       programmees = 0
+      bouclierLeve = false
     },
   }
+}
+
+function minuteLocale(): number {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
 }
 
 // --------------------------------------------------------------------------

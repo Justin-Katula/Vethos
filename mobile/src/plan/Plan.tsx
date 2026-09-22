@@ -5,12 +5,16 @@ import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { confirmer, seanceActive, tictac } from '@/seances/pendule'
+import { useNomTheme } from '@/theme/Theme'
 import { calculerPlan, cleDate } from './moteur'
 import { lireSemaine } from './lecture'
 
 function useSourcePlan() {
   const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches } = useDonnees()
   const { apprentissage, confirmations, chargees: mesuresPretes, charger, poser } = useSeances()
+  // Le bouclier s'affiche dans un AUTRE processus, qui n'a pas notre thème et
+  // ne peut pas le demander : ses couleurs se figent au moment où on le pose.
+  const theme = useNomTheme()
 
   const [instant, setInstant] = useState(() => Math.floor(Date.now() / 60_000) * 60_000)
   useEffect(() => {
@@ -96,7 +100,11 @@ function useSourcePlan() {
       const selectionId = blocage.selection?.identifiant
       if (selectionId) {
         const plage = plageDeSeance({ bloc, confirmeAMs: instant.getTime(), selectionId })
-        if (plage) await blocage.ouvrirSeance(plage)
+        // Le titre du bloc voyage jusqu'au bouclier : c'est la seule chose
+        // qu'on ait a dire a quelqu'un qui vient d'ouvrir une application
+        // ecartee. « Chemistry — until 15:30 » parle du plan ; « Blocked »
+        // parlerait de lui.
+        if (plage) await blocage.ouvrirSeance(plage, { theme, titreBloc: bloc.label })
       }
 
       return { ok: true as const, retardMinutes: suivant.retardMinutes }

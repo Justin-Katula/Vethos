@@ -26,6 +26,7 @@
  */
 
 import { z } from 'zod'
+import type { ActionsBouclier, ConfigurationBouclier } from './bouclier'
 
 /**
  * L'état de l'autorisation Temps d'écran.
@@ -215,6 +216,35 @@ export function limiterAuxCapacitesIOS(plages: readonly Plage[]): {
  * aucun test ne peut le charger. Un type qu'on ne peut pas importer sans
  * traîner React Native derrière soi finit par n'être importé nulle part.
  */
+/**
+ * À quel point une séance écarte.
+ *
+ * `ecarter` masque ce que l'utilisateur a désigné. `profond` fait l'inverse —
+ * tout est masqué sauf une liste gardée — et c'est une bascule, pas un
+ * réglage de plus : la même confirmation « Je commence » déclenche l'un ou
+ * l'autre. Vethos n'a toujours aucun horaire de blocage à lui.
+ */
+export type ModeBlocage = 'ecarter' | 'profond'
+
+export const MODES: readonly ModeBlocage[] = ['ecarter', 'profond']
+
+export type OptionsProgrammation = {
+  mode?: ModeBlocage
+  /** L'identifiant de la liste gardée. N'a de sens qu'en mode profond. */
+  gardeeId?: string | null
+  /** Ajoute le filtre web d'Apple pendant la séance. */
+  filtrerLeWeb?: boolean
+  /**
+   * `maintenant` n'existe que pour les tests : le pont doit savoir laquelle
+   * des plages a DÉJÀ commencé, et une horloge qu'on ne peut pas figer rend
+   * ce cas-là invérifiable.
+   */
+  maintenant?: number
+}
+
+/** L'identifiant de la liste gardée en mode profond. Fixe, comme l'autre. */
+export const IDENTIFIANT_GARDEE = 'vethos.garde'
+
 export type PontEcran = {
   /** Ce que le système fournit vraiment, par opposition au simulateur. */
   estReel: boolean
@@ -223,13 +253,23 @@ export type PontEcran = {
   /** Ouvre le sélecteur d'Apple. `null` si l'utilisateur referme sans choisir. */
   choisirApplications: (selectionExistante?: string) => Promise<Selection | null>
   /**
-   * Programme les plages du jour. Rend le nombre réellement programmé.
-   *
-   * `maintenant` n'existe que pour les tests : le pont doit savoir laquelle
-   * des plages a DÉJÀ commencé, et une horloge qu'on ne peut pas figer rend
-   * ce cas-là invérifiable.
+   * Dépose l'écran que l'utilisateur verra à la place d'une application
+   * écartée. Une écriture, pas un appel : l'extension la relit toute seule.
    */
-  programmer: (plages: readonly Plage[], maintenant?: number) => Promise<number>
+  habillerBouclier: (habillage: {
+    configuration: ConfigurationBouclier
+    actions: ActionsBouclier
+  }) => void
+  /**
+   * Un bouclier est-il levé, là, maintenant ?
+   *
+   * C'est la seule chose de cet écran qui ne soit pas une déclaration
+   * d'intention. Tout le reste dit ce que Vethos a demandé à iOS ; ceci dit ce
+   * qu'iOS fait. Les deux ont déjà divergé en silence une fois.
+   */
+  bouclierActif: () => boolean
+  /** Programme les plages du jour. Rend le nombre réellement programmé. */
+  programmer: (plages: readonly Plage[], options?: OptionsProgrammation) => Promise<number>
   /** Lève tout : aucun bouclier ne doit survivre à un arrêt. */
   toutLever: () => Promise<void>
 }

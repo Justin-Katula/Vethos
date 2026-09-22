@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
-import { decrireSelection } from '@/blocage/contrat'
-import { SelecteurApplications } from '@/blocage/SelecteurApplications'
-import { useJetons } from '@/theme/Theme'
-import { PAS } from '@/theme/jetons'
-import { enHeure } from '@/ui/Horloge'
+import { decrireSelection, type ModeBlocage } from '@/blocage/contrat'
+import { SelecteurApplications, type RoleSelecteur } from '@/blocage/SelecteurApplications'
+import { useJetons, useNomTheme } from '@/theme/Theme'
+import { PAS, RAYON } from '@/theme/jetons'
+import { enHeure } from '@/plan/lecture'
 import {
   BoutonIris,
   BoutonPlat,
@@ -22,8 +22,8 @@ import {
  * Blocage.
  *
  * Le deuxième pilier du produit, à égalité avec la planification. L'écran dit
- * trois choses et rien d'autre : ce qu'iOS autorise, ce que l'utilisateur a
- * désigné, et ce qui est programmé.
+ * quatre choses et rien d'autre : ce qu'iOS autorise, ce que l'utilisateur a
+ * désigné, jusqu'où ça va, et ce qui est programmé.
  *
  * Il dit aussi ce que Vethos ne peut PAS faire. Une application de blocage qui
  * laisse croire qu'elle est infranchissable ment à son utilisateur le jour où
@@ -32,23 +32,43 @@ import {
 export default function Blocage() {
   const marges = useSafeAreaInsets()
   const j = useJetons()
+  const theme = useNomTheme()
 
-  const { autorisation, selection, plagesActives, ecartees, occupe, simule } = useBlocage()
+  const {
+    autorisation, selection, gardee, mode, filtrerLeWeb,
+    plagesActives, ecartees, occupe, simule, verifie,
+  } = useBlocage()
   const demander = useBlocage((e) => e.demanderAutorisation)
   const choisir = useBlocage((e) => e.choisirApplications)
+  const choisirMode = useBlocage((e) => e.choisirMode)
+  const basculerFiltreWeb = useBlocage((e) => e.basculerFiltreWeb)
+  const habiller = useBlocage((e) => e.habiller)
+  const verifier = useBlocage((e) => e.verifier)
   const lever = useBlocage((e) => e.toutLever)
 
-  const [selecteurOuvert, setSelecteurOuvert] = useState(false)
+  const [selecteur, setSelecteur] = useState<RoleSelecteur | null>(null)
 
   const maintenant = minuteCourante()
   const accordee = autorisation === 'accordee'
   const enCours = plagesActives.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
+  const profond = mode === 'profond'
+
+  // Le bouclier vit dans un autre processus, sans accès à notre thème : ses
+  // couleurs se figent au moment où on le pose. Sans ce repose, basculer en
+  // sombre laissait un bouclier clair derrière soi — visible seulement en
+  // ouvrant une application écartée, c'est-à-dire jamais pendant qu'on regarde.
+  useEffect(() => {
+    if (!enCours) return
+    // Sans `titreBloc`, l'état garde celui de la séance en cours : un repose
+    // ne doit jamais effacer le nom du bloc que le bouclier porte.
+    habiller({ theme, finMinute: enCours.finMinute })
+  }, [theme, enCours, habiller])
 
   // Le sélecteur d'Apple est une VUE, pas une fonction. Sur un vrai appareil on
   // la monte ; dans le navigateur, le simulateur fait le travail tout seul.
-  const ouvrirSelecteur = () => {
-    if (simule) void choisir()
-    else setSelecteurOuvert(true)
+  const ouvrirSelecteur = (role: RoleSelecteur) => {
+    if (simule && role === 'ecarte') void choisir()
+    else setSelecteur(role)
   }
 
   return (
@@ -105,7 +125,7 @@ export default function Blocage() {
       <Section
         titre="What you set aside"
         compte={selection ? selection.nbApplications + selection.nbCategories : undefined}
-        loi="You pick inside Apple’s own picker. It alone knows what they are."
+        loi="You pick inside Apple’s own picker. It alone knows what they are. Websites count too — set aside the app and not the site, and the site stays one tap away."
       >
         {selection ? (
           <Rangee premiere>
@@ -120,8 +140,64 @@ export default function Blocage() {
           <Texte ton="doux">Nothing picked yet.</Texte>
         )}
         <Espace h={4} />
-        <BoutonPlat onPress={ouvrirSelecteur} desactive={occupe || !accordee}>
+        <BoutonPlat onPress={() => ouvrirSelecteur('ecarte')} desactive={occupe || !accordee}>
           {selection ? 'Change my selection' : 'Pick my apps'}
+        </BoutonPlat>
+      </Section>
+
+      <Section
+        titre="How far it goes"
+        loi="Two strengths, one trigger. Either way, nothing is raised until you say “I’m starting”."
+      >
+        <ChoixMode valeur={mode} surChoix={(m) => void choisirMode(m)} desactive={occupe} />
+
+        <Espace h={4} />
+        <Texte ton="doux" taille={12.5}>
+          {profond
+            ? 'Every app is set aside except the ones you keep. Stronger, and easier to get wrong.'
+            : 'Only what you picked above is set aside. Everything else stays where it is.'}
+        </Texte>
+
+        {profond ? (
+          <>
+            <Espace h={5} />
+            <Rangee premiere>
+              <View style={{ flex: 1 }}>
+                <Texte>{gardee ? decrireSelection(gardee) : 'Nothing kept yet.'}</Texte>
+                <Texte ton={gardee ? 'eteint' : 'accent'} taille={12.5}>
+                  {gardee
+                    ? 'Reachable during a deep session'
+                    : 'Keep Vethos itself, or the only way out is iOS Settings.'}
+                </Texte>
+              </View>
+            </Rangee>
+            <Espace h={4} />
+            <BoutonPlat onPress={() => ouvrirSelecteur('garde')} desactive={occupe || !accordee}>
+              {gardee ? 'Change what I keep' : 'Pick what I keep'}
+            </BoutonPlat>
+          </>
+        ) : null}
+      </Section>
+
+      <Section
+        titre="The web"
+        loi="Apple’s own filter, not a list of ours. A blocklist we maintained would age, and let through exactly what it promised to stop."
+        action={
+          filtrerLeWeb ? (
+            <Valeur ton="accent" taille={12}>
+              ON
+            </Valeur>
+          ) : null
+        }
+      >
+        <Texte ton="doux">
+          {filtrerLeWeb
+            ? 'Explicit sites are filtered in Safari for the length of a session, then it lifts.'
+            : 'Off. Sites you picked in the selection above are still set aside with your apps.'}
+        </Texte>
+        <Espace h={4} />
+        <BoutonPlat onPress={() => void basculerFiltreWeb()} desactive={occupe || !accordee}>
+          {filtrerLeWeb ? 'Turn the filter off' : 'Filter the web during a session'}
         </BoutonPlat>
       </Section>
 
@@ -146,6 +222,13 @@ export default function Blocage() {
             Nothing is set aside right now. The next “I’m starting” takes care of it.
           </Texte>
         )}
+
+        <Espace h={4} />
+        <Preuve attendu={enCours !== undefined} verifie={verifie} />
+        <Espace h={3} />
+        <BoutonPlat onPress={() => void verifier()} desactive={occupe}>
+          Check with iOS now
+        </BoutonPlat>
       </Section>
 
       {plagesActives.length > 0 ? (
@@ -183,7 +266,11 @@ export default function Blocage() {
         </Section>
       ) : null}
 
-      <SelecteurApplications ouvert={selecteurOuvert} surFermeture={() => setSelecteurOuvert(false)} />
+      <SelecteurApplications
+        ouvert={selecteur !== null}
+        role={selecteur ?? 'ecarte'}
+        surFermeture={() => setSelecteur(null)}
+      />
 
       <Section titre="What Vethos cannot do">
         <Texte ton="doux">
@@ -192,6 +279,98 @@ export default function Blocage() {
         </Texte>
       </Section>
     </ScrollView>
+  )
+}
+
+/**
+ * La seule ligne de cet écran qui ne soit pas une déclaration d'intention.
+ *
+ * Tout le reste décrit ce que Vethos a DEMANDÉ à iOS. Ceci rapporte ce qu'iOS
+ * répond. Les deux ont déjà divergé en silence — dans Expo Go, chaque appel
+ * réussissait et aucun bouclier ne se levait jamais — et rien, nulle part, ne
+ * permettait de s'en apercevoir sans ouvrir une application écartée.
+ *
+ * Le désaccord est dit sans être expliqué : on ne sait pas POURQUOI iOS n'a
+ * pas levé, et inventer une cause serait pire que de n'en donner aucune.
+ */
+function Preuve({
+  attendu,
+  verifie,
+}: {
+  attendu: boolean
+  verifie: { leve: boolean; aMs: number } | null
+}) {
+  if (!verifie) return <Texte ton="eteint" taille={12.5}>Not checked yet.</Texte>
+
+  const heure = new Date(verifie.aMs)
+  const a = `${String(heure.getHours()).padStart(2, '0')}:${String(heure.getMinutes()).padStart(2, '0')}`
+
+  if (verifie.leve === attendu) {
+    return (
+      <Texte ton="doux" taille={12.5}>
+        {verifie.leve
+          ? `iOS confirms a shield is up. Checked at ${a}.`
+          : `iOS confirms nothing is shielded. Checked at ${a}.`}
+      </Texte>
+    )
+  }
+
+  return (
+    <Texte ton="accent" taille={12.5}>
+      {attendu
+        ? `Vethos asked for a shield; iOS says none is up. Checked at ${a}.`
+        : `A shield is still up, and no session is running. Checked at ${a}.`}
+    </Texte>
+  )
+}
+
+/** Les deux forces, côte à côte. Même motif que le choix d'apparence. */
+function ChoixMode({
+  valeur,
+  surChoix,
+  desactive,
+}: {
+  valeur: ModeBlocage
+  surChoix: (m: ModeBlocage) => void
+  desactive?: boolean
+}) {
+  const j = useJetons()
+  const modes: { cle: ModeBlocage; nom: string }[] = [
+    { cle: 'ecarter', nom: 'Set aside' },
+    { cle: 'profond', nom: 'Deep focus' },
+  ]
+
+  return (
+    <View style={{ flexDirection: 'row', gap: PAS[2] }}>
+      {modes.map((m) => {
+        const actif = valeur === m.cle
+        return (
+          <Pressable
+            key={m.cle}
+            accessibilityRole="button"
+            accessibilityState={{ selected: actif, disabled: !!desactive }}
+            onPress={() => surChoix(m.cle)}
+            disabled={desactive}
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: RAYON.sm,
+              borderWidth: 1,
+              borderColor: actif ? j.accent : j.line,
+              backgroundColor: actif ? j.accentDoux : 'transparent',
+              opacity: desactive ? 0.4 : 1,
+              transform: [{ translateY: pressed ? 1 : 0 }],
+            })}
+          >
+            <Texte ton={actif ? 'accent' : 'eteint'} taille={12.5}>
+              {m.nom}
+            </Texte>
+          </Pressable>
+        )
+      })}
+    </View>
   )
 }
 
