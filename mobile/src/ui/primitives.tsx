@@ -113,17 +113,25 @@ export function Section({
       </View>
 
       {loi ? (
-        <Text
+        <View
           style={{
-            color: j.text3,
-            fontFamily: GEIST.normal,
-            fontSize: 12.5,
-            lineHeight: 18,
+            borderLeftWidth: 2,
+            borderLeftColor: j.lineForte,
+            paddingLeft: PAS[3],
             marginTop: PAS[2],
           }}
         >
-          {loi}
-        </Text>
+          <Text
+            style={{
+              color: j.text3,
+              fontFamily: GEIST.normal,
+              fontSize: 12,
+              lineHeight: 17,
+            }}
+          >
+            {loi}
+          </Text>
+        </View>
       ) : null}
 
       <View style={{ marginTop: PAS[4] }}>{children}</View>
@@ -340,13 +348,17 @@ export function Espace({ h }: { h: keyof typeof PAS }) {
  * bordures colorées épaisses ; un filet, lui, appartient au vocabulaire.
  */
 export function Marque({ couleur, eteint }: { couleur: string; eteint?: boolean }) {
+  const j = useJetons()
   return (
     <View
       style={{
-        width: 2,
+        width: 3.5,
         alignSelf: 'stretch',
         minHeight: 26,
+        borderRadius: 1.75,
         backgroundColor: couleur,
+        borderWidth: 0.5,
+        borderColor: j.line,
         opacity: eteint ? 0.3 : 1,
       }}
     />

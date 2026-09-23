@@ -26,10 +26,20 @@ function Trait({ d, taille = 16, couleur, epaisseur = 1.6 }: Props & { d: string
 }
 
 export const Plus = (p: Props) => <Trait {...p} d="M12 5v14M5 12h14" />
+export const Moins = (p: Props) => <Trait {...p} d="M5 12h14" />
 export const Croix = (p: Props) => <Trait {...p} d="M6 6l12 12M18 6L6 18" />
 export const Coche = (p: Props) => <Trait {...p} d="M4.5 12.5l5 5 10-11" epaisseur={p.epaisseur ?? 2} />
 export const Chevron = (p: Props) => <Trait {...p} d="M9 5l7 7-7 7" />
 export const GlypheTemps = (p: Props) => <Trait {...p} d="M5 3v3M19 3v3M3 9h18M4 5h16a1 1 0 011 1v14H3V6a1 1 0 011-1zM7 13h3M14 13h3M7 17h3" />
+export const GlypheTache = (p: Props) => (
+  <Trait {...p} d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+)
+export const GlypheObjectif = (p: Props) => (
+  <Trait {...p} d="M12 22a10 10 0 100-20 10 10 0 000 20zm0-6a4 4 0 100-8 4 4 0 000 8z" />
+)
+export const GlypheAncre = (p: Props) => (
+  <Trait {...p} d="M12 5a3 3 0 100-6 3 3 0 000 6zm0 3v13m-7-5a7 7 0 0014 0" />
+)
 
 /**
  * Le triangle de « Je commence ». Plein, pas un contour.

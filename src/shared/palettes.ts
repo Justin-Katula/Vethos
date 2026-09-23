@@ -32,20 +32,20 @@ export const PALETTE_OBJECTIFS = [
   '#ad152b', // 11. Sang Impérial (carmin dense puissant)
 ] as const
 
-// ─── 2. Tâches : Famille Gris (12 variantes) ──────────────────────────────
+// ─── 2. Tâches : Famille Gris (12 variantes s'étendant jusqu'au noir) ────────
 export const PALETTE_TACHES = [
-  '#505359', // 0. Graphite Vethos canonique
-  '#6b7280', // 1. Zinc moyen
-  '#8c929d', // 2. Étain froid
-  '#a8adb5', // 3. Cendre claire
-  '#454950', // 4. Anthracite
-  '#5c636e', // 5. Titane ardoisé
-  '#717882', // 6. Acier
-  '#7e828a', // 7. Minéral neutre
-  '#9aa0a6', // 8. Brume
-  '#b8bec8', // 9. Platine mat
-  '#636b77', // 10. Ardoise froide
-  '#3d4147', // 11. Fonte profonde
+  '#505359', // 0. Graphite Ardoisé (gris moyen-sombre, signature Vethos)
+  '#d1d5db', // 1. Argent Brillant (très clair et lumineux, L: 84%)
+  '#111215', // 2. Noir Onyx Pur (quasi noir absolu très profond, L: 7%)
+  '#9ca3af', // 3. Platine Neutre (gris moyen clair équilibré, L: 65%)
+  '#282a30', // 4. Anthracite Foncé (sombre et dense, L: 17%)
+  '#f3f4f6', // 5. Blanc Craie Cendré (perle ultra-lumineux, L: 96%)
+  '#6b7280', // 6. Acier Minéral (gris franc équilibré, L: 46%)
+  '#1c1d22', // 7. Noir Obsidienne (noir minéral intense, L: 12%)
+  '#b5bcc7', // 8. Aluminium Doux (clair et soyeux, L: 75%)
+  '#373a42', // 9. Fer Profond (gris foncé industriel, L: 24%)
+  '#838a96', // 10. Étain Satiné (gris doux moyen, L: 55%)
+  '#434750', // 11. Basalte Sombre (charbon minéral, L: 29%)
 ] as const
 
 // ─── 3. Encre / Ancres : Famille Bleu Froid (12 variantes) ─────────────────
