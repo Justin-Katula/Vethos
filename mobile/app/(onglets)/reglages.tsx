@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { Pressable, ScrollView, TextInput, View } from 'react-native'
+import * as Haptics from 'expo-haptics'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
+import { verifierSommeil, type Nuit } from '@/donnees/regle-sommeil'
 import { minutesEveil } from '@/plan/moteur'
 import { useJetons, useModeApparence } from '@/theme/Theme'
+import { RoueHeure } from '@/ui/Roue'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree } from '@/ui/Horloge'
 import { useLargeur } from '@/ui/largeur'
@@ -24,6 +28,25 @@ export default function Reglages() {
   // Deduit des MEMES plages que le moteur soustrait. Un calcul a part ici
   // affichait « 16 h 30 » pendant que le moteur en retirait autre chose.
   const eveil = minutesEveil(reglages)
+
+  // La nuit ne se déplace que de 2 h en tout autour de celle déclarée, et
+  // reste entre 6 et 10 h. Un réglage refusé fait revenir la roue.
+  const [refus, setRefus] = useState('')
+  const reference: Nuit = reglages.sommeilReference ?? {
+    coucher: reglages.coucher,
+    lever: reglages.lever,
+  }
+  const verdict = verifierSommeil({ coucher: reglages.coucher, lever: reglages.lever }, reference)
+  const essayerSommeil = (nuit: Nuit) => {
+    const v = verifierSommeil(nuit, reference)
+    if (!v.ok) {
+      setRefus(v.raison)
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined)
+      return
+    }
+    setRefus('')
+    void majReglages({ ...nuit, sommeilReference: reference })
+  }
 
   return (
     <ScrollView
@@ -55,17 +78,27 @@ export default function Reglages() {
           <Champ
             etiquette="Bedtime"
             valeur={reglages.coucher}
-            surChangement={(v) => void majReglages({ coucher: v })}
+            surChangement={(v) => essayerSommeil({ coucher: v, lever: reglages.lever })}
             exemple="23:30"
             horaire
           />
           <Champ
             etiquette="Wake-up"
             valeur={reglages.lever}
-            surChangement={(v) => void majReglages({ lever: v })}
+            surChangement={(v) => essayerSommeil({ coucher: reglages.coucher, lever: v })}
             exemple="07:00"
             horaire
           />
+        </View>
+        <View style={{ marginTop: PAS[3], gap: PAS[1] }}>
+          <Texte ton={refus ? 'accent' : 'eteint'} taille={12.5}>
+            {refus ||
+              (verdict.reste === null
+                ? 'Between 6 and 10 hours a night.'
+                : verdict.reste === 0
+                  ? `No flexibility left around ${reference.coucher} → ${reference.lever}.`
+                  : `${duree(verdict.reste)} of flexibility left around ${reference.coucher} → ${reference.lever}.`)}
+          </Texte>
         </View>
       </Section>
 
@@ -173,6 +206,16 @@ function Champ({
   horaire?: boolean
 }) {
   const j = useJetons()
+  // Une heure se règle au pouce, sur une roue — jamais au clavier.
+  if (horaire)
+    return (
+      <View style={{ flex: 1, gap: PAS[2] }}>
+        <Texte ton="eteint" taille={12.5}>
+          {etiquette}
+        </Texte>
+        <RoueHeure valeur={valeur} changer={surChangement} etiquette={etiquette} compact />
+      </View>
+    )
   return (
     <View style={{ flex: 1, gap: PAS[2] }}>
       <Texte ton="eteint" taille={12.5}>

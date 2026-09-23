@@ -6,6 +6,7 @@ import { useDonnees, type Obligation } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { dateLocale, duree, enHeure, type SegmentTemps } from '@/plan/lecture'
 import { useJetons } from '@/theme/Theme'
+import { RoueDate, RoueHeure } from '@/ui/Roue'
 import { AgendaJour } from '@/ui/AgendaJour'
 import { CarteSemaine } from '@/ui/CarteSemaine'
 import { FicheDetailEngagement } from '@/ui/FicheDetailEngagement'
@@ -246,8 +247,8 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
         <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: categorie === cle ? j.bg : j.text }}>{texte}</Text>
       </Pressable>)}</View></View>
       <View style={{ flexDirection: 'row', gap: 16 }}>
-        <View style={{ flex: 1 }}><Text style={label}>Start</Text><TextInput accessibilityLabel="Start time, hours and minutes" value={debut} onChangeText={setDebut} maxLength={5} style={champ} /></View>
-        <View style={{ flex: 1 }}><Text style={label}>End</Text><TextInput accessibilityLabel="End time, hours and minutes" value={fin} onChangeText={setFin} maxLength={5} style={champ} /></View>
+        <View style={{ flex: 1 }}><Text style={label}>Start</Text><RoueHeure valeur={debut} changer={setDebut} etiquette="Start time" compact /></View>
+        <View style={{ flex: 1 }}><Text style={label}>End</Text><RoueHeure valeur={fin} changer={setFin} etiquette="End time" compact /></View>
       </View>
       <View><Text style={label}>Repeat</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -259,7 +260,7 @@ function Formulaire({ surFin, jourInitial }: { surFin: () => void; jourInitial: 
         </View>
         {recurrence === 'unique'
           ? <>
-              <TextInput accessibilityLabel="Date, year month day" value={dateUnique} onChangeText={setDateUnique} maxLength={10} placeholder="2026-09-28" placeholderTextColor={j.text2} style={{ ...champ, fontFamily: MONO.normal }} />
+              <RoueDate valeur={dateUnique} changer={setDateUnique} min={dansNJours(0)} compact />
               <Text style={{ fontFamily: GEIST.normal, fontSize: 12, color: j.text2, marginTop: 8 }}>
                 That day only. The following week stays untouched.
               </Text>

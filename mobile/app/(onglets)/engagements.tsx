@@ -15,10 +15,11 @@ import { useSeances } from '@/seances/magasin-seances'
 import { usePlan } from '@/plan/Plan'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { useJetons } from '@/theme/Theme'
+import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
 import { useLargeur } from '@/ui/largeur'
 import { PAS, RAYON } from '@/theme/jetons'
 import { duree, enHeure } from '@/ui/Horloge'
-import { Coche, Croix, Plus } from '@/ui/icones'
+import { Coche, Croix, GlypheAncre, GlypheObjectif, GlypheTache, Moins, Plus } from '@/ui/icones'
 import {
   BoutonIris,
   BoutonPlat,
@@ -44,20 +45,30 @@ import {
  * Les séparer en trois écrans obligeait à trois voyages pour voir une seule
  * chose, et effaçait le contraste qui les rend compréhensibles.
  */
+const LIMITE_VISIBLE = 2
+
 export default function Engagements() {
   const marges = useSafeAreaInsets()
   const j = useJetons()
   const d = useDonnees()
 
   const [ajout, setAjout] = useState<'aucun' | 'tache' | 'objectif' | 'ancre'>('aucun')
+  const [etenduTaches, setEtenduTaches] = useState(false)
+  const [etenduObjectifs, setEtenduObjectifs] = useState(false)
+  const [etenduAncres, setEtenduAncres] = useState(false)
+
   const largeur = useLargeur()
   // Une colonne sous 760 points, deux jusqu'a 1100, trois au-dela — comme le
   // bureau. La largeur est CALCULEE plutot que laissee a `flex: 1` : avec
   // `flexWrap`, trois enfants extensibles se serrent sur une seule ligne quoi
   // qu'il arrive, et on obtiendrait trois colonnes etranglees a 760.
+  // Sur ecran large, la largeur est plafonnee a 1200 points pour eviter le
+  // "canyon" de vide entre libelle et duree (Board.tsx).
   const colonnes = largeur.troisColonnes ? 3 : largeur.deuxColonnes ? 2 : 1
-  const dispo = largeur.points - PAS[5] * 2
-  const largeurColonne = colonnes === 1 ? undefined : (dispo - PAS[10] * (colonnes - 1)) / colonnes
+  const largeurMax = Math.min(largeur.points, 1200)
+  const dispo = largeurMax - PAS[5] * 2
+  const ecart = PAS[5]
+  const largeurColonne = colonnes === 1 ? undefined : (dispo - ecart * (colonnes - 1)) / colonnes
 
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const ouvertes = d.taches.filter((t) => !t.terminee)
@@ -66,6 +77,21 @@ export default function Engagements() {
   // cinq parties reste une tache a faire, pas cinq.
   const groupes = grouperTaches(ouvertes, fait)
 
+  // Troncature a 2 elements par defaut pour chaque section
+  const totalTaches = groupes.length + faites.length
+  const tachesCachees = Math.max(0, totalTaches - LIMITE_VISIBLE)
+  const groupesVisibles = etenduTaches ? groupes : groupes.slice(0, LIMITE_VISIBLE)
+  const restePourFaites = etenduTaches ? faites.length : Math.max(0, LIMITE_VISIBLE - groupesVisibles.length)
+  const faitesVisibles = etenduTaches ? faites : faites.slice(0, restePourFaites)
+
+  const totalObjectifs = d.objectifs.length
+  const objectifsCaches = Math.max(0, totalObjectifs - LIMITE_VISIBLE)
+  const objectifsVisibles = etenduObjectifs ? d.objectifs : d.objectifs.slice(0, LIMITE_VISIBLE)
+
+  const totalAncres = d.ancres.length
+  const ancresCachees = Math.max(0, totalAncres - LIMITE_VISIBLE)
+  const ancresVisibles = etenduAncres ? d.ancres : d.ancres.slice(0, LIMITE_VISIBLE)
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: j.bg }}
@@ -73,145 +99,458 @@ export default function Engagements() {
         paddingTop: marges.top + PAS[5],
         paddingBottom: PAS[12],
         paddingHorizontal: PAS[5],
+        alignItems: 'center',
       }}
       keyboardShouldPersistTaps="handled"
     >
-      <TitreEcran>Commitments</TitreEcran>
+      <View style={{ width: '100%', maxWidth: 1200 }}>
+        {/* Titre */}
+        <View style={{ marginBottom: PAS[5] }}>
+          <TitreEcran>Commitments</TitreEcran>
+          <Text
+            style={{
+              fontFamily: GEIST.normal,
+              fontSize: 14,
+              color: j.text3,
+              marginTop: 4,
+              lineHeight: 20,
+            }}
+          >
+            Three natures, one architecture. What you promised yourself, ruled by law.
+          </Text>
+        </View>
 
-      {/* Les trois natures COTE A COTE des qu'elles tiennent, comme sur le
-          bureau. Empilees, il faut faire defiler pour passer d'une loi a
-          l'autre — or c'est leur CONTRASTE que cet ecran doit enseigner, et un
-          contraste qu'on ne voit pas d'un coup d'œil n'en est plus un.
+        {/* Les trois natures encadrées chacune dans leur boîte (« carré »),
+            côte à côte dès qu'elles tiennent, empilées sur téléphone. */}
+        <View
+          style={
+            colonnes === 1
+              ? { flexDirection: 'column', gap: PAS[5] }
+              : {
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-start',
+                  gap: PAS[5],
+                }
+          }
+        >
+          <CarteEngagement
+            largeur={largeurColonne}
+            badge="Slack Engine · Deadlines"
+            badgeCouleur={j.text2}
+          >
+            <Section
+              premiere
+              enColonne
+              titre="Tasks"
+              compte={groupes.length}
+              loi="A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first."
+              action={
+                <BoutonAjout
+                  ouvert={ajout === 'tache'}
+                  quoi="a task"
+                  surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')}
+                />
+              }
+            >
+              {ajout === 'tache' ? (
+                <FormulaireTache
+                  surFin={() => {
+                    setAjout('aucun')
+                    setEtenduTaches(true)
+                  }}
+                />
+              ) : null}
 
-          A trois colonnes le bureau les aligne toutes ; a deux, les taches
-          gardent la leur — ce sont elles qui portent le plus de lignes — et
-          objectifs et ancres partagent la seconde. */}
-      <View style={colonnes === 1 ? {} : {
-        flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start',
-        gap: PAS[10], marginTop: PAS[6],
-      }}>
+              {ouvertes.length === 0 && ajout !== 'tache' ? (
+                <EtatVide
+                  icone={<GlypheTache couleur={j.text3} taille={18} />}
+                  titre="No open tasks"
+                  description="A task has an end and a date. The engine decides when to do it based on slack."
+                  actionTexte="Add a task"
+                  surAction={() => setAjout('tache')}
+                />
+              ) : null}
 
-      <Colonne largeur={largeurColonne}>
-      <Section
-        premiere
-        enColonne={colonnes > 1}
-        titre="Tasks"
-        compte={groupes.length}
-        loi="A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first."
-        action={<BoutonAjout ouvert={ajout === 'tache'} quoi="a task" surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')} />}
-      >
-        {ajout === 'tache' ? <FormulaireTache surFin={() => setAjout('aucun')} /> : null}
+              {groupesVisibles.map((g, i) => (
+                <GroupeTache key={g.racine.id} groupe={g} premiere={i === 0} />
+              ))}
 
-        {ouvertes.length === 0 && ajout !== 'tache' ? (
-          <Texte ton="doux">
-            Nothing to finish. A task has an end and a date — the engine decides when to do it.
-          </Texte>
-        ) : null}
+              {faitesVisibles.length > 0 ? (
+                <>
+                  <Espace h={4} />
+                  <Texte ton="eteint" taille={12.5}>
+                    {faites.length} finished
+                  </Texte>
+                  {faitesVisibles.map((t, i) => (
+                    <LigneTache
+                      key={t.id}
+                      tache={t}
+                      premiere={groupesVisibles.length === 0 && i === 0}
+                    />
+                  ))}
+                </>
+              ) : null}
 
-        {groupes.map((g, i) => (
-          <GroupeTache key={g.racine.id} groupe={g} premiere={i === 0} />
-        ))}
+              {tachesCachees > 0 ? (
+                <BoutonVoirPlus
+                  nombreCache={tachesCachees}
+                  ouvert={etenduTaches}
+                  surBasculer={() => setEtenduTaches((v) => !v)}
+                  quoi="tasks"
+                />
+              ) : null}
+            </Section>
+          </CarteEngagement>
 
-        {faites.length > 0 ? (
-          <>
-            <Espace h={4} />
-            <Texte ton="eteint" taille={12.5}>
-              {faites.length} finished
-            </Texte>
-            {faites.map((t) => (
-              <LigneTache key={t.id} tache={t} />
-            ))}
-          </>
-        ) : null}
-      </Section>
+          <CarteEngagement
+            largeur={largeurColonne}
+            badge="Rhythm Engine · Habits"
+            badgeCouleur={j.accentEncre}
+          >
+            <Section
+              premiere
+              enColonne
+              titre="Goals"
+              compte={d.objectifs.length}
+              loi="A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late."
+              action={
+                <BoutonAjout
+                  ouvert={ajout === 'objectif'}
+                  quoi="a goal"
+                  surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')}
+                />
+              }
+            >
+              {ajout === 'objectif' ? (
+                <FormulaireObjectif
+                  surFin={() => {
+                    setAjout('aucun')
+                    setEtenduObjectifs(true)
+                  }}
+                />
+              ) : null}
 
-      </Colonne>
+              {d.objectifs.length === 0 && ajout !== 'objectif' ? (
+                <EtatVide
+                  icone={<GlypheObjectif couleur={j.text3} taille={18} />}
+                  titre="No weekly goals"
+                  description="A goal never finishes: it is measured in hours per week and repeated rhythm."
+                  actionTexte="Add a goal"
+                  surAction={() => setAjout('objectif')}
+                />
+              ) : null}
 
-      <Colonne largeur={largeurColonne}>
-      <Section
-        enColonne={colonnes > 1}
-        titre="Goals"
-        compte={d.objectifs.length}
-        loi="A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late."
-        action={<BoutonAjout ouvert={ajout === 'objectif'} quoi="a goal" surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')} />}
-      >
-        {ajout === 'objectif' ? <FormulaireObjectif surFin={() => setAjout('aucun')} /> : null}
+              {objectifsVisibles.map((o, i) => {
+                const indexReel = d.objectifs.indexOf(o)
+                return (
+                  <Rangee key={o.id} premiere={i === 0}>
+                    <Marque couleur={assainirCouleur('objective', o.couleur, indexReel >= 0 ? indexReel : i)} />
+                    <View style={{ flex: 1 }}>
+                      <Texte>{o.nom}</Texte>
+                      <Texte ton="eteint" taille={12.5}>
+                        {duree(Math.round(o.cibleHebdoMinutes / 7))} a day
+                      </Texte>
+                    </View>
+                    <Valeur>{duree(o.cibleHebdoMinutes)}</Valeur>
+                    <Supprimer quoi={o.nom} surPression={() => void d.supprimerObjectif(o.id)} />
+                  </Rangee>
+                )
+              })}
 
-        {d.objectifs.length === 0 && ajout !== 'objectif' ? (
-          <Texte ton="doux">
-            Nothing yet. A goal never finishes: it is measured in hours per week.
-          </Texte>
-        ) : null}
+              {objectifsCaches > 0 ? (
+                <BoutonVoirPlus
+                  nombreCache={objectifsCaches}
+                  ouvert={etenduObjectifs}
+                  surBasculer={() => setEtenduObjectifs((v) => !v)}
+                  quoi="goals"
+                />
+              ) : null}
+            </Section>
+          </CarteEngagement>
 
-        {d.objectifs.map((o, i) => (
-          <Rangee key={o.id} premiere={i === 0}>
-            <Marque couleur={assainirCouleur('objective', o.couleur, i)} />
-            <View style={{ flex: 1 }}>
-              <Texte>{o.nom}</Texte>
-              <Texte ton="eteint" taille={12.5}>
-                {duree(Math.round(o.cibleHebdoMinutes / 7))} a day
-              </Texte>
-            </View>
-            <Valeur>{duree(o.cibleHebdoMinutes)}</Valeur>
-            <Supprimer quoi={o.nom} surPression={() => void d.supprimerObjectif(o.id)} />
-          </Rangee>
-        ))}
-      </Section>
+          <CarteEngagement
+            largeur={largeurColonne}
+            badge="Stability Engine · Appointments"
+            badgeCouleur={j.blocEncreAncre}
+          >
+            <Section
+              premiere
+              enColonne
+              titre="Anchors"
+              compte={d.ancres.length}
+              loi="A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next."
+              action={
+                <BoutonAjout
+                  ouvert={ajout === 'ancre'}
+                  quoi="an anchor"
+                  surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')}
+                />
+              }
+            >
+              {ajout === 'ancre' ? (
+                <FormulaireAncre
+                  surFin={() => {
+                    setAjout('aucun')
+                    setEtenduAncres(true)
+                  }}
+                />
+              ) : null}
 
-      </Colonne>
+              {d.ancres.length === 0 && ajout !== 'ancre' ? (
+                <EtatVide
+                  icone={<GlypheAncre couleur={j.text3} taille={18} />}
+                  titre="No fixed anchors"
+                  description="An anchor is an appointment the plan works around, never the other way."
+                  actionTexte="Add an anchor"
+                  surAction={() => setAjout('ancre')}
+                />
+              ) : null}
 
-      <Colonne largeur={largeurColonne}>
-      <Section
-        enColonne={colonnes > 1}
-        titre="Anchors"
-        compte={d.ancres.length}
-        loi="A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next."
-        action={<BoutonAjout ouvert={ajout === 'ancre'} quoi="an anchor" surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')} />}
-      >
-        {ajout === 'ancre' ? <FormulaireAncre surFin={() => setAjout('aucun')} /> : null}
+              {ancresVisibles.map((a, i) => {
+                const indexReel = d.ancres.indexOf(a)
+                return (
+                  <Rangee key={a.id} premiere={i === 0}>
+                    <Marque couleur={assainirCouleur('ancre', a.couleur, indexReel >= 0 ? indexReel : i)} />
+                    <View style={{ flex: 1 }}>
+                      <Texte>{a.nom}</Texte>
+                      <Texte ton="eteint" taille={12.5}>
+                        {joursEnTexte(a.jours)}
+                      </Texte>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Valeur>{enHeure(a.minuteAncrage)}</Valeur>
+                      <Valeur ton="doux" taille={11.5}>
+                        {duree(a.dureeMinutes)}
+                      </Valeur>
+                    </View>
+                    <Supprimer quoi={a.nom} surPression={() => void d.supprimerAncre(a.id)} />
+                  </Rangee>
+                )
+              })}
 
-        {d.ancres.length === 0 && ajout !== 'ancre' ? (
-          <Texte ton="doux">
-            Nothing yet. An anchor is an appointment the plan works around, never the other way.
-          </Texte>
-        ) : null}
-
-        {d.ancres.map((a, i) => (
-          <Rangee key={a.id} premiere={i === 0}>
-            <Marque couleur={assainirCouleur('ancre', a.couleur, i)} />
-            <View style={{ flex: 1 }}>
-              <Texte>{a.nom}</Texte>
-              <Texte ton="eteint" taille={12.5}>
-                {joursEnTexte(a.jours)}
-              </Texte>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Valeur>{enHeure(a.minuteAncrage)}</Valeur>
-              <Valeur ton="doux" taille={11.5}>
-                {duree(a.dureeMinutes)}
-              </Valeur>
-            </View>
-            <Supprimer quoi={a.nom} surPression={() => void d.supprimerAncre(a.id)} />
-          </Rangee>
-        ))}
-      </Section>
-      </Colonne>
-
+              {ancresCachees > 0 ? (
+                <BoutonVoirPlus
+                  nombreCache={ancresCachees}
+                  ouvert={etenduAncres}
+                  surBasculer={() => setEtenduAncres((v) => !v)}
+                  quoi="anchors"
+                />
+              ) : null}
+            </Section>
+          </CarteEngagement>
+        </View>
       </View>
     </ScrollView>
   )
 }
 
 /**
- * Une colonne de la grille, ou rien du tout.
+ * Une boîte (« carré ») qui encadre et sépare nettement chacune des trois natures.
  *
- * Sans largeur — donc sur un telephone — elle disparait : un `View` de plus
- * autour d'une section empilee ne ferait qu'ajouter un niveau a lire dans
- * l'arbre d'accessibilite.
+ * En colonne unique ou sur plusieurs colonnes, chaque section vit
+ * dans son propre cadre en surface sombre, avec sa bordure et ses marges.
  */
-function Colonne({ largeur, children }: { largeur: number | undefined; children: React.ReactNode }) {
-  if (largeur === undefined) return <>{children}</>
-  return <View style={{ width: largeur }}>{children}</View>
+function CarteEngagement({
+  largeur,
+  badge,
+  badgeCouleur,
+  children,
+}: {
+  largeur: number | undefined
+  badge: string
+  badgeCouleur: string
+  children: React.ReactNode
+}) {
+  const j = useJetons()
+  return (
+    <View
+      style={{
+        width: largeur ?? '100%',
+        backgroundColor: j.surface,
+        borderWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.12)',
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        borderLeftColor: 'rgba(255, 255, 255, 0.08)',
+        borderRightColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: RAYON.xl,
+        padding: PAS[5],
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: PAS[3],
+        }}
+      >
+        <View
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: badgeCouleur,
+          }}
+        />
+        <Text
+          style={{
+            fontFamily: MONO.demi,
+            fontSize: 10,
+            letterSpacing: 0.8,
+            color: j.text3,
+            textTransform: 'uppercase',
+          }}
+        >
+          {badge}
+        </Text>
+      </View>
+      {children}
+    </View>
+  )
+}
+
+
+/**
+ * État vide accueillant avec icône de nature et action directe.
+ */
+function EtatVide({
+  icone,
+  titre,
+  description,
+  actionTexte,
+  surAction,
+}: {
+  icone: React.ReactNode
+  titre: string
+  description: string
+  actionTexte: string
+  surAction: () => void
+}) {
+  const j = useJetons()
+  return (
+    <View
+      style={{
+        paddingVertical: PAS[5],
+        paddingHorizontal: PAS[3],
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: RAYON.md,
+        borderWidth: 1,
+        borderColor: j.line,
+        borderStyle: 'dashed',
+        backgroundColor: 'rgba(255, 255, 255, 0.01)',
+        gap: PAS[2],
+      }}
+    >
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: j.surface2,
+          borderWidth: 1,
+          borderColor: j.line,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {icone}
+      </View>
+      <Text style={{ fontFamily: GEIST.demi, fontSize: 13, color: j.text2 }}>{titre}</Text>
+      <Text
+        style={{
+          fontFamily: GEIST.normal,
+          fontSize: 11.5,
+          color: j.text3,
+          textAlign: 'center',
+          maxWidth: 240,
+          lineHeight: 16,
+        }}
+      >
+        {description}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={surAction}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: PAS[1],
+          marginTop: PAS[2],
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderRadius: RAYON.sm,
+          borderWidth: 1,
+          borderColor: j.lineForte,
+          backgroundColor: pressed ? j.surface2 : 'transparent',
+          transform: [{ translateY: pressed ? 1 : 0 }],
+        })}
+      >
+        <Plus couleur={j.accentEncre} taille={12} />
+        <Text style={{ fontFamily: GEIST.demi, fontSize: 12, color: j.text2 }}>{actionTexte}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+/**
+ * Bouton discret avec glyphe "+" pour déplier/replier les éléments au-delà de 2.
+ */
+function BoutonVoirPlus({
+  nombreCache,
+  ouvert,
+  surBasculer,
+  quoi,
+}: {
+  nombreCache: number
+  ouvert: boolean
+  surBasculer: () => void
+  quoi: string
+}) {
+  const j = useJetons()
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={ouvert ? `Show fewer ${quoi}` : `Show ${nombreCache} more ${quoi}`}
+      accessibilityState={{ expanded: ouvert }}
+      onPress={surBasculer}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: PAS[2],
+        paddingVertical: PAS[2] + 2,
+        paddingHorizontal: PAS[3],
+        marginTop: PAS[4],
+        borderRadius: RAYON.md,
+        borderWidth: 1,
+        borderColor: ouvert ? j.lineForte : j.line,
+        backgroundColor: pressed ? j.surface2 : 'rgba(255, 255, 255, 0.02)',
+        transform: [{ translateY: pressed ? 1 : 0 }],
+      })}
+    >
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: j.surface2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {ouvert ? (
+          <Moins couleur={j.text2} taille={11} />
+        ) : (
+          <Plus couleur={j.accentEncre} taille={11} />
+        )}
+      </View>
+      <Text style={{ fontFamily: GEIST.demi, fontSize: 12.5, color: j.text2 }}>
+        {ouvert ? 'Show less' : `+${nombreCache} more ${quoi}`}
+      </Text>
+    </Pressable>
+  )
 }
 
 // ─── Lignes ────────────────────────────────────────────────────────────────
@@ -298,10 +637,20 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
           accessibilityRole="button"
           accessibilityLabel={`Grant ${PAS_DE_TEMPS} more minutes to ${racine.titre}`}
           onPress={() => void d.ajouterDuTemps(parties[0]?.id ?? racine.id, PAS_DE_TEMPS)}
-          hitSlop={8}
-          style={({ pressed }) => ({ minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}
+          hitSlop={6}
+          style={({ pressed }) => ({
+            paddingHorizontal: 8,
+            paddingVertical: 5,
+            borderRadius: RAYON.sm,
+            borderWidth: 1,
+            borderColor: pressed ? j.lineForte : j.line,
+            backgroundColor: pressed ? j.surface3 : j.surface2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ translateY: pressed ? 1 : 0 }],
+          })}
         >
-          <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: j.text2 }}>+{PAS_DE_TEMPS}</Text>
+          <Text style={{ fontFamily: MONO.demi, fontSize: 11, color: j.text2 }}>+{PAS_DE_TEMPS}m</Text>
         </Pressable>
 
         <Supprimer quoi={racine.titre} surPression={() => void d.supprimerTache(racine.id)} />
@@ -309,9 +658,9 @@ function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean 
 
       {/* Ce qui a ete MESURE, pas ce qui a ete promis. La barre ne bouge
           qu'apres un « Je commence » et une fenetre ecoulee. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
-        <View style={{ flex: 1, height: 2, backgroundColor: j.line }}>
-          <View style={{ width: `${part * 100}%`, height: 2, backgroundColor: j.accent }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2], paddingLeft: PAS[4] }}>
+        <View style={{ flex: 1, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+          <View style={{ width: `${part * 100}%`, height: 3, borderRadius: 1.5, backgroundColor: j.accent }} />
         </View>
         <Text style={{ fontFamily: MONO.normal, fontSize: 10.5, color: j.text3, fontVariant: ['tabular-nums'] }}>
           {duree(mesure)} done
@@ -394,10 +743,19 @@ function Supprimer({ surPression, quoi }: { surPression: () => void; quoi: strin
       accessibilityRole="button"
       accessibilityLabel={`Delete ${quoi}`}
       onPress={surPression}
-      hitSlop={12}
-      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+      hitSlop={10}
+      style={({ pressed }) => ({
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: pressed ? j.surface2 : 'transparent',
+        opacity: pressed ? 1 : 0.65,
+        transform: [{ translateY: pressed ? 1 : 0 }],
+      })}
     >
-      <Croix couleur={j.text3} taille={15} />
+      <Croix couleur={j.text3} taille={14} />
     </Pressable>
   )
 }
@@ -422,15 +780,16 @@ function BoutonAjout({ ouvert, quoi, surPression }: { ouvert: boolean; quoi: str
       style={({ pressed }) => ({
         width: 28,
         height: 28,
-        borderRadius: RAYON.sm,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: ouvert ? j.accent : j.lineForte,
+        backgroundColor: ouvert ? j.accentDoux : pressed ? j.surface2 : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
         transform: [{ rotate: ouvert ? '45deg' : '0deg' }, { translateY: pressed ? 1 : 0 }],
       })}
     >
-      <Plus couleur={ouvert ? j.accentEncre : j.text2} taille={15} />
+      <Plus couleur={ouvert ? j.accentEncre : j.text2} taille={14} />
     </Pressable>
   )
 }
@@ -454,7 +813,8 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
   const [titre, setTitre] = useState('')
   const [intention, setIntention] = useState('')
   const [minutes, setMinutes] = useState('60')
-  const [jours, setJours] = useState('7')
+  // Une tâche se termine dans le mois : on la déplace ensuite si besoin.
+  const [echeance, setEcheance] = useState(() => dansNJours(7))
   const [importance, setImportance] = useState(5)
   const [nature, setNature] = useState<Tache['nature']>('routine')
 
@@ -468,7 +828,7 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
         titre: titre.trim(),
         intention: intention.trim(),
         couleur,
-        echeance: dansNJours(Number(jours) || 7),
+        echeance,
         importance,
         minutesEstimees: Math.max(5, Number(minutes) || 60),
         nature,
@@ -490,10 +850,12 @@ function FormulaireTache({ surFin }: { surFin: () => void }) {
         exemple="Tonight at my desk, I write the first three pages."
         multiligne
       />
-      <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ etiquette="Estimated duration in minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
-        <Champ etiquette="Deadline, in how many days" valeur={jours} surChangement={setJours} exemple="7" suffixe="days" numerique />
-      </View>
+      <Etiquetee titre="How long it will take">
+        <RoueDuree minutes={Number(minutes) || 0} changer={(v) => setMinutes(String(v))} etiquette="Estimated duration" maxHeures={150} pasMinutes={15} minimum={15} compact />
+      </Etiquetee>
+      <Etiquetee titre="Done by (at most a month ahead)">
+        <RoueJour valeur={echeance} changer={setEcheance} jours={30} etiquette="Deadline" />
+      </Etiquetee>
       <Bascule
         valeur={nature}
         surChangement={setNature}
@@ -579,7 +941,9 @@ function FormulaireObjectif({ surFin }: { surFin: () => void }) {
         exemple="What does it involve? E.g. every evening at the studio, an hour of scales."
         multiligne
       />
-      <Champ etiquette="Hours per week" valeur={heures} surChangement={setHeures} exemple="5" suffixe="h / week" numerique />
+      <Etiquetee titre="Every week">
+        <RoueDuree minutes={Math.round((Number(heures.replace(',', '.')) || 0) * 60)} changer={(v) => setHeures(String(v / 60))} etiquette="Time per week" maxHeures={100} pasMinutes={15} minimum={15} compact />
+      </Etiquetee>
     </Formulaire>
   )
 }
@@ -629,8 +993,12 @@ function FormulaireAncre({ surFin }: { surFin: () => void }) {
         multiligne
       />
       <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Champ etiquette="Anchor time" valeur={heure} surChangement={setHeure} exemple="12:30" suffixe="à" />
-        <Champ etiquette="Duration in minutes" valeur={minutes} surChangement={setMinutes} exemple="60" suffixe="min" numerique />
+        <Etiquetee titre="At">
+          <RoueHeure valeur={heure} changer={setHeure} etiquette="Anchor time" compact />
+        </Etiquetee>
+        <Etiquetee titre="For">
+          <RoueDuree minutes={Number(minutes) || 0} changer={(v) => setMinutes(String(v))} etiquette="Anchor duration" maxHeures={8} minimum={15} compact />
+        </Etiquetee>
       </View>
       <ChoixJours valeur={jours} surChangement={setJours} />
       {erreur ? (
@@ -664,7 +1032,7 @@ function Formulaire({
         padding: PAS[4],
         marginBottom: PAS[4],
         gap: PAS[3],
-        backgroundColor: j.surface,
+        backgroundColor: j.surface2,
       }}
     >
       {children}
@@ -676,6 +1044,18 @@ function Formulaire({
           Add
         </BoutonIris>
       </View>
+    </View>
+  )
+}
+
+/** Une roue et ce qu'elle règle, au-dessus. */
+function Etiquetee({ titre, children }: { titre: string; children: React.ReactNode }) {
+  return (
+    <View style={{ flex: 1, gap: PAS[2] }}>
+      <Texte ton="eteint" taille={12.5}>
+        {titre}
+      </Texte>
+      {children}
     </View>
   )
 }

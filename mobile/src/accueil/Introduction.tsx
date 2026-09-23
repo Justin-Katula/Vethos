@@ -1,1257 +1,597 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import {
-  AccessibilityInfo,
-  Animated,
-  Easing,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type StyleProp,
-  type TextStyle,
-  type ViewStyle,
-} from 'react-native'
+/**
+ * THESIS: One intention becomes a real place in the user's day.
+ * ARC: what matters → "you already know… then why do you keep pushing it?"
+ *      turning into "how often do you say 'tomorrow'?" → what gets pushed
+ *      (told in the words of his answer) → since when, how much, how fast →
+ *      the math, live, one problem at a time → his own sentence, with weight →
+ *      Vethos → one thing, really placed.
+ * RULES: nothing typed after the name; every answer changes what comes next;
+ *      every number comes from his answers and each thing's real nature.
+ */
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Haptics from 'expo-haptics'
+import { router } from 'expo-router'
 import { useDonnees } from '@/donnees/magasin'
-import { useJetons } from '@/theme/Theme'
-import { PAS, RAYON } from '@/theme/jetons'
-import { FondRoutage } from '@/ui/MouvementVethos'
+import { FournisseurTheme } from '@/theme/Theme'
 import { GEIST } from '@/ui/primitives'
-import { SuiteIntroduction } from './SuiteIntroduction'
+import { SuiteIntroduction, type MemoireIntroduction } from './SuiteIntroduction'
+import { ETAPES_INTRODUCTION, TOTAL_ETAPES_INTRODUCTION } from './modele-introduction'
+import {
+  bilan,
+  CHOSES,
+  chosesPour,
+  DEPUIS,
+  echoFrequence,
+  FREQUENCES,
+  PRIORITES,
+  reponsesCompletes,
+  RYTHME_REPETE,
+  RYTHME_UNIQUE,
+  TRAVAIL,
+  type Option,
+  type Priorite,
+  type Reponses,
+} from './choix-introduction'
+import {
+  ActionIntro,
+  Apparaitre,
+  BarreIntro,
+  ChampIntro,
+  ChoixIntro,
+  DUREE,
+  encre,
+  PageIntro,
+  SORTIE,
+  TitreIntro,
+  useAccessibiliteIntro,
+} from './experience-introduction'
+import { ConstatEnDeux, Frappe, LogoVethos } from './recit-introduction'
+import { CalculEnDirect } from './calcul-introduction'
 
-type Etape =
-  | 'prenom'
-  | 'priorite'
-  | 'frequence'
-  | 'silence'
-  | 'constat'
-  | 'consequence'
-  | 'pensee'
-  | 'suite'
+type Scene = (typeof ETAPES_INTRODUCTION)[number] | 'suite'
+const ORDRE: Scene[] = [...ETAPES_INTRODUCTION, 'suite']
 
-type Priorite = 'school' | 'work' | 'project' | 'health' | 'discipline' | 'other'
-type Frequence = 'daily' | 'weekly' | 'sometimes' | 'rarely'
-
-const ETAPES_QUESTIONS: Etape[] = ['prenom', 'priorite', 'frequence']
-
-const PRIORITES: ReadonlyArray<{ valeur: Priorite; etiquette: string }> = [
-  { valeur: 'school', etiquette: 'School' },
-  { valeur: 'work', etiquette: 'Work' },
-  { valeur: 'project', etiquette: 'Project' },
-  { valeur: 'health', etiquette: 'Health' },
-  { valeur: 'discipline', etiquette: 'Discipline' },
-  { valeur: 'other', etiquette: 'Something else' },
-]
-
-const FREQUENCES: ReadonlyArray<{ valeur: Frequence; etiquette: string }> = [
-  { valeur: 'daily', etiquette: 'Almost every day' },
-  { valeur: 'weekly', etiquette: 'A few times a week' },
-  { valeur: 'sometimes', etiquette: 'Sometimes' },
-  { valeur: 'rarely', etiquette: 'Rarely' },
-]
-
-const CONSEQUENCES: Record<Priorite, string> = {
-  school: 'The work that could already be finished.',
-  work: 'The work that could already be finished.',
-  project: 'The progress you could already have made.',
-  health: 'The progress you could already have made.',
-  discipline: 'The things that could already be behind you.',
-  other: 'The things that could already be behind you.',
+/** Le fond s'assombrit à mesure que l'histoire se tait, puis se rallume avec Vethos. */
+function tonDuFond(scene: Scene): number {
+  if (scene === 'nom' || scene === 'priorite') return 1
+  if (scene === 'frequence' || scene === 'differe' || scene === 'detail') return 0.45
+  if (scene === 'suite') return 0.5
+  return 0
 }
 
-const COURBE_ENTREE = Easing.bezier(0.23, 1, 0.32, 1)
-const COURBE_DEPLACEMENT = Easing.bezier(0.77, 0, 0.175, 1)
-// L'onboarding est une experience rare et explicative : a la demande du
-// Apres essai sur appareil, le rythme est environ 15 % plus vif que la version
-// "50 %" : toujours contemplatif, sans donner l'impression d'attendre.
-const FACTEUR_RYTHME = 1.72
-const FACTEUR_LETTRES = 2.25
-const auRythme = (millisecondes: number) => Math.round(millisecondes * FACTEUR_RYTHME)
-const auRythmeDesLettres = (millisecondes: number) =>
-  Math.round(millisecondes * FACTEUR_LETTRES)
-
-/**
- * Le premier lancement part de ce que la personne sait deja, laisse un silence,
- * puis lui renvoie le cout du report. Les trois questions gardent des controles
- * explicites ; la sequence de constatation avance seule pour rester un mouvement.
- */
 export function Introduction() {
-  const j = useJetons()
+  return (
+    <FournisseurTheme force="sombre">
+      <IntroductionSombre />
+    </FournisseurTheme>
+  )
+}
+
+/** Une question à choix, en grille de deux. */
+function Question({
+  titre,
+  options,
+  valeur,
+  choisir,
+  reduit,
+  grand = false,
+}: {
+  titre: string
+  options: Option[]
+  valeur: number | undefined
+  choisir: (v: number) => void
+  reduit: boolean
+  grand?: boolean
+}) {
+  return (
+    <Apparaitre reduit={reduit} style={{ gap: 14 }}>
+      {grand ? (
+        <TitreIntro>{titre}</TitreIntro>
+      ) : (
+        <Text
+          accessibilityRole="header"
+          style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 22, lineHeight: 28, letterSpacing: -0.5 }}
+        >
+          {titre}
+        </Text>
+      )}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {options.map((o) => (
+          <ChoixIntro
+            key={o.libelle}
+            titre={o.libelle}
+            compact
+            selected={valeur === o.valeur}
+            attenue={valeur !== undefined && valeur !== o.valeur}
+            onPress={() => choisir(o.valeur)}
+            style={{ flexBasis: '47%', flexGrow: 1 }}
+          />
+        ))}
+      </View>
+    </Apparaitre>
+  )
+}
+
+function IntroductionSombre() {
   const marges = useSafeAreaInsets()
-  const { reglages, majReglages, chargees } = useDonnees()
-  const [etape, setEtape] = useState<Etape>('prenom')
-  const [nom, setNom] = useState(reglages.prenom)
-  const [priorite, setPriorite] = useState<Priorite | null>(null)
-  const [prioriteLibre, setPrioriteLibre] = useState('')
-  const [frequence, setFrequence] = useState<Frequence | null>(null)
-  const [mouvementReduit, setMouvementReduit] = useState(false)
-  const opacite = useRef(new Animated.Value(1)).current
-  const decalageX = useRef(new Animated.Value(0)).current
-  const decalageY = useRef(new Animated.Value(0)).current
-  const transitionEnCours = useRef(false)
-  const prenomHydrate = useRef(false)
-  const introductionDejaTerminee = useRef(reglages.introductionFaite)
+  const { chargees, reglages, majReglages } = useDonnees()
+  const [scene, setScene] = useState<Scene>('nom')
+  const [nom, setNom] = useState('')
+  const [priorites, setPriorites] = useState<Priorite[]>([])
+  const [choseIds, setChoseIds] = useState<string[]>([])
+  const [soirs, setSoirs] = useState<number | undefined>(undefined)
+  const [reponses, setReponses] = useState<Record<string, Reponses>>({})
+  const [detail, setDetail] = useState(0)
+  const [relecture, setRelecture] = useState(false)
+  const [transition, setTransition] = useState(false)
+  const [logoArrive, setLogoArrive] = useState(false)
+  const [constatLu, setConstatLu] = useState(false)
+  const [frappee, setFrappee] = useState(false)
+  const [calculFini, setCalculFini] = useState(false)
+  const [sortie, setSortie] = useState(false)
+  const { reduit, lecteur } = useAccessibiliteIntro()
+  const visibleAvant = useRef(false)
+  const memoireEngagement = useRef<MemoireIntroduction | null>(null)
+  const aDejaTermine = useRef(false)
+  const verrou = useRef(false)
+  const p = useRef(new Animated.Value(1)).current
+  const fond = useRef(new Animated.Value(1)).current
+  const monde = useRef(new Animated.Value(1)).current
+  const transitionAnimation = useRef<Animated.CompositeAnimation | null>(null)
+  const visible = chargees && (!reglages.introductionFaite || sortie)
 
-  useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then(setMouvementReduit)
-    const abonnement = AccessibilityInfo.addEventListener('reduceMotionChanged', setMouvementReduit)
-    return () => abonnement.remove()
-  }, [])
-
-  // Une seule hydratation. Avant, `nom === ''` relancait cette copie a chaque
-  // effacement et le prenom sauvegarde se reecrivait sous les doigts.
   useEffect(() => {
     if (!chargees) return
-    if (reglages.introductionFaite) introductionDejaTerminee.current = true
-    if (!prenomHydrate.current) {
-      prenomHydrate.current = true
+    if (reglages.introductionFaite && !sortie) aDejaTermine.current = true
+    if (visible && !visibleAvant.current) {
+      memoireEngagement.current = null
       setNom(reglages.prenom)
+      setScene('nom')
+      setPriorites([])
+      setChoseIds([])
+      setSoirs(undefined)
+      setReponses({})
+      setDetail(0)
+      setRelecture(aDejaTermine.current)
+      verrou.current = false
+      setTransition(false)
+      p.setValue(1)
+      monde.setValue(1)
     }
-    if (!reglages.introductionFaite) return
-    setNom(reglages.prenom)
-    setEtape('prenom')
-    setPriorite(null)
-    setPrioriteLibre('')
-    setFrequence(null)
-    opacite.setValue(1)
-    decalageX.setValue(0)
-    decalageY.setValue(0)
-    transitionEnCours.current = false
-  }, [chargees, decalageX, decalageY, opacite, reglages.introductionFaite, reglages.prenom])
-
-  const changerEtape = useCallback(
-    (suivante: Etape, sens: 1 | -1 = 1, axe: 'horizontal' | 'vertical' = 'horizontal') => {
-      if (transitionEnCours.current) return
-      transitionEnCours.current = true
-      Keyboard.dismiss()
-
-      if (mouvementReduit) {
-        Animated.timing(opacite, {
-          toValue: 0,
-          duration: 180,
-          easing: COURBE_ENTREE,
-          useNativeDriver: true,
-        }).start(() => {
-          setEtape(suivante)
-          Animated.timing(opacite, {
-            toValue: 1,
-            duration: 260,
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }).start(() => {
-            transitionEnCours.current = false
-          })
-        })
-        return
-      }
-
-      const sortX = axe === 'horizontal' ? -22 * sens : 0
-      const sortY = axe === 'vertical' ? -12 * sens : 0
-      Animated.parallel([
-        Animated.timing(opacite, {
-          toValue: 0,
-          duration: auRythme(380),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-        Animated.timing(decalageX, {
-          toValue: sortX,
-          duration: auRythme(420),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-        Animated.timing(decalageY, {
-          toValue: sortY,
-          duration: auRythme(420),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setEtape(suivante)
-        decalageX.setValue(axe === 'horizontal' ? 26 * sens : 0)
-        decalageY.setValue(axe === 'vertical' ? 14 * sens : 0)
-        Animated.parallel([
-          Animated.timing(opacite, {
-            toValue: 1,
-            duration: auRythme(700),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-          Animated.timing(decalageX, {
-            toValue: 0,
-            duration: auRythme(700),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-          Animated.timing(decalageY, {
-            toValue: 0,
-            duration: auRythme(700),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          transitionEnCours.current = false
-        })
-      })
-    },
-    [decalageX, decalageY, mouvementReduit, opacite],
-  )
-
+    visibleAvant.current = visible
+  }, [chargees, monde, p, reglages.introductionFaite, reglages.prenom, sortie, visible])
+  useEffect(() => () => transitionAnimation.current?.stop(), [])
   useEffect(() => {
-    if (etape === 'silence') {
-      const t = setTimeout(() => changerEtape('constat', 1, 'vertical'), mouvementReduit ? 500 : auRythme(2100))
-      return () => clearTimeout(t)
-    }
-    if (etape === 'constat') {
-      const t = setTimeout(() => changerEtape('consequence', 1, 'vertical'), mouvementReduit ? 1200 : auRythme(2800))
-      return () => clearTimeout(t)
-    }
-    if (etape === 'consequence') {
-      const t = setTimeout(() => changerEtape('pensee', 1, 'vertical'), mouvementReduit ? 1800 : auRythme(4100))
-      return () => clearTimeout(t)
-    }
-    return undefined
-  }, [changerEtape, etape, mouvementReduit])
+    const a = Animated.timing(fond, {
+      toValue: tonDuFond(scene),
+      duration: reduit ? DUREE.reduit : DUREE.ui,
+      easing: SORTIE,
+      useNativeDriver: true,
+    })
+    a.start()
+    return () => a.stop()
+  }, [fond, reduit, scene])
 
-  if (!chargees || reglages.introductionFaite) return null
-
-  const rangQuestion = ETAPES_QUESTIONS.indexOf(etape)
-  const estQuestion = rangQuestion !== -1
-  const nomPropre = nom.trim()
-  const prioriteValide = priorite !== null && (priorite !== 'other' || prioriteLibre.trim().length > 0)
-  const consequence = priorite ? CONSEQUENCES[priorite] : CONSEQUENCES.other
-
-  const continuer = () => {
-    if (etape === 'prenom' && nomPropre) changerEtape('priorite', 1, 'horizontal')
-    else if (etape === 'priorite' && prioriteValide) changerEtape('frequence', 1, 'horizontal')
-    else if (etape === 'frequence' && frequence) changerEtape('silence', 1, 'vertical')
+  const aller = (suivante: Scene, sousPage = 0) => {
+    if (verrou.current) return
+    verrou.current = true
+    setTransition(true)
+    Keyboard.dismiss()
+    transitionAnimation.current = Animated.timing(p, {
+      toValue: 0,
+      duration: reduit ? 80 : DUREE.micro,
+      easing: SORTIE,
+      useNativeDriver: true,
+    })
+    transitionAnimation.current.start(({ finished }) => {
+      if (!finished) return
+      if (suivante === 'activation') setLogoArrive(false)
+      if (suivante === 'frequence') setConstatLu(false)
+      if (suivante === 'calcul') setCalculFini(false)
+      if (suivante === 'pensee') setFrappee(false)
+      setDetail(sousPage)
+      setScene(suivante)
+      transitionAnimation.current = Animated.timing(p, {
+        toValue: 1,
+        duration: reduit ? DUREE.reduit : DUREE.entree,
+        easing: SORTIE,
+        useNativeDriver: true,
+      })
+      transitionAnimation.current.start(() => {
+        verrou.current = false
+        setTransition(false)
+      })
+    })
   }
-
+  const choses = choseIds.map((id) => CHOSES.find((c) => c.id === id)!).filter(Boolean)
+  const fermerRelecture = () => {
+    void majReglages({ introductionFaite: true })
+  }
   const retour = () => {
-    if (etape === 'priorite') changerEtape('prenom', -1, 'horizontal')
-    else if (etape === 'frequence') changerEtape('priorite', -1, 'horizontal')
+    if (scene === 'detail' && detail > 0) return aller('detail', detail - 1)
+    const precedente = ORDRE[Math.max(0, ORDRE.indexOf(scene) - 1)]!
+    aller(precedente, precedente === 'detail' ? Math.max(0, choses.length - 1) : 0)
   }
-
+  /** Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous. */
   const terminer = () => {
-    void majReglages({ prenom: nomPropre, introductionFaite: true })
+    router.replace('/')
+    Animated.timing(monde, {
+      toValue: 0,
+      duration: reduit ? DUREE.reduit : DUREE.ui,
+      delay: reduit ? 0 : 60,
+      easing: SORTIE,
+      useNativeDriver: true,
+    }).start(() => setSortie(false))
   }
 
-  const continuerDesactive =
-    (etape === 'prenom' && !nomPropre) ||
-    (etape === 'priorite' && !prioriteValide) ||
-    (etape === 'frequence' && !frequence)
+  const choix = chosesPour(priorites)
+  const bilans = soirs !== undefined ? choses.map((c) => bilan(c, soirs, reponses[c.id] ?? {})) : []
+  const echo = echoFrequence(soirs ?? 3)
+  const demains = Math.max(0, ...bilans.map((b) => b.demains))
+  const actuelle = choses[detail]
+  const repondre = (id: string, cle: keyof Reponses, v: number) =>
+    setReponses((r) => ({ ...r, [id]: { ...r[id], [cle]: v } }))
+  const barreVisible = scene !== 'pensee' && (scene !== 'activation' || logoArrive)
 
+  if (!visible) return null
   return (
-    <Modal visible animationType="fade" onRequestClose={() => undefined} statusBarTranslucent>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, backgroundColor: j.bg }}
-      >
-        <View
-          style={{
-            flex: 1,
-            paddingTop: marges.top + PAS[3],
-            paddingBottom: marges.bottom + PAS[5],
-          }}
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={relecture ? fermerRelecture : retour}
+    >
+      <Animated.View style={{ flex: 1, opacity: monde }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, backgroundColor: encre.bg }}
         >
-          <FondRoutage intensite="faible" />
-          {estQuestion ? <EnteteQuestion rang={rangQuestion} /> : null}
-
           <Animated.View
+            pointerEvents="none"
+            style={{ position: 'absolute', inset: 0, backgroundColor: encre.calme, opacity: fond }}
+          />
+          <View
             style={{
               flex: 1,
-              opacity: opacite,
-              transform: [{ translateX: decalageX }, { translateY: decalageY }],
+              paddingTop: marges.top,
+              paddingBottom: Math.max(marges.bottom, 12),
+              overflow: 'hidden',
             }}
           >
-            {etape === 'prenom' ? (
-              <EcranPrenom
-                nom={nom}
-                setNom={setNom}
-                onSubmit={continuer}
-                mouvementReduit={mouvementReduit}
-              />
-            ) : null}
-            {etape === 'priorite' ? (
-              <EcranPriorite
-                valeur={priorite}
-                setValeur={setPriorite}
-                valeurLibre={prioriteLibre}
-                setValeurLibre={setPrioriteLibre}
-                mouvementReduit={mouvementReduit}
-              />
-            ) : null}
-            {etape === 'frequence' ? (
-              <EcranFrequence
-                valeur={frequence}
-                setValeur={setFrequence}
-                mouvementReduit={mouvementReduit}
-              />
-            ) : null}
-            {etape === 'silence' ? <Silence mouvementReduit={mouvementReduit} /> : null}
-            {etape === 'constat' ? <Constat /> : null}
-            {etape === 'consequence' ? <Consequence texte={consequence} /> : null}
-            {etape === 'pensee' ? (
-              <Pensee
-                mouvementReduit={mouvementReduit}
-                terminer={() => changerEtape('suite', 1, 'vertical')}
-              />
-            ) : null}
-            {etape === 'suite' ? (
-              <SuiteIntroduction
-                mouvementReduit={mouvementReduit}
-                relecture={introductionDejaTerminee.current}
-                terminer={terminer}
-              />
-            ) : null}
-          </Animated.View>
-
-          {estQuestion ? (
-            <Navigation
-              retour={rangQuestion > 0 ? retour : undefined}
-              continuer={continuer}
-              desactive={continuerDesactive}
-            />
-          ) : null}
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  )
-}
-
-function EnteteQuestion({ rang }: { rang: number }) {
-  const j = useJetons()
-  return (
-    <View
-      style={{
-        height: 44 + PAS[4],
-        paddingHorizontal: PAS[6],
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: PAS[3],
-      }}
-    >
-      <Text style={{ fontFamily: GEIST.demi, fontSize: 11, color: j.text3 }}>0{rang + 1} / 03</Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: j.line }}>
-        <View
-          style={{
-            width: `${((rang + 1) / ETAPES_QUESTIONS.length) * 100}%`,
-            height: 1,
-            backgroundColor: j.text,
-          }}
-        />
-      </View>
-    </View>
-  )
-}
-
-function CadreQuestion({ children }: { children: ReactNode }) {
-  return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: PAS[6] }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={{ gap: PAS[8] }}>{children}</View>
-    </ScrollView>
-  )
-}
-
-function TitreQuestion({ texte, mouvementReduit }: { texte: string; mouvementReduit: boolean }) {
-  const j = useJetons()
-  return (
-    <View style={{ maxWidth: 330 }}>
-      <TexteLettres
-        texte={texte}
-        mouvementReduit={mouvementReduit}
-        style={{
-          fontFamily: GEIST.demi,
-          fontSize: 31,
-          lineHeight: 37,
-          letterSpacing: -0.9,
-          color: j.text,
-        }}
-      />
-    </View>
-  )
-}
-
-/**
- * Une seule valeur anime toutes les lettres : le moteur natif interpole leur
- * decalage sans creer un minuteur JavaScript par caractere. Les mots restent
- * des groupes, donc aucun retour a la ligne ne coupe un mot en deux.
- */
-function TexteLettres({
-  texte,
-  mouvementReduit,
-  style,
-}: {
-  texte: string
-  mouvementReduit: boolean
-  style: StyleProp<TextStyle>
-}) {
-  const progression = useRef(new Animated.Value(mouvementReduit ? 1 : 0)).current
-  const mots = texte.split(' ')
-  let position = 0
-  const groupes = mots.map((mot) => {
-    const debut = position
-    position += mot.length + 1
-    return { mot, debut }
-  })
-  const longueur = Math.max(texte.length - 1, 1)
-
-  useEffect(() => {
-    progression.setValue(mouvementReduit ? 1 : 0)
-    Animated.timing(progression, {
-      toValue: 1,
-      duration: mouvementReduit ? 220 : auRythmeDesLettres(1150),
-      // Une cadence lineaire est volontaire ici : avec une courbe ease-out,
-      // presque toutes les lettres apparaissaient au debut, meme a 3 secondes.
-      easing: Easing.linear,
-      useNativeDriver: true,
-    }).start()
-    return () => progression.stopAnimation()
-  }, [mouvementReduit, progression])
-
-  return (
-    <View
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={texte}
-      style={{ flexDirection: 'row', flexWrap: 'wrap' }}
-    >
-      {groupes.map(({ mot, debut }, motIndex) => (
-        <View
-          key={`${mot}-${debut}`}
-          style={{ flexDirection: 'row', marginRight: motIndex === groupes.length - 1 ? 0 : 8 }}
-        >
-          {Array.from(mot).map((lettre, index) => {
-            const rang = debut + index
-            const depart = mouvementReduit ? 0 : (rang / longueur) * 0.62
-            const fin = Math.min(depart + 0.22, 1)
-            return (
-              <Animated.Text
-                key={`${lettre}-${index}`}
-                accessible={false}
-                style={[
-                  style,
-                  {
-                    opacity: progression.interpolate({
-                      inputRange: [depart, fin],
-                      outputRange: [0, 1],
-                      extrapolate: 'clamp',
-                    }),
-                    transform: [
-                      {
-                        translateY: progression.interpolate({
-                          inputRange: [depart, fin],
-                          outputRange: [mouvementReduit ? 0 : 7, 0],
-                          extrapolate: 'clamp',
-                        }),
-                      },
-                    ],
-                  },
-                ]}
+            <View style={{ flex: 1, width: '100%', maxWidth: 540, alignSelf: 'center' }}>
+              {scene !== 'suite' ? (
+                <BarreIntro
+                  etapeActuelle={ETAPES_INTRODUCTION.indexOf(scene)}
+                  total={TOTAL_ETAPES_INTRODUCTION}
+                  retour={scene !== 'nom' ? retour : undefined}
+                  quitter={relecture ? fermerRelecture : undefined}
+                  visible={barreVisible}
+                  reduit={reduit}
+                />
+              ) : null}
+              {/* Le contenu défile SOUS la barre, jamais par-dessus : rien n'est coupé en haut. */}
+              <Animated.View
+                pointerEvents={transition ? 'none' : 'auto'}
+                style={{ flex: 1, opacity: p, overflow: 'hidden' }}
               >
-                {lettre}
-              </Animated.Text>
-            )
-          })}
-        </View>
-      ))}
-    </View>
-  )
-}
+                {scene === 'nom' ? (
+                  <PageIntro
+                    haut={34}
+                    footer={
+                      <ActionIntro disabled={!nom.trim()} onPress={() => aller('priorite')}>
+                        Let’s begin
+                      </ActionIntro>
+                    }
+                  >
+                    <TitreIntro grand>First, what should I call you?</TitreIntro>
+                    <ChampIntro
+                      label="Your name"
+                      valeur={nom}
+                      changer={setNom}
+                      placeholder="Your name"
+                      grand
+                      autoFocus={!relecture}
+                      maxLength={40}
+                      labelVisible={false}
+                      onSubmit={() => {
+                        if (nom.trim()) aller('priorite')
+                      }}
+                    />
+                  </PageIntro>
+                ) : null}
 
-function Apparition({
-  children,
-  delai,
-  mouvementReduit,
-  style,
-}: {
-  children: ReactNode
-  delai: number
-  mouvementReduit: boolean
-  style?: StyleProp<ViewStyle>
-}) {
-  const valeur = useRef(new Animated.Value(mouvementReduit ? 1 : 0)).current
+                {scene === 'priorite' ? (
+                  <PageIntro
+                    footer={
+                      <ActionIntro disabled={!priorites.length} onPress={() => aller('frequence')}>
+                        {priorites.length > 1 ? 'These matter to me' : 'This matters to me'}
+                      </ActionIntro>
+                    }
+                  >
+                    <View style={{ gap: 8 }}>
+                      <TitreIntro>What matters most to you right now?</TitreIntro>
+                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15 }}>
+                        Choose as many as you want.
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      {[0, 1].map((groupe) => (
+                        <Apparaitre key={groupe} reduit={reduit} delai={groupe * 120} style={{ flex: 1, gap: 10 }}>
+                          {PRIORITES.slice(groupe * 3, groupe * 3 + 3).map((option) => {
+                            const pris = priorites.includes(option.nom)
+                            return (
+                              <ChoixIntro
+                                key={option.nom}
+                                titre={option.nom}
+                                detail={option.detail}
+                                selected={pris}
+                                role="checkbox"
+                                onPress={() => {
+                                  setPriorites((v) =>
+                                    pris ? v.filter((x) => x !== option.nom) : [...v, option.nom],
+                                  )
+                                  setChoseIds((ids) =>
+                                    pris
+                                      ? ids.filter((id) => CHOSES.find((c) => c.id === id)?.priorite !== option.nom)
+                                      : ids,
+                                  )
+                                }}
+                                style={{ minHeight: 96 }}
+                              />
+                            )
+                          })}
+                        </Apparaitre>
+                      ))}
+                    </View>
+                  </PageIntro>
+                ) : null}
 
-  useEffect(() => {
-    valeur.setValue(mouvementReduit ? 1 : 0)
-    Animated.timing(valeur, {
-      toValue: 1,
-      delay: mouvementReduit ? 0 : auRythme(delai),
-      duration: mouvementReduit ? 180 : auRythme(480),
-      easing: COURBE_ENTREE,
-      useNativeDriver: true,
-    }).start()
-    return () => valeur.stopAnimation()
-  }, [delai, mouvementReduit, valeur])
+                {scene === 'differe' ? (
+                  <PageIntro
+                    footer={
+                      <ActionIntro
+                        disabled={!choseIds.length}
+                        onPress={() => {
+                          memoireEngagement.current = null
+                          aller('detail', 0)
+                        }}
+                      >
+                        {choseIds.length > 1 ? 'These are the ones' : 'That’s the one'}
+                      </ActionIntro>
+                    }
+                  >
+                    <View style={{ gap: 10 }}>
+                      {/* Sa réponse d'avant, entendue : l'écran lui parle à partir d'elle. */}
+                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15, lineHeight: 21 }}>
+                        {echo.accuse}
+                      </Text>
+                      <TitreIntro>{echo.titre}</TitreIntro>
+                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15 }}>
+                        Choose everything that’s true.
+                      </Text>
+                    </View>
+                    <View style={{ gap: 18 }}>
+                      {priorites.map((pr, g) => (
+                        <Apparaitre key={pr} reduit={reduit} delai={g * 110} style={{ gap: 8 }}>
+                          {priorites.length > 1 ? (
+                            <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 13 }}>{pr}</Text>
+                          ) : null}
+                          {choix
+                            .filter((c) => c.priorite === pr)
+                            .map((c) => {
+                              const pris = choseIds.includes(c.id)
+                              return (
+                                <ChoixIntro
+                                  key={c.id}
+                                  titre={c.bouton}
+                                  compact
+                                  role="checkbox"
+                                  selected={pris}
+                                  onPress={() =>
+                                    setChoseIds((ids) => (pris ? ids.filter((x) => x !== c.id) : [...ids, c.id]))
+                                  }
+                                />
+                              )
+                            })}
+                        </Apparaitre>
+                      ))}
+                    </View>
+                  </PageIntro>
+                ) : null}
 
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: valeur,
-          transform: [
-            {
-              translateY: valeur.interpolate({
-                inputRange: [0, 1],
-                outputRange: [mouvementReduit ? 0 : 8, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  )
-}
+                {/* La reconnaissance monte, « Then » la complète — et devient la question. */}
+                {scene === 'frequence' ? (
+                  <PageIntro
+                    haut={30}
+                    footer={
+                      soirs !== undefined ? (
+                        <Apparaitre reduit={reduit} decalage={0}>
+                          <ActionIntro onPress={() => aller('differe')}>Continue</ActionIntro>
+                        </Apparaitre>
+                      ) : (
+                        <View style={{ height: 56 }} />
+                      )
+                    }
+                  >
+                    <ConstatEnDeux taille={32} reduit={reduit || lecteur} surFin={() => setConstatLu(true)} />
+                    {constatLu ? (
+                      <View style={{ gap: 14 }}>
+                        <Question
+                          titre="How often do you tell yourself “I’ll do it tomorrow”?"
+                          options={FREQUENCES}
+                          valeur={soirs}
+                          choisir={setSoirs}
+                          reduit={reduit}
+                        />
+                        {soirs !== undefined ? (
+                          <Apparaitre key={soirs} reduit={reduit}>
+                            <Text style={{ color: encre.text2, fontFamily: GEIST.moyen, fontSize: 16, lineHeight: 22 }}>
+                              {echo.accuse}
+                            </Text>
+                          </Apparaitre>
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </PageIntro>
+                ) : null}
 
-function EcranPrenom({
-  nom,
-  setNom,
-  onSubmit,
-  mouvementReduit,
-}: {
-  nom: string
-  setNom: (nom: string) => void
-  onSubmit: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  const selectionnerAuFocus = nom.length !== 0
-  return (
-    <CadreQuestion>
-      <TitreQuestion texte="First, what should I call you?" mouvementReduit={mouvementReduit} />
-      <Apparition delai={1100} mouvementReduit={mouvementReduit}>
-        <TextInput
-          autoFocus
-          autoComplete="off"
-          autoCorrect={false}
-          importantForAutofill="no"
-          textContentType="none"
-          selectTextOnFocus={selectionnerAuFocus}
-          value={nom}
-          onChangeText={setNom}
-          onSubmitEditing={onSubmit}
-          returnKeyType="next"
-          placeholder="Your name"
-          placeholderTextColor={j.text3}
-          maxLength={40}
-          accessibilityLabel="Your name"
-          style={{
-            minHeight: 58,
-            backgroundColor: j.champBg,
-            borderWidth: 1,
-            borderColor: j.lineForte,
-            borderRadius: RAYON.xl,
-            paddingHorizontal: PAS[5],
-            paddingVertical: PAS[4],
-            fontFamily: GEIST.moyen,
-            fontSize: 18,
-            color: j.text,
-          }}
-        />
-      </Apparition>
-    </CadreQuestion>
-  )
-}
+                {/* Pour chaque chose : depuis quand, combien, à quel rythme. Le piège est là. */}
+                {scene === 'detail' && actuelle ? (
+                  <PageIntro
+                    key={actuelle.id}
+                    footer={
+                      <ActionIntro
+                        disabled={!reponsesCompletes(actuelle, reponses[actuelle.id])}
+                        onPress={() =>
+                          detail < choses.length - 1 ? aller('detail', detail + 1) : aller('calcul')
+                        }
+                      >
+                        {detail < choses.length - 1 ? 'Next' : 'Show me what it cost'}
+                      </ActionIntro>
+                    }
+                  >
+                    <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 14 }}>
+                      {choses.length > 1 ? `${detail + 1} of ${choses.length} · ` : ''}
+                      {actuelle.bouton}
+                    </Text>
+                    <Question
+                      titre={
+                        detail === 0
+                          ? echo.detail(actuelle.verbe)
+                          : `Since when have you been meaning to ${actuelle.verbe}?`
+                      }
+                      options={DEPUIS}
+                      valeur={reponses[actuelle.id]?.depuis}
+                      choisir={(v) => repondre(actuelle.id, 'depuis', v)}
+                      reduit={reduit}
+                    />
+                    {actuelle.famille === 'unique' && reponses[actuelle.id]?.depuis !== undefined ? (
+                      <Question
+                        titre="How much work does it really need?"
+                        options={TRAVAIL}
+                        valeur={reponses[actuelle.id]?.travail}
+                        choisir={(v) => repondre(actuelle.id, 'travail', v)}
+                        reduit={reduit}
+                      />
+                    ) : null}
+                    {reponses[actuelle.id]?.depuis !== undefined &&
+                    (actuelle.famille === 'repetee' || reponses[actuelle.id]?.travail !== undefined) ? (
+                      <Question
+                        titre={
+                          actuelle.famille === 'unique'
+                            ? 'How many hours a week do you actually put into it?'
+                            : 'How often do you actually do it now?'
+                        }
+                        options={actuelle.famille === 'unique' ? RYTHME_UNIQUE : RYTHME_REPETE}
+                        valeur={reponses[actuelle.id]?.rythme}
+                        choisir={(v) => repondre(actuelle.id, 'rythme', v)}
+                        reduit={reduit}
+                      />
+                    ) : null}
+                  </PageIntro>
+                ) : null}
 
-function EcranPriorite({
-  valeur,
-  setValeur,
-  valeurLibre,
-  setValeurLibre,
-  mouvementReduit,
-}: {
-  valeur: Priorite | null
-  setValeur: (valeur: Priorite) => void
-  valeurLibre: string
-  setValeurLibre: (valeur: string) => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <CadreQuestion>
-      <TitreQuestion texte="What matters most to you right now?" mouvementReduit={mouvementReduit} />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: PAS[2] }}>
-        {PRIORITES.map((option, index) => (
-          <Choix
-            key={option.valeur}
-            selectionne={valeur === option.valeur}
-            onPress={() => setValeur(option.valeur)}
-            style={{ flexBasis: '47%', flexGrow: 1 }}
-            apparitionIndex={index}
-            mouvementReduit={mouvementReduit}
-          >
-            {option.etiquette}
-          </Choix>
-        ))}
-      </View>
-      {valeur === 'other' ? (
-        <Apparition delai={0} mouvementReduit={mouvementReduit} style={{ marginTop: -PAS[5] }}>
-          <TextInput
-            autoFocus
-            value={valeurLibre}
-            onChangeText={setValeurLibre}
-            placeholder="Tell Vethos what it is"
-            placeholderTextColor={j.text3}
-            maxLength={60}
-            accessibilityLabel="What matters most to you"
-            style={{
-              minHeight: 54,
-              backgroundColor: j.champBg,
-              borderWidth: 1,
-              borderColor: j.lineForte,
-              borderRadius: RAYON.xl,
-              paddingHorizontal: PAS[4],
-              paddingVertical: PAS[3],
-              fontFamily: GEIST.normal,
-              fontSize: 16,
-              color: j.text,
-            }}
-          />
-        </Apparition>
-      ) : null}
-    </CadreQuestion>
-  )
-}
+                {/* Le calcul en direct, problème par problème, puis tout rangé. */}
+                {scene === 'calcul' ? (
+                  <PageIntro
+                    footer={
+                      calculFini ? (
+                        <Apparaitre reduit={reduit} decalage={0}>
+                          <ActionIntro onPress={() => aller('pensee')}>I don’t want that</ActionIntro>
+                        </Apparaitre>
+                      ) : (
+                        <View style={{ height: 56 }} />
+                      )
+                    }
+                  >
+                    <CalculEnDirect bilans={bilans} reduit={reduit} surFin={() => setCalculFini(true)} />
+                  </PageIntro>
+                ) : null}
 
-function EcranFrequence({
-  valeur,
-  setValeur,
-  mouvementReduit,
-}: {
-  valeur: Frequence | null
-  setValeur: (valeur: Frequence) => void
-  mouvementReduit: boolean
-}) {
-  return (
-    <CadreQuestion>
-      <TitreQuestion
-        texte="How often do you end the day knowing you could have done more?"
-        mouvementReduit={mouvementReduit}
-      />
-      <View style={{ gap: PAS[2] }}>
-        {FREQUENCES.map((option, index) => (
-          <Choix
-            key={option.valeur}
-            selectionne={valeur === option.valeur}
-            onPress={() => setValeur(option.valeur)}
-            apparitionIndex={index}
-            mouvementReduit={mouvementReduit}
-          >
-            {option.etiquette}
-          </Choix>
-        ))}
-      </View>
-    </CadreQuestion>
-  )
-}
+                {scene === 'pensee' ? (
+                  <PageIntro
+                    centre
+                    defiler={false}
+                    footer={
+                      frappee ? (
+                        <Apparaitre reduit={reduit} delai={lecteur ? 0 : 1800} decalage={0}>
+                          <ActionIntro onPress={() => aller('activation')}>Not this time</ActionIntro>
+                        </Apparaitre>
+                      ) : (
+                        <View style={{ height: 56 }} />
+                      )
+                    }
+                  >
+                    <Frappe texte="“I’ll start tomorrow.”" reduit={reduit} surFin={() => setFrappee(true)} />
+                    <View style={{ minHeight: 60 }}>
+                      {frappee ? (
+                        <Apparaitre reduit={reduit} delai={lecteur ? 0 : 700} decalage={0}>
+                          <Text style={{ color: encre.text2, fontFamily: GEIST.moyen, fontSize: 20, lineHeight: 27 }}>
+                            {echo.frappe} That’s about {demains} times since you first decided.
+                          </Text>
+                        </Apparaitre>
+                      ) : null}
+                    </View>
+                  </PageIntro>
+                ) : null}
 
-function Choix({
-  children,
-  selectionne,
-  onPress,
-  style,
-  apparitionIndex,
-  mouvementReduit,
-}: {
-  children: ReactNode
-  selectionne: boolean
-  onPress: () => void
-  style?: StyleProp<ViewStyle>
-  apparitionIndex: number
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <Apparition
-      // Le titre reste volontairement lent, mais une liste doit se révéler
-      // comme un seul groupe : 69 ms réels entre choix au rythme actuel.
-      delai={1000 + apparitionIndex * 40}
-      mouvementReduit={mouvementReduit}
-      style={style}
-    >
-      <Pressable
-        accessibilityRole="radio"
-        accessibilityState={{ checked: selectionne }}
-        onPress={onPress}
-        style={({ pressed }) => ({
-          width: '100%',
-          minHeight: 56,
-          justifyContent: 'center',
-          backgroundColor: selectionne || pressed ? j.surface2 : 'transparent',
-          borderBottomWidth: 1,
-          borderBottomColor: selectionne ? j.text : j.lineForte,
-          paddingLeft: PAS[6],
-          paddingRight: PAS[3],
-          opacity: pressed ? 0.68 : 1,
-          transform: [{ translateX: pressed ? 3 : 0 }],
-        })}
-      >
-        <View
-          style={{
-            position: 'absolute',
-            left: 2,
-            width: 7,
-            height: 7,
-            borderRadius: 4,
-            backgroundColor: selectionne ? j.accentEncre : j.lineForte,
-          }}
-        />
-        <Text
-          style={{
-            fontFamily: selectionne ? GEIST.demi : GEIST.normal,
-            fontSize: 15.5,
-            color: j.text,
-            textAlign: 'left',
-          }}
-        >
-          {children}
-        </Text>
-      </Pressable>
-    </Apparition>
-  )
-}
+                {scene === 'activation' ? (
+                  <PageIntro
+                    centre
+                    defiler={false}
+                    footer={
+                      logoArrive ? (
+                        <Apparaitre reduit={reduit} delai={reduit ? 0 : 300} decalage={0}>
+                          <ActionIntro onPress={() => aller('suite')}>Give Vethos one thing</ActionIntro>
+                        </Apparaitre>
+                      ) : (
+                        <View style={{ height: 56 }} />
+                      )
+                    }
+                  >
+                    <LogoVethos taille={168} reduit={reduit} surArrivee={() => setLogoArrive(true)} />
+                    <View style={{ minHeight: 120 }}>
+                      {logoArrive ? (
+                        <Apparaitre reduit={reduit} style={{ gap: 10 }}>
+                          <Text
+                            style={{
+                              color: encre.text3,
+                              fontFamily: GEIST.moyen,
+                              fontSize: 19,
+                              lineHeight: 25,
+                              textAlign: 'center',
+                            }}
+                          >
+                            You already know what matters.
+                          </Text>
+                          <TitreIntro centre>Vethos makes sure your day respects it.</TitreIntro>
+                        </Apparaitre>
+                      ) : null}
+                    </View>
+                  </PageIntro>
+                ) : null}
 
-function Navigation({
-  retour,
-  continuer,
-  desactive,
-}: {
-  retour?: () => void
-  continuer: () => void
-  desactive: boolean
-}) {
-  const j = useJetons()
-  return (
-    <View
-      style={{
-        minHeight: 68,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: PAS[3],
-        paddingHorizontal: PAS[6],
-        paddingTop: PAS[3],
-      }}
-    >
-      {retour ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={retour}
-          style={({ pressed }) => ({
-            minWidth: 72,
-            minHeight: 52,
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            opacity: pressed ? 0.5 : 1,
-          })}
-        >
-          <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2 }}>Back</Text>
-        </Pressable>
-      ) : (
-        <View style={{ minWidth: 72 }} />
-      )}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: desactive }}
-        disabled={desactive}
-        onPress={continuer}
-        style={({ pressed }) => ({
-          flex: 1,
-          minHeight: 52,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: j.text,
-          borderWidth: 1,
-          borderColor: j.text,
-          borderBottomWidth: 2,
-          borderBottomColor: j.accent,
-          borderRadius: RAYON.xl,
-          opacity: desactive ? 0.3 : pressed ? 0.78 : 1,
-          transform: [{ translateY: pressed ? 1 : 0 }],
-        })}
-      >
-        <Text style={{ fontFamily: GEIST.demi, fontSize: 15, color: j.surface }}>Continue</Text>
-      </Pressable>
-    </View>
-  )
-}
-
-function Silence({ mouvementReduit }: { mouvementReduit: boolean }) {
-  const j = useJetons()
-  const pulsation = useRef(new Animated.Value(0.32)).current
-
-  useEffect(() => {
-    if (mouvementReduit) return
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulsation, { toValue: 1, duration: auRythme(720), useNativeDriver: true }),
-        Animated.timing(pulsation, { toValue: 0.32, duration: auRythme(720), useNativeDriver: true }),
-      ]),
-    )
-    boucle.start()
-    return () => boucle.stop()
-  }, [mouvementReduit, pulsation])
-
-  return (
-    <View
-      accessible
-      accessibilityLabel="Vethos is reflecting on your answers"
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-    >
-      <View style={{ width: 48, height: 1, backgroundColor: j.line }}>
-        <Animated.View
-          style={{
-            width: 48,
-            height: 1,
-            backgroundColor: j.accent,
-            opacity: mouvementReduit ? 0.7 : pulsation,
-            transform: [{ scaleX: mouvementReduit ? 1 : pulsation }],
-          }}
-        />
-      </View>
-    </View>
-  )
-}
-
-function Scene({ children }: { children: ReactNode }) {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: PAS[6] }}>
-      <View style={{ maxWidth: 345 }}>{children}</View>
-    </View>
-  )
-}
-
-function TexteScene({ children, secondaire }: { children: ReactNode; secondaire?: boolean }) {
-  const j = useJetons()
-  return (
-    <Text
-      accessibilityRole="header"
-      style={{
-        fontFamily: secondaire ? GEIST.normal : GEIST.demi,
-        fontSize: secondaire ? 25 : 31,
-        lineHeight: secondaire ? 33 : 39,
-        letterSpacing: secondaire ? -0.45 : -0.85,
-        color: secondaire ? j.text2 : j.text,
-      }}
-    >
-      {children}
-    </Text>
-  )
-}
-
-function Constat() {
-  return (
-    <Scene>
-      <TexteScene>You already know what matters to you.</TexteScene>
-    </Scene>
-  )
-}
-
-function Consequence({ texte }: { texte: string }) {
-  const j = useJetons()
-  return (
-    <Scene>
-      <View style={{ gap: PAS[8] }}>
-        <TexteScene secondaire>
-          But every time you put it off, something else gets pushed back with it.
-        </TexteScene>
-        <View style={{ borderLeftWidth: 2, borderLeftColor: j.accent, paddingLeft: PAS[5] }}>
-          <Text
-            style={{
-              fontFamily: GEIST.demi,
-              fontSize: 28,
-              lineHeight: 35,
-              letterSpacing: -0.7,
-              color: j.text,
-            }}
-          >
-            {texte}
-          </Text>
-        </View>
-      </View>
-    </Scene>
-  )
-}
-
-function Pensee({ mouvementReduit, terminer }: { mouvementReduit: boolean; terminer: () => void }) {
-  const j = useJetons()
-  const introduction = useRef(new Animated.Value(1)).current
-  const citation = useRef(new Animated.Value(0)).current
-  const fondLeve = useRef(new Animated.Value(0)).current
-  const systeme = useRef(new Animated.Value(0)).current
-  const promesse1 = useRef(new Animated.Value(0)).current
-  const promesse2 = useRef(new Animated.Value(0)).current
-  const verrou = useRef(new Animated.Value(0)).current
-  const sortie = useRef(new Animated.Value(0)).current
-  const [anneauVisible, setAnneauVisible] = useState(false)
-  const [anneauVerrouille, setAnneauVerrouille] = useState(false)
-
-  useEffect(() => {
-    const facteur = mouvementReduit ? 0.28 : FACTEUR_RYTHME
-    const timers: ReturnType<typeof setTimeout>[] = []
-    const plusTard = (ms: number, action: () => void) => {
-      timers.push(setTimeout(action, Math.round(ms * facteur)))
-    }
-    const apparition = (valeur: Animated.Value, duree: number) =>
-      Animated.timing(valeur, {
-        toValue: 1,
-        duration: mouvementReduit ? 220 : auRythme(duree),
-        easing: COURBE_ENTREE,
-        useNativeDriver: true,
-      }).start()
-
-    plusTard(1400, () => apparition(citation, 850))
-    plusTard(3000, () => {
-      Animated.timing(introduction, {
-        toValue: 0,
-        duration: mouvementReduit ? 180 : auRythme(700),
-        easing: COURBE_DEPLACEMENT,
-        useNativeDriver: true,
-      }).start()
-    })
-    // Une fois la phrase d'introduction effacee, la citation reste seule une
-    // seconde avant de laisser Vethos reprendre l'ecran. Cette lenteur est
-    // narrative, pas une latence d'UI.
-    plusTard(4700, () => {
-      setAnneauVisible(true)
-      Animated.parallel([
-        Animated.timing(citation, {
-          toValue: 0,
-          duration: mouvementReduit ? 220 : auRythme(900),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fondLeve, {
-          toValue: mouvementReduit ? 0.14 : 0.32,
-          duration: mouvementReduit ? 260 : auRythme(1300),
-          easing: COURBE_ENTREE,
-          useNativeDriver: true,
-        }),
-      ]).start()
-      apparition(systeme, 800)
-    })
-    plusTard(6900, () => apparition(promesse1, 420))
-    plusTard(8000, () => apparition(promesse2, 560))
-    plusTard(8850, () => {
-      setAnneauVerrouille(true)
-      apparition(verrou, 520)
-    })
-    plusTard(10100, () => apparition(sortie, 520))
-
-    return () => {
-      timers.forEach(clearTimeout)
-      ;[introduction, citation, fondLeve, systeme, promesse1, promesse2, verrou, sortie].forEach(
-        (valeur) => valeur.stopAnimation(),
-      )
-    }
-  }, [citation, fondLeve, introduction, mouvementReduit, promesse1, promesse2, sortie, systeme, verrou])
-
-  const monte = (valeur: Animated.Value, distance = 10) => ({
-    opacity: valeur,
-    transform: [
-      {
-        translateY: valeur.interpolate({
-          inputRange: [0, 1],
-          outputRange: [mouvementReduit ? 0 : distance, 0],
-        }),
-      },
-    ],
-  })
-
-  return (
-    <View style={{ flex: 1, paddingHorizontal: PAS[6], overflow: 'hidden' }}>
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: j.surface,
-          opacity: fondLeve,
-        }}
-      />
-
-      <View style={{ flex: 1, position: 'relative' }}>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            {
-              position: 'absolute',
-              inset: 0,
-              justifyContent: 'center',
-              paddingBottom: 190,
-            },
-            monte(introduction, 0),
-          ]}
-        >
-          <Text
-            style={{
-              maxWidth: 330,
-              fontFamily: GEIST.normal,
-              fontSize: 21,
-              lineHeight: 29,
-              letterSpacing: -0.25,
-              color: j.text2,
-            }}
-          >
-            And yet some days still end with the same thought.
-          </Text>
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' },
-            monte(citation, 12),
-          ]}
-        >
-          <Text
-            accessibilityLiveRegion="polite"
-            style={{
-              fontFamily: GEIST.demi,
-              fontSize: 36,
-              lineHeight: 43,
-              letterSpacing: -1.1,
-              color: j.text,
-              textAlign: 'center',
-            }}
-          >
-            “I could’ve done more.”
-          </Text>
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            {
-              position: 'absolute',
-              inset: 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingBottom: PAS[8],
-            },
-            monte(systeme, 8),
-          ]}
-        >
-          {anneauVisible ? (
-            <AnneauVethos verrouille={anneauVerrouille} mouvementReduit={mouvementReduit} />
-          ) : null}
-
-          <View style={{ minHeight: 116, marginTop: PAS[8], alignItems: 'center', gap: PAS[3] }}>
-            <Animated.Text
-              accessibilityLiveRegion="polite"
-              style={[
-                {
-                  fontFamily: GEIST.demi,
-                  fontSize: 24,
-                  lineHeight: 31,
-                  letterSpacing: -0.5,
-                  color: j.text,
-                  textAlign: 'center',
-                },
-                monte(promesse1, 8),
-              ]}
-            >
-              You already know what matters.
-            </Animated.Text>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <Animated.Text
-                style={[
-                  {
-                    fontFamily: GEIST.normal,
-                    fontSize: 17,
-                    lineHeight: 24,
-                    color: j.text2,
-                    textAlign: 'center',
-                  },
-                  monte(promesse2, 6),
-                ]}
-              >
-                Vethos makes sure your day{' '}
-              </Animated.Text>
-              <Animated.Text
-                style={[
-                  {
-                    fontFamily: GEIST.demi,
-                    fontSize: 17,
-                    lineHeight: 24,
-                    color: j.text,
-                  },
-                  monte(verrou, 6),
-                ]}
-              >
-                respects it.
-              </Animated.Text>
+                {scene === 'suite' && choses.length ? (
+                  <SuiteIntroduction
+                    memoire={memoireEngagement}
+                    mouvementReduit={reduit}
+                    lecteur={lecteur}
+                    prenom={nom.trim()}
+                    choses={choses}
+                    priorites={priorites}
+                    retour={() => aller('activation')}
+                    quitter={relecture ? fermerRelecture : undefined}
+                    preparerSortie={() => setSortie(true)}
+                    terminer={terminer}
+                  />
+                ) : null}
+              </Animated.View>
             </View>
           </View>
-        </Animated.View>
-      </View>
-
-      <Animated.View style={{ opacity: sortie }} pointerEvents={anneauVerrouille ? 'auto' : 'none'}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !anneauVerrouille }}
-          disabled={!anneauVerrouille}
-          onPress={terminer}
-          style={({ pressed }) => ({
-            minHeight: 52,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderTopWidth: 1,
-            borderTopColor: j.line,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2 }}>Continue</Text>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Animated.View>
-    </View>
-  )
-}
-
-function AnneauVethos({ verrouille, mouvementReduit }: { verrouille: boolean; mouvementReduit: boolean }) {
-  const j = useJetons()
-  const segments = useRef(Array.from({ length: 8 }, (_, index) => new Animated.Value(index === 7 ? 0.12 : 0))).current
-  const v = useRef(new Animated.Value(0)).current
-  const echelle = useRef(new Animated.Value(0.96)).current
-  const haptiqueJouee = useRef(false)
-
-  useEffect(() => {
-    if (mouvementReduit) {
-      segments.slice(0, 7).forEach((segment) => segment.setValue(1))
-      v.setValue(1)
-      echelle.setValue(1)
-      return
-    }
-    Animated.parallel([
-      Animated.stagger(
-        auRythme(190),
-        segments.slice(0, 7).map((segment) =>
-          Animated.timing(segment, {
-            toValue: 1,
-            duration: auRythme(650),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-        ),
-      ),
-      Animated.sequence([
-        Animated.delay(auRythme(520)),
-        Animated.timing(v, {
-          toValue: 1,
-          duration: auRythme(900),
-          easing: COURBE_ENTREE,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.timing(echelle, {
-        toValue: 1,
-        duration: auRythme(1100),
-        easing: COURBE_ENTREE,
-        useNativeDriver: true,
-      }),
-    ]).start()
-    return () => {
-      segments.forEach((segment) => segment.stopAnimation())
-      v.stopAnimation()
-      echelle.stopAnimation()
-    }
-  }, [echelle, mouvementReduit, segments, v])
-
-  useEffect(() => {
-    if (!verrouille) return
-    Animated.parallel([
-      Animated.spring(segments[7]!, {
-        toValue: 1,
-        damping: 22,
-        stiffness: 240,
-        mass: 0.9,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.timing(echelle, {
-          toValue: 1.035,
-          duration: mouvementReduit ? 100 : auRythme(180),
-          easing: COURBE_ENTREE,
-          useNativeDriver: true,
-        }),
-        Animated.spring(echelle, {
-          toValue: 1,
-          damping: 22,
-          stiffness: 240,
-          mass: 0.9,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      if (haptiqueJouee.current) return
-      haptiqueJouee.current = true
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    })
-  }, [echelle, mouvementReduit, segments, verrouille])
-
-  const centre = 72
-  const rayon = 56
-  return (
-    <Animated.View
-      accessible
-      accessibilityLabel="Vethos system activated"
-      style={{ width: 144, height: 144, transform: [{ scale: echelle }] }}
-    >
-      {segments.map((segment, index) => {
-        const angle = -90 + index * 45
-        const radians = (angle * Math.PI) / 180
-        const largeur = 31
-        const hauteur = 8
-        return (
-          <Animated.View
-            key={index}
-            style={{
-              position: 'absolute',
-              left: centre + Math.cos(radians) * rayon - largeur / 2,
-              top: centre + Math.sin(radians) * rayon - hauteur / 2,
-              width: largeur,
-              height: hauteur,
-              borderRadius: RAYON.sm,
-              backgroundColor: index === 7 ? j.accentEncre : j.text,
-              opacity: segment,
-              transform: [
-                { rotate: `${angle + 90}deg` },
-                { scaleX: segment },
-              ],
-            }}
-          />
-        )
-      })}
-      <Animated.Text
-        style={{
-          position: 'absolute',
-          inset: 0,
-          textAlign: 'center',
-          textAlignVertical: 'center',
-          fontFamily: GEIST.demi,
-          fontSize: 62,
-          lineHeight: 144,
-          letterSpacing: -5,
-          color: j.text,
-          opacity: v,
-          transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
-        }}
-      >
-        V
-      </Animated.Text>
-    </Animated.View>
+    </Modal>
   )
 }

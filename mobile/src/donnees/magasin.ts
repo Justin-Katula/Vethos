@@ -10,6 +10,7 @@ import {
   estCouleurDansFamille,
 } from '@shared/palettes'
 import { preparerTache, type BrouillonTache } from './creation'
+import type { AjoutsIntroduction } from '@/accueil/modele-introduction'
 
 /**
  * Tout ce que l'utilisateur écrit, gardé sur le téléphone.
@@ -137,6 +138,12 @@ export const ReglagesSchema = z.object({
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
   lever: z.string().default('07:00'),
+  /**
+   * La nuit déclarée à l'introduction. Ensuite, le sommeil ne se déplace que
+   * de 2 h au total autour d'elle (coucher + lever), et reste entre 6 et 10 h.
+   * Null tant qu'aucune introduction n'a fixé de référence.
+   */
+  sommeilReference: z.object({ coucher: z.string(), lever: z.string() }).nullish(),
 })
 export type Reglages = z.infer<typeof ReglagesSchema>
 
@@ -195,6 +202,7 @@ type EtatDonnees = Contenu & {
   supprimerObligation: (id: string) => Promise<void>
 
   majReglages: (r: Partial<Reglages>) => Promise<void>
+  finaliserIntroduction: (ajouts: AjoutsIntroduction, prenom: string) => Promise<void>
 }
 
 async function ecrire(contenu: Contenu): Promise<void> {
@@ -435,6 +443,32 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
 
     async majReglages(r) {
       await enregistrer({ reglages: { ...get().reglages, ...r } })
+    },
+
+    async finaliserIntroduction(ajouts, prenom) {
+      const actuel = get()
+      const fusionner = <T extends { id: string }>(existants: T[], nouveaux: T[]) => {
+        const ids = new Set(existants.map((x) => x.id))
+        return [...existants, ...nouveaux.filter((x) => !ids.has(x.id))]
+      }
+      const contenu = ContenuSchema.parse({
+        taches: fusionner(actuel.taches, ajouts.taches),
+        objectifs: fusionner(actuel.objectifs, ajouts.objectifs),
+        ancres: fusionner(actuel.ancres, ajouts.ancres),
+        obligations: fusionner(actuel.obligations, ajouts.obligations),
+        reglages: {
+          ...actuel.reglages,
+          prenom,
+          coucher: ajouts.coucher,
+          lever: ajouts.lever,
+          sommeilReference: { coucher: ajouts.coucher, lever: ajouts.lever },
+          introductionFaite: true,
+        },
+      })
+      // Le parcours ne disparaît qu'après une vraie sauvegarde. Un échec laisse
+      // le brouillon intact et réessayable, sans créer de doublons.
+      await AsyncStorage.setItem(CLE, JSON.stringify(contenu))
+      set(contenu)
     },
   }
 })

@@ -1,1562 +1,925 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import {
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native'
-import { maxTaskMinutesPerDay } from '@shared/planning/placement'
-import type { PlacedBlock } from '@shared/planning/types'
-import {
-  allouerCouleurAncre,
-  allouerCouleurObjectif,
-  couleurAncre,
-  couleurObjectif,
-} from '@shared/palettes'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { Animated, Keyboard, Pressable, Text, View } from 'react-native'
+import { useDonnees } from '@/donnees/magasin'
 import { useBlocage } from '@/blocage/etat'
 import { SelecteurApplications } from '@/blocage/SelecteurApplications'
-import { useDonnees } from '@/donnees/magasin'
-import { usePlan } from '@/plan/Plan'
-import { useJetons } from '@/theme/Theme'
-import { PAS, RAYON } from '@/theme/jetons'
-import { ChargementVethos, FondRoutage } from '@/ui/MouvementVethos'
+import { selectionEstVide } from '@/blocage/contrat'
+import { verifierSommeil } from '@/donnees/regle-sommeil'
 import { GEIST, MONO } from '@/ui/primitives'
+import { GlypheBlocage } from '@/ui/icones'
+import { duree } from '@/plan/format'
+import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
+import {
+  creerBrouillon,
+  dateDans,
+  dateValide,
+  ETAPES_INTRODUCTION,
+  ETAPES_SUITE,
+  minuteValide,
+  preparerIntroduction,
+  TOTAL_ETAPES_INTRODUCTION,
+  basculerActivite,
+  type Activite,
+  type ActiviteFixe,
+  type BrouillonIntroduction,
+  type NatureIntroduction,
+} from './modele-introduction'
+import type { ChoseRepoussee, Priorite } from './choix-introduction'
+import {
+  ActionIntro,
+  Apparaitre,
+  BarreIntro,
+  ChoixIntro,
+  CorpsIntro,
+  DUREE,
+  encre,
+  JoursIntro,
+  morpher,
+  PageIntro,
+  SORTIE,
+  styles,
+  TitreIntro,
+  toucher,
+} from './experience-introduction'
+import { MiniSemaine, NOM_NATURE, TEINTE } from './engagement-introduction'
+import { CadranTemps, SemaineReelle, type Apercu } from './apercu-introduction'
 
-type Nature = 'tache' | 'objectif' | 'ancre'
-type Etape =
-  | 'choix'
-  | 'definition'
-  | 'nom'
-  | 'parametre'
-  | 'jours'
-  | 'confirmation'
-  | 'placement'
-  | 'systeme'
-  | 'protection'
-  | 'sommeil'
-  | 'activite'
-  | 'apercu'
-  | 'finale'
+export type EtapeSuite = (typeof ETAPES_SUITE)[number]
+type Etape = EtapeSuite
+/** Une Task se termine dans le mois : on pourra la déplacer ensuite, pas la poser en l'an 3000. */
+const ECHEANCE_MAX_JOURS = 30
 
-type OptionNature = {
-  nature: Nature
-  titre: string
-  description: string
-  terme: string
-}
-
-const NATURES: readonly OptionNature[] = [
-  {
-    nature: 'tache',
-    titre: 'Finish something',
-    description: 'Something that needs to be completed.',
-    terme: 'TASK',
-  },
-  {
-    nature: 'objectif',
-    titre: 'Keep something moving',
-    description: 'Something you want to keep progressing on.',
-    terme: 'GOAL',
-  },
-  {
-    nature: 'ancre',
-    titre: 'Make something part of your routine',
-    description: 'Something that happens repeatedly.',
-    terme: 'ANCHOR',
-  },
+const NATURES: { nature: NatureIntroduction; pourquoi: string }[] = [
+  { nature: 'tache', pourquoi: 'It has a finish line. Once it’s done, it’s done.' },
+  { nature: 'objectif', pourquoi: 'A few hours every week, wherever they fit.' },
+  { nature: 'ancre', pourquoi: 'Same time, same days — it never moves.' },
 ]
 
-const ECHEANCES = [
-  { etiquette: 'Tomorrow', jours: 1 },
-  { etiquette: 'In 3 days', jours: 3 },
-  { etiquette: 'In one week', jours: 7 },
-] as const
+/** Trois groupes : à l'intérieur, la scène se transforme ; entre eux, un fondu court. */
+const groupe = (e: Etape) =>
+  e === 'choix' || e === 'parametre' ? 'engagement' : e === 'protection' ? 'protection' : 'temps'
 
-const HEURES_OBJECTIF = [
-  { etiquette: '2 hours a week', heures: 2 },
-  { etiquette: '4 hours a week', heures: 4 },
-  { etiquette: '6 hours a week', heures: 6 },
-  { etiquette: '8 hours a week', heures: 8 },
-] as const
+export type MemoireIntroduction = {
+  brouillon: BrouillonIntroduction
+}
 
-const HEURES = [
-  { etiquette: '7:00 AM', minute: 7 * 60 },
-  { etiquette: '12:00 PM', minute: 12 * 60 },
-  { etiquette: '6:00 PM', minute: 18 * 60 },
-  { etiquette: '9:00 PM', minute: 21 * 60 },
-] as const
-
-const GROUPES_JOURS = [
-  { etiquette: 'Mon · Wed · Fri', jours: [1, 3, 5] },
-  { etiquette: 'Weekdays', jours: [1, 2, 3, 4, 5] },
-  { etiquette: 'Weekends', jours: [0, 6] },
-  { etiquette: 'Every day', jours: [0, 1, 2, 3, 4, 5, 6] },
-] as const
-
-const SOMMEILS = [
-  { etiquette: '11:00 PM — 7:00 AM', coucher: '23:00', lever: '07:00' },
-  { etiquette: '12:00 AM — 8:00 AM', coucher: '00:00', lever: '08:00' },
-  { etiquette: '10:30 PM — 6:30 AM', coucher: '22:30', lever: '06:30' },
-] as const
-
-const ACTIVITES = [
-  { etiquette: 'I work weekdays', detail: '9:00 AM — 5:00 PM', categorie: 'work' as const, debut: 9 * 60, fin: 17 * 60 },
-  { etiquette: 'I’m in school', detail: '8:00 AM — 3:00 PM', categorie: 'school' as const, debut: 8 * 60, fin: 15 * 60 },
-  { etiquette: 'My days change', detail: 'I’ll add the fixed times later', categorie: null, debut: null, fin: null },
-  { etiquette: 'Nothing fixed right now', detail: 'Keep my weekdays open', categorie: null, debut: null, fin: null },
-] as const
-type Activite = (typeof ACTIVITES)[number]
-
-const COURBE_ENTREE = Easing.bezier(0.23, 1, 0.32, 1)
-const COURBE_DEPLACEMENT = Easing.bezier(0.77, 0, 0.175, 1)
-// Environ 15 % plus vif que le ralenti "50 %", tout en laissant chaque etape
-// respirer. Les controles restent instantanes : seule la mise en scene change.
-const FACTEUR_RYTHME = 1.72
-const auRythme = (millisecondes: number) => Math.round(millisecondes * FACTEUR_RYTHME)
+/** Le brouillon part de ce qu'il a choisi : nom, nature et durée sont déjà justes. */
+function brouillonDepuis(
+  chose: ChoseRepoussee,
+  reglages: Parameters<typeof creerBrouillon>[0],
+  priorites: Priorite[],
+) {
+  const b = creerBrouillon(reglages)
+  // Il a déjà dit qu'il va à l'école ou au travail : c'est coché, il ne reste que les heures.
+  const activites: Activite[] = [
+    ...(priorites.includes('School') ? (['school'] as const) : []),
+    ...(priorites.includes('Work') ? (['work'] as const) : []),
+  ]
+  return {
+    ...b,
+    activites,
+    nom: chose.engagement,
+    nature: chose.nature,
+    minutes: chose.nature === 'tache' ? 240 : chose.seance,
+    // Ce que la chose demande vraiment : 4 séances de salle, 5 blocs d'étude…
+    heuresHebdo:
+      chose.famille === 'repetee'
+        ? Math.min(100, Math.round(((chose.cible * chose.seance) / 60) * 4) / 4)
+        : 3,
+    joursAncre:
+      chose.famille === 'repetee'
+        ? chose.cible >= 7
+          ? [0, 1, 2, 3, 4, 5, 6]
+          : chose.cible >= 5
+            ? [1, 2, 3, 4, 5]
+            : chose.cible >= 4
+              ? [1, 2, 4, 5]
+              : [1, 3, 5]
+        : b.joursAncre,
+    echeance: dateDans(7),
+    heureAncre: '18:00',
+  }
+}
 
 export function SuiteIntroduction({
-  mouvementReduit,
-  relecture,
+  mouvementReduit: reduit,
+  lecteur,
+  prenom,
+  choses,
+  priorites,
+  retour,
+  quitter,
+  preparerSortie,
   terminer,
+  memoire,
 }: {
   mouvementReduit: boolean
-  relecture: boolean
+  lecteur: boolean
+  prenom: string
+  /** Ce qu'il a dit repousser ; il commence par une seule, rien à retaper. */
+  choses: ChoseRepoussee[]
+  priorites: Priorite[]
+  retour: () => void
+  quitter?: () => void
+  preparerSortie: () => void
   terminer: () => void
+  memoire: MutableRefObject<MemoireIntroduction | null>
 }) {
-  const j = useJetons()
   const donnees = useDonnees()
-  const { resultat } = usePlan()
   const blocage = useBlocage()
+  const [choseId, setChoseId] = useState(choses[0]!.id)
+  const chose = choses.find((c) => c.id === choseId) ?? choses[0]!
+  const [b, setB] = useState(
+    () => memoire.current?.brouillon ?? brouillonDepuis(chose, donnees.reglages, priorites),
+  )
   const [etape, setEtape] = useState<Etape>('choix')
-  const [nature, setNature] = useState<Nature | null>(null)
-  const [nom, setNom] = useState('')
-  const [echeanceJours, setEcheanceJours] = useState<number | null>(null)
-  const [heuresObjectif, setHeuresObjectif] = useState<number | null>(null)
-  const [heure, setHeure] = useState<number | null>(null)
-  const [jours, setJours] = useState<number[]>([])
-  const [sommeil, setSommeil] = useState<(typeof SOMMEILS)[number] | null>(null)
-  const [activite, setActivite] = useState<Activite | null>(null)
-  const [idsCrees, setIdsCrees] = useState<string[]>([])
-  const [creation, setCreation] = useState<'attente' | 'encours' | 'faite' | 'erreur'>('attente')
+  const [page, setPage] = useState(0)
+  useEffect(() => {
+    memoire.current = { brouillon: b }
+  }, [b, memoire])
   const [erreur, setErreur] = useState('')
-  const [selecteurOuvert, setSelecteurOuvert] = useState(false)
-  const cree = useRef(false)
-  const modeRelecture = useRef(
-    relecture || donnees.taches.length + donnees.objectifs.length + donnees.ancres.length > 0,
-  ).current
-  const opacite = useRef(new Animated.Value(1)).current
-  const decalage = useRef(new Animated.Value(0)).current
-  const transition = useRef(0)
+  const [occupe, setOccupe] = useState(false)
+  const [selecteur, setSelecteur] = useState(false)
+  const [aperçu, setApercu] = useState<Apercu | null>(null)
+  const [jourChoisi, setJourChoisi] = useState('')
+  const [transition, setTransition] = useState(false)
 
-  const optionNature = useMemo(() => NATURES.find((option) => option.nature === nature) ?? null, [nature])
-  const blocsCrees = useMemo(
-    () => resultat.blocks.filter((bloc) => idsCrees.includes(bloc.refId)),
-    [idsCrees, resultat.blocks],
-  )
+  const p = useRef(new Animated.Value(1)).current
+  const habillage = useRef(new Animated.Value(1)).current
+  const verrou = useRef(false)
+  const sauvegarde = useRef(false)
+  const animation = useRef<Animated.CompositeAnimation | null>(null)
+  const monter = useRef(true)
+  useEffect(() => {
+    monter.current = true
+    return () => {
+      monter.current = false
+      animation.current?.stop()
+    }
+  }, [])
 
-  const aller = useCallback(
-    (suivante: Etape, sens: 1 | -1 = 1) => {
-      const id = ++transition.current
-      opacite.stopAnimation()
-      decalage.stopAnimation()
-
-      const installer = () => {
-        if (id !== transition.current) return
-        setEtape(suivante)
-        decalage.setValue(mouvementReduit ? 0 : 30 * sens)
-        Animated.parallel([
-          Animated.timing(opacite, {
-            toValue: 1,
-            duration: mouvementReduit ? 260 : auRythme(720),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-          Animated.timing(decalage, {
-            toValue: 0,
-            duration: mouvementReduit ? 260 : auRythme(720),
-            easing: COURBE_ENTREE,
-            useNativeDriver: true,
-          }),
-        ]).start()
-      }
-
-      Animated.parallel([
-        Animated.timing(opacite, {
-          toValue: 0,
-          duration: mouvementReduit ? 180 : auRythme(400),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-        Animated.timing(decalage, {
-          toValue: mouvementReduit ? 0 : -26 * sens,
-          duration: mouvementReduit ? 180 : auRythme(430),
-          easing: COURBE_DEPLACEMENT,
-          useNativeDriver: true,
-        }),
-      ]).start(installer)
-    },
-    [decalage, mouvementReduit, opacite],
-  )
-
-  const choisirNature = (choix: Nature) => {
-    setNature(choix)
-    aller('definition')
-  }
-
-  const apresNom = () => {
-    if (!nom.trim()) return
-    aller('parametre')
-  }
-
-  const apresParametre = () => {
-    if (nature === 'tache' && echeanceJours !== null) aller('confirmation')
-    else if (nature === 'objectif' && heuresObjectif !== null) aller('confirmation')
-    else if (nature === 'ancre' && heure !== null) aller('jours')
-  }
-
-  const enregistrer = useCallback(async () => {
-    if (!nature || cree.current) return
-    // Verrouiller AVANT la première écriture. L'ajout modifie Zustand et
-    // rerend l'onboarding pendant que la promesse est encore en cours ; sans
-    // ce verrou précoce, l'effet relançait la création à chaque rendu et
-    // pouvait dupliquer un objectif des dizaines de fois.
-    cree.current = true
-    setCreation('encours')
+  const maj = <K extends keyof BrouillonIntroduction>(cle: K, valeur: BrouillonIntroduction[K]) => {
+    setB((avant) => ({ ...avant, [cle]: valeur }))
     setErreur('')
+  }
+  /** Change d'écran ; `sousPage` sert aux paramètres découpés en deux écrans. */
+  const aller = (suivante: Etape, sousPage = 0) => {
+    if (verrou.current) return
+    setErreur('')
+    Keyboard.dismiss()
+    verrou.current = true
+    setTransition(true)
+    animation.current = Animated.timing(p, {
+      toValue: 0,
+      duration: reduit ? 80 : DUREE.micro,
+      easing: SORTIE,
+      useNativeDriver: true,
+    })
+    animation.current.start(({ finished }) => {
+      if (!finished || !monter.current) return
+      if (groupe(suivante) === groupe(etape)) morpher(reduit)
+      setEtape(suivante)
+      setPage(sousPage)
+      animation.current = Animated.timing(p, {
+        toValue: 1,
+        duration: reduit ? DUREE.reduit : DUREE.entree,
+        easing: SORTIE,
+        useNativeDriver: true,
+      })
+      animation.current.start(() => {
+        verrou.current = false
+        if (monter.current) setTransition(false)
+      })
+    })
+  }
+  const pages = b.nature === 'objectif' ? 1 : 2
+  const precedent = () => {
+    if (occupe) return
+    if (etape === 'choix') retour()
+    else if (etape === 'parametre' && page > 0) aller('parametre', page - 1)
+    else if (etape === 'protection') aller('parametre', pages - 1)
+    else if (etape === 'jour' || etape === 'construction') aller('activite')
+    else aller(ETAPES_SUITE[ETAPES_SUITE.indexOf(etape) - 1]!)
+  }
+  const proteger = async () => {
+    if (occupe) return
+    setErreur('')
+    if (blocage.simule) {
+      setErreur('App protection needs the iPhone build. You can set it up there.')
+      return
+    }
+    setOccupe(true)
     try {
-      // Depuis les réglages, l'introduction reste une démonstration : elle ne
-      // doit jamais dupliquer silencieusement les engagements de l'utilisateur.
-      if (modeRelecture) {
-        setCreation('faite')
+      if (blocage.autorisation !== 'accordee') await blocage.demanderAutorisation()
+      if (useBlocage.getState().autorisation !== 'accordee') {
+        setErreur('Screen Time access was not granted. Allow it in Settings, or continue without it.')
         return
       }
-      const avant = new Set(
-        nature === 'tache'
-          ? useDonnees.getState().taches.map((element) => element.id)
-          : nature === 'objectif'
-            ? useDonnees.getState().objectifs.map((element) => element.id)
-            : useDonnees.getState().ancres.map((element) => element.id),
-      )
-      if (nature === 'tache') {
-        await donnees.ajouterTache(
-          {
-            titre: nom.trim(),
-            intention: `Finish ${nom.trim()}.`,
-            echeance: dansNJours(echeanceJours ?? 7),
-            importance: 5,
-            minutesEstimees: 60,
-            nature: 'routine',
-          },
-          { maxParJourMinutes: maxTaskMinutesPerDay(resultat.capacities) },
-        )
-      } else if (nature === 'objectif') {
-        await donnees.ajouterObjectif({
-          nom: nom.trim(),
-          intention: `Keep making progress on ${nom.trim()}.`,
-          couleur: allouerCouleurObjectif(donnees.objectifs),
-          cibleHebdoMinutes: (heuresObjectif ?? 4) * 60,
-        })
-      } else {
-        await donnees.ajouterAncre({
-          nom: nom.trim(),
-          intention: `Repeat ${nom.trim()} consistently.`,
-          declencheur: nom.trim().toLowerCase(),
-          couleur: allouerCouleurAncre(donnees.ancres),
-          minuteAncrage: heure ?? 18 * 60,
-          jours: jours.length ? jours : [1, 3, 5],
-          dureeMinutes: 60,
-        })
-      }
-      const etat = useDonnees.getState()
-      const apres = nature === 'tache' ? etat.taches : nature === 'objectif' ? etat.objectifs : etat.ancres
-      setIdsCrees(apres.filter((element) => !avant.has(element.id)).map((element) => element.id))
-      setCreation('faite')
+      setSelecteur(true)
+    } catch {
+      setErreur('Screen Time could not open. Try again, or set it up later.')
+    } finally {
+      if (monter.current) setOccupe(false)
+    }
+  }
+  const construire = () => {
+    try {
+      const resultat = preparerIntroduction(useDonnees.getState(), b)
+      const premier = [...resultat.blocs].sort(
+        (x, y) => x.date.localeCompare(y.date) || x.startMinute - y.startMinute,
+      )[0]
+      setApercu(resultat)
+      setJourChoisi(premier?.date ?? resultat.jours[0]?.date ?? '')
+      aller('construction')
     } catch (cause) {
-      cree.current = false
-      setErreur(cause instanceof Error ? cause.message : 'Vethos could not create this yet.')
-      setCreation('erreur')
+      setErreur(cause instanceof Error ? cause.message : 'Check your commitment and fixed hours.')
     }
-  }, [donnees, echeanceJours, heure, heuresObjectif, j.blocAncre, jours, modeRelecture, nature, nom, resultat.capacities])
-
-  useEffect(() => {
-    if (etape === 'confirmation') void enregistrer()
-  }, [enregistrer, etape])
-
-  const ouvrirProtection = async () => {
-    if (modeRelecture) {
-      aller('sommeil')
-      return
+  }
+  /** Toujours une vraie sauvegarde : l'engagement existe dans l'app, pas en aperçu. */
+  const enregistrer = async () => {
+    if (sauvegarde.current) return
+    sauvegarde.current = true
+    setOccupe(true)
+    setErreur('')
+    preparerSortie()
+    try {
+      const frais = preparerIntroduction(useDonnees.getState(), b)
+      await donnees.finaliserIntroduction(frais.ajouts, prenom)
+      toucher('verrou')
+      Animated.timing(habillage, {
+        toValue: 0,
+        duration: reduit ? DUREE.reduit : DUREE.micro,
+        easing: SORTIE,
+        useNativeDriver: true,
+      }).start(() => terminer())
+    } catch (cause) {
+      sauvegarde.current = false
+      setErreur(cause instanceof Error ? cause.message : 'Your plan could not be saved. Please try again.')
+      setOccupe(false)
     }
-    if (blocage.selection) {
-      aller('sommeil')
-      return
-    }
-    if (blocage.autorisation !== 'accordee') await blocage.demanderAutorisation()
-    if (blocage.simule) {
-      await blocage.choisirApplications()
-      aller('sommeil')
-      return
-    }
-    setSelecteurOuvert(true)
   }
 
-  const fermerSelecteur = () => {
-    setSelecteurOuvert(false)
-    if (useBlocage.getState().selection) aller('sommeil')
+  const nuit = verifierSommeil({ coucher: b.coucher, lever: b.lever }, null)
+  const fixeValide = (a: ActiviteFixe) => {
+    const h = b.fixes[a]
+    const debut = minuteValide(h.debut)
+    const fin = minuteValide(h.fin)
+    return debut !== null && fin !== null && debut !== fin && h.jours.length > 0
   }
-
-  const confirmerSommeil = async () => {
-    if (sommeil && !modeRelecture) {
-      await donnees.majReglages({ coucher: sommeil.coucher, lever: sommeil.lever })
-    }
-    aller('activite')
+  const activiteValide =
+    b.activites.length > 0 &&
+    (['work', 'school'] as const).every((a) => !b.activites.includes(a) || fixeValide(a))
+  const majFixe = (a: ActiviteFixe, cle: 'debut' | 'fin' | 'jours', v: string | number[]) => {
+    setB((x) => ({ ...x, fixes: { ...x.fixes, [a]: { ...x.fixes[a], [cle]: v } } }))
+    setErreur('')
   }
+  const ancreValide =
+    minuteValide(b.heureAncre) !== null &&
+    b.joursAncre.length > 0 &&
+    b.minutes >= 15 &&
+    b.minutes <= 480 &&
+    (minuteValide(b.heureAncre) ?? 1440) + b.minutes <= 1440
+  const pageValide =
+    b.nature === 'tache'
+      ? page === 0
+        ? dateValide(b.echeance) && b.echeance > dateDans(0)
+        : b.minutes >= 5
+      : b.nature === 'objectif'
+        ? b.heuresHebdo >= 0.25 && b.heuresHebdo <= 100
+        : page === 0
+          ? minuteValide(b.heureAncre) !== null
+          : ancreValide
+  const selection =
+    blocage.selection && !selectionEstVide(blocage.selection) ? blocage.selection : null
+  const protégé = !!selection
 
-  const confirmerActivite = async () => {
-    if (activite?.categorie && activite.debut !== null && activite.fin !== null && !modeRelecture) {
-      const etat = useDonnees.getState()
-      for (const jour of [1, 2, 3, 4, 5]) {
-        const existe = etat.obligations.some((obligation) =>
-          obligation.dayOfWeek === jour
-          && obligation.categoryType === activite.categorie
-          && obligation.startMinute === activite.debut
-          && obligation.endMinute === activite.fin,
-        )
-        if (!existe) {
-          await donnees.ajouterObligation({
-            dayOfWeek: jour,
-            startMinute: activite.debut,
-            endMinute: activite.fin,
-            categoryType: activite.categorie,
-            label: activite.categorie === 'work' ? 'Work' : 'School',
-            color: j.text3,
-          })
-        }
-      }
-    }
-    aller('apercu')
-  }
+  let action: React.ReactNode = null
+  if (etape === 'choix')
+    action = <ActionIntro onPress={() => aller('parametre', 0)}>Continue</ActionIntro>
+  if (etape === 'parametre')
+    action = (
+      <ActionIntro
+        disabled={!pageValide}
+        onPress={() => {
+          if (page < pages - 1) aller('parametre', page + 1)
+          else {
+            toucher('verrou')
+            aller('protection')
+          }
+        }}
+      >
+        {page < pages - 1 ? 'Next' : 'Keep this commitment'}
+      </ActionIntro>
+    )
+  if (etape === 'protection')
+    action = protégé ? (
+      <>
+        <ActionIntro onPress={() => aller('sommeil')}>Continue</ActionIntro>
+        <ActionIntro secondaire onPress={() => void proteger()}>
+          Change what’s locked
+        </ActionIntro>
+      </>
+    ) : (
+      <>
+        <ActionIntro disabled={occupe} onPress={() => void proteger()}>
+          {occupe ? 'Opening Screen Time…' : 'Lock my distractions'}
+        </ActionIntro>
+        <ActionIntro secondaire onPress={() => aller('sommeil')}>
+          Not now
+        </ActionIntro>
+      </>
+    )
+  if (etape === 'sommeil')
+    action = (
+      <ActionIntro disabled={!nuit.ok} onPress={() => aller('activite')}>
+        Keep this time for me
+      </ActionIntro>
+    )
+  if (etape === 'activite')
+    action = (
+      <>
+        <ActionIntro disabled={!activiteValide} onPress={construire}>
+          Find its place, Vethos
+        </ActionIntro>
+        {/* Une erreur qui vient de l'engagement se corrige là où il se règle. */}
+        {erreur ? (
+          <ActionIntro secondaire onPress={() => aller('parametre', 0)}>
+            Adjust my commitment
+          </ActionIntro>
+        ) : null}
+      </>
+    )
+  if (etape === 'construction' && lecteur)
+    action = <ActionIntro onPress={() => aller('jour')}>See my week</ActionIntro>
+  if (etape === 'jour')
+    action = (
+      <ActionIntro disabled={occupe} onPress={() => void enregistrer()}>
+        {occupe ? 'Saving your week…' : 'Enter Vethos'}
+      </ActionIntro>
+    )
+  const pied =
+    erreur || action ? (
+      <Animated.View style={{ gap: 6, opacity: habillage }}>
+        {erreur ? (
+          <Text
+            accessibilityRole="alert"
+            style={{ color: encre.accentEncre, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 19 }}
+          >
+            {erreur}
+          </Text>
+        ) : null}
+        {action}
+      </Animated.View>
+    ) : undefined
 
-  const revenir = () => {
-    const precedent: Partial<Record<Etape, Etape>> = {
-      definition: 'choix',
-      nom: 'definition',
-      parametre: 'nom',
-      jours: 'parametre',
-      protection: 'systeme',
-      sommeil: 'protection',
-      activite: 'sommeil',
-      apercu: 'activite',
-    }
-    const cible = precedent[etape]
-    if (cible) aller(cible, -1)
-  }
-
+  const indexEtape =
+    ETAPES_INTRODUCTION.length + ETAPES_SUITE.indexOf(etape) + (etape === 'parametre' ? 0 : 0)
+  const g = groupe(etape)
+  const recommandee = chose.nature
+  const ordre = [
+    NATURES.find((x) => x.nature === recommandee)!,
+    ...NATURES.filter((x) => x.nature !== recommandee),
+  ]
   return (
     <View style={{ flex: 1 }}>
-      <FondRoutage intensite="faible" />
+      <Animated.View style={{ opacity: habillage }}>
+        <BarreIntro
+          etapeActuelle={indexEtape}
+          total={TOTAL_ETAPES_INTRODUCTION}
+          retour={etape !== 'construction' ? precedent : undefined}
+          quitter={quitter}
+          visible={etape !== 'construction'}
+          reduit={reduit}
+        />
+      </Animated.View>
       <Animated.View
         style={{
           flex: 1,
-          opacity: opacite,
-          transform: [{ translateX: decalage }],
+          overflow: 'hidden',
+          opacity: p,
+          pointerEvents: transition || occupe ? 'none' : 'auto',
         }}
       >
         {etape === 'choix' ? (
-          <ChoixNature mouvementReduit={mouvementReduit} choisir={choisirNature} />
-        ) : null}
-        {etape === 'definition' && optionNature ? (
-          <DefinitionNature
-            option={optionNature}
-            mouvementReduit={mouvementReduit}
-            continuer={() => aller('nom')}
-            retour={revenir}
-          />
-        ) : null}
-        {etape === 'nom' && nature ? (
-          <QuestionNom
-            nature={nature}
-            valeur={nom}
-            changer={setNom}
-            continuer={apresNom}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'parametre' && nature ? (
-          <QuestionParametre
-            nature={nature}
-            nom={nom}
-            echeance={echeanceJours}
-            choisirEcheance={setEcheanceJours}
-            heuresObjectif={heuresObjectif}
-            choisirHeuresObjectif={setHeuresObjectif}
-            heure={heure}
-            choisirHeure={setHeure}
-            continuer={apresParametre}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'jours' ? (
-          <QuestionJours
-            nom={nom}
-            heure={heure}
-            jours={jours}
-            choisir={setJours}
-            continuer={() => jours.length > 0 && aller('confirmation')}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'confirmation' && nature ? (
-          <Confirmation
-            nature={nature}
-            nom={nom}
-            detail={
-              nature === 'tache'
-                ? libelleParametre(nature, echeanceJours ?? 7)
-                : nature === 'objectif'
-                  ? libelleParametre(nature, heuresObjectif ?? 4)
-                  : heureTexte(heure ?? 18 * 60)
-            }
-            sousDetail={nature === 'ancre' && jours.length ? joursTexte(jours) : undefined}
-            creation={creation}
-            erreur={erreur}
-            continuer={() => aller('placement')}
-            corriger={() => aller(nature === 'ancre' ? 'parametre' : 'nom', -1)}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'placement' && nature ? (
-          <Placement
-            nature={nature}
-            nom={nom}
-            heure={heure}
-            blocs={blocsCrees}
-            mouvementReduit={mouvementReduit}
-            continuer={() => aller('systeme')}
-          />
-        ) : null}
-        {etape === 'systeme' ? (
-          <RevelationSysteme
-            mouvementReduit={mouvementReduit}
-            continuer={() => aller('protection')}
-          />
-        ) : null}
-        {etape === 'protection' ? (
-          <Protection
-            selection={blocage.selection}
-            occupe={blocage.occupe}
-            choisir={() => void ouvrirProtection()}
-            plusTard={() => aller('sommeil')}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'sommeil' ? (
-          <Sommeil
-            valeur={sommeil}
-            choisir={setSommeil}
-            continuer={() => void confirmerSommeil()}
-            plusTard={() => aller('activite')}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'activite' ? (
-          <ActiviteJournee
-            valeur={activite}
-            choisir={setActivite}
-            continuer={() => void confirmerActivite()}
-            retour={revenir}
-            mouvementReduit={mouvementReduit}
-          />
-        ) : null}
-        {etape === 'apercu' && nature ? (
-          <ApercuFinal
-            nature={nature}
-            nom={nom}
-            heure={heure}
-            blocs={blocsCrees}
-            coucher={sommeil?.coucher ?? donnees.reglages.coucher}
-            lever={sommeil?.lever ?? donnees.reglages.lever}
-            protege={!!blocage.selection}
-            activite={activite}
-            mouvementReduit={mouvementReduit}
-            continuer={() => aller('finale')}
-          />
-        ) : null}
-        {etape === 'finale' ? <Finale terminer={terminer} mouvementReduit={mouvementReduit} /> : null}
-      </Animated.View>
-
-      <SelecteurApplications ouvert={selecteurOuvert} surFermeture={fermerSelecteur} />
-    </View>
-  )
-}
-
-function ChoixNature({ mouvementReduit, choisir }: { mouvementReduit: boolean; choisir: (nature: Nature) => void }) {
-  const j = useJetons()
-  return (
-    <EcranDefilable>
-      <Entree delai={180} mouvementReduit={mouvementReduit}>
-        <Text style={{ color: j.accentEncre, fontFamily: MONO.demi, fontSize: 10, letterSpacing: 1.5 }}>
-          TELL VETHOS WHAT · NOT WHEN
-        </Text>
-      </Entree>
-      <TitreAnime texte="Let’s start with one thing that matters." mouvementReduit={mouvementReduit} />
-      <Entree delai={560} mouvementReduit={mouvementReduit}>
-        <MiniMoteur />
-      </Entree>
-      <View style={{ borderTopWidth: 1, borderTopColor: j.lineForte }}>
-        {NATURES.map((option, index) => (
-          <Entree key={option.nature} delai={650 + index * 40} mouvementReduit={mouvementReduit}>
-            <CarteChoix
-              index={index}
-              terme={option.terme}
-              titre={option.titre}
-              description={option.description}
-              onPress={() => choisir(option.nature)}
-            />
-          </Entree>
-        ))}
-      </View>
-    </EcranDefilable>
-  )
-}
-
-function DefinitionNature({
-  option,
-  mouvementReduit,
-  continuer,
-  retour,
-}: {
-  option: OptionNature
-  mouvementReduit: boolean
-  continuer: () => void
-  retour: () => void
-}) {
-  const j = useJetons()
-  const echelle = useRef(new Animated.Value(mouvementReduit ? 1 : 0.96)).current
-
-  useEffect(() => {
-    Animated.spring(echelle, {
-      toValue: 1,
-      damping: 22,
-      stiffness: 240,
-      mass: 0.9,
-      useNativeDriver: true,
-    }).start()
-    return () => echelle.stopAnimation()
-  }, [echelle])
-
-  return (
-    <EcranCentre>
-      <Animated.View
-        style={{
-          alignSelf: 'stretch',
-          borderTopWidth: 1,
-          borderBottomWidth: 1,
-          borderColor: j.lineForte,
-          paddingVertical: PAS[8],
-          transform: [{ scale: echelle }],
-        }}
-      >
-        <Text style={{ fontFamily: MONO.normal, fontSize: 10, letterSpacing: 1.4, color: j.text3 }}>
-          COMMITMENT TYPE
-        </Text>
-        <Text style={{ marginTop: PAS[3], fontFamily: GEIST.demi, fontSize: 48, lineHeight: 52, letterSpacing: -2, color: j.text }}>
-          {option.terme}
-        </Text>
-        <View style={{ width: 54, height: 2, marginTop: PAS[4], backgroundColor: j.accentEncre }} />
-        <Text style={{ marginTop: PAS[5], fontFamily: GEIST.demi, fontSize: 21, lineHeight: 28, color: j.text }}>
-          {option.titre}
-        </Text>
-        <Text style={{ marginTop: PAS[2], fontFamily: GEIST.normal, fontSize: 15, lineHeight: 22, color: j.text2 }}>
-          {option.description}
-        </Text>
-      </Animated.View>
-
-      <Entree delai={650} mouvementReduit={mouvementReduit}>
-        <Text style={{ fontFamily: GEIST.normal, fontSize: 17, lineHeight: 25, textAlign: 'center', color: j.text2 }}>
-          {option.nature === 'ancre'
-            ? 'You choose the fixed time. Vethos protects it.'
-            : 'You choose the commitment. Vethos decides when it happens.'}
-        </Text>
-      </Entree>
-      <Navigation retour={retour} continuer={continuer} libelle="Continue" />
-    </EcranCentre>
-  )
-}
-
-function QuestionNom({
-  nature,
-  valeur,
-  changer,
-  continuer,
-  retour,
-  mouvementReduit,
-}: {
-  nature: Nature
-  valeur: string
-  changer: (valeur: string) => void
-  continuer: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  const question =
-    nature === 'tache'
-      ? 'What needs to get done?'
-      : nature === 'objectif'
-        ? 'What do you want to keep moving forward?'
-        : 'What do you want to repeat?'
-  return (
-    <EcranDefilable>
-      <TitreAnime texte={question} mouvementReduit={mouvementReduit} />
-      <Entree delai={620} mouvementReduit={mouvementReduit}>
-        <TextInput
-          autoFocus
-          autoComplete="off"
-          autoCorrect={false}
-          accessibilityLabel={question}
-          value={valeur}
-          onChangeText={changer}
-          onSubmitEditing={continuer}
-          placeholder={nature === 'ancre' ? 'Gym, reading, meditation…' : 'Name it clearly'}
-          placeholderTextColor={j.text3}
-          returnKeyType="next"
-          maxLength={60}
-          style={champ(j)}
-        />
-      </Entree>
-      <CarteEngagement nature={nature} nom={valeur} mouvementReduit={mouvementReduit} />
-      <Navigation retour={retour} continuer={continuer} desactive={!valeur.trim()} libelle="Continue" />
-    </EcranDefilable>
-  )
-}
-
-function QuestionParametre({
-  nature,
-  nom,
-  echeance,
-  choisirEcheance,
-  heuresObjectif,
-  choisirHeuresObjectif,
-  heure,
-  choisirHeure,
-  continuer,
-  retour,
-  mouvementReduit,
-}: {
-  nature: Nature
-  nom: string
-  echeance: number | null
-  choisirEcheance: (valeur: number) => void
-  heuresObjectif: number | null
-  choisirHeuresObjectif: (valeur: number) => void
-  heure: number | null
-  choisirHeure: (valeur: number) => void
-  continuer: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  const question =
-    nature === 'tache'
-      ? 'When does it need to be finished?'
-      : nature === 'objectif'
-        ? 'How many hours should Vethos protect for this each week?'
-        : 'When does it happen?'
-  const options =
-    nature === 'tache'
-      ? ECHEANCES.map((o) => ({ etiquette: o.etiquette, valeur: o.jours }))
-      : nature === 'objectif'
-        ? HEURES_OBJECTIF.map((o) => ({ etiquette: o.etiquette, valeur: o.heures }))
-        : HEURES.map((o) => ({ etiquette: o.etiquette, valeur: o.minute }))
-  const valeur = nature === 'tache' ? echeance : nature === 'objectif' ? heuresObjectif : heure
-  const choisir = nature === 'tache' ? choisirEcheance : nature === 'objectif' ? choisirHeuresObjectif : choisirHeure
-
-  return (
-    <EcranDefilable>
-      <TitreAnime texte={question} mouvementReduit={mouvementReduit} />
-      {nature !== 'ancre' ? (
-        <Text style={{ fontFamily: GEIST.normal, fontSize: 14, lineHeight: 21, color: j.text2 }}>
-          {nature === 'tache'
-            ? 'Give Vethos the deadline. It will choose the work sessions.'
-            : 'Choose the weekly investment. Vethos will choose the days and times.'}
-        </Text>
-      ) : null}
-      <View style={{ gap: PAS[2] }}>
-        {options.map((option, index) => (
-          <Entree key={option.etiquette} delai={620 + index * 40} mouvementReduit={mouvementReduit}>
-            <Option
-              etiquette={option.etiquette}
-              selectionnee={valeur === option.valeur}
-              onPress={() => choisir(option.valeur)}
-            />
-          </Entree>
-        ))}
-      </View>
-      <CarteEngagement
-        nature={nature}
-        nom={nom}
-        detail={valeur === null ? undefined : libelleParametre(nature, valeur)}
-        mouvementReduit={mouvementReduit}
-      />
-      <Navigation retour={retour} continuer={continuer} desactive={valeur === null} libelle="Continue" />
-    </EcranDefilable>
-  )
-}
-
-function QuestionJours({
-  nom,
-  heure,
-  jours,
-  choisir,
-  continuer,
-  retour,
-  mouvementReduit,
-}: {
-  nom: string
-  heure: number | null
-  jours: number[]
-  choisir: (jours: number[]) => void
-  continuer: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  return (
-    <EcranDefilable>
-      <TitreAnime texte="Which days?" mouvementReduit={mouvementReduit} />
-      <View style={{ gap: PAS[2] }}>
-        {GROUPES_JOURS.map((option, index) => (
-          <Entree key={option.etiquette} delai={620 + index * 40} mouvementReduit={mouvementReduit}>
-            <Option
-              etiquette={option.etiquette}
-              selectionnee={memesJours(jours, option.jours)}
-              onPress={() => choisir([...option.jours])}
-            />
-          </Entree>
-        ))}
-      </View>
-      <CarteEngagement
-        nature="ancre"
-        nom={nom}
-        detail={heure === null ? undefined : heureTexte(heure)}
-        sousDetail={jours.length ? joursTexte(jours) : undefined}
-        mouvementReduit={mouvementReduit}
-      />
-      <Navigation retour={retour} continuer={continuer} desactive={jours.length === 0} libelle="Create Anchor" />
-    </EcranDefilable>
-  )
-}
-
-function Confirmation({
-  nature,
-  nom,
-  detail,
-  sousDetail,
-  creation,
-  erreur,
-  continuer,
-  corriger,
-  mouvementReduit,
-}: {
-  nature: Nature
-  nom: string
-  detail: string
-  sousDetail?: string
-  creation: 'attente' | 'encours' | 'faite' | 'erreur'
-  erreur: string
-  continuer: () => void
-  corriger: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <EcranCentre>
-      <TitreAnime texte="That’s enough." mouvementReduit={mouvementReduit} centre />
-      <Entree delai={1000} mouvementReduit={mouvementReduit}>
-        <Text style={{ fontFamily: GEIST.normal, fontSize: 21, lineHeight: 29, textAlign: 'center', color: j.text2 }}>
-          Vethos can work with this.
-        </Text>
-      </Entree>
-      <CarteEngagement
-        nature={nature}
-        nom={nom}
-        detail={detail}
-        sousDetail={sousDetail}
-        mouvementReduit={mouvementReduit}
-        complete
-      />
-      {creation === 'encours' || creation === 'attente' ? (
-        <View style={{ alignItems: 'center', gap: PAS[3] }}>
-          <ChargementVethos compact libelle="Vethos is placing your commitment." />
-          <Text style={{ color: j.text3, fontFamily: MONO.normal, fontSize: 10, letterSpacing: 0.4 }}>
-            FINDING THE RIGHT TIME
-          </Text>
-        </View>
-      ) : null}
-      {creation === 'erreur' ? (
-        <View style={{ gap: PAS[3] }}>
-          <Text accessibilityRole="alert" style={{ color: j.accentEncre, fontFamily: GEIST.normal, fontSize: 13, textAlign: 'center' }}>
-            {erreur}
-          </Text>
-          <Navigation continuer={corriger} libelle="Adjust it" />
-        </View>
-      ) : (
-        <Navigation
-          continuer={continuer}
-          desactive={creation !== 'faite'}
-          libelle={creation === 'faite' ? 'Show me' : 'Building…'}
-        />
-      )}
-    </EcranCentre>
-  )
-}
-
-function Placement({
-  nature,
-  nom,
-  heure,
-  blocs,
-  mouvementReduit,
-  continuer,
-}: {
-  nature: Nature
-  nom: string
-  heure: number | null
-  blocs: readonly PlacedBlock[]
-  mouvementReduit: boolean
-  continuer: () => void
-}) {
-  const j = useJetons()
-  return (
-    <EcranCentre>
-      <TexteMots texte="You chose what. Vethos chose when." mouvementReduit={mouvementReduit} centre />
-      <Timeline nature={nature} nom={nom} heure={heure} blocs={blocs} mouvementReduit={mouvementReduit} />
-      <Text style={{ fontFamily: GEIST.normal, fontSize: 14, lineHeight: 21, color: j.text3, textAlign: 'center' }}>
-        Tasks and Goals move with your week. Only Anchors keep the time you choose.
-      </Text>
-      <Navigation continuer={continuer} libelle="Continue" />
-    </EcranCentre>
-  )
-}
-
-function RevelationSysteme({ mouvementReduit, continuer }: { mouvementReduit: boolean; continuer: () => void }) {
-  const j = useJetons()
-  const chaine = ['Commitment', 'Plan', 'Protected time', 'Done']
-  return (
-    <EcranCentre>
-      <TitreAnime texte="You set the commitment." mouvementReduit={mouvementReduit} centre />
-      <Entree delai={950} mouvementReduit={mouvementReduit}>
-        <Text style={{ fontFamily: GEIST.normal, fontSize: 21, lineHeight: 29, color: j.text2, textAlign: 'center' }}>
-          Vethos builds around it.
-        </Text>
-      </Entree>
-      <View style={{ alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-        {chaine.map((mot, index) => (
-          <Entree key={mot} delai={1500 + index * 45} mouvementReduit={mouvementReduit} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontFamily: MONO.demi, fontSize: 12, color: index === chaine.length - 1 ? j.text : j.text2 }}>
-              {mot}
-            </Text>
-            {index < chaine.length - 1 ? (
-              <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.accentEncre, marginHorizontal: PAS[2] }}>→</Text>
-            ) : null}
-          </Entree>
-        ))}
-      </View>
-      <Navigation continuer={continuer} libelle="Protect it" />
-    </EcranCentre>
-  )
-}
-
-function Protection({
-  selection,
-  occupe,
-  choisir,
-  plusTard,
-  retour,
-  mouvementReduit,
-}: {
-  selection: { nbApplications: number; nbCategories: number } | null
-  occupe: boolean
-  choisir: () => void
-  plusTard: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <EcranDefilable>
-      <TitreAnime
-        texte="What tends to pull you away when you’re supposed to be focused?"
-        mouvementReduit={mouvementReduit}
-      />
-      <Entree delai={850} mouvementReduit={mouvementReduit}>
-        <View style={{ borderLeftWidth: 2, borderLeftColor: j.accent, paddingLeft: PAS[4], gap: PAS[2] }}>
-          <Text style={{ fontFamily: GEIST.moyen, fontSize: 16, color: j.text }}>Protect the time, not the entire phone.</Text>
-          <Text style={{ fontFamily: GEIST.normal, fontSize: 13.5, lineHeight: 20, color: j.text2 }}>
-            Vethos only shields what you choose, and only while you’re working on a commitment.
-          </Text>
-        </View>
-      </Entree>
-      {selection ? (
-        <CarteStatut>{selection.nbApplications} apps · {selection.nbCategories} categories protected</CarteStatut>
-      ) : null}
-      <View style={{ gap: PAS[2] }}>
-        <BoutonPrincipal onPress={choisir} desactive={occupe}>
-          {occupe ? 'Opening Screen Time…' : selection ? 'Continue with this selection' : 'Choose distractions'}
-        </BoutonPrincipal>
-        <BoutonTexte onPress={plusTard}>I’ll do this later</BoutonTexte>
-      </View>
-      <Retour onPress={retour} />
-    </EcranDefilable>
-  )
-}
-
-function Sommeil({
-  valeur,
-  choisir,
-  continuer,
-  plusTard,
-  retour,
-  mouvementReduit,
-}: {
-  valeur: (typeof SOMMEILS)[number] | null
-  choisir: (valeur: (typeof SOMMEILS)[number]) => void
-  continuer: () => void
-  plusTard: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <EcranDefilable>
-      <TitreAnime texte="When should Vethos leave your time alone?" mouvementReduit={mouvementReduit} />
-      <Text style={{ fontFamily: GEIST.normal, fontSize: 14, lineHeight: 21, color: j.text2 }}>
-        Start with sleep. Vethos never schedules over it.
-      </Text>
-      <View style={{ gap: PAS[2] }}>
-        {SOMMEILS.map((option, index) => (
-          <Entree key={option.etiquette} delai={650 + index * 40} mouvementReduit={mouvementReduit}>
-            <Option etiquette={option.etiquette} selectionnee={valeur?.etiquette === option.etiquette} onPress={() => choisir(option)} />
-          </Entree>
-        ))}
-      </View>
-      <View style={{ gap: PAS[2] }}>
-        <BoutonPrincipal onPress={continuer} desactive={!valeur}>Use these hours</BoutonPrincipal>
-        <BoutonTexte onPress={plusTard}>Keep my current hours</BoutonTexte>
-      </View>
-      <Retour onPress={retour} />
-    </EcranDefilable>
-  )
-}
-
-function ActiviteJournee({
-  valeur,
-  choisir,
-  continuer,
-  retour,
-  mouvementReduit,
-}: {
-  valeur: Activite | null
-  choisir: (valeur: Activite) => void
-  continuer: () => void
-  retour: () => void
-  mouvementReduit: boolean
-}) {
-  const j = useJetons()
-  return (
-    <EcranDefilable>
-      <Text style={{ color: j.accentEncre, fontFamily: MONO.demi, fontSize: 10, letterSpacing: 1.5 }}>
-        ONE LAST CONSTRAINT
-      </Text>
-      <TitreAnime texte="What already owns your weekdays?" mouvementReduit={mouvementReduit} />
-      <Text style={{ color: j.text2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 21 }}>
-        Vethos needs the immovable part of your day. Everything else can be added later in My Time.
-      </Text>
-      <View style={{ borderTopWidth: 1, borderTopColor: j.lineForte }}>
-        {ACTIVITES.map((option, index) => (
-          <Entree key={option.etiquette} delai={620 + index * 40} mouvementReduit={mouvementReduit}>
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ checked: valeur?.etiquette === option.etiquette }}
-              onPress={() => choisir(option)}
-              style={({ pressed }) => ({
-                minHeight: 68,
-                justifyContent: 'center',
-                borderBottomWidth: 1,
-                borderBottomColor: valeur?.etiquette === option.etiquette ? j.text : j.lineForte,
-                paddingLeft: PAS[5],
-                paddingRight: 42,
-                backgroundColor: pressed || valeur?.etiquette === option.etiquette ? j.surface : 'transparent',
-              })}
-            >
-              <View style={{ position: 'absolute', left: 0, width: 6, height: 6, borderRadius: 3, backgroundColor: valeur?.etiquette === option.etiquette ? j.accentEncre : j.lineForte }} />
-              <Text style={{ color: j.text, fontFamily: GEIST.demi, fontSize: 15 }}>{option.etiquette}</Text>
-              <Text style={{ marginTop: 3, color: j.text3, fontFamily: MONO.normal, fontSize: 10.5 }}>{option.detail}</Text>
-              <Text style={{ position: 'absolute', right: 4, color: j.text3, fontFamily: MONO.normal, fontSize: 10 }}>0{index + 1}</Text>
-            </Pressable>
-          </Entree>
-        ))}
-      </View>
-      <Navigation retour={retour} continuer={continuer} desactive={!valeur} libelle="Build my first day" />
-    </EcranDefilable>
-  )
-}
-
-function ApercuFinal({
-  nature,
-  nom,
-  heure,
-  blocs,
-  coucher,
-  lever,
-  protege,
-  activite,
-  mouvementReduit,
-  continuer,
-}: {
-  nature: Nature
-  nom: string
-  heure: number | null
-  blocs: readonly PlacedBlock[]
-  coucher: string
-  lever: string
-  protege: boolean
-  activite: Activite | null
-  mouvementReduit: boolean
-  continuer: () => void
-}) {
-  const j = useJetons()
-  const premierBloc = [...blocs].sort((a, b) => a.date.localeCompare(b.date) || a.startMinute - b.startMinute)[0]
-  return (
-    <EcranDefilable>
-      <TitreAnime texte="Your first Vethos day." mouvementReduit={mouvementReduit} />
-      <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: j.line, paddingVertical: PAS[5], gap: PAS[4] }}>
-        <LigneApercu heure={lever} titre="Your time begins" ton="doux" />
-        {activite?.categorie && activite.debut !== null && activite.fin !== null ? (
-          <LigneApercu heure={`${heure24(activite.debut)}–${heure24(activite.fin)}`} titre={activite.categorie === 'work' ? 'Work' : 'School'} ton="doux" />
-        ) : null}
-        <LigneApercu
-          heure={nature === 'ancre' && heure !== null ? heureTexte(heure) : premierBloc ? heureTexte(premierBloc.startMinute) : 'Vethos decides'}
-          titre={nom}
-          ton="fort"
-        />
-        {protege ? <LigneApercu heure="During focus" titre="Distractions protected" ton="accent" /> : null}
-        <LigneApercu heure={coucher} titre="Vethos leaves you alone" ton="doux" />
-      </View>
-      <Text style={{ fontFamily: GEIST.normal, fontSize: 14, lineHeight: 21, color: j.text3 }}>
-        One commitment is enough for Vethos to start building around what matters.
-      </Text>
-      <Navigation continuer={continuer} libelle="Continue" />
-    </EcranDefilable>
-  )
-}
-
-function Finale({ terminer, mouvementReduit }: { terminer: () => void; mouvementReduit: boolean }) {
-  const j = useJetons()
-  return (
-    <EcranCentre>
-      <TitreAnime texte="You’ve made the decision." mouvementReduit={mouvementReduit} centre />
-      <Entree delai={1050} mouvementReduit={mouvementReduit}>
-        <Text style={{ maxWidth: 330, fontFamily: GEIST.normal, fontSize: 21, lineHeight: 30, color: j.text2, textAlign: 'center' }}>
-          Now Vethos can help you protect it.
-        </Text>
-      </Entree>
-      <Entree delai={1900} mouvementReduit={mouvementReduit} style={{ alignSelf: 'stretch' }}>
-        <BoutonPrincipal onPress={terminer}>Enter Vethos</BoutonPrincipal>
-      </Entree>
-    </EcranCentre>
-  )
-}
-
-function EcranDefilable({ children }: { children: ReactNode }) {
-  return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: PAS[6], paddingVertical: PAS[5], gap: PAS[6] }}
-    >
-      {children}
-    </ScrollView>
-  )
-}
-
-function EcranCentre({ children }: { children: ReactNode }) {
-  return <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: PAS[6], paddingVertical: PAS[5], gap: PAS[6] }}>{children}</View>
-}
-
-function TitreAnime({ texte, mouvementReduit, centre }: { texte: string; mouvementReduit: boolean; centre?: boolean }) {
-  return (
-    <View style={{ maxWidth: centre ? 360 : 345, alignSelf: centre ? 'center' : 'auto' }}>
-      <TexteMots texte={texte} mouvementReduit={mouvementReduit} centre={centre} taille={30} />
-    </View>
-  )
-}
-
-function TexteMots({
-  texte,
-  mouvementReduit,
-  centre,
-  taille = 30,
-}: {
-  texte: string
-  mouvementReduit: boolean
-  centre?: boolean
-  taille?: number
-}) {
-  const j = useJetons()
-  const progression = useRef(new Animated.Value(mouvementReduit ? 1 : 0)).current
-  const mots = texte.split(' ')
-
-  useEffect(() => {
-    progression.setValue(mouvementReduit ? 1 : 0)
-    Animated.timing(progression, {
-      toValue: 1,
-      duration: mouvementReduit ? 240 : auRythme(1250),
-      // Le texte progressif doit garder une cadence lisible jusqu'au dernier
-      // mot ; ease-out donnait l'impression que tout arrivait d'un coup.
-      easing: Easing.linear,
-      useNativeDriver: true,
-    }).start()
-    return () => progression.stopAnimation()
-  }, [mouvementReduit, progression])
-
-  return (
-    <View
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={texte}
-      style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: centre ? 'center' : 'flex-start' }}
-    >
-      {mots.map((mot, index) => {
-        const depart = (index / Math.max(mots.length - 1, 1)) * 0.58
-        const fin = Math.min(depart + 0.28, 1)
-        const opacite = progression.interpolate({ inputRange: [depart, fin], outputRange: [0, 1], extrapolate: 'clamp' })
-        return (
-          <Animated.Text
-            key={`${mot}-${index}`}
-            accessible={false}
-            style={{
-              marginRight: index === mots.length - 1 ? 0 : 8,
-              fontFamily: GEIST.demi,
-              fontSize: taille,
-              lineHeight: taille * 1.22,
-              letterSpacing: -0.8,
-              color: j.text,
-              opacity: opacite,
-              transform: [
-                {
-                  translateY: opacite.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [mouvementReduit ? 0 : 9, 0],
-                  }),
-                },
-              ],
-            }}
-          >
-            {mot}
-          </Animated.Text>
-        )
-      })}
-    </View>
-  )
-}
-
-function Entree({
-  children,
-  delai,
-  mouvementReduit,
-  style,
-}: {
-  children: ReactNode
-  delai: number
-  mouvementReduit: boolean
-  style?: StyleProp<ViewStyle>
-}) {
-  const valeur = useRef(new Animated.Value(mouvementReduit ? 1 : 0)).current
-  useEffect(() => {
-    Animated.timing(valeur, {
-      toValue: 1,
-      delay: mouvementReduit ? 0 : auRythme(delai),
-      duration: mouvementReduit ? 220 : auRythme(520),
-      easing: COURBE_ENTREE,
-      useNativeDriver: true,
-    }).start()
-    return () => valeur.stopAnimation()
-  }, [delai, mouvementReduit, valeur])
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: valeur,
-          transform: [
-            { translateY: valeur.interpolate({ inputRange: [0, 1], outputRange: [mouvementReduit ? 0 : 10, 0] }) },
-          ],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  )
-}
-
-function MiniMoteur() {
-  const j = useJetons()
-  const positions = [18, 42, 66, 84]
-  return (
-    <View style={{ height: 70, borderLeftWidth: 1, borderLeftColor: j.lineForte, paddingLeft: PAS[4], justifyContent: 'space-between' }}>
-      {positions.map((position, index) => (
-        <View key={position} style={{ height: 1, backgroundColor: j.line, marginRight: index * 13 }}>
-          {index === 1 || index === 3 ? (
-            <View
-              style={{
-                position: 'absolute',
-                left: `${position}%`,
-                top: -3,
-                width: index === 1 ? 64 : 38,
-                height: 7,
-                backgroundColor: index === 1 ? j.surface3 : j.accent,
-              }}
-            />
-          ) : null}
-        </View>
-      ))}
-      <Text style={{ position: 'absolute', right: 0, bottom: -2, color: j.text3, fontFamily: MONO.normal, fontSize: 9 }}>
-        VETHOS ROUTES THE TIME
-      </Text>
-    </View>
-  )
-}
-
-function CarteChoix({ index, terme, titre, description, onPress }: { index: number; terme: string; titre: string; description: string; onPress: () => void }) {
-  const j = useJetons()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 82,
-        justifyContent: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: pressed ? j.text : j.lineForte,
-        paddingLeft: 50,
-        paddingRight: 34,
-        backgroundColor: pressed ? j.surface : 'transparent',
-        transform: [{ translateX: pressed ? 3 : 0 }],
-      })}
-    >
-      <Text style={{ position: 'absolute', left: 0, top: 18, color: j.accentEncre, fontFamily: MONO.demi, fontSize: 10 }}>
-        0{index + 1}
-      </Text>
-      <Text style={{ position: 'absolute', right: 0, top: 18, color: j.text3, fontFamily: MONO.normal, fontSize: 9 }}>
-        {terme}
-      </Text>
-      <Text style={{ fontFamily: GEIST.demi, fontSize: 18, color: j.text }}>{titre}</Text>
-      <Text style={{ marginTop: PAS[1], fontFamily: GEIST.normal, fontSize: 13.5, lineHeight: 20, color: j.text2 }}>{description}</Text>
-    </Pressable>
-  )
-}
-
-function CarteEngagement({
-  nature,
-  nom,
-  detail,
-  sousDetail,
-  mouvementReduit,
-  complete,
-}: {
-  nature: Nature
-  nom: string
-  detail?: string
-  sousDetail?: string
-  mouvementReduit: boolean
-  complete?: boolean
-}) {
-  const j = useJetons()
-  return (
-    <Entree delai={complete ? 1500 : 850} mouvementReduit={mouvementReduit}>
-      <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: j.lineForte, backgroundColor: j.surface, paddingVertical: PAS[4], paddingHorizontal: PAS[5], gap: PAS[2] }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ fontFamily: MONO.demi, fontSize: 10.5, letterSpacing: 1.2, color: j.accentEncre }}>{termeNature(nature)}</Text>
-          <Text style={{ fontFamily: MONO.normal, fontSize: 9.5, letterSpacing: 0.8, color: j.text3 }}>
-            {nature === 'ancre' ? 'FIXED BY YOU' : 'TIME BY VETHOS'}
-          </Text>
-        </View>
-        <Text style={{ fontFamily: GEIST.demi, fontSize: 19, color: nom.trim() ? j.text : j.text3 }}>{nom.trim() || 'Your commitment'}</Text>
-        {detail ? <PieceCarte texte={detail} mouvementReduit={mouvementReduit} /> : null}
-        {sousDetail ? <PieceCarte texte={sousDetail} mouvementReduit={mouvementReduit} /> : null}
-      </View>
-    </Entree>
-  )
-}
-
-function PieceCarte({ texte, mouvementReduit }: { texte: string; mouvementReduit: boolean }) {
-  const j = useJetons()
-  return (
-    <Entree delai={0} mouvementReduit={mouvementReduit}>
-      <Text style={{ fontFamily: MONO.normal, fontSize: 12, color: j.text2 }}>{texte}</Text>
-    </Entree>
-  )
-}
-
-function Timeline({ nature, nom, heure, blocs, mouvementReduit }: { nature: Nature; nom: string; heure: number | null; blocs: readonly PlacedBlock[]; mouvementReduit: boolean }) {
-  const j = useJetons()
-  const arrivee = useRef(new Animated.Value(mouvementReduit ? 1 : 0)).current
-  useEffect(() => {
-    Animated.timing(arrivee, {
-      toValue: 1,
-      delay: mouvementReduit ? 0 : auRythme(850),
-      duration: mouvementReduit ? 240 : auRythme(1400),
-      easing: COURBE_DEPLACEMENT,
-      useNativeDriver: true,
-    }).start()
-    return () => arrivee.stopAnimation()
-  }, [arrivee, mouvementReduit])
-  const dates = datesPourApercu(blocs)
-  const blocsApercu = blocs.length > 0
-    ? blocs
-    : [{
-        id: 'preview',
-        date: dates[2],
-        startMinute: nature === 'ancre' ? (heure ?? 18 * 60) : nature === 'objectif' ? 17 * 60 : 10 * 60,
-        endMinute: nature === 'ancre' ? (heure ?? 18 * 60) + 60 : nature === 'objectif' ? 18 * 60 : 11 * 60,
-        label: nom,
-      }]
-  return (
-    <View style={{ alignSelf: 'stretch' }}>
-      <View style={{ flexDirection: 'row', height: 246, borderTopWidth: 1, borderBottomWidth: 1, borderColor: j.lineForte }}>
-        {dates.map((date) => {
-          const locale = new Date(`${date}T12:00:00`)
-          const duJour = blocsApercu.filter((bloc) => bloc.date === date)
-          return (
-            <View key={date} style={{ flex: 1, borderRightWidth: 1, borderRightColor: j.line, overflow: 'hidden' }}>
-              <View style={{ height: 38, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: j.text3, fontFamily: MONO.normal, fontSize: 8.5 }}>
-                  {locale.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()} {locale.getDate()}
+          <PageIntro footer={pied}>
+            {choses.length > 1 ? (
+              <View style={{ gap: 10 }}>
+                <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 14 }}>
+                  Start with one. Add the others in the app.
                 </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {choses.map((c) => {
+                    const pris = c.id === chose.id
+                    return (
+                      <Pressable
+                        key={c.id}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: pris }}
+                        onPress={() => {
+                          if (pris) return
+                          toucher()
+                          morpher(reduit)
+                          setChoseId(c.id)
+                          setB((v) => ({
+                            ...brouillonDepuis(c, donnees.reglages, priorites),
+                            activites: v.activites,
+                            fixes: v.fixes,
+                            coucher: v.coucher,
+                            lever: v.lever,
+                          }))
+                        }}
+                        style={({ pressed }) => ({
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 999,
+                          backgroundColor: pris ? encre.text : encre.surface2,
+                          transform: [{ scale: pressed ? 0.95 : 1 }],
+                        })}
+                      >
+                        <Text
+                          style={{ color: pris ? encre.bg : encre.text2, fontFamily: GEIST.moyen, fontSize: 14 }}
+                        >
+                          {c.bouton}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                {[8, 12, 16, 20].map((h) => (
-                  <View key={h} style={{ position: 'absolute', top: ((h - 8) / 14) * 208, left: 4, right: 4, height: 1, backgroundColor: j.line }} />
-                ))}
-                {duJour.map((bloc) => {
-                  const top = Math.max(0, Math.min(188, ((bloc.startMinute - 8 * 60) / (14 * 60)) * 208))
-                  const hauteur = Math.max(12, Math.min(62, ((bloc.endMinute - bloc.startMinute) / (14 * 60)) * 208))
-                  return (
-                    <Animated.View
-                      key={bloc.id}
-                      style={{
-                        position: 'absolute',
-                        left: 4,
-                        right: 4,
-                        top,
-                        height: hauteur,
-                        minHeight: 12,
-                        backgroundColor: j.surface3,
-                        borderLeftWidth: 2,
-                        borderLeftColor: nature === 'ancre' ? j.blocAncre : nature === 'objectif' ? j.blocObjectif : j.accent,
-                        opacity: arrivee,
-                        transform: [{ translateY: arrivee.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }],
-                      }}
-                    />
-                  )
-                })}
-              </View>
+            ) : null}
+            <View style={{ gap: 8 }}>
+              <TitreIntro>How should Vethos hold “{b.nom}”?</TitreIntro>
+              <CorpsIntro>We picked what fits. You can change it.</CorpsIntro>
             </View>
-          )
-        })}
-      </View>
-      <Text numberOfLines={1} style={{ marginTop: PAS[3], color: j.text, fontFamily: GEIST.demi, fontSize: 13, textAlign: 'center' }}>
-        {nom} · {blocsApercu[0] ? `${heureTexte(blocsApercu[0].startMinute)} ${blocs.length ? 'placed by Vethos' : 'preview'}` : 'Vethos is placing it'}
-      </Text>
+            <View style={{ gap: 12 }}>
+              {ordre.map((n, i) => (
+                <Apparaitre key={n.nature} reduit={reduit} delai={i * 90}>
+                  <CarteNature
+                    nature={n.nature}
+                    pourquoi={n.pourquoi}
+                    choisie={b.nature === n.nature}
+                    recommandee={n.nature === recommandee}
+                    reduit={reduit}
+                    delai={360 + i * 200}
+                    choisir={() => {
+                      morpher(reduit)
+                      setB((v) => ({
+                        ...v,
+                        nature: n.nature,
+                        minutes: n.nature === 'tache' ? 240 : chose.seance,
+                      }))
+                    }}
+                  />
+                </Apparaitre>
+              ))}
+            </View>
+          </PageIntro>
+        ) : null}
+
+        {etape === 'parametre' ? (
+          <PageIntro footer={pied}>
+            <View style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TEINTE[b.nature] }} />
+                <Text style={[styles.etiquette, { color: encre.text2 }]}>{NOM_NATURE[b.nature]}</Text>
+                <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 13 }}>· {b.nom}</Text>
+              </View>
+              <TitreIntro>{questionParametre(b.nature, page)}</TitreIntro>
+            </View>
+            <Parametre b={b} page={page} maj={maj} />
+          </PageIntro>
+        ) : null}
+
+        {g === 'protection' ? (
+          <PageIntro footer={pied}>
+            <View style={{ gap: 10 }}>
+              <TitreIntro>Give it your undivided attention.</TitreIntro>
+              <CorpsIntro>While you work on it, your distractions stay locked.</CorpsIntro>
+            </View>
+            <EcranProtege
+              protege={protégé}
+              reduit={reduit}
+              nom={b.nom.trim()}
+              couleur={TEINTE[b.nature]}
+              compte={selection ? `${selection.nbApplications} apps · ${selection.nbCategories} categories` : undefined}
+            />
+          </PageIntro>
+        ) : null}
+
+        {g === 'temps' ? (
+          <PageIntro footer={pied}>
+            <Animated.View style={{ opacity: habillage }}>
+              {etape === 'sommeil' ? (
+                <Apparaitre key="t-sommeil" reduit={reduit} style={{ gap: 8 }}>
+                  <TitreIntro>Your day starts with a good night.</TitreIntro>
+                  <CorpsIntro>Vethos never places anything while you sleep.</CorpsIntro>
+                </Apparaitre>
+              ) : null}
+              {etape === 'activite' ? (
+                <Apparaitre key="t-activite" reduit={reduit} style={{ gap: 8 }}>
+                  <TitreIntro>What’s already part of your day?</TitreIntro>
+                  <CorpsIntro>Vethos builds around it, never over it.</CorpsIntro>
+                </Apparaitre>
+              ) : null}
+              {etape === 'construction' ? (
+                <Apparaitre key="t-construction" reduit={reduit} style={{ gap: 8 }}>
+                  <TitreIntro>Finding its place.</TitreIntro>
+                  <CorpsIntro>Around your sleep, around your fixed hours.</CorpsIntro>
+                </Apparaitre>
+              ) : null}
+              {etape === 'jour' && aperçu ? (
+                <Apparaitre key="t-jour" reduit={reduit} style={{ gap: 8 }}>
+                  <TitreIntro>
+                    {aperçu.blocs.length
+                      ? 'This is what one decision changes.'
+                      : 'Your week is full. Vethos sees it.'}
+                  </TitreIntro>
+                  <CorpsIntro>
+                    {aperçu.blocs.length
+                      ? `“${b.nom}” finally has a place in your week.`
+                      : 'Free up some hours, or adjust the commitment.'}
+                  </CorpsIntro>
+                </Apparaitre>
+              ) : null}
+            </Animated.View>
+
+            {etape === 'jour' && aperçu && jourChoisi ? (
+              <Apparaitre key="semaine" reduit={reduit} duree={DUREE.ui}>
+                <SemaineReelle aperçu={aperçu} b={b} selection={jourChoisi} choisir={setJourChoisi} />
+              </Apparaitre>
+            ) : etape !== 'jour' ? (
+              <CadranTemps
+                phase={etape as 'sommeil' | 'activite' | 'construction'}
+                b={b}
+                aperçu={aperçu}
+                reduit={reduit}
+                surPlace={() => {
+                  if (!lecteur) aller('jour')
+                }}
+              />
+            ) : null}
+
+            <Animated.View style={{ opacity: habillage, gap: 16 }}>
+              {etape === 'sommeil' ? (
+                <Apparaitre key="c-sommeil" reduit={reduit} style={{ gap: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <View style={{ gap: 8, alignItems: 'center' }}>
+                      <Text style={styles.etiquetteChamp}>Bedtime</Text>
+                      <RoueHeure
+                        valeur={b.coucher}
+                        changer={(v) => maj('coucher', v)}
+                        etiquette="Bedtime"
+                        pasMinutes={15}
+                      />
+                    </View>
+                    <View style={{ gap: 8, alignItems: 'center' }}>
+                      <Text style={styles.etiquetteChamp}>Wake-up</Text>
+                      <RoueHeure
+                        valeur={b.lever}
+                        changer={(v) => maj('lever', v)}
+                        etiquette="Wake-up"
+                        pasMinutes={15}
+                      />
+                    </View>
+                  </View>
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    style={{
+                      color: nuit.ok ? encre.text2 : encre.accentEncre,
+                      fontFamily: GEIST.moyen,
+                      fontSize: 14,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {nuit.ok ? `${duree(nuit.duree)} of sleep` : `${duree(nuit.duree)} — ${nuit.raison}`}
+                  </Text>
+                </Apparaitre>
+              ) : null}
+              {etape === 'activite' ? (
+                <Apparaitre key="c-activite" reduit={reduit} style={{ gap: 16 }}>
+                  <View style={{ gap: 8 }}>
+                    {[
+                      [
+                        { id: 'work' as const, nom: 'Work' },
+                        { id: 'school' as const, nom: 'School' },
+                      ],
+                      [
+                        { id: 'variable' as const, nom: 'My days change' },
+                        { id: 'none' as const, nom: 'Nothing fixed' },
+                      ],
+                    ].map((ligne, i) => (
+                      <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+                        {ligne.map((a) => (
+                          <ChoixIntro
+                            key={a.id}
+                            compact
+                            role="checkbox"
+                            style={{ flex: 1 }}
+                            titre={a.nom}
+                            selected={b.activites.includes(a.id)}
+                            onPress={() => {
+                              morpher(reduit)
+                              setB((v) => ({ ...v, activites: basculerActivite(v.activites, a.id) }))
+                              setErreur('')
+                            }}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                  {(['school', 'work'] as const)
+                    .filter((a) => b.activites.includes(a))
+                    .map((a) => (
+                      <View key={a} style={{ gap: 12 }}>
+                        <Text style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 17 }}>
+                          {a === 'work' ? 'Work' : 'School'}
+                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <View style={{ gap: 8, alignItems: 'center' }}>
+                            <Text style={styles.etiquetteChamp}>From</Text>
+                            <RoueHeure
+                              valeur={b.fixes[a].debut}
+                              changer={(v) => majFixe(a, 'debut', v)}
+                              etiquette={`${a === 'work' ? 'Work' : 'School'} start`}
+                              pasMinutes={15}
+                            />
+                          </View>
+                          <View style={{ gap: 8, alignItems: 'center' }}>
+                            <Text style={styles.etiquetteChamp}>Until</Text>
+                            <RoueHeure
+                              valeur={b.fixes[a].fin}
+                              changer={(v) => majFixe(a, 'fin', v)}
+                              etiquette={`${a === 'work' ? 'Work' : 'School'} end`}
+                              pasMinutes={15}
+                            />
+                          </View>
+                        </View>
+                        <JoursIntro jours={b.fixes[a].jours} changer={(v) => majFixe(a, 'jours', v)} />
+                      </View>
+                    ))}
+                </Apparaitre>
+              ) : null}
+              {etape === 'jour' ? (
+                <ActionIntro secondaire onPress={() => aller('parametre', 0)}>
+                  Adjust my commitment
+                </ActionIntro>
+              ) : null}
+            </Animated.View>
+          </PageIntro>
+        ) : null}
+      </Animated.View>
+      <SelecteurApplications
+        ouvert={selecteur}
+        surFermeture={() => {
+          setSelecteur(false)
+          toucher('verrou')
+        }}
+      />
     </View>
   )
 }
 
-function Option({ etiquette, selectionnee, onPress }: { etiquette: string; selectionnee: boolean; onPress: () => void }) {
-  const j = useJetons()
+function questionParametre(nature: NatureIntroduction, page: number) {
+  if (nature === 'tache') return page === 0 ? 'When does it need to be done?' : 'How much work is left, in total?'
+  if (nature === 'objectif') return 'How much time does it get each week?'
+  return page === 0 ? 'At what time?' : 'For how long, and on which days?'
+}
+
+/** Une seule question par écran, une grande roue, rien d'autre. */
+function Parametre({
+  b,
+  page,
+  maj,
+}: {
+  b: BrouillonIntroduction
+  page: number
+  maj: <K extends keyof BrouillonIntroduction>(cle: K, valeur: BrouillonIntroduction[K]) => void
+}) {
+  const lisible = (d: string) =>
+    new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  if (b.nature === 'tache' && page === 0)
+    return (
+      <View style={{ gap: 14 }}>
+        <RoueJour
+          valeur={b.echeance}
+          changer={(v) => maj('echeance', v)}
+          jours={ECHEANCE_MAX_JOURS}
+          etiquette="Deadline"
+        />
+        <Text style={styles.aideCentree}>Done by {lisible(b.echeance)}. At most a month ahead.</Text>
+      </View>
+    )
+  if (b.nature === 'tache')
+    return (
+      <View style={{ gap: 14 }}>
+        <RoueDuree
+          minutes={b.minutes}
+          changer={(v) => maj('minutes', v)}
+          etiquette="Work left"
+          maxHeures={150}
+          pasMinutes={15}
+          minimum={15}
+        />
+        <Text style={styles.aideCentree}>Vethos splits it into sessions and adds a safety margin.</Text>
+      </View>
+    )
+  if (b.nature === 'objectif')
+    return (
+      <RoueDuree
+        minutes={Math.round(b.heuresHebdo * 60)}
+        changer={(v) => maj('heuresHebdo', v / 60)}
+        etiquette="Time per week"
+        maxHeures={100}
+        pasMinutes={15}
+        minimum={15}
+      />
+    )
+  if (page === 0)
+    return <RoueHeure valeur={b.heureAncre} changer={(v) => maj('heureAncre', v)} etiquette="Anchor time" />
+  return (
+    <View style={{ gap: 18 }}>
+      <RoueDuree
+        minutes={b.minutes}
+        changer={(v) => maj('minutes', v)}
+        etiquette="Anchor duration"
+        maxHeures={8}
+        minimum={15}
+      />
+      <JoursIntro jours={b.joursAncre} changer={(v) => maj('joursAncre', v)} />
+    </View>
+  )
+}
+
+/** Une carte-nature : le nom d'abord, puis pourquoi, puis ce que l'app fera. */
+function CarteNature({
+  nature,
+  pourquoi,
+  choisie,
+  recommandee,
+  reduit,
+  delai,
+  choisir,
+}: {
+  nature: NatureIntroduction
+  pourquoi: string
+  choisie: boolean
+  recommandee: boolean
+  reduit: boolean
+  delai: number
+  choisir: () => void
+}) {
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ checked: selectionnee }}
-      onPress={onPress}
+      accessibilityLabel={`${NOM_NATURE[nature]}. ${pourquoi}${recommandee ? ' Best fit.' : ''}`}
+      accessibilityState={{ checked: choisie }}
+      onPress={() => {
+        toucher()
+        choisir()
+      }}
       style={({ pressed }) => ({
-        minHeight: 54,
-        justifyContent: 'center',
-        paddingLeft: PAS[6],
-        paddingRight: PAS[4],
-        borderBottomWidth: 1,
-        borderBottomColor: selectionnee ? j.text : j.lineForte,
-        backgroundColor: selectionnee || pressed ? j.surface2 : 'transparent',
-        transform: [{ translateX: pressed ? 3 : 0 }],
-      })}
-    >
-      <View style={{ position: 'absolute', left: 2, width: 7, height: 7, borderRadius: 4, backgroundColor: selectionnee ? j.accentEncre : j.lineForte }} />
-      <Text style={{ fontFamily: selectionnee ? GEIST.demi : GEIST.normal, fontSize: 15, color: j.text }}>{etiquette}</Text>
-    </Pressable>
-  )
-}
-
-function Navigation({
-  retour,
-  continuer,
-  desactive,
-  libelle,
-}: {
-  retour?: () => void
-  continuer: () => void
-  desactive?: boolean
-  libelle: string
-}) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[3], marginTop: PAS[2] }}>
-      {retour ? <Retour onPress={retour} /> : null}
-      <View style={{ flex: 1 }}>
-        <BoutonPrincipal onPress={continuer} desactive={desactive}>{libelle}</BoutonPrincipal>
-      </View>
-    </View>
-  )
-}
-
-function Retour({ onPress }: { onPress: () => void }) {
-  const j = useJetons()
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ minWidth: 64, minHeight: 52, justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
-      <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text2 }}>Back</Text>
-    </Pressable>
-  )
-}
-
-function BoutonPrincipal({ children, onPress, desactive }: { children: ReactNode; onPress: () => void; desactive?: boolean }) {
-  const j = useJetons()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!desactive }}
-      disabled={desactive}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 54,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: j.text,
+        padding: 16,
+        gap: 12,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: j.text,
-        borderBottomWidth: 2,
-        borderBottomColor: j.accent,
-        borderRadius: RAYON.xl,
-        opacity: desactive ? 0.3 : 1,
+        backgroundColor: encre.surface,
+        borderColor: choisie ? encre.text : 'rgba(242, 242, 242, 0.07)',
+        opacity: choisie ? 1 : 0.62,
         transform: [{ scale: pressed ? 0.98 : 1 }],
       })}
     >
-      <Text style={{ fontFamily: GEIST.demi, fontSize: 15, color: j.surface }}>{children}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: TEINTE[nature] }} />
+        <Text style={{ flex: 1, color: encre.text, fontFamily: MONO.demi, fontSize: 15, letterSpacing: 1.4 }}>
+          {NOM_NATURE[nature]}
+        </Text>
+        {recommandee ? (
+          <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: encre.surface3 }}>
+            <Text style={{ color: encre.text, fontFamily: GEIST.moyen, fontSize: 11 }}>Best fit</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={{ color: encre.text2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>{pourquoi}</Text>
+      <MiniSemaine nature={nature} reduit={reduit} delai={delai} />
     </Pressable>
   )
 }
 
-function BoutonTexte({ children, onPress }: { children: ReactNode; onPress: () => void }) {
-  const j = useJetons()
+/**
+ * Ce que « protégé » veut dire, à l'écran : son iPhone. En haut, la séance
+ * de son engagement ; dessous, des apps (anonymes — Apple ne dit pas
+ * lesquelles). Protégé : les apps s'éteignent et se verrouillent.
+ */
+function EcranProtege({
+  protege,
+  reduit,
+  nom,
+  couleur,
+  compte,
+}: {
+  protege: boolean
+  reduit: boolean
+  nom: string
+  couleur: string
+  compte?: string
+}) {
+  const p = useRef(new Animated.Value(protege ? 1 : 0)).current
+  const arrivee = useRef(new Animated.Value(reduit ? 1 : 0)).current
+  useEffect(() => {
+    const a = Animated.timing(arrivee, {
+      toValue: 1,
+      duration: reduit ? DUREE.reduit : DUREE.ui,
+      easing: SORTIE,
+      useNativeDriver: true,
+    })
+    a.start()
+    return () => a.stop()
+  }, [arrivee, reduit])
+  useEffect(() => {
+    const a = Animated.timing(p, {
+      toValue: protege ? 1 : 0,
+      duration: reduit ? DUREE.reduit : DUREE.ui,
+      easing: SORTIE,
+      useNativeDriver: true,
+    })
+    a.start()
+    return () => a.stop()
+  }, [p, protege, reduit])
+  const gris = ['#3a3a3a', '#2c2c2c', '#454545', '#333333']
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => ({ minHeight: 46, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.5 : 1 })}>
-      <Text style={{ fontFamily: GEIST.moyen, fontSize: 13.5, color: j.text3 }}>{children}</Text>
-    </Pressable>
+    <Animated.View
+      accessible
+      accessibilityLabel={
+        protege ? `Your phone during ${nom}: apps locked.` : `Your phone during ${nom}: every app still open.`
+      }
+      style={{
+        alignSelf: 'center',
+        width: 232,
+        borderRadius: 40,
+        borderWidth: 6,
+        borderColor: '#1c1c1c',
+        backgroundColor: '#050505',
+        padding: 14,
+        paddingTop: 22,
+        gap: 18,
+        opacity: arrivee,
+        transform: [{ scale: arrivee.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }],
+      }}
+    >
+      <View style={{ alignSelf: 'center', width: 64, height: 18, borderRadius: 9, backgroundColor: '#000' }} />
+      <View
+        style={{
+          borderRadius: 16,
+          padding: 12,
+          backgroundColor: encre.surface2,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <View style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: couleur }} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text numberOfLines={1} style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 13 }}>
+            {nom}
+          </Text>
+          <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 11 }}>
+            {protege ? 'Focus · protected' : 'Focus session'}
+          </Text>
+        </View>
+        <Animated.View style={{ opacity: p }}>
+          <GlypheBlocage taille={14} couleur={encre.text} />
+        </Animated.View>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 }}>
+        {Array.from({ length: 12 }, (_, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 11,
+              backgroundColor: gris[(i * 7) % 4],
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: p.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }),
+              transform: [
+                { scale: p.interpolate({ inputRange: [0, 1], outputRange: [1, reduit ? 1 : 0.9] }) },
+              ],
+            }}
+          >
+            <Animated.View style={{ opacity: p }}>
+              <GlypheBlocage taille={13} couleur={encre.text} />
+            </Animated.View>
+          </Animated.View>
+        ))}
+      </View>
+      <View style={{ height: 18, alignItems: 'center', justifyContent: 'center' }}>
+        {compte ? (
+          <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 11 }}>{compte}</Text>
+        ) : (
+          <View style={{ width: 80, height: 4, borderRadius: 2, backgroundColor: '#2a2a2a' }} />
+        )}
+      </View>
+    </Animated.View>
   )
-}
-
-function CarteStatut({ children }: { children: ReactNode }) {
-  const j = useJetons()
-  return (
-    <View style={{ minHeight: 52, justifyContent: 'center', borderWidth: 1, borderColor: j.line, borderLeftWidth: 2, borderLeftColor: j.accent, paddingHorizontal: PAS[4], backgroundColor: j.surface }}>
-      <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: j.text }}>{children}</Text>
-    </View>
-  )
-}
-
-function LigneApercu({ heure, titre, ton }: { heure: string; titre: string; ton: 'doux' | 'fort' | 'accent' }) {
-  const j = useJetons()
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: PAS[4] }}>
-      <Text numberOfLines={1} style={{ width: 92, fontFamily: MONO.normal, fontSize: 10.5, color: ton === 'accent' ? j.accentEncre : j.text3 }}>{heure}</Text>
-      <Text style={{ flex: 1, fontFamily: ton === 'fort' ? GEIST.demi : GEIST.normal, fontSize: 14, color: ton === 'doux' ? j.text2 : j.text }}>{titre}</Text>
-    </View>
-  )
-}
-
-function champ(j: ReturnType<typeof useJetons>) {
-  return {
-    minHeight: 58,
-    backgroundColor: j.champBg,
-    borderWidth: 1,
-    borderColor: j.lineForte,
-    borderRadius: RAYON.xl,
-    paddingHorizontal: PAS[5],
-    paddingVertical: PAS[4],
-    fontFamily: GEIST.moyen,
-    fontSize: 18,
-    color: j.text,
-  } as const
-}
-
-function nomNature(nature: Nature) {
-  return nature === 'tache' ? 'Task' : nature === 'objectif' ? 'Goal' : 'Anchor'
-}
-
-function termeNature(nature: Nature) {
-  return nomNature(nature).toUpperCase()
-}
-
-function libelleParametre(nature: Nature, valeur: number) {
-  if (nature === 'tache') return ECHEANCES.find((option) => option.jours === valeur)?.etiquette ?? `${valeur} days`
-  if (nature === 'objectif') return HEURES_OBJECTIF.find((option) => option.heures === valeur)?.etiquette ?? `${valeur} hours a week`
-  return heureTexte(valeur)
-}
-
-function heureTexte(minute: number) {
-  const heures = Math.floor(minute / 60)
-  const minutes = minute % 60
-  const suffixe = heures >= 12 ? 'PM' : 'AM'
-  const heure12 = heures % 12 || 12
-  return `${heure12}:${String(minutes).padStart(2, '0')} ${suffixe}`
-}
-
-function heure24(minute: number) {
-  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
-}
-
-function joursTexte(jours: readonly number[]) {
-  const noms = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  return jours.map((jour) => noms[jour]).join(' · ')
-}
-
-function memesJours(a: readonly number[], b: readonly number[]) {
-  return a.length === b.length && a.every((jour, index) => jour === b[index])
-}
-
-function dansNJours(jours: number) {
-  const date = new Date()
-  date.setDate(date.getDate() + jours)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function datesPourApercu(blocs: readonly PlacedBlock[]) {
-  const trouvees = [...new Set(blocs.map((bloc) => bloc.date))].sort().slice(0, 5)
-  const depart = trouvees[0] ? new Date(`${trouvees[0]}T12:00:00`) : new Date()
-  const dates = [...trouvees]
-  for (let index = 0; dates.length < 5; index += 1) {
-    const date = new Date(depart)
-    date.setDate(depart.getDate() + index)
-    const cle = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    if (!dates.includes(cle)) dates.push(cle)
-  }
-  return dates.sort().slice(0, 5)
 }

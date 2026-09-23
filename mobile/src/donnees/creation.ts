@@ -67,7 +67,12 @@ export function preparerTache(
   // Sans plafond connu, on ne découpe pas : mieux vaut une tâche entière qu'un
   // découpage calculé sur une capacité inventée.
   const parties = options.maxParJourMinutes
-    ? autoSplit({ totalMinutes: prevu, maxPerDayMinutes: options.maxParJourMinutes })
+    ? autoSplit({
+        totalMinutes: prevu,
+        maxPerDayMinutes: options.maxParJourMinutes,
+        // L'app iPhone est en anglais : le moteur partagé nomme « Partie » par défaut.
+        labeller: (n) => Array.from({ length: n }, (_, i) => `Part ${i + 1}`),
+      })
     : []
 
   if (parties.length === 0) return [base]
