@@ -5,7 +5,7 @@
  * suivant démarre seul. À la fin, tout se range en cartes qu'on peut rouvrir.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Animated, Pressable, Text, View } from 'react-native'
+import { Animated, Easing, Pressable, Text, View } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { GEIST, MONO } from '@/ui/primitives'
 import { equivalenceTotale, formatHeures, type Bilan } from './choix-introduction'
@@ -57,11 +57,15 @@ export function CalendrierAnnee({
           const date = new Date(premier.getFullYear(), premier.getMonth(), d + 1, 12)
           const semaine = Math.floor((date.getTime() - aujourdHui.getTime()) / (7 * 86_400_000))
           const avenir = date >= aujourdHui
+          // Aujourd'hui n'est jamais un soir perdu : c'est le jour où il a installé Vethos.
+          const ceJour = date.toDateString() === aujourdHui.toDateString()
           const perdu =
             avenir &&
+            !ceJour &&
             (!fin || date <= fin) &&
-            (toujours.includes(date.getDay()) || (uneSurDeux === date.getDay() && semaine % 2 === 0))
-          return { passe: !avenir, perdu, fin: date.toDateString() === cleFin }
+            (toujours.includes(date.getDay()) ||
+              (uneSurDeux === date.getDay() && semaine % 2 === 0))
+          return { passe: !avenir, perdu, fin: date.toDateString() === cleFin, ceJour }
         }),
       }
     })
@@ -77,7 +81,14 @@ export function CalendrierAnnee({
     }
     const a = Animated.stagger(
       lent(110),
-      p.map((v) => Animated.timing(v, { toValue: 1, duration: lent(240), easing: SORTIE, useNativeDriver: true })),
+      p.map((v) =>
+        Animated.timing(v, {
+          toValue: 1,
+          duration: lent(240),
+          easing: SORTIE,
+          useNativeDriver: true,
+        }),
+      ),
     )
     a.start(({ finished }) => {
       if (!finished) return
@@ -94,7 +105,7 @@ export function CalendrierAnnee({
     <View
       onLayout={(e) => setLargeur(e.nativeEvent.layout.width)}
       accessible
-      accessibilityLabel={`Your next twelve months: ${perdus} evenings lost if nothing changes.${fin ? ` Done on ${fin.toDateString()}.` : ''}`}
+      accessibilityLabel={`Your next twelve months: ${perdus} evenings lost if nothing changes.${fin ? ` Done on ${fin.toDateString()}.` : ''} Today is lit: this is where it changes.`}
       style={{ gap: 3 }}
     >
       {largeur > 0
@@ -108,25 +119,44 @@ export function CalendrierAnnee({
                 opacity: p[r]!.interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] }),
               }}
             >
-              <Text style={{ width: etiquette, color: encre.text3, fontFamily: MONO.normal, fontSize: 10 }}>
+              <Text
+                style={{
+                  width: etiquette,
+                  color: encre.text3,
+                  fontFamily: MONO.normal,
+                  fontSize: 10,
+                }}
+              >
                 {m.nom}
               </Text>
               {m.jours.map((j, d) => (
-                <View key={d} style={{ width: cellule, height: cellule, alignItems: 'center', justifyContent: 'center' }}>
-                  <View
-                    style={{
-                      width: point,
-                      height: point,
-                      borderRadius: point * 0.28,
-                      backgroundColor: j.fin
-                        ? encre.text
-                        : j.perdu
-                          ? encre.accentEncre
-                          : j.passe
-                            ? 'transparent'
-                            : encre.surface2,
-                    }}
-                  />
+                <View
+                  key={d}
+                  style={{
+                    width: cellule,
+                    height: cellule,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {j.ceJour ? (
+                    <Aujourdhui taille={point} reduit={reduit} />
+                  ) : (
+                    <View
+                      style={{
+                        width: point,
+                        height: point,
+                        borderRadius: point * 0.28,
+                        backgroundColor: j.fin
+                          ? encre.text
+                          : j.perdu
+                            ? encre.accentEncre
+                            : j.passe
+                              ? 'transparent'
+                              : encre.surface2,
+                      }}
+                    />
+                  )}
                 </View>
               ))}
             </Animated.View>
@@ -136,6 +166,101 @@ export function CalendrierAnnee({
         <Legende couleur={encre.accentEncre} texte="Lost to “tomorrow”" />
         {fin ? <Legende couleur={encre.text} texte="Done, at your pace" /> : null}
       </View>
+    </View>
+  )
+}
+
+/**
+ * Aujourd'hui. Aucun mot ne le signale : il brille, simplement — une lumière
+ * chaude qui respire au tout début d'une année de rouge. C'est le jour où il a
+ * installé Vethos, celui où la suite du calendrier cesse d'être écrite.
+ */
+function Aujourdhui({ taille, reduit }: { taille: number; reduit: boolean }) {
+  const souffle = useRef(new Animated.Value(reduit ? 0.5 : 0)).current
+  const eclat = useRef(new Animated.Value(reduit ? 1 : 0.7)).current
+  useEffect(() => {
+    if (reduit) return
+    const respire = Animated.loop(
+      Animated.sequence([
+        Animated.timing(souffle, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(souffle, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    )
+    // Un scintillement plus court, décalé du souffle : jamais deux fois le même battement.
+    const scintille = Animated.loop(
+      Animated.sequence([
+        Animated.timing(eclat, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(eclat, {
+          toValue: 0.72,
+          duration: 900,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1700),
+      ]),
+    )
+    respire.start()
+    scintille.start()
+    return () => {
+      respire.stop()
+      scintille.stop()
+    }
+  }, [eclat, reduit, souffle])
+  const halo = taille * 4.2
+  return (
+    <View style={{ width: taille, height: taille, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: halo,
+          height: halo,
+          borderRadius: halo / 2,
+          backgroundColor: 'rgba(255, 214, 150, 0.34)',
+          opacity: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+          transform: [
+            { scale: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.15] }) },
+          ],
+        }}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: halo * 0.55,
+          height: halo * 0.55,
+          borderRadius: halo,
+          backgroundColor: 'rgba(255, 232, 190, 0.6)',
+          opacity: eclat.interpolate({ inputRange: [0.7, 1], outputRange: [0.25, 0.9] }),
+        }}
+      />
+      <Animated.View
+        style={{
+          width: taille,
+          height: taille,
+          borderRadius: taille * 0.28,
+          backgroundColor: '#fff3dc',
+          opacity: eclat,
+          transform: [
+            { scale: eclat.interpolate({ inputRange: [0.7, 1], outputRange: [1, 1.18] }) },
+          ],
+        }}
+      />
     </View>
   )
 }
@@ -230,14 +355,23 @@ export function CalculEnDirect({
         <View style={{ gap: 8, minHeight: 70 }}>
           {etape >= 1 ? (
             <Apparition reduit={reduit}>
-              <Text style={{ color: encre.text2, fontFamily: GEIST.normal, fontSize: 17, lineHeight: 24 }}>
+              <Text
+                style={{
+                  color: encre.text2,
+                  fontFamily: GEIST.normal,
+                  fontSize: 17,
+                  lineHeight: 24,
+                }}
+              >
                 {courant.passe}
               </Text>
             </Apparition>
           ) : null}
           {etape >= 2 ? (
             <Apparition reduit={reduit}>
-              <Text style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 18, lineHeight: 25 }}>
+              <Text
+                style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 18, lineHeight: 25 }}
+              >
                 {courant.futur}
               </Text>
             </Apparition>
@@ -252,7 +386,9 @@ export function CalculEnDirect({
     <View style={{ gap: 22 }}>
       <View style={{ gap: 4 }}>
         <Text style={{ color: encre.text2, fontFamily: GEIST.moyen, fontSize: 18 }}>
-          {bilans.length > 1 ? 'All together, since you first decided,' : 'Since you first decided,'}
+          {bilans.length > 1
+            ? 'All together, since you first decided,'
+            : 'Since you first decided,'}
         </Text>
         <Compteur
           cible={total}
@@ -267,13 +403,25 @@ export function CalculEnDirect({
           }}
         />
         <Text
-          style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 24, lineHeight: 30, letterSpacing: -0.7 }}
+          style={{
+            color: encre.text,
+            fontFamily: GEIST.demi,
+            fontSize: 24,
+            lineHeight: 30,
+            letterSpacing: -0.7,
+          }}
         >
           hours went to “tomorrow”.
         </Text>
         <Apparition reduit={reduit} delai={lent(1900)}>
           <Text
-            style={{ color: encre.text2, fontFamily: GEIST.normal, fontSize: 17, lineHeight: 24, marginTop: 8 }}
+            style={{
+              color: encre.text2,
+              fontFamily: GEIST.normal,
+              fontSize: 17,
+              lineHeight: 24,
+              marginTop: 8,
+            }}
           >
             {equivalenceTotale(total)}
           </Text>
@@ -281,7 +429,13 @@ export function CalculEnDirect({
       </View>
       <View style={{ gap: 10 }}>
         {bilans.map((b, k) => (
-          <CarteBilan key={b.chose.id} b={b} max={max} reduit={reduit} delai={lent(2300) + k * lent(250)} />
+          <CarteBilan
+            key={b.chose.id}
+            b={b}
+            max={max}
+            reduit={reduit}
+            delai={lent(2300) + k * lent(250)}
+          />
         ))}
         <Apparition reduit={reduit} delai={lent(2300) + bilans.length * lent(250)}>
           <Text style={{ color: encre.text3, fontFamily: GEIST.normal, fontSize: 13 }}>
@@ -293,7 +447,15 @@ export function CalculEnDirect({
   )
 }
 
-function Apparition({ children, reduit, delai = 0 }: { children: ReactNode; reduit: boolean; delai?: number }) {
+function Apparition({
+  children,
+  reduit,
+  delai = 0,
+}: {
+  children: ReactNode
+  reduit: boolean
+  delai?: number
+}) {
   const p = useRef(new Animated.Value(reduit ? 1 : 0)).current
   useEffect(() => {
     if (reduit) return
@@ -311,7 +473,9 @@ function Apparition({ children, reduit, delai = 0 }: { children: ReactNode; redu
     <Animated.View
       style={{
         opacity: p,
-        transform: [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [reduit ? 0 : 8, 0] }) }],
+        transform: [
+          { translateY: p.interpolate({ inputRange: [0, 1], outputRange: [reduit ? 0 : 8, 0] }) },
+        ],
       }}
     >
       {children}
@@ -323,7 +487,17 @@ function Apparition({ children, reduit, delai = 0 }: { children: ReactNode; redu
  * Un problème, rangé. Fermé : son nom, ses heures, une barre qui compare au
  * plus lourd. Ouvert : son année, allumée.
  */
-function CarteBilan({ b, max, reduit, delai }: { b: Bilan; max: number; reduit: boolean; delai: number }) {
+function CarteBilan({
+  b,
+  max,
+  reduit,
+  delai,
+}: {
+  b: Bilan
+  max: number
+  reduit: boolean
+  delai: number
+}) {
   const [ouvert, setOuvert] = useState(false)
   const part = max > 0 ? Math.max(0.06, b.heuresPerdues / max) : 0
   return (
@@ -345,22 +519,51 @@ function CarteBilan({ b, max, reduit, delai }: { b: Bilan; max: number; reduit: 
           transform: [{ scale: pressed ? 0.985 : 1 }],
         })}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <Text style={{ flex: 1, color: encre.text, fontFamily: GEIST.demi, fontSize: 16 }}>{b.chose.bouton}</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <Text style={{ flex: 1, color: encre.text, fontFamily: GEIST.demi, fontSize: 16 }}>
+            {b.chose.bouton}
+          </Text>
           <Text style={{ color: encre.accentEncre, fontFamily: MONO.normal, fontSize: 14 }}>
             {formatHeures(b.heuresPerdues)}
           </Text>
         </View>
-        <View style={{ height: 6, borderRadius: 3, backgroundColor: encre.surface2, overflow: 'hidden' }}>
-          <View style={{ width: `${part * 100}%`, height: 6, borderRadius: 3, backgroundColor: encre.accent }} />
+        <View
+          style={{
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: encre.surface2,
+            overflow: 'hidden',
+          }}
+        >
+          <View
+            style={{
+              width: `${part * 100}%`,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: encre.accent,
+            }}
+          />
         </View>
-        <Text style={{ color: encre.text2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>{b.passe}</Text>
+        <Text
+          style={{ color: encre.text2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}
+        >
+          {b.passe}
+        </Text>
         {ouvert ? (
           <View style={{ paddingTop: 6 }}>
             <CalendrierAnnee parSemaine={b.parSemaine} fin={b.fin} reduit={reduit} anime={false} />
           </View>
         ) : null}
-        <Text style={{ color: encre.text, fontFamily: GEIST.moyen, fontSize: 14, lineHeight: 20 }}>{b.futur}</Text>
+        <Text style={{ color: encre.text, fontFamily: GEIST.moyen, fontSize: 14, lineHeight: 20 }}>
+          {b.futur}
+        </Text>
       </Pressable>
     </Apparition>
   )
