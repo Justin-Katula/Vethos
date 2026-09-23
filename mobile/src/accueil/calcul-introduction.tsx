@@ -1,278 +1,18 @@
 /**
  * Le calcul, montré comme une image, jamais comme des maths : pour chaque
- * problème, ses douze prochains mois s'allument soir par soir, les heures
- * tombent, et le jour où ce sera fini (à son rythme) est entouré. Puis le
- * suivant démarre seul. À la fin, tout se range en cartes qu'on peut rouvrir.
+ * problème, sa frise se remplit — surtout son passé, soir repoussé après soir
+ * repoussé, jusqu'à aujourd'hui — et les heures tombent. Puis le suivant
+ * démarre seul. À la fin, tout se range en cartes qu'on peut rouvrir.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Animated, Easing, Pressable, Text, View } from 'react-native'
-import * as Haptics from 'expo-haptics'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Animated, Pressable, Text, View } from 'react-native'
 import { GEIST, MONO } from '@/ui/primitives'
 import { equivalenceTotale, formatHeures, type Bilan } from './choix-introduction'
 import { encre, LENTEUR, morpher, SORTIE, toucher } from './experience-introduction'
 import { Compteur } from './recit-introduction'
+import { Frise } from './frise-introduction'
 
 const lent = (ms: number) => Math.round(ms * LENTEUR)
-/** L'ordre dans lequel on allume les soirs d'une semaine : étalés, pas collés. */
-const ORDRE_SOIRS = [3, 1, 5, 2, 4, 6, 0]
-
-/**
- * Quels soirs de la semaine s'allument. « 2,5 par semaine » = 2 soirs chaque
- * semaine, et un troisième une semaine sur deux.
- */
-function soirsPerdus(parSemaine: number) {
-  const entiers = Math.min(7, Math.floor(parSemaine))
-  return {
-    toujours: ORDRE_SOIRS.slice(0, entiers),
-    uneSurDeux: parSemaine - entiers >= 0.5 && entiers < 7 ? ORDRE_SOIRS[entiers]! : null,
-  }
-}
-
-/** Ses douze prochains mois, un mois par ligne. */
-export function CalendrierAnnee({
-  parSemaine,
-  fin,
-  reduit,
-  anime = true,
-  surFin,
-}: {
-  parSemaine: number
-  fin: Date | null
-  reduit: boolean
-  anime?: boolean
-  surFin?: () => void
-}) {
-  const [largeur, setLargeur] = useState(0)
-  const mois = useMemo(() => {
-    const aujourdHui = new Date()
-    aujourdHui.setHours(12, 0, 0, 0)
-    const { toujours, uneSurDeux } = soirsPerdus(parSemaine)
-    const cleFin = fin ? fin.toDateString() : ''
-    return Array.from({ length: 12 }, (_, m) => {
-      const premier = new Date(aujourdHui.getFullYear(), aujourdHui.getMonth() + m, 1, 12)
-      const nb = new Date(premier.getFullYear(), premier.getMonth() + 1, 0).getDate()
-      return {
-        nom: premier.toLocaleDateString('en-US', { month: 'short' }),
-        jours: Array.from({ length: nb }, (_, d) => {
-          const date = new Date(premier.getFullYear(), premier.getMonth(), d + 1, 12)
-          const semaine = Math.floor((date.getTime() - aujourdHui.getTime()) / (7 * 86_400_000))
-          const avenir = date >= aujourdHui
-          // Aujourd'hui n'est jamais un soir perdu : c'est le jour où il a installé Vethos.
-          const ceJour = date.toDateString() === aujourdHui.toDateString()
-          const perdu =
-            avenir &&
-            !ceJour &&
-            (!fin || date <= fin) &&
-            (toujours.includes(date.getDay()) ||
-              (uneSurDeux === date.getDay() && semaine % 2 === 0))
-          return { passe: !avenir, perdu, fin: date.toDateString() === cleFin, ceJour }
-        }),
-      }
-    })
-  }, [fin, parSemaine])
-  const p = useRef(mois.map(() => new Animated.Value(reduit || !anime ? 1 : 0))).current
-  const finRef = useRef(surFin)
-  finRef.current = surFin
-  useEffect(() => {
-    if (!largeur) return
-    if (reduit || !anime) {
-      finRef.current?.()
-      return
-    }
-    const a = Animated.stagger(
-      lent(110),
-      p.map((v) =>
-        Animated.timing(v, {
-          toValue: 1,
-          duration: lent(240),
-          easing: SORTIE,
-          useNativeDriver: true,
-        }),
-      ),
-    )
-    a.start(({ finished }) => {
-      if (!finished) return
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => undefined)
-      finRef.current?.()
-    })
-    return () => a.stop()
-  }, [anime, largeur, p, reduit])
-  const etiquette = 32
-  const cellule = largeur ? (largeur - etiquette) / 31 : 0
-  const point = Math.max(3, cellule - 2.5)
-  const perdus = mois.reduce((s, m) => s + m.jours.filter((j) => j.perdu).length, 0)
-  return (
-    <View
-      onLayout={(e) => setLargeur(e.nativeEvent.layout.width)}
-      accessible
-      accessibilityLabel={`Your next twelve months: ${perdus} evenings lost if nothing changes.${fin ? ` Done on ${fin.toDateString()}.` : ''} Today is lit: this is where it changes.`}
-      style={{ gap: 3 }}
-    >
-      {largeur > 0
-        ? mois.map((m, r) => (
-            <Animated.View
-              key={m.nom + r}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                height: cellule,
-                opacity: p[r]!.interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] }),
-              }}
-            >
-              <Text
-                style={{
-                  width: etiquette,
-                  color: encre.text3,
-                  fontFamily: MONO.normal,
-                  fontSize: 10,
-                }}
-              >
-                {m.nom}
-              </Text>
-              {m.jours.map((j, d) => (
-                <View
-                  key={d}
-                  style={{
-                    width: cellule,
-                    height: cellule,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {j.ceJour ? (
-                    <Aujourdhui taille={point} reduit={reduit} />
-                  ) : (
-                    <View
-                      style={{
-                        width: point,
-                        height: point,
-                        borderRadius: point * 0.28,
-                        backgroundColor: j.fin
-                          ? encre.text
-                          : j.perdu
-                            ? encre.accentEncre
-                            : j.passe
-                              ? 'transparent'
-                              : encre.surface2,
-                      }}
-                    />
-                  )}
-                </View>
-              ))}
-            </Animated.View>
-          ))
-        : null}
-      <View style={{ flexDirection: 'row', gap: 14, marginTop: 8, marginLeft: etiquette }}>
-        <Legende couleur={encre.accentEncre} texte="Lost to “tomorrow”" />
-        {fin ? <Legende couleur={encre.text} texte="Done, at your pace" /> : null}
-      </View>
-    </View>
-  )
-}
-
-/**
- * Aujourd'hui. Aucun mot ne le signale : il brille, simplement — une lumière
- * chaude qui respire au tout début d'une année de rouge. C'est le jour où il a
- * installé Vethos, celui où la suite du calendrier cesse d'être écrite.
- */
-function Aujourdhui({ taille, reduit }: { taille: number; reduit: boolean }) {
-  const souffle = useRef(new Animated.Value(reduit ? 0.5 : 0)).current
-  const eclat = useRef(new Animated.Value(reduit ? 1 : 0.7)).current
-  useEffect(() => {
-    if (reduit) return
-    const respire = Animated.loop(
-      Animated.sequence([
-        Animated.timing(souffle, {
-          toValue: 1,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(souffle, {
-          toValue: 0,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    )
-    // Un scintillement plus court, décalé du souffle : jamais deux fois le même battement.
-    const scintille = Animated.loop(
-      Animated.sequence([
-        Animated.timing(eclat, {
-          toValue: 1,
-          duration: 260,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(eclat, {
-          toValue: 0.72,
-          duration: 900,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.delay(1700),
-      ]),
-    )
-    respire.start()
-    scintille.start()
-    return () => {
-      respire.stop()
-      scintille.stop()
-    }
-  }, [eclat, reduit, souffle])
-  const halo = taille * 4.2
-  return (
-    <View style={{ width: taille, height: taille, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: halo,
-          height: halo,
-          borderRadius: halo / 2,
-          backgroundColor: 'rgba(255, 214, 150, 0.34)',
-          opacity: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
-          transform: [
-            { scale: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.15] }) },
-          ],
-        }}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: halo * 0.55,
-          height: halo * 0.55,
-          borderRadius: halo,
-          backgroundColor: 'rgba(255, 232, 190, 0.6)',
-          opacity: eclat.interpolate({ inputRange: [0.7, 1], outputRange: [0.25, 0.9] }),
-        }}
-      />
-      <Animated.View
-        style={{
-          width: taille,
-          height: taille,
-          borderRadius: taille * 0.28,
-          backgroundColor: '#fff3dc',
-          opacity: eclat,
-          transform: [
-            { scale: eclat.interpolate({ inputRange: [0.7, 1], outputRange: [1, 1.18] }) },
-          ],
-        }}
-      />
-    </View>
-  )
-}
-
-function Legende({ couleur, texte }: { couleur: string; texte: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: couleur }} />
-      <Text style={{ color: encre.text3, fontFamily: GEIST.normal, fontSize: 11 }}>{texte}</Text>
-    </View>
-  )
-}
 
 export function CalculEnDirect({
   bilans,
@@ -342,15 +82,7 @@ export function CalculEnDirect({
           </Text>
         </View>
         <View style={{ gap: 10 }}>
-          <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 13 }}>
-            Your next 12 months, if nothing changes.
-          </Text>
-          <CalendrierAnnee
-            parSemaine={courant.parSemaine}
-            fin={courant.fin}
-            reduit={reduit}
-            surFin={calendrierRempli}
-          />
+          <Frise bilans={[courant]} reduit={reduit} surFin={calendrierRempli} />
         </View>
         <View style={{ gap: 8, minHeight: 70 }}>
           {etape >= 1 ? (
@@ -558,7 +290,7 @@ function CarteBilan({
         </Text>
         {ouvert ? (
           <View style={{ paddingTop: 6 }}>
-            <CalendrierAnnee parSemaine={b.parSemaine} fin={b.fin} reduit={reduit} anime={false} />
+            <Frise bilans={[b]} reduit={reduit} anime={false} />
           </View>
         ) : null}
         <Text style={{ color: encre.text, fontFamily: GEIST.moyen, fontSize: 14, lineHeight: 20 }}>

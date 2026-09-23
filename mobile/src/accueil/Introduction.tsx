@@ -48,6 +48,7 @@ import {
 } from './experience-introduction'
 import { ConstatEnDeux, Frappe, LogoVethos } from './recit-introduction'
 import { CalculEnDirect } from './calcul-introduction'
+import { Bascule } from './frise-introduction'
 
 type Scene = (typeof ETAPES_INTRODUCTION)[number] | 'suite'
 const ORDRE: Scene[] = [...ETAPES_INTRODUCTION, 'suite']
@@ -129,6 +130,7 @@ function IntroductionSombre() {
   const [constatLu, setConstatLu] = useState(false)
   const [frappee, setFrappee] = useState(false)
   const [calculFini, setCalculFini] = useState(false)
+  const [basculeFinie, setBasculeFinie] = useState(false)
   const [sortie, setSortie] = useState(false)
   const { reduit, lecteur } = useAccessibiliteIntro()
   const visibleAvant = useRef(false)
@@ -186,7 +188,10 @@ function IntroductionSombre() {
     })
     transitionAnimation.current.start(({ finished }) => {
       if (!finished) return
-      if (suivante === 'activation') setLogoArrive(false)
+      if (suivante === 'activation') {
+        setLogoArrive(false)
+        setBasculeFinie(false)
+      }
       if (suivante === 'frequence') setConstatLu(false)
       if (suivante === 'calcul') setCalculFini(false)
       if (suivante === 'pensee') setFrappee(false)
@@ -232,7 +237,7 @@ function IntroductionSombre() {
   const actuelle = choses[detail]
   const repondre = (id: string, cle: keyof Reponses, v: number) =>
     setReponses((r) => ({ ...r, [id]: { ...r[id], [cle]: v } }))
-  const barreVisible = scene !== 'pensee' && (scene !== 'activation' || logoArrive)
+  const barreVisible = scene !== 'pensee' && (scene !== 'activation' || (basculeFinie && logoArrive))
 
   if (!visible) return null
   return (
@@ -537,7 +542,14 @@ function IntroductionSombre() {
                   </PageIntro>
                 ) : null}
 
-                {scene === 'activation' ? (
+                {/* La bascule : son passé, puis aujourd'hui, puis un futur rendu. Sans bouton. */}
+                {scene === 'activation' && !basculeFinie ? (
+                  <PageIntro centre defiler={false}>
+                    <Bascule bilans={bilans} reduit={reduit} surFin={() => setBasculeFinie(true)} />
+                  </PageIntro>
+                ) : null}
+
+                {scene === 'activation' && basculeFinie ? (
                   <PageIntro
                     centre
                     defiler={false}

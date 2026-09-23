@@ -299,6 +299,8 @@ export type Bilan = {
   parSemaine: number
   /** Chose unique : le jour où elle sera finie à son rythme (null = jamais). */
   fin: Date | null
+  /** Depuis combien de semaines il s'est décidé : là où commence son passé. */
+  semaines: number
 }
 
 /**
@@ -334,7 +336,7 @@ export function bilan(c: ChoseRepoussee, frequence: number, r: Reponses, mainten
     const reste = Math.max(H * 0.25, H - A * S)
     const fin = A <= 0 ? null : plusSemaines(maintenant, reste / A)
     const futur = fin ? `At your current pace: ${jourLisible(fin)}.` : 'At your current pace: never.'
-    return { chose: c, lignes, heuresPerdues, passe, futur, demains: Math.round(F * S), parSemaine: F, fin }
+    return { chose: c, lignes, heuresPerdues, passe, futur, demains: Math.round(F * S), parSemaine: F, fin, semaines: S }
   }
   const manqueesSemaine = Math.max(0, c.cible - A)
   const manquees = Math.round(manqueesSemaine * S)
@@ -353,7 +355,7 @@ export function bilan(c: ChoseRepoussee, frequence: number, r: Reponses, mainten
     manqueesSemaine <= 0
       ? 'You’re already doing what it asks. Vethos will keep it that way.'
       : `At your current pace: ${Math.round(A * 52)} this year, instead of ${c.cible * 52}.`
-  return { chose: c, lignes, heuresPerdues, passe, futur, demains: manquees, parSemaine: manqueesSemaine, fin: null }
+  return { chose: c, lignes, heuresPerdues, passe, futur, demains: manquees, parSemaine: manqueesSemaine, fin: null, semaines: S }
 }
 
 /** Ce que toutes ses heures perdues, ensemble, représentent. */
