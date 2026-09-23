@@ -558,54 +558,6 @@ export function JoursIntro({ jours, changer }: { jours: number[]; changer: (j: n
   )
 }
 
-/** Petites pastilles de valeurs rapides : 30 min, 1 h… */
-export function Pastilles<T extends number | string>({
-  options,
-  valeur,
-  changer,
-  libelle,
-  accessibilite,
-}: {
-  options: readonly T[]
-  valeur: T
-  changer: (v: T) => void
-  libelle: (v: T) => string
-  accessibilite?: (v: T) => string
-}) {
-  return (
-    <View style={{ flexDirection: 'row', gap: 6 }}>
-      {options.map((o) => {
-        const pris = o === valeur
-        return (
-          <Pressable
-            key={String(o)}
-            accessibilityRole="radio"
-            accessibilityLabel={accessibilite ? accessibilite(o) : libelle(o)}
-            accessibilityState={{ checked: pris }}
-            onPress={() => {
-              toucher()
-              changer(o)
-            }}
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 44,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: pris ? encre.text : encre.surface2,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-            })}
-          >
-            <Text style={{ fontFamily: GEIST.moyen, fontSize: 14, color: pris ? encre.bg : encre.text2 }}>
-              {libelle(o)}
-            </Text>
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
-
 export const styles = StyleSheet.create({
   titre: { color: encre.text, fontFamily: GEIST.demi },
   corps: { color: encre.text2, fontFamily: GEIST.normal, fontSize: 16, lineHeight: 23 },

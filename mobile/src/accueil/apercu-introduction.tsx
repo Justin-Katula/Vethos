@@ -28,7 +28,6 @@ import { libreDansLaJournee } from './temps-libre'
 export { libreDansLaJournee }
 
 export type Apercu = ReturnType<typeof preparerIntroduction>
-export type PhaseTemps = 'sommeil' | 'activite' | 'construction' | 'jour'
 
 const maintenantMinute = () => {
   const d = new Date()
