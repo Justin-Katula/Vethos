@@ -217,6 +217,77 @@ export function maxTaskMinutesPerDay(
   )
 }
 
+// ─── Placement par score (spec moteur 2026-09-25) ─────────────────────────
+//
+// « Le créneau le plus tôt à qualité égale » collait tous les blocs juste
+// après le réveil. Chaque départ possible reçoit désormais un score ; les
+// poids sont des valeurs de départ, que l'apprentissage remplacera.
+
+export const SCORE_DEFAULTS = {
+  /** Aucun bloc exigeant dans la première heure après le réveil (inertie du sommeil). */
+  inertiaMinutes: 60,
+  inertiaPenalty: 60,
+  /** Deux séances d'un même objectif le même jour : au moins 3 h d'écart. */
+  minGapSameObjective: 180,
+  maxSessionsPerObjectivePerDay: 2,
+  /** Le pic du jour, en heures après le milieu du sommeil : réveil à 7 h → pic vers 10 h (exemple de la spec). */
+  peakHoursAfterMidSleep: 7,
+  synchronyPerHour: 3,
+  constancyPerHour: 6,
+  /** Une tâche aussi s'écarte d'un bloc de la même tâche, sans interdiction. */
+  softGapPerHour: 20,
+  fatiguePerMinute: 0.05,
+  quality: { PROFONDE: 30, NORMALE: 0, BASSE: -30 } as Record<CognitiveWindow, number>,
+} as const
+
+export type ScoreContext = {
+  windowAt: (hour: number) => CognitiveWindow
+  /** Heure de lever du jour, en minutes ; null si aucune nuit ne finit ce jour-là. */
+  wakeMinute: number | null
+  /** Milieu du sommeil, en minutes depuis minuit : estime le chronotype sans question. */
+  midSleepMinute: number | null
+  /** Départ habituel de ce bloc pour ce type de jour, s'il y en a déjà un. */
+  habitualStart: number | null
+  /** Blocs déjà posés aujourd'hui pour le même engagement. */
+  sameRefToday: Array<{ startMinute: number; endMinute: number }>
+  /** Écart minimal imposé avec ces blocs (objectif : 3 h) ; 0 = aucun écart imposé. */
+  hardGapMinutes: number
+  /** Sans écart imposé, l'écart est-il au moins préféré ? Non pour une tâche en crise : pas de trou forcé. */
+  softGap: boolean
+  /** Minutes de charge cognitive déjà faites avant `start` (école, travail, blocs). */
+  loadBefore: (start: number) => number
+}
+
+const circularHours = (a: number, b: number) => {
+  const d = Math.abs(a - b) % 1440
+  return Math.min(d, 1440 - d) / 60
+}
+
+export function scoreSlot(start: number, minutes: number, c: ScoreContext): number {
+  const end = start + minutes
+  let gap = Infinity
+  for (const o of c.sameRefToday) {
+    const g = start >= o.endMinute ? start - o.endMinute : o.startMinute >= end ? o.startMinute - end : -1
+    gap = Math.min(gap, g)
+  }
+  if (c.hardGapMinutes > 0 && gap < c.hardGapMinutes) return -Infinity
+  let s = SCORE_DEFAULTS.quality[c.windowAt(Math.floor(start / 60))]
+  if (c.midSleepMinute !== null) {
+    const peak = (c.midSleepMinute + SCORE_DEFAULTS.peakHoursAfterMidSleep * 60) % 1440
+    s -= SCORE_DEFAULTS.synchronyPerHour * circularHours(start + minutes / 2, peak)
+  }
+  if (c.habitualStart !== null) s -= SCORE_DEFAULTS.constancyPerHour * circularHours(start, c.habitualStart)
+  if (c.wakeMinute !== null) {
+    const after = start - c.wakeMinute
+    if (after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes)
+      s -= (SCORE_DEFAULTS.inertiaPenalty * (SCORE_DEFAULTS.inertiaMinutes - after)) / SCORE_DEFAULTS.inertiaMinutes
+  }
+  if (c.hardGapMinutes === 0 && c.softGap && gap < SCORE_DEFAULTS.minGapSameObjective)
+    s -= (SCORE_DEFAULTS.softGapPerHour * (SCORE_DEFAULTS.minGapSameObjective - Math.max(0, gap))) / 60
+  s -= SCORE_DEFAULTS.fatiguePerMinute * c.loadBefore(start)
+  return s
+}
+
 // ─── D.6 — Limite de travail en cours ─────────────────────────────────────
 
 /** Défaut tant que λ n'est pas mesuré (moins de 2 semaines de données). */
@@ -255,6 +326,14 @@ export type TakeOptions = {
   avoid?: CognitiveWindow
   /** D.5 : fin du dernier bloc long du jour — le suivant s'en écarte si la place existe. */
   spreadFrom?: number
+  /**
+   * Placement par score (spec moteur 2026-09-25) : quand il est fourni, il
+   * remplace « le plus tôt à qualité égale ». Les départs sont examinés tous
+   * les quarts d'heure ; un score −Infinity rend le départ impossible.
+   * `avoid` garde sa priorité ; `prefer` et `spreadFrom` sont alors ignorés —
+   * la qualité et l'écart font partie du score.
+   */
+  score?: (start: number, minutes: number) => number
 }
 
 export class DayAllocator {
@@ -303,6 +382,8 @@ export class DayAllocator {
   take(minutes: number, options: TakeOptions = {}): Allocation | null {
     if (minutes <= 0) return null
 
+    if (options.score) return this.takeByScore(minutes, options.score, options.avoid)
+
     const target = this.spreadTarget(minutes, options.spreadFrom)
     const starts = this.candidateStarts(minutes, target)
     if (starts.length === 0) return null
@@ -330,6 +411,37 @@ export class DayAllocator {
       startMinute: start,
       endMinute: start + minutes,
       cognitiveWindow: this.windowAt(Math.floor(start / 60)),
+    }
+    this.reserve(allocation.startMinute, allocation.endMinute)
+    return allocation
+  }
+
+  private takeByScore(
+    minutes: number,
+    score: (start: number, minutes: number) => number,
+    avoid?: CognitiveWindow,
+  ): Allocation | null {
+    let best: { start: number; avoided: boolean; value: number } | null = null
+    for (const i of this.free) {
+      const latest = i.end - minutes
+      if (latest < i.start) continue
+      const starts = [i.start]
+      for (let q = Math.ceil(i.start / 15) * 15; q <= latest; q += 15) if (q > i.start) starts.push(q)
+      for (const start of starts) {
+        const value = score(start, minutes)
+        if (value === -Infinity) continue
+        const avoided = avoid ? this.overlapsWindow(start, minutes, avoid) : false
+        const better =
+          !best ||
+          (avoided !== best.avoided ? !avoided : value > best.value || (value === best.value && start < best.start))
+        if (better) best = { start, avoided, value }
+      }
+    }
+    if (!best) return null
+    const allocation: Allocation = {
+      startMinute: best.start,
+      endMinute: best.start + minutes,
+      cognitiveWindow: this.windowAt(Math.floor(best.start / 60)),
     }
     this.reserve(allocation.startMinute, allocation.endMinute)
     return allocation

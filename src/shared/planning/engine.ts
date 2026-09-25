@@ -13,6 +13,7 @@ import {
   buildDayCapacity,
   measureFragmentThreshold,
   scheduleEntriesForDate,
+  wakeMinutes,
   wakeZoneFor,
 } from './capacity'
 import {
@@ -43,6 +44,8 @@ import {
   dailyRhythm,
   DayAllocator,
   DAYS_PER_WEEK,
+  SCORE_DEFAULTS,
+  scoreSlot,
   sortTasksByCascade,
   TASK_CONSTANTS,
   type TaskWithMargin,
@@ -332,11 +335,47 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
   // la comptabilité en partie double divergeraient d'exactement ce montant.
   let pinnedWorkMinutes = 0
 
+  // Placement par score : le chronotype s'estime sans question, depuis le
+  // milieu du sommeil — celui des jours libres d'abord (méthode de Munich).
+  const midSleepMinute = estimateMidSleep(input.schedule, dates)
+  // La constance : même heure par type de jour (jours occupés / jours libres).
+  const habitual = new Map<string, number>()
+
   for (let di = 0; di < dates.length; di++) {
     const date = dates[di]!
     const cap = capacities[di]!
     const dow = cap.dayOfWeek
     const allocator = new DayAllocator(cap.slots, windowAt)
+    const dayEntries = scheduleEntriesForDate(input.schedule, date, dow)
+    const wakes = wakeMinutes(dayEntries)
+    const wakeMinute = wakes.length ? Math.min(...wakes) : null
+    const dayType = dayEntries.some((e) => e.categoryType === 'school' || e.categoryType === 'work') ? 'busy' : 'free'
+    const placedToday: Array<{ refId: string; startMinute: number; endMinute: number; work: number }> = []
+    const loadBefore = (start: number) =>
+      dayEntries
+        .filter((e) => (e.categoryType === 'school' || e.categoryType === 'work') && e.startMinute < start)
+        .reduce((t, e) => t + Math.min(e.endMinute, start) - e.startMinute, 0) +
+      placedToday.filter((b) => b.endMinute <= start).reduce((t, b) => t + b.work, 0)
+    const scorer = (refId: string, session: number, hardGap: number, softGap = true) => {
+      const key = `${refId}|${dayType}|${session}`
+      const sameRefToday = placedToday.filter((b) => b.refId === refId)
+      return (start: number, minutes: number) =>
+        scoreSlot(start, minutes, {
+          windowAt,
+          wakeMinute,
+          midSleepMinute,
+          habitualStart: habitual.get(key) ?? null,
+          sameRefToday,
+          hardGapMinutes: hardGap,
+          softGap,
+          loadBefore,
+        })
+    }
+    const remember = (refId: string, session: number, start: number, end: number, work: number) => {
+      const key = `${refId}|${dayType}|${session}`
+      if (!habitual.has(key)) habitual.set(key, start)
+      placedToday.push({ refId, startMinute: start, endMinute: end, work })
+    }
     let budget = cap.effectiveCapacityMinutes
 
     // D.5/A.4 : budget profond du jour — 2 blocs de 90 min, PARTAGÉ entre les
@@ -344,9 +383,6 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
     // placées avant, par immobilité (D.1). Une fois le budget consommé, le
     // travail suivant se place en fenêtre NORMALE/BASSE — jamais bloqué.
     let deepWindowMinutes = 0
-    // Fin du dernier bloc de 90 min posé aujourd'hui : le suivant s'en écarte
-    // si la journée offre assez d'étalement, sinon rien ne bouge.
-    let lastFullBlockEnd: number | undefined
 
     // D.1.1 La réalité fixe est déjà hors des créneaux (A.1).
 
@@ -501,16 +537,23 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
       }
 
       let left = Math.min(quota, budget)
-      while (left >= TASK_CONSTANTS.minBlockMinutes) {
+      // Au plus 2 séances par objectif et par jour, à 3 h d'écart au moins.
+      // Si le quota tient en un bloc, une seule. Ce qui ne trouve pas sa place
+      // part dans le report de D.4 — jamais en blocs collés.
+      let session = 0
+      while (
+        left >= TASK_CONSTANTS.minBlockMinutes &&
+        session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay
+      ) {
         const work = Math.min(left, TASK_CONSTANTS.targetBlockMinutes)
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
         const slot = allocator.take(Math.min(footprint, budget), {
-          prefer: deepExhausted ? undefined : 'PROFONDE',
           avoid: deepExhausted ? 'PROFONDE' : undefined,
-          spreadFrom: work >= TASK_CONSTANTS.targetBlockMinutes ? lastFullBlockEnd : undefined,
+          score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective),
         })
         if (!slot) break
+        session++
 
         const size = slot.endMinute - slot.startMinute
         const brk = computeBreakMinutes(size)
@@ -538,7 +581,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         })
 
         if (slot.cognitiveWindow === 'PROFONDE') deepWindowMinutes += workMinutes
-        if (workMinutes >= TASK_CONSTANTS.targetBlockMinutes) lastFullBlockEnd = slot.endMinute
+        remember(objective.id, session - 1, slot.startMinute, slot.endMinute, workMinutes)
         budget -= size
         left -= workMinutes
         objectiveServed.set(key, (objectiveServed.get(key) ?? 0) + workMinutes)
@@ -590,9 +633,10 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
 
         // D.5 : le budget profond du jour est déjà partagé avec les objectifs.
         // Épuisé, il ne bloque rien : le bloc part en fenêtre NORMALE/BASSE.
+        const taskSession = placedToday.filter((b) => b.refId === task.id).length
         const slot = allocator.take(footprint, {
           avoid: deepWindowMinutes + work > DEEP_BUDGET_MINUTES ? 'PROFONDE' : undefined,
-          spreadFrom: work >= TASK_CONSTANTS.targetBlockMinutes ? lastFullBlockEnd : undefined,
+          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0),
         })
         if (!slot) break
 
@@ -622,7 +666,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         })
 
         if (slot.cognitiveWindow === 'PROFONDE') deepWindowMinutes += workMinutes
-        if (workMinutes >= TASK_CONSTANTS.targetBlockMinutes) lastFullBlockEnd = slot.endMinute
+        remember(task.id, taskSession, slot.startMinute, slot.endMinute, workMinutes)
         budget -= size
         dayTarget -= workMinutes
         remainingNeed.set(task.id, Math.max(0, (remainingNeed.get(task.id) ?? 0) - workMinutes))
@@ -920,4 +964,28 @@ function applyWeeklyBreathing(args: {
   }
 
   return breathing
+}
+
+/**
+ * Le milieu du sommeil, en minutes depuis minuit : la nuit qui finit un jour
+ * libre (ni école ni travail) d'abord, n'importe quelle nuit sinon. Null s'il
+ * n'y a aucune nuit déclarée — le score se passe alors de synchronie.
+ */
+function estimateMidSleep(schedule: PlanningInput['schedule'], dates: string[]): number | null {
+  let fallback: number | null = null
+  for (const date of dates) {
+    const dow = dayOfWeek(date)
+    const entries = scheduleEntriesForDate(schedule, date, dow)
+    const wake = entries.find((e) => e.categoryType === 'sleep' && e.startMinute === 0 && e.endMinute < 1440)
+    if (!wake) continue
+    const prevDate = addDays(date, -1)
+    const prev = scheduleEntriesForDate(schedule, prevDate, dayOfWeek(prevDate))
+    const bed = prev.find((e) => e.categoryType === 'sleep' && e.endMinute === 1440)
+    const start = bed ? bed.startMinute - 1440 : 0
+    const mid = (((start + wake.endMinute) / 2) % 1440 + 1440) % 1440
+    const free = !entries.some((e) => e.categoryType === 'school' || e.categoryType === 'work')
+    if (free) return Math.round(mid)
+    fallback ??= Math.round(mid)
+  }
+  return fallback
 }

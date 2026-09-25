@@ -478,19 +478,21 @@ describe('D.5/A.4 — budget de travail profond', () => {
       }),
       NOW,
     )
-    // L'objectif prend les deux blocs profonds : il ne reste rien pour la
-    // tâche en fenêtre PROFONDE, et le budget du jour ne dépasse jamais 180.
+    // Le budget profond du jour ne dépasse jamais 180, tâches et objectifs
+    // confondus. L'objectif n'en prend qu'un bloc : ses deux séances sont à
+    // 3 h l'une de l'autre, la seconde tombe hors de la fenêtre profonde, et
+    // la tâche prend le reste du budget.
     for (const c of plan.capacities) {
       expect(deepMinutes(plan, c.date)).toBeLessThanOrEqual(
         TASK_CONSTANTS.maxDeepBlocksPerDay * TASK_CONSTANTS.targetBlockMinutes,
       )
     }
     expect(deepMinutes(plan, TODAY)).toBe(180)
-    expect(
-      plan.blocks.filter(
-        (b) => b.date === TODAY && b.kind === 'task' && b.cognitiveWindow === 'PROFONDE',
-      ),
-    ).toEqual([])
+    const obj = plan.blocks
+      .filter((b) => b.date === TODAY && b.kind === 'objective')
+      .sort((a, b) => a.startMinute - b.startMinute)
+    expect(obj).toHaveLength(2)
+    expect(obj[1]!.startMinute - obj[0]!.endMinute).toBeGreaterThanOrEqual(180)
   })
 
   it('au-delà du budget, le travail part en fenêtre NORMALE/BASSE — jamais bloqué', () => {
@@ -514,6 +516,7 @@ describe('D.5/A.4 — budget de travail profond', () => {
         // 16 h → 17 h, en pleine fenêtre profonde : placée par immobilité (D.1).
         ancres: [ancre({ anchorMinute: 960, normalMaxMinutes: 60 })],
         objectives: [objective({ weeklyTargetMinutes: 1260 })],
+        tasks: [task({ remainingMinutes: 900, deadline: '2026-08-17' })],
       }),
       NOW,
     )
@@ -593,10 +596,10 @@ describe('D.5/A.4 — budget de travail profond', () => {
     const t2 = plan.verdicts.find((v) => v.title === 'T2')!
     expect(t1.status).toBe('placed')
     expect(t2.status).toBe('placed')
+    // Placement par score : laquelle des deux passe hors fenêtre profonde
+    // dépend du créneau (le pic du matin attire T1) — mais l'une des deux y va.
     expect(
-      dayBlocks.some(
-        (b) => b.kind === 'task' && b.refId === uuid(2) && b.cognitiveWindow !== 'PROFONDE',
-      ),
+      dayBlocks.some((b) => b.kind === 'task' && b.cognitiveWindow !== 'PROFONDE'),
     ).toBe(true)
   })
 
@@ -969,12 +972,11 @@ describe('D.2 — préemption', () => {
   })
 
   it('entre 85 % et 100 % de tension, l’objectif cède une part croissante — jamais tout ou rien', () => {
-    // Cible large exprès, même raison que le test D.7 « le sacrifice s'arrête
-    // dès que le compte y est » plus bas : le quota du jour doit rester bien
-    // au-dessus du bloc minimum (25 min, A.2/D.5) une fois la part volée
-    // retranchée, sinon le résultat tomberait sous ce plancher et ce test ne
-    // prouverait plus rien sur la PROGRESSIVITÉ du vol — juste sur le plancher.
-    const gros = () => objective({ weeklyTargetMinutes: 2800 })
+    // Quota du jour sous un bloc (80 min), mais bien au-dessus du bloc minimum
+    // (25 min, A.2/D.5) une fois la part volée retranchée. Au-delà d'un bloc,
+    // la limite de 2 séances à 3 h d'écart plafonnerait déjà la journée, et le
+    // test ne prouverait plus rien sur la PROGRESSIVITÉ du vol.
+    const gros = () => objective({ weeklyTargetMinutes: 560 })
 
     const base = computePlan(input({ objectives: [gros()] }), NOW)
     const baseObjective = objectiveMinutesOn(base, TODAY)
@@ -1386,12 +1388,11 @@ describe('D.7 — sacrifice par retard non confirmé', () => {
   })
 
   it('le sacrifice s’arrête dès que le compte y est — jamais plus large que nécessaire', () => {
-    // Cible large exprès : le quota du jour doit rester bien au-dessus du bloc
-    // minimum (25 min, A.2/D.5) une fois l'excédent retranché. Avec un petit
-    // quota, le reste tomberait sous ce plancher et ne serait pas placé — ce
-    // qui serait le comportement correct du moteur, mais ne dirait rien sur
-    // l'ampleur du sacrifice, la seule chose que ce test cherche à prouver.
-    const gros = () => objective({ weeklyTargetMinutes: 2800 })
+    // Quota du jour sous un bloc (100 min × la capacité de ce jour d'école) :
+    // au-delà, la limite de 2 séances à 3 h d'écart plafonnerait déjà la
+    // journée. Il reste au-dessus du bloc minimum (25 min, A.2/D.5) une fois
+    // l'excédent retranché.
+    const gros = () => objective({ weeklyTargetMinutes: 700 })
     const base = computePlan(
       input({
         tasks: [task({ deadline: '2026-08-17', remainingMinutes: 600 })],
@@ -1569,5 +1570,47 @@ describe('BUG RÉEL DU 2026-08-22 — un recalcul tardif ne replace jamais dans 
     const tomorrow = plan.blocks.filter((b) => b.date === '2026-08-12' && b.kind === 'task')
     // Un jour futur garde son créneau normal, dès le matin s'il y a de la place.
     expect(tomorrow.some((b) => b.startMinute < 21 * 60)).toBe(true)
+  })
+})
+
+describe('Placement par score (spec moteur 2026-09-25)', () => {
+  const libre = (over: Partial<PlanningInput> = {}) =>
+    input({ schedule: sleepScheduleEntries('23:00', '07:00'), ...over })
+  const DEMAIN = '2026-08-12'
+
+  it('ne colle plus le travail au réveil : rien dans la première heure quand la journée a de la place', () => {
+    const plan = computePlan(
+      libre({ objectives: [objective({ weeklyTargetMinutes: 1200 })] }),
+      NOW,
+    )
+    const jour = plan.blocks.filter((b) => b.date === DEMAIN && b.kind !== 'ancre')
+    expect(jour.length).toBeGreaterThan(0)
+    for (const b of jour) expect(b.startMinute).toBeGreaterThanOrEqual(8 * 60)
+  })
+
+  it('20 h par semaine : deux séances par jour au plus, à 3 h d’écart au moins', () => {
+    const plan = computePlan(
+      libre({ objectives: [objective({ weeklyTargetMinutes: 1200 })] }),
+      NOW,
+    )
+    const seances = plan.blocks
+      .filter((b) => b.date === DEMAIN && b.kind === 'objective')
+      .sort((a, b) => a.startMinute - b.startMinute)
+    expect(seances).toHaveLength(2)
+    expect(seances[1]!.startMinute - seances[0]!.endMinute).toBeGreaterThanOrEqual(180)
+  })
+
+  it('un quota qui tient en un bloc donne une seule séance', () => {
+    const plan = computePlan(libre({ objectives: [objective({ weeklyTargetMinutes: 420 })] }), NOW)
+    expect(plan.blocks.filter((b) => b.date === DEMAIN && b.kind === 'objective')).toHaveLength(1)
+  })
+
+  it('même heure d’un jour libre à l’autre : la constance', () => {
+    const plan = computePlan(libre({ objectives: [objective({ weeklyTargetMinutes: 420 })] }), NOW)
+    const departs = plan.blocks
+      .filter((b) => b.kind === 'objective' && b.date > TODAY)
+      .map((b) => b.startMinute)
+    expect(departs.length).toBeGreaterThan(2)
+    expect(new Set(departs).size).toBe(1)
   })
 })

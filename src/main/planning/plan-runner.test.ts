@@ -52,7 +52,10 @@ function fakeOverlay(): ConfirmationOverlay & { shown: PendingBlockView[]; close
   }
 }
 
-const WAKE = new Date(2026, 7, 17, 7, 30, 0, 0) // lundi 17 août, 07h30 — premier créneau utilisable après le réveil.
+// Lundi 17 août, 09h30. Depuis le placement par score (spec moteur 2026-09-25),
+// rien d'exigeant ne tombe dans l'heure qui suit le réveil (07h00) et la
+// journée vise le pic du matin : c'est là que le premier bloc s'ouvre.
+const WAKE = new Date(2026, 7, 17, 9, 30, 0, 0)
 
 const settings: Settings = { sleepStart: '23:00', sleepEnd: '07:00' }
 
