@@ -37,7 +37,7 @@ export type Jetons = {
   line: string
   lineForte: string
 
-  /** L'argent du logo. Le seul accent de l'application — plus aucun rouge. */
+  /** Le rouge. Le seul accent de l'application. */
   accent: string
   accentEncre: string
   accentSur: string
@@ -79,22 +79,22 @@ const CLAIR: Jetons = {
   line: 'rgba(24, 24, 24, 0.13)',
   lineForte: 'rgba(24, 24, 24, 0.28)',
 
-  accent: '#181818',
-  accentEncre: '#181818',
+  accent: '#c1121f',
+  accentEncre: '#c1121f',
   accentSur: '#ffffff',
-  accentDoux: 'rgba(24, 24, 24, 0.08)',
+  accentDoux: 'rgba(193, 18, 31, 0.08)',
   alerte: '#8d5b00',
 
   blocTache: '#55585c',
-  blocObjectif: '#8a8f98',
+  blocObjectif: '#c1121f',
   blocAncre: '#253047',
   blocEncreTache: '#f8f8f8',
-  blocEncreObjectif: '#ffffff',
+  blocEncreObjectif: '#fff7f5',
   blocEncreAncre: '#f8f9ff',
 
   champBg: '#f8f8f8',
   champBgActif: '#ffffff',
-  focusBordure: 'rgba(24, 24, 24, 0.4)',
+  focusBordure: 'rgba(193, 18, 31, 0.52)',
 
   voile: 'rgba(24, 24, 24, 0.12)',
   rideau: 'rgba(0, 0, 0, 0.75)',
@@ -117,23 +117,25 @@ const SOMBRE: Jetons = {
   line: 'rgba(242, 242, 242, 0.16)',
   lineForte: 'rgba(242, 242, 242, 0.3)',
 
-  // L'argent du logo, sur du noir. Plus de rouge.
-  accent: '#d4d7dc',
-  accentEncre: '#d4d7dc',
-  accentSur: '#000000',
-  accentDoux: 'rgba(212, 215, 220, 0.14)',
+  // Deux rouges en sombre : le plein pour les aplats, le clair pour le texte.
+  // Sur #000, un seul rouge ne peut pas faire les deux — trop sombre il
+  // disparaît, trop clair il brûle en aplat.
+  accent: '#cf1b29',
+  accentEncre: '#f0525f',
+  accentSur: '#ffffff',
+  accentDoux: 'rgba(240, 82, 95, 0.14)',
   alerte: '#d69b3a',
 
   blocTache: '#505359',
-  blocObjectif: '#c9ccd2',
+  blocObjectif: '#e03131',
   blocAncre: '#2c3a56',
   blocEncreTache: '#f2f2f2',
-  blocEncreObjectif: '#0b0b0b',
+  blocEncreObjectif: '#fff2f2',
   blocEncreAncre: '#eef2f8',
 
   champBg: '#141414',
   champBgActif: '#222222',
-  focusBordure: 'rgba(212, 215, 220, 0.5)',
+  focusBordure: 'rgba(240, 82, 95, 0.6)',
 
   voile: 'rgba(0, 0, 0, 0.5)',
   rideau: 'rgba(0, 0, 0, 0.82)',

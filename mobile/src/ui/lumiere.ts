@@ -93,10 +93,10 @@ export function accentApp(H: number) {
 /** La teinte du jour, en hex, pour les reflets des surfaces. */
 export const teinteApp = (H: number) => hex(lumiere(H).tc.map((x) => x * 255) as RVB)
 
-/** L'accent de l'introduction : bleu la nuit, ambre à midi, orchidée le soir, violet tard. Jamais de rouge. */
+/** L'accent de l'introduction : bleu la nuit, ambre à midi, rouge le soir, violet tard. */
 const KF: [number, string][] = [
   [0, '#6a73f0'], [5, '#6a73f0'], [7, '#4f8ff5'], [10, '#8fb2f5'], [12, '#e9a93f'], [15.5, '#e9a93f'],
-  [17.5, '#e0902c'], [19.5, '#c77ab8'], [21, '#a45ad8'], [23, '#8c45d6'], [24, '#6a73f0'],
+  [17.5, '#e0782c'], [19.5, '#dc4a26'], [21, '#cf1b29'], [23, '#8c45d6'], [24, '#6a73f0'],
 ]
 function accentRvb(h: number): RVB {
   for (let i = 0; i < KF.length - 1; i++) {
@@ -112,7 +112,7 @@ export const encreIntro = (h: number) => hex(accentRvb(h).map((v) => v + (255 - 
 
 const TK: [number, RVB][] = [
   [0, [0.35, 0.42, 0.75]], [5, [0.35, 0.42, 0.75]], [8, [0.78, 0.84, 1]], [12, [1, 0.98, 0.95]],
-  [16, [1, 0.98, 0.95]], [19, [1, 0.72, 0.45]], [21, [0.64, 0.4, 0.85]], [24, [0.35, 0.42, 0.75]],
+  [16, [1, 0.98, 0.95]], [19, [1, 0.55, 0.32]], [21, [0.81, 0.16, 0.18]], [24, [0.35, 0.42, 0.75]],
 ]
 export function teinteIntro(h: number): RVB {
   for (let i = 0; i < TK.length - 1; i++) {

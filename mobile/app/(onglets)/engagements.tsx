@@ -1,6 +1,6 @@
 /**
  * Commitments, comme la maquette : trois cartes — Tasks, Goals, Anchors —
- * chacune avec sa loi en une ligne, deux engagements visibles, « See all »
+ * deux engagements visibles, « See all »
  * pour le reste. Toucher une ligne l'ouvre sur place ; « + » ouvre la feuille
  * d'ajout de SA nature. Tout ce qui s'affiche est mesuré ou planifié, jamais
  * déclaré.
@@ -38,32 +38,26 @@ import {
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const relD = (k: number) => (k <= 0 ? 'today' : k === 1 ? 'tomorrow' : `in ${k} days`)
-const COULEUR: Record<NatureApp, string> = { TASK: '#8d8d8d', GOAL: '#c9ccd2', ANCHOR: '#4b6190' }
+const COULEUR: Record<NatureApp, string> = { TASK: '#8d8d8d', GOAL: '#e03131', ANCHOR: '#4b6190' }
 
-const SECTIONS: Record<NatureApp, { titre: string; loi: string; vide: string; cta: string }> = {
+const SECTIONS: Record<NatureApp, { titre: string; cta: string }> = {
   TASK: {
     titre: 'Tasks',
-    loi: 'A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first.',
-    vide: 'A task has an end and a date. The engine decides when to do it based on slack.',
     cta: 'Add a task',
   },
   GOAL: {
     titre: 'Goals',
-    loi: 'A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late.',
-    vide: 'A goal never finishes: it is measured in hours per week and repeated rhythm.',
     cta: 'Add a goal',
   },
   ANCHOR: {
     titre: 'Anchors',
-    loi: 'A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next.',
-    vide: 'An anchor is an hour you choose once. Vethos plans everything else around it.',
     cta: 'Add an anchor',
   },
 }
 const FORM: Record<NatureApp, [string, string, string]> = {
-  TASK: ['New task', 'What needs to be done?', 'Add it, Vethos finds the slack'],
-  GOAL: ['New goal', 'What do you want to keep doing?', 'Add it, Vethos keeps the rhythm'],
-  ANCHOR: ['New anchor', 'What happens at a fixed hour?', 'Add it, it never moves'],
+  TASK: ['New task', 'What needs to be done?', 'Add it'],
+  GOAL: ['New goal', 'What do you want to keep doing?', 'Add it'],
+  ANCHOR: ['New anchor', 'What happens at a fixed hour?', 'Add it'],
 }
 
 type Groupe = { racine: Tache; parties: Tache[]; total: number; fait: number }
@@ -275,7 +269,7 @@ export default function Engagements() {
               <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>{s.titre}</Text>
               <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{total}</Text>
             </View>
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{resumeTxt || s.loi}</Text>
+            {resumeTxt ? <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{resumeTxt}</Text> : null}
           </View>
           <Pressable
             accessibilityRole="button"
@@ -297,8 +291,7 @@ export default function Engagements() {
             {extra}
           </>
         ) : (
-          <View style={{ alignItems: 'flex-start', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: A.ligne }}>
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>{s.vide}</Text>
+          <View style={{ alignItems: 'flex-start', paddingVertical: 16, borderTopWidth: 1, borderTopColor: A.ligne }}>
             <Pressable accessibilityRole="button" onPress={() => setForme(K)} style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(242,242,242,0.1)', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
               <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{s.cta}</Text>
             </Pressable>
@@ -371,13 +364,13 @@ export default function Engagements() {
               { titre: f.nom, intention: f.plan, couleur: allouerCouleurTache(d.taches.filter((x) => !x.terminee)), echeance: f.echeance, importance: f.imp, minutesEstimees: f.minutes, nature: f.premiere ? 'nouveau' : 'routine' },
               { maxParJourMinutes: maxTaskMinutesPerDay(resultat.capacities) },
             )
-            toast('Added. Vethos will place it by slack.')
+            toast('Added.')
           } else if (f.K === 'GOAL') {
             await d.ajouterObjectif({ nom: f.nom, intention: f.plan, couleur: allouerCouleurObjectif(d.objectifs), cibleHebdoMinutes: f.minutes })
-            toast('Added. Vethos will keep the rhythm.')
+            toast('Added.')
           } else {
             await d.ajouterAncre({ nom: f.nom, intention: f.plan, declencheur: f.nom, couleur: allouerCouleurAncre(d.ancres), minuteAncrage: f.a, jours: f.jours, dureeMinutes: f.minutes })
-            toast('Added. It will never move.')
+            toast('Added.')
           }
         }}
       />
@@ -523,7 +516,7 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
             </>
           ) : null}
         </View>
-        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.alerte, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
       </ScrollView>
       <Pressable
         accessibilityRole="button"

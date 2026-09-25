@@ -35,7 +35,6 @@ import {
   MONO,
   Plus,
   TitrePage,
-  ENCRE,
   TYPEC,
   useLumiere,
   useToast,
@@ -268,8 +267,8 @@ export default function MonTemps() {
                             zIndex: on ? 15 : 5,
                           }}
                         >
-                          <Text numberOfLines={1} style={{ color: ENCRE[n], fontFamily: GEIST.demi, fontSize: 12, lineHeight: 15 }}>{s.titre}</Text>
-                          {h >= 38 ? <Text numberOfLines={1} style={{ marginTop: 2, color: ENCRE[n], opacity: 0.7, fontFamily: MONO.normal, fontSize: 10, lineHeight: 13 }}>{t}</Text> : null}
+                          <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 12, lineHeight: 15 }}>{s.titre}</Text>
+                          {h >= 38 ? <Text numberOfLines={1} style={{ marginTop: 2, color: 'rgba(242,242,242,0.7)', fontFamily: MONO.normal, fontSize: 10, lineHeight: 13 }}>{t}</Text> : null}
                         </Pressable>
                       )
                     })}
@@ -323,7 +322,7 @@ function FeuilleSeance({
   const iJour = DAYS.findIndex((x) => x.cle === s.date)
   const statut = (x: SegmentTemps, i: number): [string, string] => {
     const passe = i < AUJ || (i === AUJ && x.fin <= N)
-    if (passe) return x.bloc && confirmees[x.bloc.id] ? ['Done', A.t2] : ['Missed', A.alerte]
+    if (passe) return x.bloc && confirmees[x.bloc.id] ? ['Done', A.t2] : ['Missed', A.rouge]
     if (i === AUJ && x.debut <= N && N < x.fin) return ['Now', acc]
     return ['Upcoming', A.t3]
   }
@@ -458,7 +457,7 @@ function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: (
                   <RoueHeure valeur={lever} changer={setLever} etiquette="Wake up" bande="rgba(242,242,242,0.08)" />
                 </View>
               </View>
-              <Text style={{ textAlign: 'center', color: verdict.ok && !apresMinuit ? A.t3 : A.alerte, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>
+              <Text style={{ textAlign: 'center', color: verdict.ok && !apresMinuit ? A.t3 : A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>
                 {!verdict.ok ? verdict.raison : apresMinuit ? 'After midnight counts as 00:00.' : `${hm(verdict.duree)} of sleep. Vethos plans around it.`}
               </Text>
             </View>
@@ -630,7 +629,7 @@ function FeuilleNouveau({ ouverte, fermer, DAYS }: { ouverte: boolean; fermer: (
           )
         })}
       </ScrollView>
-      <Text style={{ marginTop: 10, minHeight: 18, paddingHorizontal: 8, color: A.alerte, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+      <Text style={{ marginTop: 10, minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
       <Pressable
         accessibilityRole="button"
         onPress={() => void ajouter()}
