@@ -1,3 +1,4 @@
+import type { Contract } from '@shared/contract'
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type { Settings } from '@shared/schemas'
@@ -33,6 +34,8 @@ type SettingsState = {
    * bien ainsi : tout le classement local est déterministe et hors ligne.
    */
   deepseekApiKey: string
+  /** Le contrat d'Ulysse, s'il a été signé. */
+  contract: Contract | null
   loaded: boolean
 
   load: () => Promise<void>
@@ -49,6 +52,7 @@ type SettingsState = {
         | 'themeLightAt'
         | 'themeDarkAt'
         | 'deepseekApiKey'
+        | 'contract'
       >
     >,
   ) => Promise<void>
@@ -65,6 +69,7 @@ function buildPayload(state: SettingsState): Settings {
     themeLightAt: state.themeLightAt,
     themeDarkAt: state.themeDarkAt,
     deepseekApiKey: state.deepseekApiKey || undefined,
+    ...(state.contract ? { contract: state.contract } : {}),
   }
 }
 
@@ -141,6 +146,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   themeLightAt: DEFAULT_LIGHT_AT,
   themeDarkAt: DEFAULT_DARK_AT,
   deepseekApiKey: '',
+  contract: null,
   loaded: false,
 
   async load() {
@@ -157,6 +163,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       themeLightAt: data?.themeLightAt ?? DEFAULT_LIGHT_AT,
       themeDarkAt: data?.themeDarkAt ?? DEFAULT_DARK_AT,
       deepseekApiKey: data?.deepseekApiKey ?? '',
+      contract: data?.contract ?? null,
       loaded: true,
     })
     syncSleepWindow(get())

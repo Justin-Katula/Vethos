@@ -9,6 +9,7 @@
  * protection, la nuit, les heures fixes — puis le vrai moteur le pose, et la
  * vraie semaine apparaît. « Enter Vethos » l'enregistre pour de vrai.
  */
+import { signContract } from '@shared/contract'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, BackHandler, KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
@@ -45,6 +46,7 @@ import { EcranBascule, EcranCout, EcranPensee, EcranVethos } from './ecrans-cout
 import {
   EcranFixes,
   EcranAge,
+  EcranContrat,
   EcranNuit,
   EcranPlace,
   EcranProtection,
@@ -79,6 +81,7 @@ const SCN: Record<string, [number, number, number, number, number, Mode]> = {
   '14': [0.5, 0.85, 0.9, 2.4, 0.03, 'n'],
   '15': [0.12, 0.3, 0.8, 2.4, 0.05, 'h'],
   '16': [0, 0, 1, 2.4, 0, 'd'],
+  contrat: [0.5, 0.95, 1, 2.2, 0.03, 'h'],
   '17': [0.5, 1.05, 1.1, 1.8, 0.03, 'h'],
 }
 function lueurDe(k: string, H: number): Lueur {
@@ -235,7 +238,8 @@ function IntroductionSombre() {
       try {
         const r = preparerIntroduction(useDonnees.getState(), b, new Date(), autres)
         setSortie(true)
-        await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age)
+        const m = eRef.current.mode
+        await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age, m ? signContract(m, new Date()) : null)
         // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.
         router.replace('/')
         Animated.timing(monde, { toValue: 0, duration: reduit ? 200 : 650, easing: SORTIE, useNativeDriver: true }).start(() => {
@@ -324,6 +328,8 @@ function IntroductionSombre() {
         return <EcranFixes ctx={ctx} />
       case '16':
         return placement ? <EcranPlace ctx={ctx} placement={placement} /> : null
+      case 'contrat':
+        return <EcranContrat ctx={ctx} />
       case '17':
         return placement ? <EcranSemaine ctx={ctx} placement={placement} entrer={entrer} /> : null
       default:

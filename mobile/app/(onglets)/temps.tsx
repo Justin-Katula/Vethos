@@ -15,6 +15,7 @@ import Svg, { Defs, LinearGradient, Path, Stop, Rect } from 'react-native-svg'
 import * as Haptics from 'expo-haptics'
 import { useDonnees, type Obligation } from '@/donnees/magasin'
 import { verifierSommeil } from '@/donnees/regle-sommeil'
+import { useGardeContrat } from '@/seances/garde-contrat'
 import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
 import type { SegmentTemps } from '@/plan/lecture'
@@ -68,6 +69,7 @@ export default function MonTemps() {
   const { width, height } = useWindowDimensions()
   const { acc } = useLumiere()
   const toast = useToast()
+  const garde = useGardeContrat()
   const { jours, minute: N, maintenant } = usePlan()
   const d = useDonnees()
   const confirmees = useSeances((e) => e.confirmations)
@@ -149,7 +151,7 @@ export default function MonTemps() {
           <Pressable accessibilityRole="button" disabled={vis === AUJ} onPress={allerAujourdhui} style={{ height: 32, paddingHorizontal: 12, borderRadius: 8, backgroundColor: A.s, justifyContent: 'center', opacity: vis === AUJ ? 0 : 1 }}>
             <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 13 }}>Today</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="New fixed commitment" onPress={() => setNouveau(true)} style={({ pressed }) => ({ width: 32, height: 32, borderRadius: 8, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Pressable accessibilityRole="button" accessibilityLabel="New fixed commitment" onPress={() => garde() && setNouveau(true)} style={({ pressed }) => ({ width: 32, height: 32, borderRadius: 8, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
             <Plus taille={14} />
           </Pressable>
         </View>
@@ -287,7 +289,7 @@ export default function MonTemps() {
       </ScrollView>
 
       <FeuilleSeance seg={sel} fermer={() => setSel(null)} DAYS={DAYS} N={N} acc={acc} confirmees={confirmees.confirmedAt} segmentsDe={segmentsDe} />
-      <FeuilleFixe ouverte={fixe} fermer={() => setFixe(false)} nouveau={() => (setFixe(false), setNouveau(true))} />
+      <FeuilleFixe ouverte={fixe} fermer={() => setFixe(false)} nouveau={() => (setFixe(false), garde() && setNouveau(true))} />
       <FeuilleNouveau ouverte={nouveau} fermer={() => setNouveau(false)} DAYS={DAYS} />
     </View>
   )
@@ -396,6 +398,7 @@ function FeuilleSeance({
 function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: () => void; nouveau: () => void }) {
   const d = useDonnees()
   const toast = useToast()
+  const garde = useGardeContrat()
   const [nuitOuverte, setNuitOuverte] = useState(false)
   const [listeOuverte, setListeOuverte] = useState(true)
   const [coucher, setCoucher] = useState(d.reglages.coucher)
@@ -427,7 +430,10 @@ function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: (
       toast(verdict.raison)
       return
     }
-    if (coucher !== d.reglages.coucher || lever !== d.reglages.lever) await d.majReglages({ coucher, lever })
+    if (coucher !== d.reglages.coucher || lever !== d.reglages.lever) {
+      if (!garde()) return
+      await d.majReglages({ coucher, lever })
+    }
     fermer()
   }
   return (
@@ -491,6 +497,7 @@ function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: (
                     accessibilityRole="button"
                     accessibilityLabel={`Delete ${o.label}`}
                     onPress={() => {
+                      if (!garde()) return
                       for (const id of ids) void d.supprimerObligation(id)
                       toast('Removed. Vethos can use that time again.')
                     }}

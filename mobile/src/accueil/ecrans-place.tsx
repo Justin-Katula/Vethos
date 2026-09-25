@@ -40,6 +40,7 @@ import {
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
 import type { TrancheAge } from '@/donnees/regle-sommeil'
+import { duringBlockLine, type Mode } from '@shared/contract'
 
 export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
@@ -568,6 +569,65 @@ function Heures({ taille, police }: { taille: number; police: number }) {
         )
       })}
     </>
+  )
+}
+
+// ——— Le contrat d'Ulysse ———
+
+const MODES_CONTRAT: [Mode, string][] = [
+  ['ally', 'Ally'],
+  ['sergeant', 'Sergeant'],
+]
+const heures = (m: number) => (m % 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}` : `${m / 60} h`)
+
+export function EcranContrat({ ctx }: { ctx: Ctx }) {
+  const e = ctx.e
+  const ch = choisie(e, ctx.maintenant)
+  const nature = natureDe(e, ch)
+  const engagement =
+    nature === 'GOAL'
+      ? `${heures(e.w.goalMin)} a week`
+      : nature === 'ANCHOR'
+        ? `${e.w.anAt}, ${heures(e.w.anDur)}`
+        : `${heures(e.w.taskMin)} before ${e.w.due.slice(8, 10)}/${e.w.due.slice(5, 7)}`
+  const choisir = (m: Mode) => {
+    vibrer('light')
+    ctx.maj(() => ({ mode: m }))
+  }
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ position: 'absolute', left: 24, right: 24, top: ctx.haut }}>
+        <Entree dl={150} reduit={ctx.reduit}>
+          <Titre>Your contract.</Titre>
+        </Entree>
+        <Entree dl={330} reduit={ctx.reduit} style={{ marginTop: 20, gap: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ flexShrink: 1, color: C.t1, fontFamily: GEIST.demi, fontSize: 16 }}>{ITEM[ch]!.name}</Text>
+            <Text style={{ color: C.t2, fontFamily: MONO.normal, fontSize: 13 }}>{engagement}</Text>
+          </View>
+          <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>No changes during a block.</Text>
+          <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>A change to this contract takes 48 hours.</Text>
+        </Entree>
+        <View style={{ gap: 8, marginTop: 24 }}>
+          {MODES_CONTRAT.map(([m, l], i) => (
+            <Entree key={m} dl={480 + i * 110} reduit={ctx.reduit}>
+              <Ligne titre={l} sous={duringBlockLine(m, 18)} forme="radio" pris={e.mode === m} onPress={() => choisir(m)} />
+            </Entree>
+          ))}
+        </View>
+      </View>
+      <Entree dl={700} reduit={ctx.reduit} style={{ position: 'absolute', left: 24, right: 24, bottom: ctx.bas }}>
+        <Bouton
+          actif={e.mode !== null}
+          onPress={() => {
+            vibrer('success')
+            ctx.suivant()
+          }}
+        >
+          Sign it
+        </Bouton>
+      </Entree>
+    </View>
   )
 }
 

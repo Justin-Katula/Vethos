@@ -14,6 +14,8 @@ import { dateLocale } from '@/plan/format'
 import type { SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 import { ArretSeance, DemarrerSeance } from '@/seances/ArretSeance'
+import { useSeances } from '@/seances/magasin-seances'
+import { afterMissLine, effectiveContract } from '@shared/contract'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -60,7 +62,8 @@ export default function Aujourdhui() {
   const marges = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const { acc } = useLumiere()
-  const { jours, minute: N, chargees, maintenant, seanceActive, demarrable } = usePlan()
+  const { jours, minute: N, chargees, maintenant, seanceActive, demarrable, aujourdHui: cleJour } = usePlan()
+  const evenements = useSeances((e) => e.apprentissage.sessionEvents)
   const { taches, objectifs, ancres, obligations, reglages } = useDonnees()
   const [focus, setFocus] = useState<Focus>(null)
   const [slide, setSlide] = useState(0)
@@ -115,6 +118,16 @@ export default function Aujourdhui() {
     const n = naturePlan(s)
     return n ? TYPEC[n] : FIXE
   }
+  // Après un raté : un constat en une phrase, puis la prochaine action — au
+  // ton du contrat. Visible une heure et demie, puis il s'efface.
+  const rate = evenements
+    .filter((e) => e.date === cleJour && !e.started)
+    .map((e) => e.plannedStartMinute + e.plannedMinutes)
+    .filter((fin) => N >= fin && N - fin < 90)
+    .sort((a, b) => b - a)[0]
+  const contrat = reglages.contrat ? effectiveContract(reglages.contrat, maintenant) : null
+  const ligneRate = rate !== undefined && contrat ? afterMissLine(contrat.mode, nxt ? fmt(nxt.debut) : null) : null
+
   let maintenantCarte: { k: string; t: string; titre: string; point: string }
   if (N < WAKE || N >= BED) maintenantCarte = { k: 'NOW', t: `${fmt(BED)} – ${fmt(WAKE)}`, titre: 'The night is yours.', point: acc }
   else if (cur) maintenantCarte = { k: 'NOW', t: `${fmt(cur.debut)} – ${fmt(cur.fin)}`, titre: cur.titre, point: couleurSeg(cur) }
@@ -204,6 +217,10 @@ export default function Aujourdhui() {
           <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{maintenantCarte.t}</Text>
         )}
       </View>
+
+      {ligneRate ? (
+        <Text style={{ marginTop: 8, marginHorizontal: 20, color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{ligneRate}</Text>
+      ) : null}
 
       <ScrollView
         ref={carrousel}

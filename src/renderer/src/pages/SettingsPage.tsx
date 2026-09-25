@@ -10,6 +10,10 @@ import { useShortcut } from '@/lib/use-shortcut'
 import { useStagger } from '@/lib/motion'
 import { nexus } from '@/lib/ipc'
 import { THEME_MODES, type ThemeMode } from '@shared/theme'
+import { effectiveContract, requestModeChange, signContract, MODES, type Mode } from '@shared/contract'
+import { activeConfirmedSession } from '@shared/planning/session'
+import { dateKey } from '@shared/planning/dates'
+import { usePlanningStore } from '@/store/planning.store'
 
 /**
  * Les réglages tiennent en trois choses : qui tu es, où se règle le reste, et
@@ -126,6 +130,10 @@ export default function SettingsPage() {
                   Change it in My time
                 </Link>
               </p>
+            </Row>
+
+            <Row label="Contract" hint="No changes during a block. A change here takes 48 hours.">
+              <ContractChoice />
             </Row>
 
             <Row label="Appearance" hint="Applies at once, everywhere, overlays included.">
@@ -329,6 +337,50 @@ function Row({
       <h2 className="text-sm font-medium text-fg">{label}</h2>
       <p className="mb-4 mt-1 text-xs text-fg-3">{hint}</p>
       {children}
+    </div>
+  )
+}
+
+/**
+ * Le mode du contrat d'Ulysse : Allié ou Sergent. Même fermeté, deux tons.
+ * Un changement se fait hors bloc et prend effet 48 h plus tard.
+ */
+function ContractChoice() {
+  const contract = useSettingsStore((s) => s.contract)
+  const updateSettings = useSettingsStore((s) => s.updateSettings)
+  const confirmations = usePlanningStore((s) => s.sessionConfirmations)
+  const [refused, setRefused] = useState(false)
+  const now = new Date()
+  const current = contract ? effectiveContract(contract, now) : null
+  const choose = (mode: Mode) => {
+    if (!current) {
+      void updateSettings({ contract: signContract(mode, new Date()) })
+      return
+    }
+    const inBlock = activeConfirmedSession(confirmations ?? null, dateKey(now), now.getHours() * 60 + now.getMinutes()) !== null
+    const r = requestModeChange(current, mode, new Date(), inBlock)
+    setRefused(!r.ok && r.reason === 'during-block')
+    if (r.ok) void updateSettings({ contract: r.contract })
+  }
+  const shown = current?.pending?.mode ?? current?.mode
+  return (
+    <div>
+      <div className="flex gap-2">
+        {MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => choose(m)}
+            className={cn('pressable rounded border px-4 py-2 text-sm', shown === m ? 'border-line-strong text-fg' : 'border-line text-fg-3')}
+          >
+            {m === 'ally' ? 'Ally' : 'Sergeant'}
+          </button>
+        ))}
+      </div>
+      {current?.pending && (
+        <p className="mt-2 text-[11px] text-fg-3">From {new Date(current.pending.effectiveAt).toLocaleString('en-GB')}</p>
+      )}
+      {refused && <p className="mt-2 text-[11px] text-fg-3">Not during a block.</p>}
     </div>
   )
 }

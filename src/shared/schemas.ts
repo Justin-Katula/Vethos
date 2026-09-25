@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ContractSchema } from './contract'
 import { APP_CATEGORIES } from './app-categories'
 import { THEME_MODES } from './theme'
 
@@ -61,6 +62,8 @@ export const SettingsSchema = z.object({
    * Stockée avec le reste des réglages, donc chiffrée au repos par le coffre.
    */
   deepseekApiKey: z.string().max(200).optional(),
+  /** Le contrat d'Ulysse et son mode, Allié ou Sergent (spec moteur 2026-09-25). */
+  contract: ContractSchema.optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 

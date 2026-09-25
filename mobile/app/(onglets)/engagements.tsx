@@ -13,6 +13,7 @@ import { useDonnees, type Tache } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
 import { dateLocale } from '@/plan/format'
+import { useGardeContrat } from '@/seances/garde-contrat'
 import { useSeances } from '@/seances/magasin-seances'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
@@ -105,6 +106,7 @@ export default function Engagements() {
   const { resultat, maintenant } = usePlan()
   const { acc } = useLumiere()
   const toast = useToast()
+  const garde = useGardeContrat()
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
   const [ouvert, setOuvert] = useState<string | null>(null)
@@ -171,6 +173,7 @@ export default function Engagements() {
               <Pilule
                 contour
                 onPress={() => {
+                  if (!garde()) return
                   for (const p of g.parties) void d.supprimerTache(p.id)
                   void d.supprimerTache(t.id)
                   toast(`${t.titre} removed.`)
@@ -214,7 +217,7 @@ export default function Engagements() {
           <View style={{ gap: 12, paddingTop: 12 }}>
             {o.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{o.intention}</Text> : null}
             <View style={{ flexDirection: 'row' }}>
-              <Pilule contour onPress={() => (void d.supprimerObjectif(o.id), toast(`${o.nom} removed.`))}>
+              <Pilule contour onPress={() => garde() && (void d.supprimerObjectif(o.id), toast(`${o.nom} removed.`))}>
                 Remove
               </Pilule>
             </View>
@@ -251,7 +254,7 @@ export default function Engagements() {
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 70 }}>
             {a.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{a.intention}</Text> : null}
             <View style={{ flexDirection: 'row' }}>
-              <Pilule contour onPress={() => (void d.supprimerAncre(a.id), toast(`${a.nom} removed.`))}>
+              <Pilule contour onPress={() => garde() && (void d.supprimerAncre(a.id), toast(`${a.nom} removed.`))}>
                 Remove
               </Pilule>
             </View>
@@ -277,7 +280,7 @@ export default function Engagements() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={s.cta}
-            onPress={() => setForme(K)}
+            onPress={() => garde() && setForme(K)}
             style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.92 : 1 }] })}
           >
             <Plus />
@@ -295,7 +298,7 @@ export default function Engagements() {
           </>
         ) : (
           <View style={{ alignItems: 'flex-start', paddingVertical: 16, borderTopWidth: 1, borderTopColor: A.ligne }}>
-            <Pressable accessibilityRole="button" onPress={() => setForme(K)} style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(242,242,242,0.1)', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
+            <Pressable accessibilityRole="button" onPress={() => garde() && setForme(K)} style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(242,242,242,0.1)', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
               <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{s.cta}</Text>
             </Pressable>
           </View>
