@@ -212,7 +212,7 @@ export type BlockingSessionState = {
   endsAt: number | null
 }
 
-export type ConfirmBlockResult = { ok: true } | { ok: false; reason: string }
+export type ConfirmBlockResult = { ok: true; help?: string } | { ok: false; reason: string }
 
 contextBridge.exposeInMainWorld('nexus', api)
 

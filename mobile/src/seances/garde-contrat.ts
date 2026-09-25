@@ -2,6 +2,8 @@ import { effectiveContract, refusalLine, refusesChange } from '@shared/contract'
 import { useDonnees } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { useToast } from '@/ui/app-briques'
+import { useSeances } from '@/seances/magasin-seances'
+import { disciplineSuspendue } from '@shared/coach/garde-fous'
 
 /**
  * Le contrat d'Ulysse, au moment d'agir (spec moteur 2026-09-25) : pendant
@@ -12,9 +14,12 @@ import { useToast } from '@/ui/app-briques'
 export function useGardeContrat(): () => boolean {
   const contrat = useDonnees((d) => d.reglages.contrat)
   const { seanceActive, minute, maintenant } = usePlan()
+  const signaux = useSeances((e) => e.apprentissage.lastSignalAt)
   const toast = useToast()
   return () => {
     const c = contrat ? effectiveContract(contrat, maintenant) : null
+    // Détresse récente : l'app arrête d'exiger — aucun refus.
+    if (disciplineSuspendue(signaux, maintenant)) return true
     if (!c || !refusesChange(c, !!seanceActive)) return true
     toast(refusalLine(c.mode, c.signedAt, (seanceActive?.endMinute ?? minute) - minute))
     return false

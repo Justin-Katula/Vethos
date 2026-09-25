@@ -26,17 +26,23 @@ export function ArretSeance({ titre }: { titre: string }) {
   const [ouverte, setOuverte] = useState(false)
   const [texte, setTexte] = useState('')
   const [occupe, setOccupe] = useState(false)
+  const [aide, setAide] = useState<string | null>(null)
   const depuis = useRef(0)
 
   const choisir = async (raison: StopReason) => {
     if (occupe) return
     setOccupe(true)
     vibrer('medium')
-    await arreter(raison, texte.trim() || undefined, Date.now() - depuis.current)
-    Keyboard.dismiss()
-    setOccupe(false)
-    setOuverte(false)
-    setTexte('')
+    try {
+      const r = await arreter(raison, texte.trim() || undefined, Date.now() - depuis.current)
+      Keyboard.dismiss()
+      setTexte('')
+      // Une détresse lue dans le texte : on le dit, et on reste là.
+      if (r.ok && r.aide) setAide(r.aide)
+      else setOuverte(false)
+    } finally {
+      setOccupe(false)
+    }
   }
 
   return (
@@ -52,7 +58,14 @@ export function ArretSeance({ titre }: { titre: string }) {
       >
         <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Stop</Text>
       </Pressable>
-      <Feuille ouverte={ouverte} fermer={() => setOuverte(false)} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+      <Feuille ouverte={ouverte} fermer={() => (setOuverte(false), setAide(null))} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+        {aide ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: A.t1, fontFamily: GEIST.normal, fontSize: 16, lineHeight: 23 }}>
+            {aide}
+          </Text>
+        ) : null}
+        {aide ? null : (
+        <>
         <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 22, lineHeight: 28, letterSpacing: -0.4 }}>
           {`Stop ${titre}?`}
         </Text>
@@ -86,6 +99,8 @@ export function ArretSeance({ titre }: { titre: string }) {
           selectionColor={A.t1}
           style={{ marginTop: 12, height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.normal, fontSize: 15 }}
         />
+        </>
+        )}
       </Feuille>
     </>
   )

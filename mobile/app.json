@@ -32,7 +32,8 @@
       [
         "react-native-device-activity",
         {
-          "appGroup": "group.com.vethos.app"
+          "appGroup": "group.com.vethos.app",
+          "copyToTargetFolder": false
         }
       ],
       "expo-font",

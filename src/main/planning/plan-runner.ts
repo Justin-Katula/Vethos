@@ -1,5 +1,6 @@
 import log from '@main/logging/setup'
 import { lireTexteArret } from '@shared/coach/coach'
+import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
 import type { Storage } from '@shared/storage'
 import { computePlan, PLANNING_HORIZON_DAYS } from '@shared/planning/engine'
 import { addDays, dateKey } from '@shared/planning/dates'
@@ -80,7 +81,7 @@ export type PlanRunnerDeps = {
   onError?: (err: unknown) => void
 }
 
-export type ConfirmResult = { ok: true } | { ok: false; reason: string }
+export type ConfirmResult = { ok: true; help?: string } | { ok: false; reason: string }
 
 export type PlanRunner = {
   start: (intervalMs?: number) => void
@@ -96,7 +97,7 @@ export type PlanRunner = {
 export type StopArgs = {
   reason: StopReason | null
   text?: string
-  /** Temps mis à répondre, en ms. */
+  /** Temps mis à répondre, en ms : « Stop » a été touché `answerMs` avant maintenant. */
   answerMs?: number
 }
 
@@ -208,7 +209,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
 
   async function tick(): Promise<void> {
     const now = deps.now()
-    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks } =
+    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks, wakeMinute } =
       await loadTodayState(now)
 
     const confirmedIds = new Set(Object.keys(confirmations.confirmedAt))
@@ -221,6 +222,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       nowMinute,
       confirmedBlockIds: confirmedIds,
       observedPending: confirmations.observedPending,
+      stoppedBlockIds: confirmations.stoppedBlockIds,
     })
 
     // Le bloc actif MAINTENANT, confirmé ou non — sert à entretenir
@@ -233,6 +235,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       today: confirmations.date,
       nowMinute,
       observedPending: confirmations.observedPending,
+      stoppedBlockIds: confirmations.stoppedBlockIds,
     })
 
     // D.7 : le bloc qu'on surveillait au tic précédent (`observedPending`,
@@ -254,7 +257,19 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       const confirmedAtMs = confirmations.confirmedAt[closed.blockId]
       if (confirmedAtMs === undefined) {
         // D.7 : jamais confirmé — la fenêtre entière compte comme du retard.
-        const result = applyLapsedCredit(workingLearning, workingConfirmations, closed, now.getTime())
+        const result = applyLapsedCredit(
+          workingLearning,
+          workingConfirmations,
+          closed,
+          now.getTime(),
+          journalContextFor({
+            learning: workingLearning,
+            today: workingConfirmations.date,
+            yesterday: addDays(workingConfirmations.date, -1),
+            nowMinute: closed.plannedStartMinute ?? closed.startMinute,
+            wakeMinute,
+          }),
+        )
         workingLearning = result.learning
         workingConfirmations = result.confirmations
         log.info('[planning] bloc jamais confirmé, retard crédité', {
@@ -396,18 +411,33 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     // Retrait progressif : en phase 3 l'overlay attend 10 min (et ne vient pas
     // un jour-test), en phase 4 il ne vient plus. La séance, elle, reste
     // démarrable par le raccourci de l'application.
-    if (pending && overlayDueFor({ learning: workingLearning, block: pending, nowMinute, today: workingConfirmations.date }))
+    if (
+      pending &&
+      !disciplineSuspendue(workingLearning.lastSignalAt, now) &&
+      overlayDueFor({ learning: workingLearning, block: pending, nowMinute, today: workingConfirmations.date })
+    )
       deps.overlay.show(viewFor(pending))
     else deps.overlay.close()
 
     await collectExpiredBlockSession(now)
   }
 
+  // UN seul verrou pour tout ce qui lit puis réécrit `learning` et
+  // `session_confirmations` : le tic, « Je commence », « Stop », une tentative
+  // d'app. Sans lui, un tic parti avant un « Stop » réécrivait son instantané
+  // périmé par-dessus — l'arrêt disparaissait, le blocage restait levé.
+  let lock: Promise<unknown> = Promise.resolve()
+  function serialize<T>(f: () => Promise<T>): Promise<T> {
+    const run = lock.then(f, f)
+    lock = run.catch(() => undefined)
+    return run
+  }
+
   async function tickNow(): Promise<void> {
     // Un tic lent ne doit pas se faire doubler par le suivant — même garde
     // que l'horloge de blocage.
     if (running !== null) return running
-    running = tick()
+    running = serialize(tick)
       .catch((err) => deps.onError?.(err))
       .finally(() => {
         running = null
@@ -435,6 +465,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       nowMinute,
       confirmedBlockIds: confirmedIds,
       observedPending: confirmations.observedPending,
+      stoppedBlockIds: confirmations.stoppedBlockIds,
     })
     // Filet : l'overlay a pu être ouvert sur le bloc qu'on surveillait, et le
     // scan frais avoir glissé entre-temps. Tant que c'est CE bloc-là, la
@@ -501,11 +532,14 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
   async function stopBlock(args: StopArgs): Promise<ConfirmResult> {
     const now = deps.now()
     const { nowMinute, learning, confirmations } = await loadTodayState(now)
+    // L'arrêt date du moment où « Stop » a été touché, pas de la réponse :
+    // le temps passé à choisir une raison n'est pas du travail.
+    const pressedAt = new Date(now.getTime() - Math.min(args.answerMs ?? 0, 30 * 60_000))
     const result = applyStop({
       learning,
       confirmations,
       nowMs: now.getTime(),
-      minute: nowMinute,
+      minute: minuteOfDay(pressedAt),
       reason: args.reason,
       ...(args.text !== undefined ? { text: args.text } : {}),
       ...(args.answerMs !== undefined ? { answerMs: args.answerMs } : {}),
@@ -513,6 +547,15 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       textReason: args.text ? lireTexteArret(args.text) : null,
     })
     if (!result) return { ok: false, reason: 'Aucune séance en cours.' }
+    // Une détresse lue dans le texte (qui reste sur la machine) : l'app
+    // arrête d'exiger pendant 24 h, et oriente vers une aide humaine.
+    const detresse = !!args.text && detecteDetresse(args.text)
+    if (detresse) {
+      result.learning = {
+        ...result.learning,
+        lastSignalAt: { ...result.learning.lastSignalAt, [SUJET_DETRESSE]: now.toISOString() },
+      }
+    }
 
     const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
     await Promise.all([
@@ -524,7 +567,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     log.info('[planning] séance arrêtée', { heldMinutes: result.heldMinutes, reason: args.reason })
     deps.onBlockConfirmed?.()
     deps.onPlanningDataChanged?.()
-    return { ok: true }
+    return detresse ? { ok: true, help: MESSAGE_AIDE } : { ok: true }
   }
 
   return {
@@ -539,8 +582,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       timer = null
     },
     tickNow,
-    confirmBlock,
-    stopBlock,
-    recordBlockedAttempt: recordAttempt,
+    confirmBlock: (blockId: string) => serialize(() => confirmBlock(blockId)),
+    stopBlock: (args: StopArgs) => serialize(() => stopBlock(args)),
+    recordBlockedAttempt: () => serialize(recordAttempt),
   }
 }

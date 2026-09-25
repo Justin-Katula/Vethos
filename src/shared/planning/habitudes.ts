@@ -89,7 +89,10 @@ export function autonomie(events: SessionEvent[], refId: string, today: string):
 export function phaseHabitude(events: SessionEvent[], refId: string): Phase {
   const ev = eventsDe(events, refId)
   let phase: Phase = 1
-  let depuis = 0 // index du premier événement compté dans la phase courante
+  // Tout se compte DEPUIS l'entrée dans la phase courante : après un recul,
+  // la phase se regagne sur des preuves neuves, pas sur l'historique d'avant.
+  let depuis = 0
+  let demarresAvant = 0 // démarrages accumulés avant la phase courante (1 → 2 → 3 cumule)
   for (let i = 0; i < ev.length; i++) {
     const e = ev[i]!
     const vus = ev.slice(depuis, i + 1)
@@ -97,22 +100,28 @@ export function phaseHabitude(events: SessionEvent[], refId: string): Phase {
     if (semaine.filter((x) => !x.started).length >= PHASES.ratesRecul && phase > 1) {
       phase = (phase - 1) as Phase
       depuis = i + 1
+      demarresAvant = 0
       continue
     }
-    const demarres = ev.slice(0, i + 1).filter((x) => x.started)
-    if (phase === 1 && demarres.length >= PHASES.demarragesAncrage) {
+    const demarres = vus.filter((x) => x.started)
+    const total = demarresAvant + demarres.length
+    if (phase === 1 && total >= PHASES.demarragesAncrage) {
       phase = 2
+      demarresAvant = total
       depuis = i + 1
     } else if (
       phase === 2 &&
-      demarres.length >= PHASES.demarragesAutonomie &&
-      mediane(demarres.slice(-PHASES.demarragesAutonomie).map((x) => x.delayMinutes ?? 0)) <= PHASES.retardMedianMax
+      total >= PHASES.demarragesAutonomie &&
+      demarres.length > 0 &&
+      mediane(demarres.map((x) => x.delayMinutes ?? 0)) <= PHASES.retardMedianMax
     ) {
       phase = 3
       depuis = i + 1
     } else if (phase === 3) {
-      const fen = ev.slice(0, i + 1).filter((x) => x.started && x.date > addDays(e.date, -PHASES.fenetreJours))
-      const auto = fen.length ? fen.filter((x) => x.spontaneous).length / fen.length : 0
+      // Un raté (jamais démarré) compte comme un démarrage NON spontané : sans
+      // ça, les ratés ne baisseraient jamais l'autonomie.
+      const fen = vus.filter((x) => x.date > addDays(e.date, -PHASES.fenetreJours))
+      const auto = fen.length ? fen.filter((x) => x.started && x.spontaneous).length / fen.length : 0
       if (fen.length >= MIN_OBSERVATIONS && auto >= PHASES.autonomieMin) {
         phase = 4
         depuis = i + 1
@@ -146,7 +155,11 @@ export const RAMPE = {
 } as const
 
 /** Ce qui a été tenu, en minutes, sur les 7 derniers jours ; et la part tenue sur 14 jours. */
-export function tenue(events: SessionEvent[], refId: string, today: string): { tenuRecent: number; tauxTenue: number; observations: number } {
+export function tenue(
+  events: SessionEvent[],
+  refId: string,
+  today: string,
+): { tenuRecent: number; tauxTenue: number; tauxBlocs: number; observations: number } {
   const ev = eventsDe(events, refId).filter((e) => e.date < today)
   const semaine = ev.filter((e) => e.date >= addDays(today, -7))
   const quinzaine = ev.filter((e) => e.date >= addDays(today, -14))
@@ -155,6 +168,11 @@ export function tenue(events: SessionEvent[], refId: string, today: string): { t
   return {
     tenuRecent: semaine.reduce((t, e) => t + (e.started ? (e.heldMinutes ?? 0) : 0), 0),
     tauxTenue: prevu ? tenu / prevu : 0,
+    // La part de BLOCS tenus (≥ 80 % de leur durée) : c'est elle que vise la
+    // difficulté (~85 %), pas une part de minutes.
+    tauxBlocs: quinzaine.length
+      ? quinzaine.filter((e) => e.started && (e.heldMinutes ?? 0) >= 0.8 * e.plannedMinutes).length / quinzaine.length
+      : 0,
     observations: quinzaine.length,
   }
 }

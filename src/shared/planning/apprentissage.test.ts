@@ -201,3 +201,31 @@ describe('Explications d’arrêt', () => {
     expect(pauseAnticipee(e.slice(0, 3), 'obj')).toBeNull()
   })
 })
+
+describe('Revue — correctifs', () => {
+  it('après un recul, un seul démarrage ne fait pas remonter : la phase se regagne sur des preuves neuves', () => {
+    const base = serie(12)
+    const rates = [0, 1, 2].map((k) => ev({ date: addDays(TODAY, k), started: false, delayMinutes: null, heldMinutes: null }))
+    const apres = [...base, ...rates, ev({ date: addDays(TODAY, 3) })]
+    expect(phaseHabitude(apres, 'obj')).toBe(1)
+  })
+
+  it('Kaplan-Meier : tout tenu à 40 min → 44, pas un bond à 90', () => {
+    expect(dureeCible(Array(6).fill({ minutes: 40, arret: false }))).toBe(44)
+  })
+
+  it('le diagnostic se fait sur tous les arrêts : l’évitement ne raccourcit que l’engagement où il se concentre', () => {
+    const stop = (refId: string, i: number) =>
+      ev({ refId, date: addDays(TODAY, -i - 1), stoppedEarly: true, heldMinutes: 6, stop: { reason: 'boring', attemptsBefore: 2 } })
+    const events = [...[0, 1, 2, 3, 4, 5].map((i) => stop('a', i)), stop('b', 7)]
+    expect(ajustementPour(events, 'a').blocMax).toBe(25)
+    expect(ajustementPour(events, 'b').blocMax).toBeUndefined()
+  })
+
+  it('« Something real came up » ne compte pas — sauf s’il devient fréquent', () => {
+    const reel = (i: number) => ev({ date: addDays(TODAY, -i - 1), stoppedEarly: true, heldMinutes: 20, stop: { reason: 'real-event', attemptsBefore: 0 } })
+    const peu = [...serie(6, () => ({ stoppedEarly: true, heldMinutes: 30, stop: { reason: 'tired', attemptsBefore: 0 } })), reel(9)]
+    expect(diagnostiquer(peu)).not.toBe('pas assez de données')
+    expect(diagnostiquer([reel(1), reel(2), reel(3), reel(4)])).toBe('pas assez de données')
+  })
+})

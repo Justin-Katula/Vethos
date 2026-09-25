@@ -4,6 +4,8 @@ import { effectiveContract } from '@shared/contract'
 import { useDonnees } from '@/donnees/magasin'
 import { A, Feuille, GEIST } from '@/ui/app-briques'
 import { coach } from './client'
+import { detecteDetresse, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
+import { useSeances } from '@/seances/magasin-seances'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -23,6 +25,17 @@ export function FeuilleCoach({ ouverte, fermer }: { ouverte: boolean; fermer: ()
   const defil = useRef<ScrollView>(null)
 
   const demander = async (historique: Message[]) => {
+    // Détresse : l'aide s'affiche sans réseau, et l'app arrête d'exiger 24 h.
+    const dernier = historique[historique.length - 1]
+    if (dernier?.role === 'user' && detecteDetresse(dernier.content)) {
+      const e = useSeances.getState()
+      await e.poser({
+        apprentissage: { ...e.apprentissage, lastSignalAt: { ...e.apprentissage.lastSignalAt, [SUJET_DETRESSE]: new Date().toISOString() } },
+        confirmations: e.confirmations,
+      })
+      setMessages([...historique, { role: 'assistant', content: MESSAGE_AIDE }])
+      return
+    }
     setAttente(true)
     const r = await coach().demander({ job: 'woop', mode, faits: {}, messages: historique.slice(-12) })
     setAttente(false)

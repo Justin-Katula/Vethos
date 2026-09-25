@@ -99,6 +99,8 @@ export function tictac(args: {
   blocsDuJour: readonly PlacedBlock[]
   taches: readonly Tache[]
   etat: EtatSeances
+  /** Le contexte d'un raté (charge, heures éveillé) : le journal le garde. */
+  contexteRate?: JournalContext
 }): ResultatTic {
   const minute = minuteDuJour(args.maintenant)
   const confirmationsDuJour = pourAujourdHui(args.etat.confirmations, args.aujourdHui)
@@ -115,6 +117,7 @@ export function tictac(args: {
     nowMinute: minute,
     confirmedBlockIds: dejaConfirmes,
     ...(confirmations.observedPending ? { observedPending: confirmations.observedPending } : {}),
+    stoppedBlockIds: confirmations.stoppedBlockIds,
   })
 
   // Le bloc actif MAINTENANT, confirmé ou non — il entretient `observedPending`.
@@ -125,6 +128,7 @@ export function tictac(args: {
     today: confirmations.date,
     nowMinute: minute,
     ...(confirmations.observedPending ? { observedPending: confirmations.observedPending } : {}),
+    stoppedBlockIds: confirmations.stoppedBlockIds,
   })
 
   const ferme = closedObservedBlock({
@@ -137,7 +141,7 @@ export function tictac(args: {
     const confirmeA = confirmations.confirmedAt[ferme.blockId]
     if (confirmeA === undefined) {
       // D.7 : jamais confirmé — toute la fenêtre compte comme du retard.
-      const r = applyLapsedCredit(apprentissage, confirmations, ferme, args.maintenant.getTime())
+      const r = applyLapsedCredit(apprentissage, confirmations, ferme, args.maintenant.getTime(), args.contexteRate)
       apprentissage = r.learning
       confirmations = r.confirmations
     } else {
@@ -289,6 +293,8 @@ export function confirmer(args: {
  */
 export function arreter(args: {
   maintenant: Date
+  /** L'instant où « Stop » a été touché (le temps de répondre n'est pas du travail). */
+  touche?: Date
   etat: EtatSeances
   raison: StopReason | null
   texte?: string
@@ -300,7 +306,7 @@ export function arreter(args: {
     learning: args.etat.apprentissage,
     confirmations: args.etat.confirmations,
     nowMs: args.maintenant.getTime(),
-    minute: minuteDuJour(args.maintenant),
+    minute: minuteDuJour(args.touche && args.touche <= args.maintenant ? args.touche : args.maintenant),
     reason: args.raison,
     ...(args.texte !== undefined ? { text: args.texte } : {}),
     ...(args.reponseMs !== undefined ? { answerMs: args.reponseMs } : {}),

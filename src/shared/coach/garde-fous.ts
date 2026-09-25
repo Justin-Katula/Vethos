@@ -59,3 +59,14 @@ export function filtrerReponse(brut: string): Verdict | null {
   const coupe = premiere >= 0 ? t.slice(0, premiere + 1) : t
   return { texte: coupe.length > 600 ? `${coupe.slice(0, 597).trimEnd()}…` : coupe, remplace: false }
 }
+
+/** La clé du journal où l'on note une détresse détectée. */
+export const SUJET_DETRESSE = 'detresse'
+/** Sortie du mode discipline : 24 h sans overlay, sans refus du contrat. */
+export const PAUSE_DETRESSE_MS = 24 * 60 * 60 * 1000
+
+/** Le mode discipline est-il suspendu, parce qu'une détresse a été vue il y a moins de 24 h ? */
+export function disciplineSuspendue(lastSignalAt: Record<string, string>, maintenant: Date): boolean {
+  const t = lastSignalAt[SUJET_DETRESSE]
+  return !!t && maintenant.getTime() - new Date(t).getTime() < PAUSE_DETRESSE_MS
+}

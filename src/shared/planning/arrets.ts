@@ -73,7 +73,11 @@ function softmax(s: Record<Cause, number>): Record<Cause, number> {
  * - bloc trop long : arrêt au même % du bloc, peu importe la raison.
  */
 export function diagnostiquer(events: SessionEvent[]): Record<Cause, number> | 'pas assez de données' {
-  const a = arretsDe(events)
+  const tous = arretsDe(events)
+  // « Imprévu réel » : ignoré pour l'apprentissage — sauf s'il devient
+  // fréquent (plus d'un arrêt sur trois), où il se lit comme un évitement probable.
+  const reels = tous.filter((e) => e.stop?.reason === 'real-event')
+  const a = reels.length / (tous.length || 1) > 1 / 3 ? tous : tous.filter((e) => e.stop?.reason !== 'real-event')
   if (a.length < MIN_OBSERVATIONS) return 'pas assez de données'
   const charge = a.map((e) => e.load48hMinutes)
   const eveil = a.map((e) => e.hoursAwake ?? e.plannedStartMinute / 60)
@@ -135,19 +139,28 @@ export function pauseAnticipee(events: SessionEvent[], refId: string): number | 
 
 /** Ce que le diagnostic change au placement d'un engagement. */
 export type Ajustement = {
-  /** Longueur de bloc imposée (évitement : un bloc court dans le meilleur créneau). */
+  /** Évitement : un bloc court (le minimum utile), que le score pose dans le meilleur créneau. */
   blocMax?: number
-  /** Fatigue : blocs raccourcis de ce facteur après 18 h. */
-  soirFacteur?: number
+  /** Fatigue : l'exigeant quitte le soir — une pénalité sur les départs après 18 h. */
+  soirPenalite?: number
 }
 
+/**
+ * Le diagnostic se fait sur TOUS les arrêts (sinon « concentré sur une
+ * tâche » vaudrait toujours 1). L'évitement ne raccourcit que l'engagement
+ * où les arrêts se concentrent vraiment.
+ */
 export function ajustementPour(events: SessionEvent[], refId: string): Ajustement {
-  const d = diagnostiquer(events.filter((e) => e.refId === refId))
+  const d = diagnostiquer(events)
   if (d === 'pas assez de données') return {}
   const top = (Object.keys(d) as Cause[]).reduce((m, k) => (d[k] > d[m] ? k : m))
   if (d[top] < 0.4) return {}
-  if (top === 'evitement') return { blocMax: 25 }
-  if (top === 'fatigue') return { soirFacteur: 0.75 }
+  if (top === 'evitement') {
+    const a = arretsDe(events)
+    const part = a.filter((e) => e.refId === refId).length / (a.length || 1)
+    return part >= 0.5 ? { blocMax: 25 } : {}
+  }
+  if (top === 'fatigue') return { soirPenalite: 20 }
   // Mauvais créneau : le bandit s'en charge. Bloc trop long : Kaplan-Meier aussi.
   return {}
 }

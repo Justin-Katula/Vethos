@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { StopSession } from '@/components/tasks/StopSession'
 import { nexus } from '@/lib/ipc'
 import { overlayDueFor } from '@shared/planning/clock'
+import { activeConfirmedSession } from '@shared/planning/session'
 import { revueDimanche, revueEnClair } from '@shared/coach/coach'
 import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 import { usePlanning } from '@/lib/use-planning'
@@ -179,13 +180,10 @@ export default function HomePage() {
       : null
 
   // La séance confirmée en cours, s'il y en a une : c'est là que vit « Stop ».
-  const running = todayBlocks.find(
-    (b) =>
-      b.startMinute <= nowMinute &&
-      nowMinute < b.endMinute &&
-      sessionConfirmations?.date === today &&
-      b.id in sessionConfirmations.confirmedAt,
-  )
+  // Dérivée de la VRAIE session (confirmée, non arrêtée, fenêtre ouverte),
+  // pas d'un bloc du plan : une ancre arrêtée garde son créneau.
+  const session = activeConfirmedSession(sessionConfirmations ?? null, today, nowMinute)
+  const running = session ? todayBlocks.find((b) => b.id === session.blockId) : undefined
 
   return (
     <PageTransition>

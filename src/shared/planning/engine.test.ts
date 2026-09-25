@@ -1653,8 +1653,11 @@ describe('Apprentissage branché sur le moteur (spec moteur 2026-09-25)', () => 
     expect(servi(plan, '2026-08-12')).toBeLessThanOrEqual(Math.ceil(175 / 7) + 5)
   })
 
-  it('tenu à plus de 90 % : la dose monte de 15 %', () => {
-    const events = Array.from({ length: 7 }, (_, i) => evenement(i, { plannedMinutes: 50, heldMinutes: 50 }))
+  it('tenu à plus de 90 % : la dose monte de 15 % — figée pour la semaine, mesurée avant le lundi', () => {
+    // Lundi 10 août : la semaine d'avant compte, pas le lundi lui-même.
+    const events = Array.from({ length: 7 }, (_, i) =>
+      evenement(i, { date: addDays('2026-08-10', -(i + 1)), plannedMinutes: 50, heldMinutes: 50 }),
+    )
     const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
     expect(plan.objectiveDoses[OBJ.id]!.dose).toBe(Math.round(350 * 1.15))
   })
@@ -1684,13 +1687,74 @@ describe('Apprentissage branché sur le moteur (spec moteur 2026-09-25)', () => 
 
   it('phase 3 et volume modeste : des jours off sur les jours de plus faible capacité', () => {
     const events = Array.from({ length: 25 }, (_, i) => evenement(i, { plannedMinutes: 60, heldMinutes: 60 }))
-    const plan = computePlan(
-      libre({ objectives: [{ ...objective({ weeklyTargetMinutes: 360 }), id: OBJ.id }], sessionEvents: events }),
-      NOW,
-    )
+    const entree = libre({
+      objectives: [{ ...objective({ weeklyTargetMinutes: 360 }), id: OBJ.id }],
+      sessionEvents: events,
+      rangeEnd: '2026-08-23',
+    })
+    const plan = computePlan(entree, NOW)
     const semaine = ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23']
     const actifs = semaine.filter((d) => servi(plan, d) > 0)
-    expect(actifs.length).toBeLessThan(7)
-    expect(actifs.length).toBeGreaterThan(0)
+    // Jamais moins de 4 jours de contact (≥ 4 séances / semaine pour une habitude).
+    expect(actifs.length).toBe(4)
+    // Le choix des jours off ne bouge pas au fil de la journée.
+    const tard = computePlan(entree, new Date(2026, 7, 11, 20, 0))
+    expect(semaine.filter((d) => servi(tard, d) > 0)).toEqual(actifs)
+  })
+})
+
+describe('Revue du moteur — correctifs (spec moteur 2026-09-25)', () => {
+  const libre = (over: Partial<PlanningInput> = {}) => input({ schedule: sleepScheduleEntries('23:00', '07:00'), ...over })
+  const OBJ = objective({ weeklyTargetMinutes: 1200 })
+  const ev = (over: Partial<SessionEvent>): SessionEvent => ({
+    blockId: `b-${Math.random()}`,
+    date: TODAY,
+    kind: 'objective',
+    refId: OBJ.id,
+    category: `objectif:${OBJ.id}`,
+    plannedStartMinute: 9 * 60,
+    plannedMinutes: 60,
+    started: true,
+    delayMinutes: 0,
+    spontaneous: false,
+    heldMinutes: 60,
+    stoppedEarly: false,
+    blockedAttempts: 0,
+    load48hMinutes: 0,
+    createdAt: '2026-08-11T09:00:00.000Z',
+    ...over,
+  })
+
+  it('deux séances déjà faites aujourd’hui : plus aucune ce jour-là', () => {
+    const events = [ev({ plannedStartMinute: 480 }), ev({ plannedStartMinute: 660, blockId: 'b2' })]
+    const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), new Date(2026, 7, 11, 13, 0))
+    expect(plan.blocks.filter((b) => b.kind === 'objective' && b.date === TODAY)).toHaveLength(0)
+  })
+
+  it('la première heure après le réveil est interdite, même face à une fenêtre PROFONDE', () => {
+    const obs = Array.from({ length: 5 }, () => ({ startHour: 7, completed: true, createdAt: '2026-08-01T10:00:00.000Z' }))
+    const plan = computePlan(libre({ objectives: [OBJ], observations: obs, sessionEvents: [] }), NOW)
+    for (const b of plan.blocks.filter((x) => x.date === '2026-08-12')) expect(b.startMinute).toBeGreaterThanOrEqual(8 * 60)
+  })
+
+  it('la constance vient de l’histoire : le plan ne bouge pas entre un calcul à 9 h et un à 20 h', () => {
+    const events = Array.from({ length: 6 }, (_, i) =>
+      ev({ date: addDays(TODAY, -(i + 1)), blockId: `h${i}`, plannedStartMinute: 10 * 60 }),
+    )
+    const demain = (p: ReturnType<typeof computePlan>) => p.blocks.filter((b) => b.date === '2026-08-12')
+    const matin = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), new Date(2026, 7, 11, 9, 0))
+    const soir = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), new Date(2026, 7, 11, 20, 0))
+    expect(demain(soir)).toEqual(demain(matin))
+  })
+
+  it('en crise prouvée, pas d’exploration : deux graines différentes, le même plan', () => {
+    const events = Array.from({ length: 8 }, (_, i) =>
+      ev({ date: addDays(TODAY, -(i + 1)), blockId: `c${i}`, plannedStartMinute: (9 + (i % 4)) * 60 }),
+    )
+    const crise = [task({ remainingMinutes: 5000, deadline: '2026-08-12' })]
+    const a = computePlan(libre({ objectives: [OBJ], tasks: crise, sessionEvents: events }), NOW)
+    expect(a.feasibility.globallyFeasible).toBe(false)
+    const b = computePlan(libre({ objectives: [OBJ], tasks: crise, sessionEvents: [...events].reverse() }), NOW)
+    expect(b.blocks).toEqual(a.blocks)
   })
 })

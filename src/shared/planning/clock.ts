@@ -104,10 +104,15 @@ export function activeBlockFor(args: {
   today: string
   nowMinute: number
   observedPending?: ObservedPendingBlock | null
+  /** Les blocs arrêtés aujourd'hui : jamais « actifs » à nouveau. */
+  stoppedBlockIds?: readonly string[]
 }): PlacedBlock | null {
   const active = args.blocks.find(
     (b) =>
-      b.date === args.today && b.startMinute <= args.nowMinute && args.nowMinute < b.endMinute,
+      b.date === args.today &&
+      b.startMinute <= args.nowMinute &&
+      args.nowMinute < b.endMinute &&
+      !(args.stoppedBlockIds ?? []).includes(b.id),
   )
   if (!active) return null
   return stabilized(active, args.observedPending ?? null, args.nowMinute)
@@ -124,9 +129,11 @@ export function pendingConfirmation(args: {
   nowMinute: number
   confirmedBlockIds: ReadonlySet<string>
   observedPending?: ObservedPendingBlock | null
+  stoppedBlockIds?: readonly string[]
 }): PlacedBlock | null {
   const resolved = activeBlockFor(args)
   if (!resolved || args.confirmedBlockIds.has(resolved.id)) return null
+  if ((args.stoppedBlockIds ?? []).includes(resolved.id)) return null
   return resolved
 }
 
@@ -244,6 +251,7 @@ const EMPTY_CONFIRMATIONS_FOR = (date: string): SessionConfirmationsState => ({
   lapsedCreditedRanges: [],
   workCreditedRanges: [],
   streakBumpedRefs: [],
+  stoppedBlockIds: [],
   observedPending: null,
 })
 
@@ -281,6 +289,7 @@ export function applyLapsedCredit(
   confirmations: SessionConfirmationsState,
   block: CreditableBlock & { blockId?: string; workMinutes?: number; category?: string; plannedStartMinute?: number },
   nowMs: number = Date.now(),
+  context: JournalContext = {},
 ): { learning: LearningState; confirmations: SessionConfirmationsState } {
   const delay = uncoveredMinutes(block, confirmations.lapsedCreditedRanges)
   const today = confirmations.date
@@ -313,7 +322,10 @@ export function applyLapsedCredit(
           heldMinutes: null,
           stoppedEarly: false,
           blockedAttempts: 0,
-          load48hMinutes: 0,
+          // Le contexte d'un raté compte autant que celui d'un départ :
+          // sans lui, le diagnostic confondrait fatigue et évitement.
+          load48hMinutes: context.load48hMinutes ?? 0,
+          ...(context.hoursAwake !== undefined ? { hoursAwake: context.hoursAwake } : {}),
           createdAt: new Date(nowMs).toISOString(),
         })
 
@@ -590,9 +602,13 @@ export function recordBlockedAttempt(
 /**
  * « Stop » pendant une séance : le travail est crédité jusqu'à cette minute,
  * la fenêtre observée se referme ici — la pendule la clôt au tic suivant sans
- * rien créditer de plus —, et l'arrêt entre au journal avec sa raison (un
- * tap, texte optionnel). La raison est un signal faible ; le comportement
- * autour d'elle (minute, tentatives d'apps, temps de réponse) est le fort.
+ * rien créditer de plus —, le bloc est marqué arrêté (plus jamais « en cours »
+ * ni proposé aujourd'hui), et l'arrêt entre au journal avec sa raison (un tap,
+ * texte optionnel). La raison est un signal faible ; le comportement autour
+ * d'elle (minute, tentatives d'apps, temps de réponse) est le fort.
+ *
+ * `minute` est l'instant où « Stop » a été TOUCHÉ, pas celui où la raison a
+ * été choisie : le temps passé à répondre n'est pas du travail.
  */
 export function applyStop(args: {
   learning: LearningState
@@ -609,16 +625,21 @@ export function applyStop(args: {
   const { confirmations } = args
   const o = confirmations.observedPending
   if (!o) return null
+  if ((confirmations.stoppedBlockIds ?? []).includes(o.blockId)) return null
   const confirmedAt = confirmations.confirmedAt[o.blockId]
   if (confirmedAt === undefined || args.minute >= o.endMinute) return null
 
-  const credited = applyWorkCredit(args.learning, confirmations, o, o.startMinute, args.minute)
-  const held = Math.max(0, args.minute - o.startMinute)
+  const minute = Math.max(o.startMinute, args.minute)
+  const work = o.workMinutes ?? o.endMinute - o.startMinute
+  const credited = applyWorkCredit(args.learning, confirmations, o, o.startMinute, minute)
+  // Arrêté pendant la pause : le travail du bloc était fait — tenu en entier.
+  const held = Math.min(work, Math.max(0, minute - o.startMinute))
+  const early = minute - o.startMinute < work
   const text = args.text?.trim()
   const learning = updateEvent(credited.learning, confirmations.date, o.blockId, (e) => ({
     ...e,
     heldMinutes: held,
-    stoppedEarly: true,
+    stoppedEarly: early,
     stop: {
       reason: args.reason,
       ...(text ? { text: text.slice(0, 500) } : {}),
@@ -627,25 +648,17 @@ export function applyStop(args: {
       attemptsBefore: args.attemptsBefore ?? 0,
     },
   }))
-  const end = Math.max(o.startMinute + 1, args.minute)
+  const end = Math.max(o.startMinute + 1, minute)
   return {
     learning,
     confirmations: {
       ...credited.confirmations,
-      observedPending: { ...o, endMinute: end, workMinutes: Math.max(0, end - o.startMinute) },
+      // workMinutes = ce qui a été tenu : la clôture ne créditera rien de plus.
+      observedPending: { ...o, endMinute: end, workMinutes: held },
+      stoppedBlockIds: [...(confirmations.stoppedBlockIds ?? []), o.blockId],
     },
     heldMinutes: held,
   }
-}
-
-/** Les séances déjà vécues aujourd'hui (démarrées), en intervalles réels. */
-export function sessionsDoneToday(learning: LearningState, today: string): Array<{ refId: string; startMinute: number; endMinute: number }> {
-  return (learning.sessionEvents ?? [])
-    .filter((e) => e.date === today && e.started)
-    .map((e) => {
-      const start = e.plannedStartMinute + (e.delayMinutes ?? 0)
-      return { refId: e.refId, startMinute: start, endMinute: start + (e.heldMinutes ?? e.plannedMinutes) }
-    })
 }
 
 /**

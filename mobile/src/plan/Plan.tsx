@@ -5,11 +5,9 @@ import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
-import { journalContextFor, overlayDueFor, setBlockedAttempts, setStopTextReason } from '@shared/planning/clock'
+import { journalContextFor, overlayDueFor, setBlockedAttempts } from '@shared/planning/clock'
 import { lireTexteArret } from '@shared/coach/coach'
-import { effectiveContract } from '@shared/contract'
-import { STOP_REASONS } from '@shared/schemas'
-import { coach } from '@/coach/client'
+import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
 import { pontEcran } from '@/blocage/ecran-natif'
 import { addDays } from '@shared/planning/dates'
 import type { StopReason } from '@shared/schemas'
@@ -67,7 +65,14 @@ function useSourcePlan() {
   const tic = useMemo(
     () => (mesuresPretes && chargees
       ? tictac({ maintenant: calcul.maintenant, aujourdHui: calcul.aujourdHui,
-          blocsDuJour, taches, etat: { apprentissage, confirmations } })
+          blocsDuJour, taches, etat: { apprentissage, confirmations },
+          contexteRate: journalContextFor({
+            learning: apprentissage,
+            today: calcul.aujourdHui,
+            yesterday: addDays(calcul.aujourdHui, -1),
+            nowMinute: calcul.minute,
+            wakeMinute: minutesDe(reglages.lever),
+          }) })
       : null),
     [mesuresPretes, chargees, calcul.maintenant, calcul.aujourdHui, blocsDuJour, taches,
      apprentissage, confirmations],
@@ -101,7 +106,10 @@ function useSourcePlan() {
   // phase le demande (phase 3 : 10 min après, jamais un jour-test ; phase 4 :
   // jamais). Sinon il reste démarrable d'un geste, depuis Today.
   const enAttenteBrut = tic?.enAttente ?? null
+  // Détresse vue il y a moins de 24 h : plus d'overlay, plus d'exigence.
+  const suspendu = disciplineSuspendue(apprentissage.lastSignalAt, calcul.maintenant)
   const overlayDu =
+    !suspendu &&
     enAttenteBrut !== null &&
     overlayDueFor({ learning: apprentissage, block: enAttenteBrut, nowMinute: calcul.minute, today: calcul.aujourdHui })
 
@@ -116,37 +124,47 @@ function useSourcePlan() {
      * travail est crédité jusqu'à cette minute et le bouclier se lève.
      */
     arreter: async (raison: StopReason | null, texte?: string, reponseMs?: number) => {
+      // L'état FRAIS du magasin, jamais celui du rendu : un crédit que le tic
+      // vient d'écrire ne doit pas être écrasé par un instantané périmé.
+      const frais = useSeances.getState()
+      const maintenantStop = new Date()
+      const confirmeA = frais.confirmations.observedPending
+        ? frais.confirmations.confirmedAt[frais.confirmations.observedPending.blockId]
+        : undefined
       const r = arreter({
-        maintenant: new Date(),
-        etat: { apprentissage, confirmations },
+        maintenant: maintenantStop,
+        touche: new Date(maintenantStop.getTime() - Math.min(reponseMs ?? 0, 30 * 60_000)),
+        etat: { apprentissage: frais.apprentissage, confirmations: frais.confirmations },
         raison,
         ...(texte !== undefined ? { texte } : {}),
         ...(reponseMs !== undefined ? { reponseMs } : {}),
-        tentativesAvant: pontEcran().lireTentatives().filter((t) => Date.now() - t < 10 * 60_000).length,
+        tentativesAvant: pontEcran()
+          .lireTentatives()
+          .filter((t) => Date.now() - t < 10 * 60_000 && (confirmeA === undefined || t >= confirmeA)).length,
         raisonTexte: texte ? lireTexteArret(texte) : null,
       })
-      if (!r) return false
-      const blocId = confirmations.observedPending?.blockId
+      if (!r) return { ok: false as const }
+      const blocId = frais.confirmations.observedPending?.blockId
       await poser({ apprentissage: r.apprentissage, confirmations: r.confirmations })
       const blocage = useBlocage.getState()
       if (blocId && blocage.plagesActives.some((p) => p.blocId === blocId)) {
         await blocage.appliquerPlan(blocage.plagesActives.filter((p) => p.blocId !== blocId))
       }
-      // Le Coach lit le texte après coup : sa catégorie remplace celle des
-      // mots-clés. Une donnée de plus, jamais un verdict.
-      if (texte && blocId && coach().disponible) {
-        const mode = reglages.contrat ? effectiveContract(reglages.contrat, new Date()).mode : 'ally'
-        const lu = await coach().demander({ job: 'lecture-arret', mode, faits: {}, messages: [{ role: 'user', content: texte }] })
-        const raison = STOP_REASONS.find((x) => lu?.toLowerCase().includes(x))
-        if (raison) {
-          const e = useSeances.getState()
-          await e.poser({
-            apprentissage: setStopTextReason(e.apprentissage, e.confirmations.date, blocId, raison),
-            confirmations: e.confirmations,
-          })
-        }
+      // Le texte d'un arrêt RESTE sur l'appareil (principe : données locales) :
+      // il n'est lu que par les mots-clés, jamais envoyé au Coach.
+      // Une détresse s'y lit AVANT tout : on sort du mode discipline 24 h.
+      if (texte && detecteDetresse(texte)) {
+        const e = useSeances.getState()
+        await e.poser({
+          apprentissage: {
+            ...e.apprentissage,
+            lastSignalAt: { ...e.apprentissage.lastSignalAt, [SUJET_DETRESSE]: new Date().toISOString() },
+          },
+          confirmations: e.confirmations,
+        })
+        return { ok: true as const, aide: MESSAGE_AIDE }
       }
-      return true
+      return { ok: true as const }
     },
     /** D.7 : ouvre une séance. Le retard se mesure à cet instant précis. */
     confirmer: async (bloc: NonNullable<ReturnType<typeof tictac>['enAttente']>) => {

@@ -27,6 +27,8 @@ export function activeConfirmedSession(
   // Pas confirmé = pas de session en cours : il n'y a rien à épingler, et
   // l'overlay doit encore pouvoir la proposer.
   if (!(observed.blockId in confirmations.confirmedAt)) return null
+  // Arrêtée par « Stop » : la session est finie, même si son créneau reste.
+  if ((confirmations.stoppedBlockIds ?? []).includes(observed.blockId)) return null
   // Fenêtre écoulée : la session est finie, le placement normal reprend.
   if (nowMinute >= observed.endMinute) return null
 

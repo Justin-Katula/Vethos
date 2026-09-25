@@ -380,6 +380,7 @@ const emptyConfirmations = (date: string): SessionConfirmationsState => ({
   lapsedCreditedRanges: [],
   workCreditedRanges: [],
   streakBumpedRefs: [],
+  stoppedBlockIds: [],
   observedPending: null,
 })
 
@@ -395,6 +396,7 @@ describe('confirmationsFor — le bookkeeping ne franchit jamais le jour', () =>
       lapsedCreditedRanges: [{ start: 500, end: 560 }],
       workCreditedRanges: [],
       streakBumpedRefs: ['ref-1'],
+      stoppedBlockIds: [],
       observedPending: observed(),
     }
     expect(confirmationsFor(stored, TODAY)).toBe(stored)
@@ -407,6 +409,7 @@ describe('confirmationsFor — le bookkeeping ne franchit jamais le jour', () =>
       lapsedCreditedRanges: [{ start: 500, end: 560 }],
       workCreditedRanges: [],
       streakBumpedRefs: ['ref-1'],
+      stoppedBlockIds: [],
       observedPending: observed(),
     }
     expect(confirmationsFor(stored, TODAY)).toEqual(emptyConfirmations(TODAY))
@@ -794,5 +797,41 @@ describe('Retrait progressif de l’overlay', () => {
     expect(at(3, 610)).toBe(true)
     expect(at(3, 615, true)).toBe(false)
     expect(at(4, 700)).toBe(false)
+  })
+})
+
+describe('« Stop » — cas limites', () => {
+  const MS = new Date(2026, 7, 17, 10, 0).getTime()
+  const confirme = (over: Partial<PlacedBlock> = {}) =>
+    applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block(over), MS, 600)
+
+  it('arrêté pendant la pause : le travail était fait — tenu en entier, pas un arrêt précoce', () => {
+    const c = confirme({ endMinute: 670, durationMinutes: 70, breakMinutes: 10, workMinutes: 60 })
+    const s = applyStop({ learning: c.learning, confirmations: c.confirmations, nowMs: MS, minute: 665, reason: 'tired' })!
+    expect(s.learning.sessionEvents[0]).toMatchObject({ heldMinutes: 60, stoppedEarly: false })
+  })
+
+  it('arrêté la minute même du départ : zéro minute créditée, ni maintenant ni à la clôture', () => {
+    const c = confirme()
+    const s = applyStop({ learning: c.learning, confirmations: c.confirmations, nowMs: MS, minute: 600, reason: 'boring' })!
+    expect(s.heldMinutes).toBe(0)
+    const clos = applyWorkCredit(s.learning, s.confirmations, s.confirmations.observedPending!, 600)
+    expect(clos.creditedMinutes).toBe(0)
+  })
+
+  it('un bloc arrêté n’est plus jamais « en attente », même si son créneau reste (une ancre)', () => {
+    const b = block({ kind: 'ancre' })
+    const c = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), b, MS, 600)
+    const s = applyStop({ learning: c.learning, confirmations: c.confirmations, nowMs: MS, minute: 620, reason: 'real-event' })!
+    const pending = pendingConfirmation({
+      blocks: [b],
+      today: TODAY,
+      nowMinute: 630,
+      confirmedBlockIds: new Set(),
+      stoppedBlockIds: s.confirmations.stoppedBlockIds,
+    })
+    expect(pending).toBeNull()
+    // Et un second « Stop » ne réécrit pas la raison.
+    expect(applyStop({ learning: s.learning, confirmations: s.confirmations, nowMs: MS, minute: 625, reason: 'tired' })).toBeNull()
   })
 })

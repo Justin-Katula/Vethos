@@ -145,7 +145,11 @@ export function dureeCible(obs: Survie[], seuil = 0.8, defaut = BLOC_MAX): numbe
   for (const { t, s } of kaplanMeier(obs)) {
     if (s < seuil) return Math.max(BLOC_MIN, Math.min(BLOC_MAX, t))
   }
-  return defaut
+  // La survie ne passe jamais sous 80 % : on sait seulement que tout a tenu
+  // jusqu'ici. On ne devine pas au-delà — on monte de 10 % depuis le plus long
+  // bloc tenu, pas d'un bond jusqu'au plafond.
+  const plusLong = Math.max(...obs.map((o) => o.minutes))
+  return Math.max(BLOC_MIN, Math.min(defaut, Math.round(plusLong * 1.1)))
 }
 
 /** Les observations de survie d'une catégorie, tirées du journal. */

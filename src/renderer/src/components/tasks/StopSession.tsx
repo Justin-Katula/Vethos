@@ -15,19 +15,27 @@ export function StopSession({ label }: { label: string }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const openedAt = useRef(0)
 
   const stop = async (reason: StopReason | null) => {
     if (busy) return
     setBusy(true)
-    await nexus.planning.stopBlock({
-      reason,
-      ...(text.trim() ? { text: text.trim() } : {}),
-      answerMs: Math.round(performance.now() - openedAt.current),
-    })
-    setBusy(false)
-    setOpen(false)
-    setText('')
+    try {
+      const r = await nexus.planning.stopBlock({
+        reason,
+        ...(text.trim() ? { text: text.trim() } : {}),
+        answerMs: Math.round(performance.now() - openedAt.current),
+      })
+      setText('')
+      if (!r.ok) setMessage(r.reason)
+      else if (r.help) setMessage(r.help)
+      else setOpen(false)
+    } catch {
+      setMessage('Could not stop. Try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -43,7 +51,8 @@ export function StopSession({ label }: { label: string }) {
         <Square size={12} strokeWidth={2.4} />
         Stop
       </button>
-      <Modal open={open} title={`Stop ${label}?`} onClose={() => setOpen(false)}>
+      <Modal open={open} title={`Stop ${label}?`} onClose={() => (setOpen(false), setMessage(null))}>
+        {message && <p className="mb-3 text-[13.5px] leading-relaxed text-fg">{message}</p>}
         <div className="grid grid-cols-2 gap-2">
           {STOP_REASONS.map((r) => (
             <button

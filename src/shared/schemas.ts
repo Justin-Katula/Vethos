@@ -509,6 +509,12 @@ export const SessionConfirmationsStateSchema = z.object({
    */
   streakBumpedRefs: z.array(z.string()).default([]),
   /**
+   * Les blocs arrêtés par « Stop » aujourd'hui. Un bloc arrêté n'est plus ni
+   * « en cours », ni proposé à nouveau par l'overlay — même si son créneau
+   * (une ancre, par exemple) reste le même dans le plan.
+   */
+  stoppedBlockIds: z.array(z.string()).max(200).default([]),
+  /**
    * Le bloc actuellement surveillé — celui que le dernier tic a trouvé actif
    * et non confirmé — ou `null`. C'est la mémoire qui permet de détecter
    * qu'une fenêtre s'est fermée SANS jamais avoir besoin de la retrouver dans

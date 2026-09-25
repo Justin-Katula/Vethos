@@ -272,6 +272,15 @@ export type ScoreContext = {
   hardGapMinutes: number
   /** Sans écart imposé, l'écart est-il au moins préféré ? Non pour une tâche en crise : pas de trou forcé. */
   softGap: boolean
+  /**
+   * « Aucun bloc exigeant dans la première heure après le réveil » : une règle,
+   * pas une préférence — sauf en crise prouvée, où elle redevient une pénalité.
+   */
+  inertiaHard?: boolean
+  /** Fatigue diagnostiquée : pénalité sur les départs après 18 h. */
+  eveningPenalty?: number
+  /** Un engagement arrêté par « Stop » ne revient pas avant cette minute (l'arrêt + 60). */
+  notBefore?: number
   /** Minutes de charge cognitive déjà faites avant `start` (école, travail, blocs). */
   loadBefore: (start: number) => number
 }
@@ -289,6 +298,7 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
     gap = Math.min(gap, g)
   }
   if (c.hardGapMinutes > 0 && gap < c.hardGapMinutes) return -Infinity
+  if (c.notBefore !== undefined && start < c.notBefore) return -Infinity
   let s = c.learnedQuality ? c.learnedQuality(start) : SCORE_DEFAULTS.quality[c.windowAt(Math.floor(start / 60))]
   if (c.midSleepMinute !== null) {
     const peak = (c.midSleepMinute + SCORE_DEFAULTS.peakHoursAfterMidSleep * 60) % 1440
@@ -297,12 +307,14 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
   if (c.habitualStart !== null) s -= SCORE_DEFAULTS.constancyPerHour * circularHours(start, c.habitualStart)
   if (c.wakeMinute !== null) {
     const after = start - c.wakeMinute
+    if (c.inertiaHard && after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes) return -Infinity
     if (after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes)
       s -= (SCORE_DEFAULTS.inertiaPenalty * (SCORE_DEFAULTS.inertiaMinutes - after)) / SCORE_DEFAULTS.inertiaMinutes
   }
   if (c.hardGapMinutes === 0 && c.softGap && gap < SCORE_DEFAULTS.minGapSameObjective)
     s -= (SCORE_DEFAULTS.softGapPerHour * (SCORE_DEFAULTS.minGapSameObjective - Math.max(0, gap))) / 60
   s -= SCORE_DEFAULTS.fatiguePerMinute * c.loadBefore(start)
+  if (c.eveningPenalty && start >= 18 * 60) s -= c.eveningPenalty
   if (c.triggerStarts?.some((t) => start >= t && start - t <= 5)) s += SCORE_DEFAULTS.triggerBonus
   return s
 }

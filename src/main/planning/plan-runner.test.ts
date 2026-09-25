@@ -599,3 +599,66 @@ describe('DÉFAUT DU 2026-08-23 — « ce bloc ne fait plus partie du plan » al
     expect(res.ok).toBe(false)
   })
 })
+
+describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
+  it('arrête, lève le blocage, garde la raison — et l’overlay ne redemande pas dans la foulée', async () => {
+    let nowRef = WAKE
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 })) as Storage & {
+      __mem: Map<string, unknown>
+    }
+    const overlay = fakeOverlay()
+    const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
+
+    await runner.tickNow()
+    const blockId = overlay.shown[0]!.blockId
+    expect(await runner.confirmBlock(blockId)).toEqual({ ok: true })
+
+    nowRef = new Date(WAKE.getTime() + 20 * 60_000)
+    await runner.tickNow()
+    // « Stop » touché 1 min avant la réponse : l'arrêt date du toucher.
+    expect(await runner.stopBlock({ reason: 'tired', text: 'so tired', answerMs: 60_000 })).toEqual({ ok: true })
+
+    const rules = storage.__mem.get('blocking_rules') as BlockingRulesState
+    expect(rules.block).toBeNull()
+    const learning = storage.__mem.get('learning') as LearningState
+    const e = learning.sessionEvents.find((x) => x.blockId === blockId)!
+    expect(e).toMatchObject({ stoppedEarly: true, heldMinutes: 19, stop: { reason: 'tired', text: 'so tired', textReason: 'tired' } })
+
+    const avant = overlay.shown.length
+    for (const m of [21, 30, 60]) {
+      nowRef = new Date(WAKE.getTime() + m * 60_000)
+      await runner.tickNow()
+    }
+    expect(overlay.shown.length).toBe(avant)
+    // Un second « Stop » sur une séance déjà arrêtée ne fait rien.
+    expect((await runner.stopBlock({ reason: 'boring' })).ok).toBe(false)
+  })
+
+  it('un texte de détresse : l’aide humaine, et plus d’overlay pendant 24 h', async () => {
+    let nowRef = WAKE
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 }))
+    const overlay = fakeOverlay()
+    const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
+    await runner.tickNow()
+    await runner.confirmBlock(overlay.shown[0]!.blockId)
+    nowRef = new Date(WAKE.getTime() + 10 * 60_000)
+    const r = await runner.stopBlock({ reason: null, text: 'I want to die' })
+    expect(r.ok && r.help).toBeTruthy()
+    const avant = overlay.shown.length
+    nowRef = new Date(WAKE.getTime() + 180 * 60_000)
+    await runner.tickNow()
+    expect(overlay.shown.length).toBe(avant)
+  })
+
+  it('les tentatives d’apps bloquées comptent dans la séance en cours, sous le même verrou', async () => {
+    const storage = fakeStorage(oneTaskSeed()) as Storage & { __mem: Map<string, unknown> }
+    const overlay = fakeOverlay()
+    const runner = createPlanRunner({ storage, overlay, now: () => WAKE })
+    await runner.tickNow()
+    const blockId = overlay.shown[0]!.blockId
+    await runner.confirmBlock(blockId)
+    await Promise.all([runner.recordBlockedAttempt(), runner.tickNow(), runner.recordBlockedAttempt()])
+    const learning = storage.__mem.get('learning') as LearningState
+    expect(learning.sessionEvents.find((x) => x.blockId === blockId)!.blockedAttempts).toBe(2)
+  })
+})
