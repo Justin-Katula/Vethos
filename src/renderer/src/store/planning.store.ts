@@ -42,6 +42,7 @@ const EMPTY_LEARNING: LearningState = {
   consecutiveDelays: {},
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
+  sessionEvents: [],
 }
 
 /**

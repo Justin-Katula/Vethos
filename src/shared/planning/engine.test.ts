@@ -10,8 +10,10 @@ import type {
   PlanningInput,
   PlanningResult,
   ScheduleEntry,
+  SessionEvent,
   TaskItem,
 } from './types'
+import { addDays } from './dates'
 
 // Mardi 11 août 2026, 8 h du matin.
 const NOW = new Date(2026, 7, 11, 8, 0)
@@ -1612,5 +1614,83 @@ describe('Placement par score (spec moteur 2026-09-25)', () => {
       .map((b) => b.startMinute)
     expect(departs.length).toBeGreaterThan(2)
     expect(new Set(departs).size).toBe(1)
+  })
+})
+
+describe('Apprentissage branché sur le moteur (spec moteur 2026-09-25)', () => {
+  const libre = (over: Partial<PlanningInput> = {}) =>
+    input({ schedule: sleepScheduleEntries('23:00', '07:00'), ...over })
+  const OBJ = objective({ weeklyTargetMinutes: 1200 })
+  const evenement = (i: number, over: Partial<SessionEvent> = {}): SessionEvent => ({
+    blockId: `b-${i}`,
+    date: addDays(TODAY, -(i + 1)),
+    kind: 'objective',
+    refId: OBJ.id,
+    category: `objectif:${OBJ.id}`,
+    plannedStartMinute: 9 * 60,
+    plannedMinutes: 60,
+    started: true,
+    delayMinutes: 0,
+    spontaneous: false,
+    heldMinutes: 60,
+    stoppedEarly: false,
+    blockedAttempts: 0,
+    load48hMinutes: 0,
+    createdAt: '2026-08-01T09:00:00.000Z',
+    ...over,
+  })
+  const servi = (plan: ReturnType<typeof computePlan>, date: string) =>
+    plan.blocks.filter((b) => b.kind === 'objective' && b.date === date).reduce((s, b) => s + b.workMinutes, 0)
+
+  it('sans journal : la cible complète, comme avant', () => {
+    const plan = computePlan(libre({ objectives: [OBJ] }), NOW)
+    expect(plan.objectiveDoses[OBJ.id]).toEqual({ dose: 1200, cible: 1200 })
+  })
+
+  it('journal vide : la première semaine porte la dose plancher, pas les 20 h', () => {
+    const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: [] }), NOW)
+    expect(plan.objectiveDoses[OBJ.id]).toEqual({ dose: 175, cible: 1200 })
+    expect(servi(plan, '2026-08-12')).toBeLessThanOrEqual(Math.ceil(175 / 7) + 5)
+  })
+
+  it('tenu à plus de 90 % : la dose monte de 15 %', () => {
+    const events = Array.from({ length: 7 }, (_, i) => evenement(i, { plannedMinutes: 50, heldMinutes: 50 }))
+    const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
+    expect(plan.objectiveDoses[OBJ.id]!.dose).toBe(Math.round(350 * 1.15))
+  })
+
+  it('la longueur des blocs s’apprend : on décroche vers 40 min → blocs de ~40 min', () => {
+    const events = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        evenement(i, { plannedMinutes: 90, heldMinutes: 40 + i, stoppedEarly: true, stop: { reason: 'tired', attemptsBefore: 0 } }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) => evenement(i + 6, { plannedMinutes: 90, heldMinutes: 90 })),
+    ]
+    const plan = computePlan(
+      libre({ objectives: [objective({ weeklyTargetMinutes: 6000 })].map((o) => ({ ...o, id: OBJ.id })), sessionEvents: events }),
+      NOW,
+    )
+    const blocs = plan.blocks.filter((b) => b.kind === 'objective' && b.date === '2026-08-12')
+    expect(blocs.length).toBeGreaterThan(0)
+    for (const b of blocs) expect(b.workMinutes).toBeLessThanOrEqual(45)
+  })
+
+  it('reste déterministe : mêmes entrées, même plan — le hasard de Thompson est à graine', () => {
+    const events = Array.from({ length: 12 }, (_, i) => evenement(i, { plannedStartMinute: (8 + (i % 6)) * 60 }))
+    const a = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
+    const b = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
+    expect(a.blocks).toEqual(b.blocks)
+  })
+
+  it('phase 3 et volume modeste : des jours off sur les jours de plus faible capacité', () => {
+    const events = Array.from({ length: 25 }, (_, i) => evenement(i, { plannedMinutes: 60, heldMinutes: 60 }))
+    const plan = computePlan(
+      libre({ objectives: [{ ...objective({ weeklyTargetMinutes: 360 }), id: OBJ.id }], sessionEvents: events }),
+      NOW,
+    )
+    const semaine = ['2026-08-17', '2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-22', '2026-08-23']
+    const actifs = semaine.filter((d) => servi(plan, d) > 0)
+    expect(actifs.length).toBeLessThan(7)
+    expect(actifs.length).toBeGreaterThan(0)
   })
 })

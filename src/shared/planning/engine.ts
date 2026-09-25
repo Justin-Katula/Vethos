@@ -36,7 +36,11 @@ import {
   tensionFor,
   type DayCapacityPoint,
 } from './feasibility'
-import { buildWindowMap, windowLookup } from './learning'
+import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
+import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe } from './bayes'
+import { doseSemaine, facteurDifficulte, phaseHabitude, rupturePossible, tenue } from './habitudes'
+import { ajustementPour, pauseAnticipee } from './arrets'
+import type { SessionEvent } from '@shared/schemas'
 import {
   computeObjectiveQuota,
   computeTaskDayTarget,
@@ -91,7 +95,30 @@ function footprintFor(workMinutes: number): number {
  * n'affiche rien et ne notifie personne (F, C.3.2, B.6) — elle produit des
  * faits chiffrés que d'autres points consommeront.
  */
-export function computePlan(input: PlanningInput, now: Date = new Date()): PlanningResult {
+export function computePlan(rawInput: PlanningInput, now: Date = new Date()): PlanningResult {
+  // Rampe de départ (spec 2026-09-25) : l'obligation de placement porte sur
+  // la DOSE de la semaine, pas sur la cible complète. Toute la suite du moteur
+  // — faisabilité, rythme, quota — voit la dose ; la cible reste dans le
+  // contrat, et l'écart se montre comme une progression.
+  const events = rawInput.sessionEvents
+  const objectiveDoses: Record<string, { dose: number; cible: number }> = {}
+  for (const o of rawInput.objectives) {
+    if (!events) {
+      objectiveDoses[o.id] = { dose: o.weeklyTargetMinutes, cible: o.weeklyTargetMinutes }
+      continue
+    }
+    const t = tenue(events, o.id, rawInput.today)
+    objectiveDoses[o.id] = {
+      dose: doseSemaine(o.weeklyTargetMinutes, t.tenuRecent, t.tauxTenue, t.observations),
+      cible: o.weeklyTargetMinutes,
+    }
+  }
+  const input: PlanningInput = {
+    ...rawInput,
+    objectives: rawInput.objectives.map((o) => ({ ...o, weeklyTargetMinutes: objectiveDoses[o.id]!.dose })),
+  }
+  const learn = events ? buildLearningContext(events, rawInput.today) : null
+
   const dates = datesBetween(input.today, input.rangeEnd)
   const nowMinute = dateKey(now) === input.today ? now.getHours() * 60 + now.getMinutes() : 0
 
@@ -350,18 +377,32 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
     const wakes = wakeMinutes(dayEntries)
     const wakeMinute = wakes.length ? Math.min(...wakes) : null
     const dayType = dayEntries.some((e) => e.categoryType === 'school' || e.categoryType === 'work') ? 'busy' : 'free'
-    const placedToday: Array<{ refId: string; startMinute: number; endMinute: number; work: number }> = []
+    // Les séances déjà vécues aujourd'hui comptent dans l'écart de 3 h : un
+    // objectif arrêté ou fini ne revient pas à l'écran dans la minute.
+    const placedToday: Array<{ refId: string; startMinute: number; endMinute: number; work: number }> =
+      date === input.today && events
+        ? events
+            .filter((e) => e.date === date && e.started)
+            .map((e) => {
+              const start = e.plannedStartMinute + (e.delayMinutes ?? 0)
+              const held = e.heldMinutes ?? e.plannedMinutes
+              return { refId: e.refId, startMinute: start, endMinute: start + held, work: held }
+            })
+        : []
     const loadBefore = (start: number) =>
       dayEntries
         .filter((e) => (e.categoryType === 'school' || e.categoryType === 'work') && e.startMinute < start)
         .reduce((t, e) => t + Math.min(e.endMinute, start) - e.startMinute, 0) +
       placedToday.filter((b) => b.endMinute <= start).reduce((t, b) => t + b.work, 0)
-    const scorer = (refId: string, session: number, hardGap: number, softGap = true) => {
+    const dayIsCrisis = saturated.has(date)
+    const scorer = (refId: string, session: number, hardGap: number, softGap = true, category?: string) => {
       const key = `${refId}|${dayType}|${session}`
       const sameRefToday = placedToday.filter((b) => b.refId === refId)
+      const learnedQuality = learn && category ? learn.quality(category, date, dow, dayIsCrisis) : undefined
       return (start: number, minutes: number) =>
         scoreSlot(start, minutes, {
           windowAt,
+          learnedQuality,
           wakeMinute,
           midSleepMinute,
           habitualStart: habitual.get(key) ?? null,
@@ -519,7 +560,9 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         todayCapacityMinutes: cap.effectiveCapacityMinutes,
         averageDayCapacityMinutes: averageCapacityByWeek.get(week) ?? 0,
         daysSinceLastService: lastServed ? Math.max(0, daysBetween(lastServed, date)) : 0,
+        activeDaysPerWeek: learn ? learn.activeDays(objective) : undefined,
       })
+      if (learn && learn.isDayOff(objective, week, date, capacities)) quota = 0
 
       // D.2 : part progressive cédée à la tâche en tension (85-100 % de
       // densité C.2). Débit AVANT celui de D.7 juste en dessous : deux causes
@@ -545,12 +588,13 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         left >= TASK_CONSTANTS.minBlockMinutes &&
         session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay
       ) {
-        const work = Math.min(left, TASK_CONSTANTS.targetBlockMinutes)
+        const objCategory = `objectif:${objective.id}`
+        const work = Math.min(left, learn ? learn.blockMax(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
         const slot = allocator.take(Math.min(footprint, budget), {
           avoid: deepExhausted ? 'PROFONDE' : undefined,
-          score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective),
+          score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective, true, objCategory),
         })
         if (!slot) break
         session++
@@ -578,6 +622,8 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
           cognitiveWindow: slot.cognitiveWindow,
           neverConfirmed: neverConfirmed(date, 'objective', objective.id) || undefined,
           appsToBlock: objective.appsToBlock,
+          category: `objectif:${objective.id}`,
+          breakAtMinute: learn?.pause(objective.id, size),
         })
 
         if (slot.cognitiveWindow === 'PROFONDE') deepWindowMinutes += workMinutes
@@ -623,7 +669,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         budget >= TASK_CONSTANTS.minBlockMinutes
       ) {
         const work = absorbCrumb(
-          Math.min(dayTarget, TASK_CONSTANTS.targetBlockMinutes),
+          Math.min(dayTarget, learn ? learn.blockMax(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
           remainingNeed.get(task.id) ?? 0,
         )
 
@@ -636,7 +682,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
         const taskSession = placedToday.filter((b) => b.refId === task.id).length
         const slot = allocator.take(footprint, {
           avoid: deepWindowMinutes + work > DEEP_BUDGET_MINUTES ? 'PROFONDE' : undefined,
-          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0),
+          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0, task.category),
         })
         if (!slot) break
 
@@ -663,6 +709,8 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
           neverConfirmed: neverConfirmed(date, 'task', task.id) || undefined,
           preview: previewTaskIds.has(task.id) || undefined,
           appsToBlock: task.appsToBlock,
+          category: task.category,
+          breakAtMinute: learn?.pause(task.id, size),
         })
 
         if (slot.cognitiveWindow === 'PROFONDE') deepWindowMinutes += workMinutes
@@ -758,6 +806,7 @@ export function computePlan(input: PlanningInput, now: Date = new Date()): Plann
       overLimit: activeTasks.length > wipLimit,
     },
     breathing,
+    objectiveDoses,
   }
 }
 
@@ -988,4 +1037,111 @@ function estimateMidSleep(schedule: PlanningInput['schedule'], dates: string[]):
     fallback ??= Math.round(mid)
   }
   return fallback
+}
+
+// ─── Apprentissage implicite (spec 2026-09-25) ────────────────────────────
+
+/** Valeurs de départ du score appris : pStart × (V_START + pTient × V_TIENT). */
+const V_START = 40
+const V_TIENT = 40
+/** Un prior neutre (0,5 / 0,5) donne 30 : recentré sur 0, il pèse comme une fenêtre NORMALE. */
+const V_NEUTRE = 0.5 * (V_START + 0.5 * V_TIENT)
+/** Le budget profond d'une journée : 2 blocs au plus. Appris ensuite, borné ici. */
+const MAX_JOUR = 2 * BLOC_MAX
+
+function buildLearningContext(events: SessionEvent[], today: string) {
+  // Une rupture probable (examens, vacances, nouveau travail) : l'ancien
+  // régime s'oublie plus vite.
+  const gamma = rupturePossible(events, today) ? 0.9 : GAMMA
+  const byCategory = new Map<string, SessionEvent[]>()
+  for (const e of events) {
+    const arr = byCategory.get(e.category) ?? []
+    arr.push(e)
+    byCategory.set(e.category, arr)
+  }
+  const startOk = (e: SessionEvent) => e.started && (e.delayMinutes ?? 0) <= 5
+  const heldOk = (e: SessionEvent) => e.started && (e.heldMinutes ?? 0) >= 0.8 * e.plannedMinutes
+
+  const blockMaxCache = new Map<string, number>()
+  const phaseCache = new Map<string, number>()
+  const phaseOf = (refId: string) => {
+    if (!phaseCache.has(refId)) phaseCache.set(refId, phaseHabitude(events, refId))
+    return phaseCache.get(refId)!
+  }
+  const activeDays = (objective: { id: string; weeklyTargetMinutes: number }) => {
+    if (phaseOf(objective.id) < 3) return DAYS_PER_WEEK
+    const n = Math.ceil(objective.weeklyTargetMinutes / MAX_JOUR)
+    return n <= 6 ? Math.max(1, n) : DAYS_PER_WEEK
+  }
+
+  return {
+    /**
+     * Thompson sampling : pour un départ, tire pStart et pTient dans leurs lois
+     * (catégorie → catégorie à cette heure → à cette heure ce jour de la
+     * semaine). Sous 5 observations de la catégorie : aucune conclusion, la
+     * qualité G.2 reste. En crise prouvée : pas d'exploration, la moyenne. La
+     * graine (catégorie, date, heure) rend le tirage stable d'un recalcul à
+     * l'autre.
+     */
+    quality(category: string, date: string, dow: number, crisis: boolean) {
+      const cat = byCategory.get(category) ?? []
+      if (!hasEnoughData(cat.length)) return undefined
+      return (start: number) => {
+        const hour = Math.floor(start / 60)
+        const atHour = cat.filter((e) => Math.floor(e.plannedStartMinute / 60) === hour)
+        const atDow = atHour.filter((e) => dayOfWeek(e.date) === dow)
+        const levels = (f: (e: SessionEvent) => boolean) => [cat.map(f), atHour.map(f), atDow.map(f)]
+        const pS = inheritedPosterior(levels(startOk), undefined, 4, gamma)
+        const pT = inheritedPosterior(levels(heldOk), undefined, 4, gamma)
+        let a: number
+        let b: number
+        if (crisis) {
+          a = betaMean(pS)
+          b = betaMean(pT)
+        } else {
+          const r = rng(seedFrom(`${category}|${date}|${hour}`))
+          a = sampleBeta(pS, r)
+          b = sampleBeta(pT, r)
+        }
+        return a * (V_START + b * V_TIENT) - V_NEUTRE
+      }
+    },
+    /**
+     * La longueur de bloc apprise : la durée où l'on a encore 80 % de chances
+     * de tenir (Kaplan-Meier), × la difficulté visée (~85 % tenu), bornée
+     * 25-90 ; raccourcie si le diagnostic d'arrêt montre de l'évitement.
+     */
+    blockMax(refId: string, category: string) {
+      const k = `${refId}|${category}`
+      if (!blockMaxCache.has(k)) {
+        const base = dureeCible(survieDe(events, category))
+        const t = tenue(events, refId, today)
+        const d = facteurDifficulte(t.tauxTenue, t.observations)
+        const adj = ajustementPour(events, refId)
+        const len = Math.max(BLOC_MIN, Math.min(BLOC_MAX, Math.round(base * d)))
+        blockMaxCache.set(k, adj.blocMax ? Math.min(len, adj.blocMax) : len)
+      }
+      return blockMaxCache.get(k)!
+    },
+    /** Pause anticipée, si elle tombe dans le bloc. */
+    pause(refId: string, size: number) {
+      const p = pauseAnticipee(events, refId)
+      return p !== null && p < size ? p : undefined
+    },
+    /**
+     * Jours actifs d'un objectif. Phases 1-2 : contact tous les jours (÷ 7).
+     * Phases 3-4 : jours off permis si joursNécessaires ≤ 6.
+     */
+    activeDays,
+    /** Les jours off tombent sur les jours de plus faible capacité, jamais fixés au dimanche. */
+    isDayOff(objective: { id: string; weeklyTargetMinutes: number }, week: string, date: string, caps: DayCapacity[]) {
+      const n = activeDays(objective)
+      if (n >= DAYS_PER_WEEK) return false
+      const semaine = caps.filter((c) => startOfWeek(c.date) === week)
+      const off = [...semaine]
+        .sort((a, b) => a.effectiveCapacityMinutes - b.effectiveCapacityMinutes || a.date.localeCompare(b.date))
+        .slice(0, Math.max(0, semaine.length - n))
+      return off.some((c) => c.date === date)
+    },
+  }
 }

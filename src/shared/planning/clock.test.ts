@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   applyConfirmation,
   applyLapsedCredit,
+  applyStop,
   applyWorkCredit,
   blockSessionFor,
+  closeSessionEvent,
+  recordBlockedAttempt,
   closedObservedBlock,
   computeBlockDelayMinutes,
   confirmationsFor,
@@ -366,6 +369,7 @@ const emptyLearning = (over: Partial<LearningState> = {}): LearningState => ({
   consecutiveDelays: {},
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
+  sessionEvents: [],
   ...over,
 })
 
@@ -727,5 +731,55 @@ describe('B.5.2 — « il m’en faut plus » après une complétion automatique
     expect(
       tasksToAutoComplete({ tasks: [relancee], workedMinutesByRef: { 'task-1': 165 } }),
     ).toEqual(['task-1'])
+  })
+})
+
+describe('Le journal des séances (spec moteur 2026-09-25)', () => {
+  const MS = new Date(2026, 7, 17, 10, 5).getTime()
+
+  it('« Je commence » ouvre un événement : démarré, retard mesuré, catégorie du bloc', () => {
+    const r = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block({ category: 'maths' }), MS, 605, { spontaneous: true })
+    expect(r.learning.sessionEvents).toHaveLength(1)
+    const e = r.learning.sessionEvents[0]!
+    expect(e).toMatchObject({ started: true, delayMinutes: 5, spontaneous: true, category: 'maths', plannedStartMinute: 600, heldMinutes: null })
+    expect(r.confirmations.observedPending?.plannedStartMinute).toBe(600)
+  })
+
+  it('un bloc vu mais jamais démarré entre au journal comme tel — un seul événement par bloc', () => {
+    const b = { kind: 'objective' as const, refId: 'o', startMinute: 600, endMinute: 660, blockId: 'obj-o-600', workMinutes: 60 }
+    const once = applyLapsedCredit(emptyLearning(), emptyConfirmations(TODAY), b, MS)
+    const twice = applyLapsedCredit(once.learning, once.confirmations, b, MS)
+    expect(twice.learning.sessionEvents).toHaveLength(1)
+    expect(twice.learning.sessionEvents[0]).toMatchObject({ started: false, category: 'objectif:o', delayMinutes: null })
+  })
+
+  it('une fenêtre refermée sans arrêt : tenue jusqu’au bout', () => {
+    const c = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block(), MS, 600)
+    const l = closeSessionEvent(c.learning, TODAY, block().id, 60)
+    expect(l.sessionEvents[0]!.heldMinutes).toBe(60)
+    // Déjà clos : un second passage ne réécrit rien.
+    expect(closeSessionEvent(l, TODAY, block().id, 10).sessionEvents[0]!.heldMinutes).toBe(60)
+  })
+
+  it('« Stop » : crédite jusqu’ici, referme la fenêtre ici, garde la raison', () => {
+    const c = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block(), MS, 600)
+    const s = applyStop({ learning: c.learning, confirmations: c.confirmations, nowMs: MS, minute: 638, reason: 'tired', text: '  crevé ', answerMs: 1800 })!
+    expect(s.heldMinutes).toBe(38)
+    expect(s.learning.workedMinutesByRef['ref-1']).toBe(38)
+    expect(s.confirmations.observedPending?.endMinute).toBe(638)
+    expect(s.learning.sessionEvents[0]).toMatchObject({ stoppedEarly: true, heldMinutes: 38, stop: { reason: 'tired', text: 'crevé', answerMs: 1800 } })
+    // La pendule referme ensuite la fenêtre sans créditer une minute de plus.
+    const again = applyWorkCredit(s.learning, s.confirmations, s.confirmations.observedPending!, 600)
+    expect(again.creditedMinutes).toBe(0)
+  })
+
+  it('« Stop » sans séance confirmée ne fait rien', () => {
+    expect(applyStop({ learning: emptyLearning(), confirmations: emptyConfirmations(TODAY), nowMs: MS, minute: 620, reason: null })).toBeNull()
+  })
+
+  it('compte les tentatives d’apps bloquées de la séance en cours', () => {
+    const c = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block(), MS, 600)
+    const l = recordBlockedAttempt(recordBlockedAttempt(c.learning, c.confirmations), c.confirmations)
+    expect(l.sessionEvents[0]!.blockedAttempts).toBe(2)
   })
 })

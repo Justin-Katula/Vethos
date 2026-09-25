@@ -2,7 +2,11 @@ import {
   activeBlockFor,
   applyConfirmation,
   applyLapsedCredit,
+  applyStop,
   applyWorkCredit,
+  closeSessionEvent,
+  recordBlockedAttempt,
+  type JournalContext,
   closedObservedBlock,
   confirmationsFor,
   pendingConfirmation,
@@ -10,7 +14,7 @@ import {
 } from '@shared/planning/clock'
 import { activeConfirmedSession } from '@shared/planning/session'
 import type { PlacedBlock } from '@shared/planning/types'
-import type { LearningState, SessionConfirmationsState } from '@shared/schemas'
+import type { LearningState, SessionConfirmationsState, StopReason } from '@shared/schemas'
 import { versTachesMoteur } from '@/plan/moteur'
 import type { Tache } from '@/donnees/magasin'
 
@@ -133,7 +137,7 @@ export function tictac(args: {
     const confirmeA = confirmations.confirmedAt[ferme.blockId]
     if (confirmeA === undefined) {
       // D.7 : jamais confirmé — toute la fenêtre compte comme du retard.
-      const r = applyLapsedCredit(apprentissage, confirmations, ferme)
+      const r = applyLapsedCredit(apprentissage, confirmations, ferme, args.maintenant.getTime())
       apprentissage = r.learning
       confirmations = r.confirmations
     } else {
@@ -145,7 +149,13 @@ export function tictac(args: {
         ferme,
         minuteDuJour(new Date(confirmeA)),
       )
-      apprentissage = r.learning
+      // Journal : la fenêtre s'est refermée sans « Stop » — tenue jusqu'au bout.
+      apprentissage = closeSessionEvent(
+        r.learning,
+        confirmations.date,
+        ferme.blockId,
+        ferme.workMinutes ?? ferme.endMinute - ferme.startMinute,
+      )
       confirmations = r.confirmations
     }
     change = true
@@ -190,6 +200,8 @@ export function tictac(args: {
           startMinute: actifMaintenant.startMinute,
           endMinute: actifMaintenant.endMinute,
           workMinutes: actifMaintenant.workMinutes,
+          ...(actifMaintenant.category ? { category: actifMaintenant.category } : {}),
+          plannedStartMinute: Math.min(1439, actifMaintenant.startMinute),
         }
       : null
 
@@ -248,6 +260,8 @@ export function confirmer(args: {
   maintenant: Date
   bloc: PlacedBlock
   etat: EtatSeances
+  /** Démarré sans l'overlay, charge des 48 h, heures éveillé : le journal les garde. */
+  contexte?: JournalContext
 }): EtatSeances & { retardMinutes: number; refuse?: string } {
   const minute = minuteDuJour(args.maintenant)
   if (args.bloc.id in args.etat.confirmations.confirmedAt) {
@@ -259,10 +273,43 @@ export function confirmer(args: {
     args.bloc,
     args.maintenant.getTime(),
     minute,
+    args.contexte,
   )
   return {
     apprentissage: r.learning,
     confirmations: r.confirmations,
     retardMinutes: r.delayMinutes,
   }
+}
+
+/**
+ * « Stop » : la séance s'arrête ici. Le travail est crédité jusqu'à cette
+ * minute, la raison (un tap, texte optionnel) entre au journal. Rend null s'il
+ * n'y a pas de séance confirmée en cours.
+ */
+export function arreter(args: {
+  maintenant: Date
+  etat: EtatSeances
+  raison: StopReason | null
+  texte?: string
+  reponseMs?: number
+  tentativesAvant?: number
+}): (EtatSeances & { tenuMinutes: number }) | null {
+  const r = applyStop({
+    learning: args.etat.apprentissage,
+    confirmations: args.etat.confirmations,
+    nowMs: args.maintenant.getTime(),
+    minute: minuteDuJour(args.maintenant),
+    reason: args.raison,
+    ...(args.texte !== undefined ? { text: args.texte } : {}),
+    ...(args.reponseMs !== undefined ? { answerMs: args.reponseMs } : {}),
+    ...(args.tentativesAvant !== undefined ? { attemptsBefore: args.tentativesAvant } : {}),
+  })
+  if (!r) return null
+  return { apprentissage: r.learning, confirmations: r.confirmations, tenuMinutes: r.heldMinutes }
+}
+
+/** Une tentative d'ouvrir une app bloquée, pendant la séance en cours. */
+export function tentativeBloquee(etat: EtatSeances): EtatSeances {
+  return { ...etat, apprentissage: recordBlockedAttempt(etat.apprentissage, etat.confirmations) }
 }

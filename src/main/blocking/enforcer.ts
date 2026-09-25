@@ -62,7 +62,13 @@ export type Enforcer = {
   blockedPids: () => number[]
 }
 
-export function createEnforcer(deps: { network?: NetworkController } = {}): Enforcer {
+export function createEnforcer(
+  deps: {
+    network?: NetworkController
+    /** Une tentative d'ouvrir une app ou un site bloqué : le signal le plus fort de l'apprentissage (spec 2026-09-25). */
+    onBlockedAttempt?: () => void
+  } = {},
+): Enforcer {
   const network = deps.network ?? createNetworkController()
   const suivis = new Map<number, Suivi>()
   let scanTimer: NodeJS.Timeout | null = null
@@ -132,6 +138,7 @@ export function createEnforcer(deps: { network?: NetworkController } = {}): Enfo
     // Le groupe d'overlay possède l'unique watcher de fenêtres. L'ancien
     // double watcher créait une course où deux callbacks tentaient de créer et
     // rattacher le même overlay, d'où les apparitions intermittentes.
+    deps.onBlockedAttempt?.()
     showBlockOverlayWindow({
       targetName: exeName,
       type: 'app',
@@ -207,6 +214,7 @@ export function createEnforcer(deps: { network?: NetworkController } = {}): Enfo
     })
     tracker.on('site-detected', (event) => {
       if (!actif || !siteEstBloque(event.domain)) return
+      deps.onBlockedAttempt?.()
       showBlockOverlayWindow({
         targetName: event.domain,
         type: 'site',

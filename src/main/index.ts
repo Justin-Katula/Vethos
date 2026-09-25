@@ -240,7 +240,7 @@ let blockingClock: ReconciliationClock | null = null
  * sur les fenêtres. Créé au chargement du module pour qu'un arrêt précoce
  * puisse déjà lui demander de tout restaurer.
  */
-const enforcer = createEnforcer()
+const enforcer = createEnforcer({ onBlockedAttempt: () => void planRunner?.recordBlockedAttempt() })
 
 /**
  * Horloge de planification (D.7/D.8), créée une fois l'application prête —
@@ -307,6 +307,9 @@ function startNexusApp(): void {
         () => blockingClock?.current() ?? { active: false, blockedAppIds: [], endsAt: null },
         (blockId) =>
           planRunner?.confirmBlock(blockId) ??
+          Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
+        (args) =>
+          planRunner?.stopBlock(args) ??
           Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
       )
 

@@ -1,7 +1,7 @@
 import { mergeIntervals, type Interval } from '@shared/planning/capacity'
 import { plannedTotalFor } from '@shared/planning/engine'
 import type { PlacedBlock, TaskItem } from '@shared/planning/types'
-import type { LearningState, ObservedPendingBlock, SessionConfirmationsState } from '@shared/schemas'
+import type { LearningState, ObservedPendingBlock, SessionConfirmationsState, SessionEvent, StopReason } from '@shared/schemas'
 
 // D.7 : réexporté depuis `@shared/planning/session` — le renderer en a besoin
 // aussi, et les deux DOIVENT dériver la session en cours de la même façon.
@@ -278,7 +278,8 @@ export function confirmationsFor(
 export function applyLapsedCredit(
   learning: LearningState,
   confirmations: SessionConfirmationsState,
-  block: CreditableBlock,
+  block: CreditableBlock & { blockId?: string; workMinutes?: number; category?: string; plannedStartMinute?: number },
+  nowMs: number = Date.now(),
 ): { learning: LearningState; confirmations: SessionConfirmationsState } {
   const delay = uncoveredMinutes(block, confirmations.lapsedCreditedRanges)
   const today = confirmations.date
@@ -292,8 +293,31 @@ export function applyLapsedCredit(
   // ultérieur, entièrement superflu, mentionnait son id).
   const bumpsStreak = delay > 0 && !confirmations.streakBumpedRefs.includes(block.refId)
 
+  // Journal : un bloc que l'application a VU s'ouvrir et se refermer sans
+  // démarrage. C'est un fait — « jamais démarré » —, pas un jugement.
+  const journaled =
+    block.blockId === undefined
+      ? learning
+      : recordEvent(learning, {
+          blockId: block.blockId,
+          date: today,
+          kind: block.kind,
+          refId: block.refId,
+          category: block.category ?? defaultCategory(block.kind, block.refId),
+          plannedStartMinute: Math.min(1440, block.plannedStartMinute ?? block.startMinute),
+          plannedMinutes: Math.max(1, block.workMinutes ?? block.endMinute - block.startMinute),
+          started: false,
+          delayMinutes: null,
+          spontaneous: false,
+          heldMinutes: null,
+          stoppedEarly: false,
+          blockedAttempts: 0,
+          load48hMinutes: 0,
+          createdAt: new Date(nowMs).toISOString(),
+        })
+
   const nextLearning: LearningState = {
-    ...learning,
+    ...journaled,
     dailyDelayMinutes: {
       ...learning.dailyDelayMinutes,
       [today]: Math.min(1440, (learning.dailyDelayMinutes[today] ?? 0) + delay),
@@ -440,12 +464,30 @@ export function applyConfirmation(
   block: PlacedBlock,
   confirmedAtMs: number,
   confirmationMinute: number,
+  context: JournalContext = {},
 ): { learning: LearningState; confirmations: SessionConfirmationsState; delayMinutes: number } {
   const delay = computeBlockDelayMinutes(block, confirmationMinute)
   const today = confirmations.date
 
   const nextLearning: LearningState = {
-    ...learning,
+    ...recordEvent(learning, {
+      blockId: block.id,
+      date: today,
+      kind: block.kind,
+      refId: block.refId,
+      category: block.category ?? defaultCategory(block.kind, block.refId),
+      plannedStartMinute: block.startMinute,
+      plannedMinutes: Math.max(1, block.workMinutes),
+      started: true,
+      delayMinutes: delay,
+      spontaneous: context.spontaneous ?? false,
+      heldMinutes: null,
+      stoppedEarly: false,
+      blockedAttempts: 0,
+      load48hMinutes: context.load48hMinutes ?? 0,
+      ...(context.hoursAwake !== undefined ? { hoursAwake: context.hoursAwake } : {}),
+      createdAt: new Date(confirmedAtMs).toISOString(),
+    }),
     dailyDelayMinutes: {
       ...learning.dailyDelayMinutes,
       [today]: Math.min(1440, (learning.dailyDelayMinutes[today] ?? 0) + delay),
@@ -468,10 +510,161 @@ export function applyConfirmation(
       startMinute: confirmationMinute,
       endMinute: Math.min(1440, confirmationMinute + (block.endMinute - block.startMinute)),
       workMinutes: block.workMinutes,
+      ...(block.category ? { category: block.category } : {}),
+      plannedStartMinute: Math.min(1439, block.startMinute),
     },
     // Confirmée, cette référence n'est plus « ratée » aujourd'hui non plus.
     streakBumpedRefs: confirmations.streakBumpedRefs.filter((r) => r !== block.refId),
   }
 
   return { learning: nextLearning, confirmations: nextConfirmations, delayMinutes: delay }
+}
+
+// ─── Le journal des séances (spec moteur 2026-09-25) ─────────────────────
+
+/** Ce que l'application sait du moment, au démarrage d'une séance. */
+export type JournalContext = {
+  /** Démarré sans que l'overlay ne l'ait demandé (raccourci, ou avant qu'il ne vienne). */
+  spontaneous?: boolean
+  load48hMinutes?: number
+  hoursAwake?: number
+}
+
+const JOURNAL_MAX = 3000
+
+export const defaultCategory = (kind: SessionEvent['kind'], refId: string) =>
+  kind === 'objective' ? `objectif:${refId}` : kind === 'ancre' ? `ancre:${refId}` : 'général'
+
+/**
+ * Ajoute un événement, ou ne fait rien s'il y en a déjà un pour ce bloc ce
+ * jour-là : le premier fait observé l'emporte. Le journal garde les 3000
+ * derniers — l'oubli progressif rend les plus vieux sans poids de toute façon.
+ */
+export function recordEvent(learning: LearningState, event: SessionEvent): LearningState {
+  const journal = learning.sessionEvents ?? []
+  if (journal.some((e) => e.blockId === event.blockId && e.date === event.date)) return learning
+  return { ...learning, sessionEvents: [...journal, event].slice(-JOURNAL_MAX) }
+}
+
+function updateEvent(
+  learning: LearningState,
+  date: string,
+  blockId: string,
+  f: (e: SessionEvent) => SessionEvent,
+): LearningState {
+  const journal = learning.sessionEvents ?? []
+  const i = journal.findIndex((e) => e.blockId === blockId && e.date === date)
+  if (i < 0) return learning
+  const next = [...journal]
+  next[i] = f(journal[i]!)
+  return { ...learning, sessionEvents: next }
+}
+
+/**
+ * La fenêtre d'une séance confirmée s'est refermée sans arrêt : elle a été
+ * tenue jusqu'au bout. Rien ne change si l'événement est déjà clos (un arrêt
+ * a déjà fixé le temps tenu).
+ */
+export function closeSessionEvent(
+  learning: LearningState,
+  date: string,
+  blockId: string,
+  heldMinutes: number,
+): LearningState {
+  return updateEvent(learning, date, blockId, (e) =>
+    e.heldMinutes !== null ? e : { ...e, heldMinutes: Math.max(0, Math.min(1440, Math.round(heldMinutes))) },
+  )
+}
+
+/** Une tentative d'ouvrir une app bloquée pendant la séance en cours. */
+export function recordBlockedAttempt(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+): LearningState {
+  const o = confirmations.observedPending
+  if (!o || !(o.blockId in confirmations.confirmedAt)) return learning
+  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: e.blockedAttempts + 1 }))
+}
+
+/**
+ * « Stop » pendant une séance : le travail est crédité jusqu'à cette minute,
+ * la fenêtre observée se referme ici — la pendule la clôt au tic suivant sans
+ * rien créditer de plus —, et l'arrêt entre au journal avec sa raison (un
+ * tap, texte optionnel). La raison est un signal faible ; le comportement
+ * autour d'elle (minute, tentatives d'apps, temps de réponse) est le fort.
+ */
+export function applyStop(args: {
+  learning: LearningState
+  confirmations: SessionConfirmationsState
+  nowMs: number
+  minute: number
+  reason: StopReason | null
+  text?: string
+  answerMs?: number
+  attemptsBefore?: number
+}): { learning: LearningState; confirmations: SessionConfirmationsState; heldMinutes: number } | null {
+  const { confirmations } = args
+  const o = confirmations.observedPending
+  if (!o) return null
+  const confirmedAt = confirmations.confirmedAt[o.blockId]
+  if (confirmedAt === undefined || args.minute >= o.endMinute) return null
+
+  const credited = applyWorkCredit(args.learning, confirmations, o, o.startMinute, args.minute)
+  const held = Math.max(0, args.minute - o.startMinute)
+  const text = args.text?.trim()
+  const learning = updateEvent(credited.learning, confirmations.date, o.blockId, (e) => ({
+    ...e,
+    heldMinutes: held,
+    stoppedEarly: true,
+    stop: {
+      reason: args.reason,
+      ...(text ? { text: text.slice(0, 500) } : {}),
+      ...(args.answerMs !== undefined ? { answerMs: Math.max(0, Math.round(args.answerMs)) } : {}),
+      attemptsBefore: args.attemptsBefore ?? 0,
+    },
+  }))
+  const end = Math.max(o.startMinute + 1, args.minute)
+  return {
+    learning,
+    confirmations: {
+      ...credited.confirmations,
+      observedPending: { ...o, endMinute: end, workMinutes: Math.max(0, end - o.startMinute) },
+    },
+    heldMinutes: held,
+  }
+}
+
+/** Les séances déjà vécues aujourd'hui (démarrées), en intervalles réels. */
+export function sessionsDoneToday(learning: LearningState, today: string): Array<{ refId: string; startMinute: number; endMinute: number }> {
+  return (learning.sessionEvents ?? [])
+    .filter((e) => e.date === today && e.started)
+    .map((e) => {
+      const start = e.plannedStartMinute + (e.delayMinutes ?? 0)
+      return { refId: e.refId, startMinute: start, endMinute: start + (e.heldMinutes ?? e.plannedMinutes) }
+    })
+}
+
+/**
+ * Le contexte d'un démarrage, mesuré : charge des 48 dernières heures (ce que
+ * le journal a vu tenir hier et aujourd'hui) et heures éveillé depuis le
+ * lever. Sert au diagnostic d'arrêt (fatigue ou évitement ?).
+ */
+export function journalContextFor(args: {
+  learning: LearningState
+  today: string
+  yesterday: string
+  nowMinute: number
+  wakeMinute: number | null
+  spontaneous?: boolean
+}): JournalContext {
+  const load = (args.learning.sessionEvents ?? [])
+    .filter((e) => (e.date === args.today || e.date === args.yesterday) && e.started)
+    .reduce((t, e) => t + (e.heldMinutes ?? 0), 0)
+  return {
+    spontaneous: args.spontaneous ?? false,
+    load48hMinutes: Math.min(2880, load),
+    ...(args.wakeMinute !== null && args.nowMinute >= args.wakeMinute
+      ? { hoursAwake: Math.min(24, (args.nowMinute - args.wakeMinute) / 60) }
+      : {}),
+  }
 }

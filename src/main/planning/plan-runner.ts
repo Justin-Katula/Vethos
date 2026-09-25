@@ -4,13 +4,17 @@ import { computePlan, PLANNING_HORIZON_DAYS } from '@shared/planning/engine'
 import { addDays, dateKey } from '@shared/planning/dates'
 import { sleepScheduleEntries } from '@shared/sleep'
 import type { PlacedBlock, PlanningInput } from '@shared/planning/types'
-import type { BlockingRulesState, LearningState } from '@shared/schemas'
+import type { BlockingRulesState, LearningState, StopReason } from '@shared/schemas'
 import { blockSessionIsActiveAt } from '@main/blocking/schedule'
 import {
   activeBlockFor,
   activeConfirmedSession,
   applyConfirmation,
   applyLapsedCredit,
+  applyStop,
+  closeSessionEvent,
+  recordBlockedAttempt,
+  journalContextFor,
   applyWorkCredit,
   blockSessionFor,
   closedObservedBlock,
@@ -42,6 +46,13 @@ const EMPTY_LEARNING: LearningState = {
   consecutiveDelays: {},
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
+  sessionEvents: [],
+}
+
+/** « 07:30 » → 450 ; null si absent ou illisible. */
+function minuteOf(hhmm: string | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm ?? '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
 }
 
 /** Minute du jour d'un instant — l'unité dans laquelle vivent tous les blocs. */
@@ -74,6 +85,17 @@ export type PlanRunner = {
   stop: () => void
   tickNow: () => Promise<void>
   confirmBlock: (blockId: string) => Promise<ConfirmResult>
+  /** « Stop » pendant une séance : crédite jusqu'ici, lève le blocage, garde la raison. */
+  stopBlock: (args: StopArgs) => Promise<ConfirmResult>
+  /** Une tentative d'ouvrir une app ou un site bloqué pendant la séance. */
+  recordBlockedAttempt: () => Promise<void>
+}
+
+export type StopArgs = {
+  reason: StopReason | null
+  text?: string
+  /** Temps mis à répondre, en ms. */
+  answerMs?: number
 }
 
 export const DEFAULT_PLAN_TICK_MS = 5_000
@@ -127,6 +149,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       lastSignalAt: learning.lastSignalAt,
       tasksCreatedPerWeek: learning.tasksCreatedPerWeek,
       consecutiveDelays: learning.consecutiveDelays,
+      // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
+      sessionEvents: learning.sessionEvents,
       confirmationSource: {
         getDelayMinutes: (date) => learning.dailyDelayMinutes[date] ?? 0,
         wasNeverConfirmed: () => false,
@@ -158,6 +182,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       confirmations,
       todayBlocks,
       tasks: tasksState?.tasks ?? [],
+      wakeMinute: minuteOf(settings?.sleepEnd),
     }
   }
 
@@ -227,7 +252,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       const confirmedAtMs = confirmations.confirmedAt[closed.blockId]
       if (confirmedAtMs === undefined) {
         // D.7 : jamais confirmé — la fenêtre entière compte comme du retard.
-        const result = applyLapsedCredit(workingLearning, workingConfirmations, closed)
+        const result = applyLapsedCredit(workingLearning, workingConfirmations, closed, now.getTime())
         workingLearning = result.learning
         workingConfirmations = result.confirmations
         log.info('[planning] bloc jamais confirmé, retard crédité', {
@@ -244,7 +269,13 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
           closed,
           minuteOfDay(new Date(confirmedAtMs)),
         )
-        workingLearning = result.learning
+        // Journal : refermée sans « Stop » — tenue jusqu'au bout.
+        workingLearning = closeSessionEvent(
+          result.learning,
+          workingConfirmations.date,
+          closed.blockId,
+          closed.workMinutes ?? closed.endMinute - closed.startMinute,
+        )
         workingConfirmations = result.confirmations
         log.info('[planning] bloc terminé, travail crédité', {
           blockId: closed.blockId,
@@ -295,6 +326,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
           startMinute: activeNow.startMinute,
           endMinute: activeNow.endMinute,
           workMinutes: activeNow.workMinutes,
+          ...(activeNow.category ? { category: activeNow.category } : {}),
+          plannedStartMinute: Math.min(1439, activeNow.startMinute),
           }
         : null
     if (nextObserved?.blockId !== workingConfirmations.observedPending?.blockId) {
@@ -378,7 +411,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
 
   async function confirmBlock(blockId: string): Promise<ConfirmResult> {
     const now = deps.now()
-    const { nowMinute, learning, confirmations, todayBlocks } = await loadTodayState(now)
+    const { today, nowMinute, learning, confirmations, todayBlocks, wakeMinute } = await loadTodayState(now)
 
     if (blockId in confirmations.confirmedAt) {
       return { ok: false, reason: 'Déjà confirmé.' }
@@ -407,7 +440,14 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     }
 
     const confirmedAtMs = now.getTime()
-    const result = applyConfirmation(learning, confirmations, block, confirmedAtMs, nowMinute)
+    const result = applyConfirmation(
+      learning,
+      confirmations,
+      block,
+      confirmedAtMs,
+      nowMinute,
+      journalContextFor({ learning, today, yesterday: addDays(today, -1), nowMinute, wakeMinute }),
+    )
 
     const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
     const session = blockSessionFor(block, confirmedAtMs)
@@ -431,6 +471,46 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     return { ok: true }
   }
 
+  // Horodatages des tentatives récentes : « tentatives dans les 10 min avant
+  // l'arrêt » se mesure ici, en mémoire — rien à persister.
+  let attempts: number[] = []
+
+  async function recordAttempt(): Promise<void> {
+    const now = deps.now()
+    attempts = [...attempts.filter((t) => now.getTime() - t < 10 * 60_000), now.getTime()]
+    const { learning, confirmations } = await loadTodayState(now)
+    const next = recordBlockedAttempt(learning, confirmations)
+    if (next !== learning) await deps.storage.write('learning', next)
+  }
+
+  async function stopBlock(args: StopArgs): Promise<ConfirmResult> {
+    const now = deps.now()
+    const { nowMinute, learning, confirmations } = await loadTodayState(now)
+    const result = applyStop({
+      learning,
+      confirmations,
+      nowMs: now.getTime(),
+      minute: nowMinute,
+      reason: args.reason,
+      ...(args.text !== undefined ? { text: args.text } : {}),
+      ...(args.answerMs !== undefined ? { answerMs: args.answerMs } : {}),
+      attemptsBefore: attempts.filter((t) => now.getTime() - t < 10 * 60_000).length,
+    })
+    if (!result) return { ok: false, reason: 'Aucune séance en cours.' }
+
+    const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
+    await Promise.all([
+      deps.storage.write('learning', result.learning),
+      deps.storage.write('session_confirmations', result.confirmations),
+      // La séance s'arrête : son blocage aussi.
+      deps.storage.write('blocking_rules', { ...rules, block: null }),
+    ])
+    log.info('[planning] séance arrêtée', { heldMinutes: result.heldMinutes, reason: args.reason })
+    deps.onBlockConfirmed?.()
+    deps.onPlanningDataChanged?.()
+    return { ok: true }
+  }
+
   return {
     start(intervalMs = DEFAULT_PLAN_TICK_MS) {
       if (timer !== null) return
@@ -444,5 +524,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     },
     tickNow,
     confirmBlock,
+    stopBlock,
+    recordBlockedAttempt: recordAttempt,
   }
 }

@@ -108,6 +108,11 @@ export function computeObjectiveQuota(args: {
   /** Capacité effective moyenne des jours connus de cette semaine (A.3). */
   averageDayCapacityMinutes: number
   daysSinceLastService: number
+  /**
+   * Jours actifs de la semaine. 7 par défaut (÷ 7, phases 1-2). En phases 3-4,
+   * quand le volume le permet, moins de jours portent la dose (jours off).
+   */
+  activeDaysPerWeek?: number
 }): number {
   const remainingTarget = Math.max(
     0,
@@ -115,7 +120,7 @@ export function computeObjectiveQuota(args: {
   )
   if (remainingTarget <= 0 || args.todayCapacityMinutes <= 0) return 0
 
-  const rhythm = dailyRhythm(args.objective.weeklyTargetMinutes)
+  const rhythm = args.objective.weeklyTargetMinutes / (args.activeDaysPerWeek ?? DAYS_PER_WEEK)
 
   // Un jour plus libre que la moyenne de sa semaine en porte davantage, un jour
   // plus chargé en porte moins — le rythme, lui, ne change pas. Sans moyenne
@@ -248,6 +253,11 @@ export type ScoreContext = {
   midSleepMinute: number | null
   /** Départ habituel de ce bloc pour ce type de jour, s'il y en a déjà un. */
   habitualStart: number | null
+  /**
+   * Apprentissage (Thompson) : la valeur apprise d'un départ, qui remplace la
+   * qualité G.2 quand il y a assez de données. Absent = qualité G.2.
+   */
+  learnedQuality?: (start: number) => number
   /** Blocs déjà posés aujourd'hui pour le même engagement. */
   sameRefToday: Array<{ startMinute: number; endMinute: number }>
   /** Écart minimal imposé avec ces blocs (objectif : 3 h) ; 0 = aucun écart imposé. */
@@ -271,7 +281,7 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
     gap = Math.min(gap, g)
   }
   if (c.hardGapMinutes > 0 && gap < c.hardGapMinutes) return -Infinity
-  let s = SCORE_DEFAULTS.quality[c.windowAt(Math.floor(start / 60))]
+  let s = c.learnedQuality ? c.learnedQuality(start) : SCORE_DEFAULTS.quality[c.windowAt(Math.floor(start / 60))]
   if (c.midSleepMinute !== null) {
     const peak = (c.midSleepMinute + SCORE_DEFAULTS.peakHoursAfterMidSleep * 60) % 1440
     s -= SCORE_DEFAULTS.synchronyPerHour * circularHours(start + minutes / 2, peak)

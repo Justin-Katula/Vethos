@@ -244,6 +244,7 @@ function createBrowserStub(): NexusApi {
     },
     planning: {
       confirmBlock: async () => ({ ok: true as const }),
+      stopBlock: async () => ({ ok: true as const }),
       onChanged: () => () => undefined,
     },
   }

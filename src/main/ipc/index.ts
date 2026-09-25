@@ -1,6 +1,12 @@
 import { ipcMain, app, shell, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { Storage } from '@shared/storage'
+import { z } from 'zod'
+import { STOP_REASONS, type StopReason } from '@shared/schemas'
+
+const StopBlockArgsSchema = z
+  .object({ reason: z.enum(STOP_REASONS).nullable(), text: z.string().max(500).optional(), answerMs: z.number().int().min(0).max(3_600_000).optional() })
+  .strict()
 import log, { getLogFilePath } from '@main/logging/setup'
 import { setSleepWindow } from '@main/notifications'
 import { applyThemeToWindow, setMainProcessTheme } from '@main/theme-chrome'
@@ -23,11 +29,14 @@ export type BlockingSessionState = {
 
 export type ConfirmBlockResult = { ok: true } | { ok: false; reason: string }
 
+export type StopBlockArgs = { reason: StopReason | null; text?: string; answerMs?: number }
+
 export async function registerAllIpcHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
   getBlockingSession: () => BlockingSessionState,
   confirmBlock: (blockId: string) => Promise<ConfirmBlockResult>,
+  stopBlock: (args: StopBlockArgs) => Promise<ConfirmBlockResult> = async () => ({ ok: false, reason: 'Indisponible.' }),
 ): Promise<void> {
   registerStorageHandlers(storage)
 
@@ -99,6 +108,13 @@ export async function registerAllIpcHandlers(
       ? confirmBlock(blockId)
       : { ok: false, reason: 'blockId invalide.' },
   )
+
+  // « Stop » pendant une séance (spec moteur 2026-09-25) : une raison en un
+  // tap, un texte optionnel. Validé ici — rien de la fenêtre n'est cru tel quel.
+  ipcMain.handle(IPC_CHANNELS.PLANNING_STOP_BLOCK, (_e, raw: unknown) => {
+    const parsed = StopBlockArgsSchema.safeParse(raw)
+    return parsed.success ? stopBlock(parsed.data) : { ok: false, reason: 'Arrêt invalide.' }
+  })
 
   // ─── Blocage intelligent par IA ──────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.INTELLIGENT_BLOCKING_GET_KNOWLEDGE, async () => {

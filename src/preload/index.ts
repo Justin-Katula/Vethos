@@ -6,6 +6,7 @@ import type {
 } from '@shared/schemas'
 import type { AppCategory } from '@shared/app-categories'
 import type { Theme } from '@shared/theme'
+import type { StopReason } from '@shared/schemas'
 
 export type StorageWriteResult = { ok: true } | { ok: false; error: string }
 
@@ -193,6 +194,9 @@ const api = {
     /** D.7/D.8 : confirme « Je commence » pour ce bloc. Démarre réellement le blocage de ses apps_à_bloquer. */
     confirmBlock: (blockId: string): Promise<ConfirmBlockResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_CONFIRM_BLOCK, blockId),
+    /** « Stop » : arrête la séance en cours, avec une raison en un tap (spec 2026-09-25). */
+    stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number }): Promise<ConfirmBlockResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_STOP_BLOCK, args),
     /** Poussé par l'horloge de planification dès qu'elle écrit du retard, un raté, ou une confirmation. */
     onChanged: (cb: () => void): (() => void) => {
       const listener = () => cb()

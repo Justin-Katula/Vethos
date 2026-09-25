@@ -357,8 +357,62 @@ export const LearningStateSchema = z.object({
    * capacité effective (A.3). Jamais reporté au lendemain.
    */
   dailyDelayMinutes: z.record(z.string(), z.number().int().min(0).max(1440)).default({}),
+  /**
+   * Le journal des séances (spec moteur 2026-09-25) : un événement par bloc
+   * que l'application a VU — démarré ou non, tenu combien, arrêté pourquoi.
+   * C'est la matière de l'apprentissage implicite (Beta, Kaplan-Meier, rampe,
+   * phases de retrait, diagnostic d'arrêt). Mesuré, jamais déclaré — sauf la
+   * raison d'arrêt, que l'utilisateur donne en un tap et que le moteur ne
+   * prend que comme un signal faible.
+   */
+  sessionEvents: z.array(z.lazy(() => SessionEventSchema)).max(3000).default([]),
 })
 export type LearningState = z.infer<typeof LearningStateSchema>
+
+/** Les six raisons d'arrêt proposées en un tap (Steel, 2007). */
+export const STOP_REASONS = ['too-hard', 'boring', 'no-rush', 'distracted', 'tired', 'real-event'] as const
+export type StopReason = (typeof STOP_REASONS)[number]
+
+export const SessionEventSchema = z.object({
+  /** Id stable du bloc (engine.ts) — un seul événement par bloc et par jour. */
+  blockId: z.string().min(1),
+  date: z.string().regex(DATE_REGEX),
+  kind: z.enum(['task', 'objective', 'ancre']),
+  refId: z.string().min(1),
+  /** Catégorie de la tâche, ou « objectif » / « ancre » : la clé de l'apprentissage des durées. */
+  category: z.string().max(60).default('général'),
+  /** Heure de début prévue, en minutes depuis minuit. */
+  plannedStartMinute: z.number().int().min(0).max(1440),
+  /** Durée de travail prévue (pause exclue). */
+  plannedMinutes: z.number().int().min(1).max(1440),
+  started: z.boolean(),
+  /** Retard mesuré à « Je commence » ; null si jamais démarré. */
+  delayMinutes: z.number().int().min(0).max(1440).nullable().default(null),
+  /** Démarré sans attendre l'overlay (raccourci, ou avant que l'overlay ne vienne). */
+  spontaneous: z.boolean().default(false),
+  /** Minutes réellement tenues ; null tant que la séance n'est pas close. */
+  heldMinutes: z.number().int().min(0).max(1440).nullable().default(null),
+  /** Arrêtée avant la fin prévue. */
+  stoppedEarly: z.boolean().default(false),
+  stop: z
+    .object({
+      reason: z.enum(STOP_REASONS).nullable(),
+      text: z.string().max(500).optional(),
+      /** Temps mis à répondre, en ms : une réponse mécanique est un signal plus faible. */
+      answerMs: z.number().int().min(0).optional(),
+      /** Tentatives d'ouvrir une app bloquée dans les 10 min avant l'arrêt. */
+      attemptsBefore: z.number().int().min(0).default(0),
+    })
+    .optional(),
+  /** Tentatives d'ouvrir une app bloquée pendant la séance. */
+  blockedAttempts: z.number().int().min(0).default(0),
+  /** Minutes de charge des 48 dernières heures au moment du bloc. */
+  load48hMinutes: z.number().int().min(0).default(0),
+  /** Heures éveillé au début du bloc. */
+  hoursAwake: z.number().min(0).max(24).optional(),
+  createdAt: z.string().datetime(),
+})
+export type SessionEvent = z.infer<typeof SessionEventSchema>
 
 /**
  * D.8 : une session pilotée par un bloc du planning (tâche, objectif, ancre),
@@ -480,6 +534,10 @@ export const SessionConfirmationsStateSchema = z.object({
        * retombe alors sur la durée pleine.
        */
       workMinutes: z.number().int().min(0).max(1440).optional(),
+      /** Clé d'apprentissage du bloc (spec 2026-09-25), recopiée dans le journal. */
+      category: z.string().max(60).optional(),
+      /** Heure de début PRÉVUE, avant tout retard : le journal la garde. */
+      plannedStartMinute: z.number().int().min(0).max(1439).optional(),
     })
     .nullable()
     .default(null),

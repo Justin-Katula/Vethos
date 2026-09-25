@@ -110,6 +110,8 @@ export function calculerPlan({
     observations: apprentissage?.observations ?? [],
     anchorMissCounts: apprentissage?.anchorMissCounts ?? {},
     consecutiveDelays: apprentissage?.consecutiveDelays ?? {},
+    // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
+    ...(apprentissage ? { sessionEvents: apprentissage.sessionEvents } : {}),
     dailyUtilization: apprentissage?.dailyUtilization ?? {},
     weeklyObjectiveServed: apprentissage?.weeklyObjectiveServed ?? {},
     objectiveLastServed: apprentissage?.objectiveLastServed ?? {},

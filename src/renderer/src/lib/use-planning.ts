@@ -44,6 +44,8 @@ export function usePlanning(now: Date = new Date()): PlanningResult | null {
       lastSignalAt: learning.lastSignalAt,
       tasksCreatedPerWeek: learning.tasksCreatedPerWeek,
       consecutiveDelays: learning.consecutiveDelays,
+      // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
+      sessionEvents: learning.sessionEvents,
       // D.7 : le retard est une MESURE de la confirmation « Je commence », pas
       // une déduction du moteur. Tant que rien n'est mesuré pour un jour, il
       // n'y a pas de retard — surtout pas un retard supposé (G.3).

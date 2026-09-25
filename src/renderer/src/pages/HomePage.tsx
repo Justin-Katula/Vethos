@@ -8,6 +8,7 @@ import { VisionBoard } from '@/components/board/VisionBoard'
 import { TaskHierarchyList } from '@/components/tasks/TaskHierarchy'
 import { Bracket, GlowCard, MetricPill } from '@/components/ui/Iris'
 import { Modal } from '@/components/ui/Modal'
+import { StopSession } from '@/components/tasks/StopSession'
 import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 import { usePlanning } from '@/lib/use-planning'
 import { MORE_TIME_STEP_MINUTES, usePlanningStore, type TaskDraft } from '@/store/planning.store'
@@ -150,6 +151,15 @@ export default function HomePage() {
 
   const otherSignals = signalSentences(plan?.signals ?? [], nameOf)
 
+  // La séance confirmée en cours, s'il y en a une : c'est là que vit « Stop ».
+  const running = todayBlocks.find(
+    (b) =>
+      b.startMinute <= nowMinute &&
+      nowMinute < b.endMinute &&
+      sessionConfirmations?.date === today &&
+      b.id in sessionConfirmations.confirmedAt,
+  )
+
   return (
     <PageTransition>
       <div className="mx-auto w-full max-w-[1560px] px-12 pb-20 pt-9">
@@ -246,6 +256,17 @@ export default function HomePage() {
               besoin : ce qui est prévu aujourd'hui, ce que l'application a
               remarqué sur la semaine, puis les tâches ouvertes. */}
           <div className="min-w-0 space-y-6">
+            {running && (
+              <div className="flex items-center justify-between gap-4 rounded border border-line px-4 py-3">
+                <span className="text-[13.5px] text-fg">
+                  {running.label}
+                  <span className="ml-2 text-fg-3">
+                    {duration(Math.max(0, running.workMinutes - (nowMinute - running.startMinute)))} left
+                  </span>
+                </span>
+                <StopSession label={running.label} />
+              </div>
+            )}
             <Board columns={['Time', 'Commitment', 'Duration']}>
               {todayBlocks.length === 0 ? (
                 <BoardEmpty>

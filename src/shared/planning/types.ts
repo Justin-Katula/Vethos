@@ -9,12 +9,12 @@
 // Les formes persistées vivent dans `@shared/schemas` : elles sont l'unique
 // source de vérité. Le moteur n'en redéfinit aucune.
 
-import type { Task, Objective, Ancre, ScheduleEntry, LearningObservation } from '@shared/schemas'
+import type { Task, Objective, Ancre, ScheduleEntry, LearningObservation, SessionEvent } from '@shared/schemas'
 
 export type TaskItem = Task
 export type ObjectiveItem = Objective
 export type AncreItem = Ancre
-export type { ScheduleEntry, LearningObservation }
+export type { ScheduleEntry, LearningObservation, SessionEvent }
 
 export type CognitiveWindow = 'PROFONDE' | 'NORMALE' | 'BASSE'
 
@@ -180,6 +180,13 @@ export type PlacedBlock = {
    * temps. Il n'existe aucune session de blocage autonome en parallèle.
    */
   appsToBlock?: string[]
+  /** La clé d'apprentissage des durées : catégorie de la tâche, ou `objectif:<id>` / `ancre:<id>`. */
+  category?: string
+  /**
+   * Pause anticipée (spec 2026-09-25) : minute, depuis le début du bloc, où
+   * placer la pause parce que la personne décroche d'habitude juste après.
+   */
+  breakAtMinute?: number
 }
 
 export type SeverityLevel = 'info' | 'passive' | 'high'
@@ -268,6 +275,12 @@ export type PlanningResult = {
   internalError?: { expected: number; actual: number; diff: number }
   /** D.6 : limite de travail en cours et encouragement (jamais un blocage dur). */
   wip: { activeCount: number; limit: number; overLimit: boolean }
+  /**
+   * Rampe de départ (spec 2026-09-25) : la dose de la semaine par objectif, et
+   * la cible choisie. L'écart se montre comme une progression, jamais comme
+   * un déficit.
+   */
+  objectiveDoses: Record<string, { dose: number; cible: number }>
   /** E.3 : bilan de la respiration hebdomadaire et jours réduits d'office. */
   breathing: {
     targetMinutes: number
@@ -321,4 +334,10 @@ export type PlanningInput = {
    * dans le plan du jour au lieu d'être replacée — voir `ActiveSession`.
    */
   activeSession?: ActiveSession | null
+  /**
+   * Le journal des séances (spec 2026-09-25). Absent = aucun apprentissage :
+   * la cible complète, les durées par défaut, le score sans Thompson — le
+   * moteur d'avant, exactement.
+   */
+  sessionEvents?: SessionEvent[]
 }

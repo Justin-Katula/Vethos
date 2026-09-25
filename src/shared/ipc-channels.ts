@@ -38,6 +38,7 @@ export const IPC_CHANNELS = {
   BLOCKING_EVENT_SESSION: 'blocking:event:session',
   // D.7/D.8 — confirmation « Je commence » d'un bloc du planning.
   PLANNING_CONFIRM_BLOCK: 'planning:confirmBlock',
+  PLANNING_STOP_BLOCK: 'planning:stopBlock',
   // Poussé par l'horloge de planification (main) chaque fois qu'elle écrit du
   // retard, un raté, ou une confirmation — le renderer n'a sinon aucun moyen
   // de savoir que ce qu'il affiche est devenu périmé sans rouvrir l'app.

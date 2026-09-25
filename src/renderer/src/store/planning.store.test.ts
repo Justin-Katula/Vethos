@@ -68,6 +68,7 @@ beforeEach(() => {
       consecutiveDelays: {},
       workedMinutesByRef: {},
       dailyDelayMinutes: {},
+      sessionEvents: [],
     },
   })
 })
