@@ -314,6 +314,7 @@ function FeuilleSeance({
 }) {
   const { taches, objectifs, ancres } = useDonnees()
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
+  const { resultat } = usePlan()
   const dernier = useRef<SegmentTemps | null>(null)
   if (seg) dernier.current = seg
   const s = seg ?? dernier.current
@@ -334,7 +335,7 @@ function FeuilleSeance({
   const place = miennes.reduce((q, z) => q + z.y.fin - z.y.debut, 0)
   const stat =
     n === 'GOAL' && objectif
-      ? `${hm(servis[objectif.id] ?? 0)} of ${hm(objectif.cibleHebdoMinutes)}`
+      ? `${hm(servis[objectif.id] ?? 0)} of ${hm(resultat.objectiveDoses[objectif.id]?.dose ?? objectif.cibleHebdoMinutes)}`
       : n === 'TASK' && tache
         ? `${hm(place)} placed · ${hm(tache.minutesRestantes + tache.minutesSupplementaires)} left`
         : ancre

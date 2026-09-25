@@ -310,4 +310,9 @@ export type PontEcran = {
   programmer: (plages: readonly Plage[], options?: OptionsProgrammation) => Promise<number>
   /** Lève tout : aucun bouclier ne doit survivre à un arrêt. */
   toutLever: () => Promise<void>
+  /**
+   * Les horodatages (ms) des boucliers montrés — chaque tentative d'ouvrir une
+   * app écartée. Rangés par l'extension ; ni l'app ni le site ne sortent.
+   */
+  lireTentatives: () => number[]
 }

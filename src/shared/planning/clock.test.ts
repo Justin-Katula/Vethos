@@ -6,6 +6,7 @@ import {
   applyWorkCredit,
   blockSessionFor,
   closeSessionEvent,
+  overlayDue,
   recordBlockedAttempt,
   closedObservedBlock,
   computeBlockDelayMinutes,
@@ -781,5 +782,17 @@ describe('Le journal des séances (spec moteur 2026-09-25)', () => {
     const c = applyConfirmation(emptyLearning(), emptyConfirmations(TODAY), block(), MS, 600)
     const l = recordBlockedAttempt(recordBlockedAttempt(c.learning, c.confirmations), c.confirmations)
     expect(l.sessionEvents[0]!.blockedAttempts).toBe(2)
+  })
+})
+
+describe('Retrait progressif de l’overlay', () => {
+  it('phases 1-2 : tout de suite ; phase 3 : 10 min après, jamais un jour-test ; phase 4 : jamais', () => {
+    const at = (phase: number, now: number, testDay = false) => overlayDue({ phase, nowMinute: now, blockStartMinute: 600, testDay })
+    expect(at(1, 600)).toBe(true)
+    expect(at(2, 600)).toBe(true)
+    expect(at(3, 605)).toBe(false)
+    expect(at(3, 610)).toBe(true)
+    expect(at(3, 615, true)).toBe(false)
+    expect(at(4, 700)).toBe(false)
   })
 })

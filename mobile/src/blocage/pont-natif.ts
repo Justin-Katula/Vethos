@@ -75,6 +75,8 @@ export type ModuleEcran = {
   setWebContentFilterPolicy: (politique: PolitiqueWeb, declenchePar?: string) => void
   clearWebContentFilterPolicy: (declenchePar?: string) => void
   isWebContentFilterPolicyActive: () => boolean
+  /** L'App Group partagé avec les extensions (lecture seule ici). */
+  userDefaultsGet?: <T>(cle: string) => T | undefined
 }
 
 /**
@@ -288,6 +290,12 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       }
 
       return plages.length
+    },
+
+    lireTentatives() {
+      // Rangées par l'extension ShieldConfiguration à chaque bouclier montré.
+      const brut = natif.userDefaultsGet?.<unknown>('vethos_tentatives')
+      return Array.isArray(brut) ? brut.filter((t): t is number => typeof t === 'number') : []
     },
 
     async toutLever() {

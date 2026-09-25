@@ -9,6 +9,8 @@ import { TaskHierarchyList } from '@/components/tasks/TaskHierarchy'
 import { Bracket, GlowCard, MetricPill } from '@/components/ui/Iris'
 import { Modal } from '@/components/ui/Modal'
 import { StopSession } from '@/components/tasks/StopSession'
+import { nexus } from '@/lib/ipc'
+import { overlayDueFor } from '@shared/planning/clock'
 import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 import { usePlanning } from '@/lib/use-planning'
 import { MORE_TIME_STEP_MINUTES, usePlanningStore, type TaskDraft } from '@/store/planning.store'
@@ -151,6 +153,18 @@ export default function HomePage() {
 
   const otherSignals = signalSentences(plan?.signals ?? [], nameOf)
 
+  // Retrait progressif : quand l'overlay ne vient plus (phases 3-4), la séance
+  // se démarre d'ici — un démarrage spontané, mesuré, avec blocage.
+  const learning = usePlanningStore((s) => s.learning)
+  const startable = todayBlocks.find(
+    (b) =>
+      b.startMinute <= nowMinute &&
+      nowMinute < b.endMinute &&
+      b.preview !== true &&
+      !(sessionConfirmations?.date === today && b.id in sessionConfirmations.confirmedAt) &&
+      !overlayDueFor({ learning, block: b, nowMinute, today }),
+  )
+
   // La séance confirmée en cours, s'il y en a une : c'est là que vit « Stop ».
   const running = todayBlocks.find(
     (b) =>
@@ -256,6 +270,18 @@ export default function HomePage() {
               besoin : ce qui est prévu aujourd'hui, ce que l'application a
               remarqué sur la semaine, puis les tâches ouvertes. */}
           <div className="min-w-0 space-y-6">
+            {!running && startable && (
+              <div className="flex items-center justify-between gap-4 rounded border border-line px-4 py-3">
+                <span className="text-[13.5px] text-fg">{startable.label}</span>
+                <button
+                  type="button"
+                  className="btn-iris pressable"
+                  onClick={() => void nexus.planning.confirmBlock(startable.id)}
+                >
+                  Start
+                </button>
+              </div>
+            )}
             {running && (
               <div className="flex items-center justify-between gap-4 rounded border border-line px-4 py-3">
                 <span className="text-[13.5px] text-fg">

@@ -122,8 +122,22 @@ func buildShield(placeholders: [String: String?], config: [String: Any]?)
 // Override the functions below to customize the shields used in various situations.
 // The system provides a default appearance for any methods that your subclass doesn't override.
 // Make sure that your class name matches the NSExtensionPrincipalClass in your Info.plist.
+/// Vethos (spec moteur 2026-09-25) : une tentative d'ouvrir une app ou un site
+/// écarté est le signal le plus fort de l'apprentissage. Le bouclier est
+/// demandé ici à chaque fois qu'il s'affiche : on range l'horodatage dans
+/// l'App Group, l'application le relit. Rien d'autre ne sort — ni l'app, ni
+/// le site : seulement l'heure.
+let VETHOS_TENTATIVES_KEY = "vethos_tentatives"
+
+func noterTentative() {
+  var t = (userDefaults?.array(forKey: VETHOS_TENTATIVES_KEY) as? [Double]) ?? []
+  t.append(Date().timeIntervalSince1970 * 1000)
+  userDefaults?.set(Array(t.suffix(200)), forKey: VETHOS_TENTATIVES_KEY)
+}
+
 class ShieldConfigurationExtension: ShieldConfigurationDataSource {
   override func configuration(shielding application: Application) -> ShieldConfiguration {
+    noterTentative()
     // Customize the shield as needed for applications.
 
     let config = getActivitySelectionPrefixedConfigFromUserDefaults(
@@ -149,6 +163,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
   override func configuration(shielding application: Application, in category: ActivityCategory)
     -> ShieldConfiguration {
+    noterTentative()
 
     logger.log("shielding application category")
 
@@ -176,6 +191,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
   }
 
   override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
+    noterTentative()
     logger.log("shielding web domain")
 
     let config = getActivitySelectionPrefixedConfigFromUserDefaults(
@@ -201,6 +217,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
   override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory)
     -> ShieldConfiguration {
+    noterTentative()
 
     logger.log("shielding web domain category")
 

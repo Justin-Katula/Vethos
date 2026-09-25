@@ -395,14 +395,21 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         .reduce((t, e) => t + Math.min(e.endMinute, start) - e.startMinute, 0) +
       placedToday.filter((b) => b.endMinute <= start).reduce((t, b) => t + b.work, 0)
     const dayIsCrisis = saturated.has(date)
+    // Déclencheurs-événements du jour : le premier créneau libre après une
+    // obligation ou une ancre — jamais le réveil, qui a sa propre règle.
+    const dayTriggerStarts = cap.slots
+      .map((s) => s.startMinute)
+      .filter((start) => wakeMinute === null || start > wakeMinute + 60)
     const scorer = (refId: string, session: number, hardGap: number, softGap = true, category?: string) => {
       const key = `${refId}|${dayType}|${session}`
       const sameRefToday = placedToday.filter((b) => b.refId === refId)
       const learnedQuality = learn && category ? learn.quality(category, date, dow, dayIsCrisis) : undefined
+      const triggerStarts = learn && learn.phase(refId) >= 2 ? dayTriggerStarts : undefined
       return (start: number, minutes: number) =>
         scoreSlot(start, minutes, {
           windowAt,
           learnedQuality,
+          triggerStarts,
           wakeMinute,
           midSleepMinute,
           habitualStart: habitual.get(key) ?? null,
@@ -1133,6 +1140,8 @@ function buildLearningContext(events: SessionEvent[], today: string) {
      * Phases 3-4 : jours off permis si joursNécessaires ≤ 6.
      */
     activeDays,
+    /** La phase de retrait d'une habitude (1 à 4), mesurée dans le journal. */
+    phase: phaseOf,
     /** Les jours off tombent sur les jours de plus faible capacité, jamais fixés au dimanche. */
     isDayOff(objective: { id: string; weeklyTargetMinutes: number }, week: string, date: string, caps: DayCapacity[]) {
       const n = activeDays(objective)

@@ -13,6 +13,7 @@ import { usePlan } from '@/plan/Plan'
 import { dateLocale } from '@/plan/format'
 import type { SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
+import { ArretSeance, DemarrerSeance } from '@/seances/ArretSeance'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -59,7 +60,7 @@ export default function Aujourdhui() {
   const marges = useSafeAreaInsets()
   const { width } = useWindowDimensions()
   const { acc } = useLumiere()
-  const { jours, minute: N, chargees, maintenant } = usePlan()
+  const { jours, minute: N, chargees, maintenant, seanceActive, demarrable } = usePlan()
   const { taches, objectifs, ancres, obligations, reglages } = useDonnees()
   const [focus, setFocus] = useState<Focus>(null)
   const [slide, setSlide] = useState(0)
@@ -195,7 +196,13 @@ export default function Aujourdhui() {
             {maintenantCarte.titre}
           </Text>
         </View>
-        <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{maintenantCarte.t}</Text>
+        {seanceActive ? (
+          <ArretSeance titre={cur?.titre ?? maintenantCarte.titre} />
+        ) : demarrable ? (
+          <DemarrerSeance />
+        ) : (
+          <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{maintenantCarte.t}</Text>
+        )}
       </View>
 
       <ScrollView

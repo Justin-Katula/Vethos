@@ -104,6 +104,10 @@ export function creerPontSimule(): PontEcran {
       return programmees
     },
 
+    lireTentatives() {
+      return []
+    },
+
     async toutLever() {
       await attendre(120)
       programmees = 0

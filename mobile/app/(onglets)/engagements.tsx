@@ -187,7 +187,10 @@ export default function Engagements() {
 
   const ligneObjectif = (o: (typeof d.objectifs)[number]) => {
     const fait2 = servis[o.id] ?? 0
-    const fr = o.cibleHebdoMinutes ? Math.min(1, fait2 / o.cibleHebdoMinutes) : 0
+    // Rampe de départ : la semaine se mesure à sa DOSE, et la cible reste la
+    // destination — un écart qui se lit comme une progression, jamais un retard.
+    const dose = resultat.objectiveDoses[o.id]?.dose ?? o.cibleHebdoMinutes
+    const fr = dose ? Math.min(1, fait2 / dose) : 0
     const ou = ouvert === o.id
     return (
       <Pressable key={o.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
@@ -202,9 +205,9 @@ export default function Engagements() {
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
               <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{o.nom}</Text>
-              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(fait2)} / ${hm(o.cibleHebdoMinutes)}`}</Text>
+              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(fait2)} / ${hm(dose)}`}</Text>
             </View>
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`About ${hm(o.cibleHebdoMinutes / 7)} a day · this week`}</Text>
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{dose < o.cibleHebdoMinutes ? `This week ${hm(dose)} · toward ${hm(o.cibleHebdoMinutes)}` : `About ${hm(dose / 7)} a day · this week`}</Text>
           </View>
         </View>
         {ou ? (

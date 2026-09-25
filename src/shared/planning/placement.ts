@@ -242,6 +242,8 @@ export const SCORE_DEFAULTS = {
   /** Une tâche aussi s'écarte d'un bloc de la même tâche, sans interdiction. */
   softGapPerHour: 20,
   fatiguePerMinute: 0.05,
+  /** Phase 2+ : partir juste après un déclencheur-événement. */
+  triggerBonus: 15,
   quality: { PROFONDE: 30, NORMALE: 0, BASSE: -30 } as Record<CognitiveWindow, number>,
 } as const
 
@@ -258,6 +260,12 @@ export type ScoreContext = {
    * qualité G.2 quand il y a assez de données. Absent = qualité G.2.
    */
   learnedQuality?: (start: number) => number
+  /**
+   * Retrait progressif, phase 2+ : l'habitude s'accroche à un déclencheur-
+   * événement (fin d'une obligation, fin d'une ancre), plus à une heure. Les
+   * départs qui suivent un tel événement reçoivent ce bonus.
+   */
+  triggerStarts?: number[]
   /** Blocs déjà posés aujourd'hui pour le même engagement. */
   sameRefToday: Array<{ startMinute: number; endMinute: number }>
   /** Écart minimal imposé avec ces blocs (objectif : 3 h) ; 0 = aucun écart imposé. */
@@ -295,6 +303,7 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
   if (c.hardGapMinutes === 0 && c.softGap && gap < SCORE_DEFAULTS.minGapSameObjective)
     s -= (SCORE_DEFAULTS.softGapPerHour * (SCORE_DEFAULTS.minGapSameObjective - Math.max(0, gap))) / 60
   s -= SCORE_DEFAULTS.fatiguePerMinute * c.loadBefore(start)
+  if (c.triggerStarts?.some((t) => start >= t && start - t <= 5)) s += SCORE_DEFAULTS.triggerBonus
   return s
 }
 

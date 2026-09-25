@@ -1,5 +1,6 @@
 import { mergeIntervals, type Interval } from '@shared/planning/capacity'
 import { plannedTotalFor } from '@shared/planning/engine'
+import { estJourTest, phaseHabitude } from '@shared/planning/habitudes'
 import type { PlacedBlock, TaskItem } from '@shared/planning/types'
 import type { LearningState, ObservedPendingBlock, SessionConfirmationsState, SessionEvent, StopReason } from '@shared/schemas'
 
@@ -667,4 +668,55 @@ export function journalContextFor(args: {
       ? { hoursAwake: Math.min(24, (args.nowMinute - args.wakeMinute) / 60) }
       : {}),
   }
+}
+
+// ─── Retrait progressif (spec moteur 2026-09-25) ─────────────────────────
+
+/** Phase 3 : l'overlay attend 10 min après le début — assez pour démarrer seul. */
+export const OVERLAY_DELAY_PHASE_3 = 10
+
+/**
+ * L'overlay « Je commence » doit-il s'afficher maintenant pour ce bloc ?
+ *   Phase 1-2 : oui, dès le début (plein écran, comme toujours).
+ *   Phase 3   : seulement 10 min après le début ; jamais un jour-test.
+ *   Phase 4   : jamais — l'app observe.
+ * C'est l'overlay qui disparaît, pas la séance : le démarrage par raccourci
+ * ouvre toujours une séance mesurée, avec blocage.
+ */
+export function overlayDue(args: { phase: number; nowMinute: number; blockStartMinute: number; testDay: boolean }): boolean {
+  if (args.phase >= 4) return false
+  if (args.phase === 3) return !args.testDay && args.nowMinute >= args.blockStartMinute + OVERLAY_DELAY_PHASE_3
+  return true
+}
+
+/**
+ * La même règle, lue pour un bloc précis. Une tâche n'est pas une habitude —
+ * elle a une fin — : elle garde toujours l'overlay (phase 1). Les objectifs
+ * et les ancres passent par les 4 phases, mesurées dans le journal.
+ */
+export function overlayDueFor(args: { learning: LearningState; block: Pick<PlacedBlock, 'kind' | 'refId' | 'startMinute'>; nowMinute: number; today: string }): boolean {
+  const phase = args.block.kind === 'task' ? 1 : phaseHabitude(args.learning.sessionEvents ?? [], args.block.refId)
+  return overlayDue({
+    phase,
+    nowMinute: args.nowMinute,
+    blockStartMinute: args.block.startMinute,
+    testDay: estJourTest(args.block.refId, args.today),
+  })
+}
+
+/**
+ * Variante idempotente, pour qui relit des horodatages (l'iPhone, via
+ * l'extension du bouclier) : fixe le nombre de tentatives de la séance en
+ * cours à `count` s'il est plus grand. Relire deux fois ne compte pas deux fois.
+ */
+export function setBlockedAttempts(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+  count: number,
+): LearningState {
+  const o = confirmations.observedPending
+  if (!o || !(o.blockId in confirmations.confirmedAt)) return learning
+  const current = (learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === confirmations.date)
+  if (!current || current.blockedAttempts >= count) return learning
+  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: count }))
 }

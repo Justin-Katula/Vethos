@@ -15,6 +15,7 @@ import {
   closeSessionEvent,
   recordBlockedAttempt,
   journalContextFor,
+  overlayDueFor,
   applyWorkCredit,
   blockSessionFor,
   closedObservedBlock,
@@ -391,7 +392,11 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       deps.onPlanningDataChanged?.()
     }
 
-    if (pending) deps.overlay.show(viewFor(pending))
+    // Retrait progressif : en phase 3 l'overlay attend 10 min (et ne vient pas
+    // un jour-test), en phase 4 il ne vient plus. La séance, elle, reste
+    // démarrable par le raccourci de l'application.
+    if (pending && overlayDueFor({ learning: workingLearning, block: pending, nowMinute, today: workingConfirmations.date }))
+      deps.overlay.show(viewFor(pending))
     else deps.overlay.close()
 
     await collectExpiredBlockSession(now)
@@ -446,7 +451,16 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       block,
       confirmedAtMs,
       nowMinute,
-      journalContextFor({ learning, today, yesterday: addDays(today, -1), nowMinute, wakeMinute }),
+      journalContextFor({
+        learning,
+        today,
+        yesterday: addDays(today, -1),
+        nowMinute,
+        wakeMinute,
+        // Démarré avant que l'overlay ne le demande : un démarrage spontané,
+        // la mesure même de l'autonomie.
+        spontaneous: !overlayDueFor({ learning, block, nowMinute, today }),
+      }),
     )
 
     const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
