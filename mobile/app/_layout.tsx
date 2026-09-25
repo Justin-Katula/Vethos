@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AppState } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { View } from 'react-native'
@@ -30,6 +31,16 @@ function Coque() {
   const initialiser = useBlocage((e) => e.initialiser)
   const charger = useDonnees((e) => e.charger)
   const donneesPretes = useDonnees((e) => e.chargees)
+
+  // L'autorisation appartient à iOS, qui peut la retirer ou la rendre pendant
+  // que Vethos dort : on la relit à chaque retour au premier plan.
+  const relire = useBlocage((e) => e.relireAutorisation)
+  useEffect(() => {
+    const abonnement = AppState.addEventListener('change', (etat) => {
+      if (etat === 'active') void relire()
+    })
+    return () => abonnement.remove()
+  }, [relire])
 
   useEffect(() => {
     // Les données d'abord : l'écran d'accueil les lit dès son premier rendu.
