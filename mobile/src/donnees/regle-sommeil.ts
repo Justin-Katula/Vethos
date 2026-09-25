@@ -12,9 +12,10 @@
  *
  * Les écarts se mesurent sur le cercle de 24 h : 23:30 et 00:30 sont à 1 h.
  */
-export type TrancheAge = 'ado' | 'adulte'
+export const TRANCHES_AGE = ['13-18', '19-24', '25+'] as const
+export type TrancheAge = (typeof TRANCHES_AGE)[number]
 /** Le plancher par âge. Sans tranche connue, celui d'un adulte. */
-export const plancherSommeil = (tranche?: TrancheAge | null) => (tranche === 'ado' ? 8 * 60 : 7 * 60)
+export const plancherSommeil = (tranche?: TrancheAge | null) => (tranche === '13-18' ? 8 * 60 : 7 * 60)
 export const SOMMEIL_MAX = 10 * 60
 export const MARGE_SOMMEIL = 2 * 60
 

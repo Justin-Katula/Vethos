@@ -6,8 +6,9 @@ const ref = { coucher: '23:00', lever: '08:00' }
 describe('la règle du sommeil', () => {
   it('tient le plancher de l’âge : 8 h de 13 à 18 ans, 7 h adulte', () => {
     const nuit = { coucher: '23:30', lever: '07:00' } // 7 h 30
-    expect(verifierSommeil(nuit, null, 'adulte').ok).toBe(true)
-    const ado = verifierSommeil(nuit, null, 'ado')
+    expect(verifierSommeil(nuit, null, '19-24').ok).toBe(true)
+    expect(verifierSommeil(nuit, null, '25+').ok).toBe(true)
+    const ado = verifierSommeil(nuit, null, '13-18')
     expect(ado.ok).toBe(false)
     expect(!ado.ok && ado.raison).toBe('A night is at least 8 hours.')
     expect(verifierSommeil({ coucher: '00:00', lever: '06:30' }, null).ok).toBe(false) // 6 h 30 < 7 h

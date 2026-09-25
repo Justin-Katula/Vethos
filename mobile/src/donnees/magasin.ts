@@ -10,6 +10,7 @@ import {
   estCouleurDansFamille,
 } from '@shared/palettes'
 import { preparerTache, type BrouillonTache } from './creation'
+import { TRANCHES_AGE, type TrancheAge } from './regle-sommeil'
 import type { AjoutsIntroduction } from '@/accueil/modele-introduction'
 
 /**
@@ -145,7 +146,9 @@ export const ReglagesSchema = z.object({
    */
   sommeilReference: z.object({ coucher: z.string(), lever: z.string() }).nullish(),
   /** La tranche d'âge, demandée à l'introduction : elle fixe le plancher de sommeil. */
-  trancheAge: z.enum(['ado', 'adulte']).nullish(),
+  trancheAge: z
+    .preprocess((v) => (v === 'ado' ? '13-18' : v === 'adulte' ? '25+' : v), z.enum(TRANCHES_AGE))
+    .nullish(),
 })
 export type Reglages = z.infer<typeof ReglagesSchema>
 
@@ -204,7 +207,7 @@ type EtatDonnees = Contenu & {
   supprimerObligation: (id: string) => Promise<void>
 
   majReglages: (r: Partial<Reglages>) => Promise<void>
-  finaliserIntroduction: (ajouts: AjoutsIntroduction, prenom: string, trancheAge?: 'ado' | 'adulte' | null) => Promise<void>
+  finaliserIntroduction: (ajouts: AjoutsIntroduction, prenom: string, trancheAge?: TrancheAge | null) => Promise<void>
 }
 
 async function ecrire(contenu: Contenu): Promise<void> {

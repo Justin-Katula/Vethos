@@ -574,8 +574,9 @@ function Heures({ taille, police }: { taille: number; police: number }) {
 // ——— L'âge : il fixe le plancher de la nuit ———
 
 const AGES: [TrancheAge, string][] = [
-  ['ado', '13 to 18'],
-  ['adulte', 'Over 18'],
+  ['13-18', '13 – 18'],
+  ['19-24', '19 – 24'],
+  ['25+', '25+'],
 ]
 
 export function EcranAge({ ctx }: { ctx: Ctx }) {
