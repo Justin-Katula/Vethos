@@ -49,7 +49,7 @@ function Coque() {
   }, [charger, initialiser])
 
   if (!donneesPretes) {
-    return <ChargementVethos pleinEcran libelle="Vethos is reading your time." />
+    return <ChargementVethos pleinEcran />
   }
 
   return (

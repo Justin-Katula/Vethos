@@ -194,10 +194,8 @@ export function Valeur({
 /**
  * Le bouton principal, repris du bureau à l'identique.
  *
- * Il s'inverse — encre en fond, surface en texte — et porte un **filet rouge
- * de 2 px en bas**. C'est la signature de Vethos : le seul endroit où l'accent
- * touche un élément plein. Un bouton rouge plein serait un bouton de n'importe
- * quelle application ; celui-ci n'appartient qu'à celle-ci.
+ * Il s'inverse — encre en fond, surface en texte — et porte un filet d'accent
+ * de 2 px en bas.
  */
 export function BoutonIris({
   children,

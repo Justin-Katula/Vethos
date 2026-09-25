@@ -23,7 +23,8 @@
       },
       "entitlements": {
         "com.apple.developer.family-controls": true
-      }
+      },
+      "icon": "./assets/icon.png"
     },
     "plugins": [
       "expo-router",
@@ -35,14 +36,23 @@
         }
       ],
       "expo-font",
-      "expo-splash-screen"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/icon.png"
     },
     "extra": {
       "router": {},
@@ -88,6 +98,7 @@
         "projectId": "862f46d8-f1a7-404e-8ea9-cd20027d21fd"
       }
     },
-    "owner": "justin-katula"
+    "owner": "justin-katula",
+    "icon": "./assets/icon.png"
   }
 }

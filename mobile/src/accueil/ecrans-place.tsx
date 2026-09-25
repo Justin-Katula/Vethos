@@ -40,9 +40,9 @@ import {
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
 
-export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
+export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#c9ccd2', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
-const TRAIT: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#4b6190' }
+const TRAIT: Record<Nature, string> = { TASK: '#505359', GOAL: '#c9ccd2', ANCHOR: '#4b6190' }
 const TYPEL: Record<Nature, string> = {
   TASK: 'It has a finish line. Once it’s done, it’s done.',
   GOAL: 'A few hours every week, wherever they fit.',

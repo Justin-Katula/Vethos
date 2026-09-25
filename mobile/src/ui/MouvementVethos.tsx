@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Text,
   View,
 } from 'react-native'
 import { useJetons } from '@/theme/Theme'
@@ -19,7 +18,7 @@ import { GEIST, MONO } from './primitives'
 export function ChargementVethos({
   pleinEcran,
   compact,
-  libelle = 'Vethos is building your plan.',
+  libelle = 'Vethos',
 }: {
   pleinEcran?: boolean
   compact?: boolean
@@ -151,17 +150,6 @@ export function ChargementVethos({
       }}
     >
       {marque}
-      <Text
-        style={{
-          color: j.text2,
-          fontFamily: MONO.normal,
-          fontSize: 11,
-          letterSpacing: 0.35,
-          textAlign: 'center',
-        }}
-      >
-        {libelle}
-      </Text>
     </View>
   )
 }

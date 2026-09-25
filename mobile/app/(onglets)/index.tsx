@@ -104,7 +104,7 @@ export default function Aujourdhui() {
     }
   }, [jour, N, reglages.coucher, reglages.lever])
 
-  if (!jour || !chargees || !d) return <ChargementVethos pleinEcran libelle="Vethos is placing your day." />
+  if (!jour || !chargees || !d) return <ChargementVethos pleinEcran />
 
   const { WAKE, BED, blocs, visibles } = d
   // Ce qui se passe maintenant.
@@ -507,9 +507,7 @@ export default function Aujourdhui() {
               {carres(ancres.map((x) => ({ n: x.jours.length })), TRAIT.ANCHOR)}
               <View style={{ gap: 4 }}>{ancres.map((x) => ligne(`${x.nom} · ${x.jours.length} times a week`, `${x.jours.length * WK} sessions`))}</View>
             </View>
-          ) : (
-            vide('No ritual anchored yet', 'An anchor is a fixed appointment with yourself that never moves — sport at 6 pm, reading at 9 pm.', 'Create an anchor')
-          )}
+          ) : null}
         </View>
       </View>
     )

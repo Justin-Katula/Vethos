@@ -1,19 +1,11 @@
-/**
- * Blocking, dans la forme de la maquette : ce qui est écarté, et les apps
- * installées. Avec une règle que la maquette ne pouvait pas connaître : iOS
- * ne donne JAMAIS à une application le nom des apps choisies, ni la liste de
- * celles qui sont installées, ni leur usage. Tout passe par des jetons
- * opaques et par le sélecteur d'Apple. Cet écran montre donc ce qui est vrai
- * — combien d'apps, de catégories, de sites — et ouvre le sélecteur d'Apple
- * pour le reste. Il n'invente ni un nom, ni une raison.
- */
+/** Blocking, dans la forme de la maquette. iOS ne donne que des jetons opaques : on montre les vrais compteurs. */
 import { useState } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
 import { SelecteurApplications } from '@/blocage/SelecteurApplications'
 import { selectionEstVide } from '@/blocage/contrat'
-import { A, Cadenas, Carte, GEIST, MONO, Plus, TitrePage, useToast } from '@/ui/app-briques'
+import { A, Cadenas, Carte, GEIST, MONO, Plus, TitrePage } from '@/ui/app-briques'
 
 function Pilule({ children, onPress, plein = true }: { children: React.ReactNode; onPress: () => void; plein?: boolean }) {
   return (
@@ -41,7 +33,6 @@ function Pilule({ children, onPress, plein = true }: { children: React.ReactNode
 
 export default function Blocage() {
   const marges = useSafeAreaInsets()
-  const toast = useToast()
   const { autorisation, selection, simule } = useBlocage()
   const demander = useBlocage((e) => e.demanderAutorisation)
   const choisir = useBlocage((e) => e.choisirApplications)
@@ -56,10 +47,7 @@ export default function Blocage() {
         return
       }
       await demander()
-      if (useBlocage.getState().autorisation !== 'accordee') {
-        toast('Screen Time was not allowed. Nothing can be shielded until iOS allows it.')
-        return
-      }
+      if (useBlocage.getState().autorisation !== 'accordee') return
     }
     if (simule) void choisir()
     else setSelecteur(true)
@@ -83,19 +71,13 @@ export default function Blocage() {
             <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{total}</Text>
           </View>
           {!accordee ? (
-            <View style={{ gap: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
-              <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>
-                {refusee
-                  ? 'Screen Time access was declined. You can turn it back on in Settings.'
-                  : 'Vethos needs Screen Time to shield apps. iOS will ask you once.'}
-              </Text>
+            <View style={{ paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
               <Pilule onPress={() => void ouvrir()}>
                 <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{refusee ? 'Open Settings' : 'Allow Screen Time'}</Text>
               </Pilule>
             </View>
           ) : vide ? (
-            <View style={{ gap: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
-              <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>Nothing set aside yet. A session will shield nothing.</Text>
+            <View style={{ paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
               <Pilule onPress={() => void ouvrir()}>
                 <Plus />
                 <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Pick my apps</Text>
@@ -112,10 +94,7 @@ export default function Blocage() {
                   <Text style={{ color: v ? A.t1 : A.t4, fontFamily: MONO.normal, fontSize: 16 }}>{v}</Text>
                 </View>
               ))}
-              <Text style={{ marginTop: 6, color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>
-                Shielded during every session you start with “I’m starting”, and never otherwise.
-              </Text>
-              <View style={{ marginTop: 14 }}>
+              <View style={{ marginTop: 8 }}>
                 <Pilule onPress={() => void ouvrir()}>
                   <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Change my selection</Text>
                 </Pilule>
@@ -126,9 +105,6 @@ export default function Blocage() {
 
         <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 18 }}>
           <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Installed apps</Text>
-          <Text style={{ marginTop: 3, color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>
-            iOS keeps this list private. Only Apple’s own picker can show your apps, sorted by category.
-          </Text>
           <View style={{ marginTop: 14 }}>
             <Pilule plein={false} onPress={() => void ouvrir()}>
               <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Browse my apps</Text>
@@ -138,11 +114,7 @@ export default function Blocage() {
       </View>
       <SelecteurApplications
         ouvert={selecteur}
-        surFermeture={() => {
-          setSelecteur(false)
-          const s = useBlocage.getState().selection
-          if (s && !selectionEstVide(s)) toast('Saved. Vethos shields them during your sessions.')
-        }}
+        surFermeture={() => setSelecteur(false)}
       />
     </ScrollView>
   )

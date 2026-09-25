@@ -48,7 +48,7 @@ export {
 
 /**
  * Couleur d'accent d'une nature d'engagement :
- * - Objectifs : famille rouge (j.accentEncre / #f0525f)
+ * - Objectifs : argent (j.accentEncre)
  * - Tâches : famille gris (j.text2 / #bebebe)
  * - Ancres : famille bleu froid (j.blocAncre / #2c3a56)
  * - Fixes : j.text3

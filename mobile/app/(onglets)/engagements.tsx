@@ -38,7 +38,7 @@ import {
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const relD = (k: number) => (k <= 0 ? 'today' : k === 1 ? 'tomorrow' : `in ${k} days`)
-const COULEUR: Record<NatureApp, string> = { TASK: '#8d8d8d', GOAL: '#e03131', ANCHOR: '#4b6190' }
+const COULEUR: Record<NatureApp, string> = { TASK: '#8d8d8d', GOAL: '#c9ccd2', ANCHOR: '#4b6190' }
 
 const SECTIONS: Record<NatureApp, { titre: string; loi: string; vide: string; cta: string }> = {
   TASK: {
@@ -523,7 +523,7 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
             </>
           ) : null}
         </View>
-        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.alerte, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
       </ScrollView>
       <Pressable
         accessibilityRole="button"

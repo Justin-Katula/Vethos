@@ -18,14 +18,16 @@ export const A = {
   s: 'rgba(242,242,242,0.08)',
   s1: 'rgba(242,242,242,0.055)',
   ligne: 'rgba(242,242,242,0.07)',
-  rouge: '#f0525f',
+  alerte: '#d69b3a',
 }
 export { GEIST, MONO }
 export const SORTIE = Easing.bezier(0.23, 1, 0.32, 1)
 /** Les couleurs des natures, partout dans l'app. */
-export const TYPEC = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' } as const
+export const TYPEC = { TASK: '#505359', GOAL: '#c9ccd2', ANCHOR: '#2c3a56' } as const
+/** L'encre posée sur un bloc plein : l'objectif, argenté, prend du noir. */
+export const ENCRE = { TASK: '#f2f2f2', GOAL: '#0b0b0b', ANCHOR: '#f2f2f2' } as const
 /** Sur un trait fin, les natures remontent d'un ton. */
-export const TRAIT = { TASK: '#8d8d8d', GOAL: '#e03131', ANCHOR: '#4b6190' } as const
+export const TRAIT = { TASK: '#8d8d8d', GOAL: '#c9ccd2', ANCHOR: '#4b6190' } as const
 export type NatureApp = keyof typeof TYPEC
 export const natureDe = (kind: string): NatureApp | null =>
   kind === 'task' ? 'TASK' : kind === 'objective' ? 'GOAL' : kind === 'ancre' || kind === 'anchor' ? 'ANCHOR' : null
