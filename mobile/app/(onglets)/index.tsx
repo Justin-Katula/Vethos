@@ -3,7 +3,7 @@
  * de la journée, trois chiffres qu'on peut toucher, la projection, puis la
  * journée ligne par ligne. Tout est lu dans le vrai plan : rien n'est inventé.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -17,6 +17,7 @@ import { ArretSeance, DemarrerSeance } from '@/seances/ArretSeance'
 import { useSeances } from '@/seances/magasin-seances'
 import { RevueDimanche } from '@/coach/RevueDimanche'
 import { afterMissLine, effectiveContract } from '@shared/contract'
+import { peutParler } from '@shared/coach/coach'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -65,6 +66,20 @@ export default function Aujourdhui() {
   const { acc } = useLumiere()
   const { jours, minute: N, chargees, maintenant, seanceActive, demarrable, aujourdHui: cleJour } = usePlan()
   const evenements = useSeances((e) => e.apprentissage.sessionEvents)
+  const apprentissageSignaux = useSeances((e) => e.apprentissage.lastSignalAt)
+  // Le constat d'après un raté est noté quand il s'affiche : il ne revient
+  // qu'après 72 h (usure des messages).
+  const ligneMontree = useRef(false)
+  useEffect(() => {
+    if (!ligneMontree.current) return
+    const dit = apprentissageSignaux['coach:rate']
+    if (dit && Date.now() - new Date(dit).getTime() < 90 * 60_000) return
+    const e = useSeances.getState()
+    void e.poser({
+      apprentissage: { ...e.apprentissage, lastSignalAt: { ...e.apprentissage.lastSignalAt, 'coach:rate': new Date().toISOString() } },
+      confirmations: e.confirmations,
+    })
+  })
   const { taches, objectifs, ancres, obligations, reglages } = useDonnees()
   const [focus, setFocus] = useState<Focus>(null)
   const [slide, setSlide] = useState(0)
@@ -127,7 +142,14 @@ export default function Aujourdhui() {
     .filter((fin) => N >= fin && N - fin < 90)
     .sort((a, b) => b - a)[0]
   const contrat = reglages.contrat ? effectiveContract(reglages.contrat, maintenant) : null
-  const ligneRate = rate !== undefined && contrat ? afterMissLine(contrat.mode, nxt ? fmt(nxt.debut) : null) : null
+  // 72 h par sujet : le même constat ne revient pas chaque soir.
+  const sujetRate = 'coach:rate'
+  const dejaDit = apprentissageSignaux[sujetRate]
+  const ligneRate =
+    rate !== undefined && contrat && (!dejaDit || maintenant.getTime() - new Date(dejaDit).getTime() < 90 * 60_000 || peutParler({ dernier: dejaDit, maintenant, autonomie: 0 }))
+      ? afterMissLine(contrat.mode, nxt ? fmt(nxt.debut) : null)
+      : null
+  ligneMontree.current = !!ligneRate
 
   let maintenantCarte: { k: string; t: string; titre: string; point: string }
   if (N < WAKE || N >= BED) maintenantCarte = { k: 'NOW', t: `${fmt(BED)} – ${fmt(WAKE)}`, titre: 'The night is yours.', point: acc }

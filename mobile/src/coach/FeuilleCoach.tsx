@@ -7,7 +7,7 @@ import { coach } from './client'
 import { detecteDetresse, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
 import { useSeances } from '@/seances/magasin-seances'
 
-type Message = { role: 'user' | 'assistant'; content: string }
+type Message = { role: 'user' | 'assistant'; content: string; sig?: string }
 
 /**
  * L'entretien d'entrée du Coach (WOOP : souhait, résultat, obstacle, plan
@@ -37,16 +37,19 @@ export function FeuilleCoach({ ouverte, fermer }: { ouverte: boolean; fermer: ()
       return
     }
     setAttente(true)
-    const r = await coach().demander({ job: 'woop', mode, faits: {}, messages: historique.slice(-12) })
+    // La conversation garde ses tours dans l'ordre et commence par l'utilisateur :
+    // le premier message du Coach (sans question posée) n'y entre pas.
+    const envoyes = historique.slice(historique[0]?.role === 'assistant' ? 1 : 0).slice(-11)
+    const r = await coach().converser({ job: 'woop', mode, faits: {}, messages: envoyes })
     setAttente(false)
     if (r === null) {
       setHorsLigne(true)
       return
     }
     setHorsLigne(false)
-    const suite = [...historique, { role: 'assistant' as const, content: r }]
+    const suite = [...historique, { role: 'assistant' as const, content: r.texte, ...(r.sig ? { sig: r.sig } : {}) }]
     setMessages(suite)
-    const plan = /PLAN:\s*(.+)$/im.exec(r)?.[1]?.trim()
+    const plan = /PLAN:\s*(.+)$/im.exec(r.texte)?.[1]?.trim()
     if (plan) void majReglages({ planSiAlors: plan.slice(0, 200) })
   }
 

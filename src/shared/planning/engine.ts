@@ -412,8 +412,24 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     const dayIsCrisis = saturated.has(date)
     // Déclencheurs-événements du jour : le premier créneau libre après une
     // obligation ou une ancre — jamais le réveil, qui a sa propre règle.
-    const dayTriggerStarts = cap.slots
-      .map((s) => s.startMinute)
+    // Un déclencheur nommé (plan si-alors) : le premier créneau libre qui suit
+    // CET événement-là. Sinon, la fin de n'importe quelle obligation.
+    const nommes = (input.triggerLabels ?? []).map((l) => l.trim().toLowerCase()).filter(Boolean)
+    const finsNommees = nommes.length
+      ? [
+          ...dayEntries.filter((e) => nommes.includes(e.label.trim().toLowerCase())).map((e) => e.endMinute),
+          ...ancresFor(dow)
+            .filter((a) => nommes.includes(a.name.trim().toLowerCase()))
+            .map((a) => a.anchorMinute + a.normalMaxMinutes),
+        ]
+      : null
+    const dayTriggerStarts = (
+      finsNommees
+        ? finsNommees
+            .map((fin) => cap.slots.find((s) => s.startMinute >= fin)?.startMinute)
+            .filter((x): x is number => x !== undefined)
+        : cap.slots.map((s) => s.startMinute)
+    )
       .filter((start) => wakeMinute === null || start > wakeMinute + 60)
       // Le créneau coupé à « maintenant » ne suit aucun événement.
       .filter((start) => !(date === input.today && start === nowMinute))

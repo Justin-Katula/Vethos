@@ -1,4 +1,5 @@
 import type { Contract } from '@shared/contract'
+import type { TrancheAge } from '@shared/sommeil-plancher'
 import { create } from 'zustand'
 import { nexus } from '@/lib/ipc'
 import type { Settings } from '@shared/schemas'
@@ -36,6 +37,7 @@ type SettingsState = {
   deepseekApiKey: string
   /** Le contrat d'Ulysse, s'il a été signé. */
   contract: Contract | null
+  ageBracket: TrancheAge | null
   loaded: boolean
 
   load: () => Promise<void>
@@ -53,6 +55,7 @@ type SettingsState = {
         | 'themeDarkAt'
         | 'deepseekApiKey'
         | 'contract'
+        | 'ageBracket'
       >
     >,
   ) => Promise<void>
@@ -70,6 +73,7 @@ function buildPayload(state: SettingsState): Settings {
     themeDarkAt: state.themeDarkAt,
     deepseekApiKey: state.deepseekApiKey || undefined,
     ...(state.contract ? { contract: state.contract } : {}),
+    ...(state.ageBracket ? { ageBracket: state.ageBracket } : {}),
   }
 }
 
@@ -147,6 +151,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   themeDarkAt: DEFAULT_DARK_AT,
   deepseekApiKey: '',
   contract: null,
+  ageBracket: null,
   loaded: false,
 
   async load() {
@@ -164,6 +169,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       themeDarkAt: data?.themeDarkAt ?? DEFAULT_DARK_AT,
       deepseekApiKey: data?.deepseekApiKey ?? '',
       contract: data?.contract ?? null,
+      ageBracket: data?.ageBracket ?? null,
       loaded: true,
     })
     syncSleepWindow(get())

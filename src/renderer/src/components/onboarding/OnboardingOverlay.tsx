@@ -5,11 +5,13 @@ import { cn } from '@/lib/cn'
 import { ONBOARDING_STEPS, useOnboardingStore, type OnboardingStep } from '@/store/onboarding.store'
 import { WelcomeStep } from './WelcomeStep'
 import { UsernameStep } from './UsernameStep'
+import { AgeStep } from './AgeStep'
 import { DonePage } from './DonePage'
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
   welcome: 'Welcome',
   username: 'You',
+  age: 'Age',
   done: 'Done',
 }
 
@@ -97,6 +99,7 @@ export function OnboardingOverlay(): JSX.Element {
           >
             {step === 'welcome' && <WelcomeStep onContinue={next} />}
             {step === 'username' && <UsernameStep />}
+            {step === 'age' && <AgeStep />}
             {step === 'done' && <DonePage />}
           </motion.div>
         </AnimatePresence>

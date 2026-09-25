@@ -1758,3 +1758,40 @@ describe('Revue du moteur — correctifs (spec moteur 2026-09-25)', () => {
     expect(b.blocks).toEqual(a.blocks)
   })
 })
+
+describe('Déclencheur-événement nommé (plan si-alors)', () => {
+  it('phase 2+ : l’habitude part juste après l’événement nommé', () => {
+    const OBJ = objective({ weeklyTargetMinutes: 420 })
+    const cours: ScheduleEntry = { dayOfWeek: 2, startMinute: 600, endMinute: 780, categoryType: 'custom', label: 'Piano lesson', color: '#5E81AC' }
+    const events: SessionEvent[] = Array.from({ length: 12 }, (_, i) => ({
+      blockId: `t${i}`,
+      date: addDays(TODAY, -(i + 1)),
+      kind: 'objective',
+      refId: OBJ.id,
+      category: `objectif:${OBJ.id}`,
+      plannedStartMinute: 900,
+      plannedMinutes: 60,
+      started: true,
+      delayMinutes: 0,
+      spontaneous: false,
+      heldMinutes: 60,
+      stoppedEarly: false,
+      blockedAttempts: 0,
+      load48hMinutes: 0,
+      createdAt: '2026-08-01T09:00:00.000Z',
+    }))
+    const plan = computePlan(
+      input({
+        schedule: [...sleepScheduleEntries('23:00', '07:00'), cours],
+        objectives: [OBJ],
+        sessionEvents: events,
+        triggerLabels: ['Piano lesson'],
+      }),
+      NOW,
+    )
+    // Mercredi 12 août (dayOfWeek 2) : après la leçon et son buffer de retour.
+    const mercredi = plan.blocks.filter((b) => b.kind === 'objective' && b.date === '2026-08-12')
+    expect(mercredi[0]!.startMinute).toBeGreaterThanOrEqual(780)
+    expect(mercredi[0]!.startMinute).toBeLessThanOrEqual(840)
+  })
+})

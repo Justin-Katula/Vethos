@@ -112,6 +112,9 @@ export function calculerPlan({
     consecutiveDelays: apprentissage?.consecutiveDelays ?? {},
     // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
     ...(apprentissage ? { sessionEvents: apprentissage.sessionEvents } : {}),
+    // Le plan si-alors de l'entretien WOOP : les obligations et ancres qu'il nomme
+    // deviennent les déclencheurs-événements des habitudes (phase 2+).
+    ...(reglages.planSiAlors ? { triggerLabels: declencheursNommes(reglages.planSiAlors, obligations.map((o) => o.label), ancres.map((a) => a.nom)) } : {}),
     dailyUtilization: apprentissage?.dailyUtilization ?? {},
     weeklyObjectiveServed: apprentissage?.weeklyObjectiveServed ?? {},
     objectiveLastServed: apprentissage?.objectiveLastServed ?? {},
@@ -264,4 +267,10 @@ function obligationSommeil(jour: number, debut: number, fin: number): Obligation
 
 export function cleDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Les libellés d'obligations ou d'ancres que le plan si-alors nomme en toutes lettres. */
+export function declencheursNommes(plan: string, obligations: string[], ancres: string[]): string[] {
+  const t = plan.toLowerCase()
+  return [...new Set([...obligations, ...ancres])].filter((l) => l.trim().length >= 3 && t.includes(l.trim().toLowerCase()))
 }

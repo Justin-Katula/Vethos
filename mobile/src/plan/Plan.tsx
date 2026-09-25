@@ -7,6 +7,7 @@ import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
 import { journalContextFor, overlayDueFor, setBlockedAttempts } from '@shared/planning/clock'
 import { lireTexteArret } from '@shared/coach/coach'
+import { dueRemovals } from '@shared/contract'
 import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
 import { pontEcran } from '@/blocage/ecran-natif'
 import { addDays } from '@shared/planning/dates'
@@ -17,7 +18,7 @@ import { calculerPlan, cleDate } from './moteur'
 import { lireSemaine } from './lecture'
 
 function useSourcePlan() {
-  const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches } = useDonnees()
+  const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches, supprimerObjectif, majReglages } = useDonnees()
   const { apprentissage, confirmations, chargees: mesuresPretes, charger, poser } = useSeances()
   // Le bouclier s'affiche dans un AUTRE processus, qui n'a pas notre thème et
   // ne peut pas le demander : ses couleurs se figent au moment où on le pose.
@@ -79,6 +80,17 @@ function useSourcePlan() {
   )
 
   useEffect(() => { void charger(cleDate(new Date())) }, [charger])
+
+  // Contrat : un retrait d'objectif demandé il y a 48 h prend effet maintenant.
+  useEffect(() => {
+    if (!reglages.contrat) return
+    const r = dueRemovals(reglages.contrat, new Date(instant))
+    if (!r.refIds.length) return
+    void (async () => {
+      for (const id of r.refIds) await supprimerObjectif(id)
+      await majReglages({ contrat: r.contract })
+    })()
+  }, [instant, reglages.contrat, supprimerObjectif, majReglages])
 
   // Le tic écrit, le rendu ne doit pas. On range ce qu'il a produit dans un
   // effet, une seule fois par changement réel — `change` est calculé par la

@@ -1,3 +1,4 @@
+import { dureeNuitHHMM, plancherSommeil } from '@shared/sommeil-plancher'
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { PageTransition } from '@/components/PageTransition'
@@ -47,6 +48,19 @@ export default function TimePage() {
   const setSchedule = usePlanningStore((s) => s.setSchedule)
   const sleepStart = useSettingsStore((s) => s.sleepStart)
   const sleepEnd = useSettingsStore((s) => s.sleepEnd)
+  const ageBracket = useSettingsStore((s) => s.ageBracket)
+  // Le plancher de sommeil par âge : une nuit plus courte n'est pas enregistrée.
+  const [sleepRefused, setSleepRefused] = useState<string | null>(null)
+  const setSleep = (start: string, end: string) => {
+    const d = dureeNuitHHMM(start, end)
+    const floor = plancherSommeil(ageBracket)
+    if (d !== null && d < floor) {
+      setSleepRefused(`A night is at least ${floor / 60} hours.`)
+      return
+    }
+    setSleepRefused(null)
+    void updateSettings({ sleepStart: start, sleepEnd: end })
+  }
   const updateSettings = useSettingsStore((s) => s.updateSettings)
   const reduce = useReducedMotion()
 
@@ -136,7 +150,7 @@ export default function TimePage() {
                     type="time"
                     name="sleep-start"
                     value={sleepStart}
-                    onChange={(e) => void updateSettings({ sleepStart: e.target.value })}
+                    onChange={(e) => setSleep(e.target.value, sleepEnd)}
                     className={inputClass}
                   />
                 </label>
@@ -146,11 +160,12 @@ export default function TimePage() {
                     type="time"
                     name="sleep-end"
                     value={sleepEnd}
-                    onChange={(e) => void updateSettings({ sleepEnd: e.target.value })}
+                    onChange={(e) => setSleep(sleepStart, e.target.value)}
                     className={inputClass}
                   />
                 </label>
               </div>
+              {sleepRefused && <p className="mt-3 text-[12px] text-warn">{sleepRefused}</p>}
               <p className="mt-3 text-[11px] text-fg-3">
                 Never counted as work, and no notification is sent during these hours. It is
                 also what decides which hours the grid shows.

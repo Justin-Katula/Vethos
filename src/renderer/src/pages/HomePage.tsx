@@ -75,6 +75,11 @@ export default function HomePage() {
     return () => clearInterval(id)
   }, [])
 
+  const applyDueRemovals = usePlanningStore((s) => s.applyDueRemovals)
+  useEffect(() => {
+    void applyDueRemovals()
+  }, [now, applyDueRemovals])
+
   const plan = usePlanning(now)
   const tasks = usePlanningStore((s) => s.tasks)
   const objectives = usePlanningStore((s) => s.objectives)

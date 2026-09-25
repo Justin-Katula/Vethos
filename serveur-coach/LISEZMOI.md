@@ -4,7 +4,10 @@ La clé DeepSeek vit **ici, et nulle part ailleurs** : ni dans l'app iPhone, ni 
 
 ## Ce qu'il protège
 - **La clé** : lue dans l'environnement, jamais renvoyée, jamais journalisée.
-- **Le portefeuille** : 40 demandes par installation et par jour, 2000 en tout par jour, 5 nouveaux jetons par IP et par heure (réglables).
+- **Le portefeuille** : 40 demandes par installation et par jour, 2000 en tout par jour, 5 nouveaux jetons par adresse et par heure (IPv6 regroupé par /64), 20 échecs d'authentification par adresse et par heure, jetons qui expirent après 30 jours (réglables). Un plafond mal écrit empêche le serveur de démarrer.
+- **La conversation** : un tour « Coach » renvoyé par l'app n'est accepté que s'il porte la signature du serveur ; les faits sont une liste fermée par job.
+
+Pour aller plus loin contre l'abus (fabrication de jetons en masse) : exiger une attestation d'appareil Apple (App Attest) avant `/v1/install`.
 - **Les règles du Coach** : le prompt système est construit sur le serveur. Une demande qui essaie d'en envoyer un est refusée.
 - **La détresse** : détectée avant tout appel au modèle ; la réponse oriente vers une aide humaine.
 
@@ -17,7 +20,8 @@ La clé DeepSeek vit **ici, et nulle part ailleurs** : ni dans l'app iPhone, ni 
 | `COACH_PAR_INSTALLATION_PAR_JOUR` | non | 40 |
 | `COACH_GLOBAL_PAR_JOUR` | non | 2000 |
 | `COACH_INSTALLATIONS_PAR_IP_PAR_HEURE` | non | 5 |
-| `COACH_DERRIERE_PROXY` | non (mettre `1` derrière un proxy qui pose `X-Forwarded-For`) | — |
+| `COACH_PROXYS` | non : nombre de proxys de confiance devant le serveur (l'adresse est lue à droite de `X-Forwarded-For`) | 0 |
+| `COACH_JOURS_JETON` | non : durée de vie d'un jeton | 30 |
 | `PORT` | non | 8787 |
 
 Générer un secret : `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`

@@ -1,4 +1,8 @@
 import { create } from 'zustand'
+import { useSettingsStore } from './settings.store'
+import { useToastStore } from './toast.store'
+import { dueRemovals, effectiveContract, refusalLine, refusesChange, removalDate, requestObjectiveRemoval } from '@shared/contract'
+import { activeConfirmedSession } from '@shared/planning/session'
 import { nexus } from '@/lib/ipc'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { computeAncreMinimum, findAncreConflict } from '@shared/planning/placement'
@@ -91,6 +95,8 @@ type PlanningStore = {
 
   addObjective: (o: Creatable<ObjectiveItem, 'id' | 'createdAt'>) => Promise<void>
   deleteObjective: (id: string) => Promise<void>
+  /** Contrat : les retraits d'objectif demandés il y a 48 h prennent effet. */
+  applyDueRemovals: () => Promise<void>
 
   /** Refuse la création en cas de conflit d'heure ou de déclencheur (D.3). */
   addAncre: (a: Creatable<AncreItem, 'id' | 'createdAt' | 'minimumMinutes'>) => Promise<void>
@@ -119,6 +125,27 @@ export type TaskDraft = Creatable<
   TaskItem,
   'id' | 'createdAt' | 'parentTaskId' | 'partOrder' | 'extraMinutes'
 >
+
+/**
+ * Le contrat d'Ulysse, au moment d'agir (spec moteur 2026-09-25) : pendant
+ * une séance confirmée, le plan ne change pas — refusé avec les mots du
+ * contrat signé. Rend `true` quand l'action peut avoir lieu.
+ */
+function contractAllows(confirmations: SessionConfirmationsState | null): boolean {
+  const raw = useSettingsStore.getState().contract
+  const now = new Date()
+  if (!raw) return true
+  const contract = effectiveContract(raw, now)
+  const minute = now.getHours() * 60 + now.getMinutes()
+  const session = activeConfirmedSession(confirmations, dateKey(now), minute)
+  if (!refusesChange(contract, session !== null)) return true
+  useToastStore.getState().push({
+    variant: 'error',
+    title: 'Not during a block',
+    description: refusalLine(contract.mode, contract.signedAt, (session?.endMinute ?? minute) - minute),
+  })
+  return false
+}
 
 export const usePlanningStore = create<PlanningStore>((set, get) => ({
   loaded: false,
@@ -171,6 +198,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async addTask(input, options) {
+    if (!contractAllows(get().sessionConfirmations)) return
     // B.1/B.4 : la durée retenue est l'estimation CORRIGÉE par ce que les
     // tâches passées de cette catégorie ont réellement coûté. L'utilisateur
     // donne son estimation ; l'application ne la prend jamais au mot.
@@ -273,12 +301,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async deleteTask(id) {
+    if (!contractAllows(get().sessionConfirmations)) return
     const tasks = get().tasks.filter((t) => t.id !== id && t.parentTaskId !== id)
     set({ tasks })
     assertStorageWrite(await nexus.storage.write('tasks', { tasks }), 'tasks')
   },
 
   async addObjective(input) {
+    if (!contractAllows(get().sessionConfirmations)) return
     const color =
       input.color && estCouleurDansFamille('objective', input.color)
         ? input.color
@@ -294,15 +324,50 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
     const objectives = [...get().objectives, objective]
     set({ objectives })
     assertStorageWrite(await nexus.storage.write('objectives', { objectives }), 'objectives')
+    // Dit une fois, à la création : 20 h prend presque tout le budget profond.
+    if (objective.weeklyTargetMinutes >= 18 * 60)
+      useToastStore.getState().push({
+        variant: 'info',
+        title: 'Almost all your deep-work time',
+        description: `${Math.round(objective.weeklyTargetMinutes / 60)} h a week takes almost all of it, every day.`,
+      })
   },
 
   async deleteObjective(id) {
+    if (!contractAllows(get().sessionConfirmations)) return
+    // Retirer un objectif modifie le contrat : effectif 48 h plus tard.
+    const settings = useSettingsStore.getState()
+    if (settings.contract) {
+      const r = requestObjectiveRemoval(effectiveContract(settings.contract, new Date()), id, new Date(), false)
+      if (r.ok) {
+        await settings.updateSettings({ contract: r.contract })
+        const when = removalDate(r.contract, id)
+        useToastStore.getState().push({
+          variant: 'info',
+          title: 'Leaves in 48 hours',
+          description: when ? `It stays planned until ${when.toLocaleString('en-GB')}.` : '',
+        })
+      }
+      return
+    }
     const objectives = get().objectives.filter((o) => o.id !== id)
     set({ objectives })
     assertStorageWrite(await nexus.storage.write('objectives', { objectives }), 'objectives')
   },
 
+  async applyDueRemovals() {
+    const settings = useSettingsStore.getState()
+    if (!settings.contract) return
+    const r = dueRemovals(settings.contract, new Date())
+    if (!r.refIds.length) return
+    const objectives = get().objectives.filter((o) => !r.refIds.includes(o.id))
+    set({ objectives })
+    assertStorageWrite(await nexus.storage.write('objectives', { objectives }), 'objectives')
+    await settings.updateSettings({ contract: r.contract })
+  },
+
   async addAncre(input) {
+    if (!contractAllows(get().sessionConfirmations)) return
     // D.3 : conflit d'heure ou de déclencheur → création REFUSÉE, sans
     // exception. Pas de fusion, pas de décalage automatique : c'est à
     // l'utilisateur de changer l'heure.
@@ -334,12 +399,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async deleteAncre(id) {
+    if (!contractAllows(get().sessionConfirmations)) return
     const ancres = get().ancres.filter((a) => a.id !== id)
     set({ ancres })
     assertStorageWrite(await nexus.storage.write('ancres', { ancres }), 'ancres')
   },
 
   async setSchedule(entries) {
+    if (!contractAllows(get().sessionConfirmations)) return
     set({ schedule: entries })
     assertStorageWrite(await nexus.storage.write('schedule', { entries }), 'schedule')
   },

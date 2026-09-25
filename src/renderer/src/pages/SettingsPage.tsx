@@ -14,6 +14,7 @@ import { effectiveContract, requestModeChange, signContract, MODES, type Mode } 
 import { activeConfirmedSession } from '@shared/planning/session'
 import { dateKey } from '@shared/planning/dates'
 import { usePlanningStore } from '@/store/planning.store'
+import { AgeChoice } from '@/components/onboarding/AgeStep'
 
 /**
  * Les réglages tiennent en trois choses : qui tu es, où se règle le reste, et
@@ -130,6 +131,10 @@ export default function SettingsPage() {
                   Change it in My time
                 </Link>
               </p>
+            </Row>
+
+            <Row label="Age" hint="Sets your sleep floor: 8 hours from 13 to 18, 7 hours after.">
+              <AgeChoice />
             </Row>
 
             <Row label="Contract" hint="No changes during a block. A change here takes 48 hours.">

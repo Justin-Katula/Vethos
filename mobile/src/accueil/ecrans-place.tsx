@@ -40,7 +40,7 @@ import {
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
 import type { TrancheAge } from '@/donnees/regle-sommeil'
-import { duringBlockLine, type Mode } from '@shared/contract'
+import { toneSample, type Mode } from '@shared/contract'
 
 export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
@@ -611,7 +611,7 @@ export function EcranContrat({ ctx }: { ctx: Ctx }) {
         <View style={{ gap: 8, marginTop: 24 }}>
           {MODES_CONTRAT.map(([m, l], i) => (
             <Entree key={m} dl={480 + i * 110} reduit={ctx.reduit}>
-              <Ligne titre={l} sous={duringBlockLine(m, 18)} forme="radio" pris={e.mode === m} onPress={() => choisir(m)} />
+              <Ligne titre={l} sous={toneSample(m)} forme="radio" pris={e.mode === m} onPress={() => choisir(m)} />
             </Entree>
           ))}
         </View>

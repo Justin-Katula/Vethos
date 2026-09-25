@@ -14,6 +14,7 @@ import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
+import { effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
 import { useSeances } from '@/seances/magasin-seances'
 import { CoachEnLigne } from '@/coach/CoachEnLigne'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
@@ -108,6 +109,22 @@ export default function Engagements() {
   const { acc } = useLumiere()
   const toast = useToast()
   const garde = useGardeContrat()
+  const contratSigne = d.reglages.contrat
+  const jourCourt = (x: Date) =>
+    `${x.getDate()} ${MOIS3[x.getMonth()]}, ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
+  // Retirer un objectif, c'est modifier le contrat : effectif 48 h plus tard.
+  const retirerObjectif = (id: string, nom: string) => {
+    if (!contratSigne) {
+      void d.supprimerObjectif(id)
+      toast(`${nom} removed.`)
+      return
+    }
+    const r = requestObjectiveRemoval(effectiveContract(contratSigne, new Date()), id, new Date(), false)
+    if (!r.ok) return
+    void d.majReglages({ contrat: r.contract })
+    const quand = removalDate(r.contract, id)
+    if (quand) toast(`${nom} leaves on ${jourCourt(quand)}.`)
+  }
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
   const [ouvert, setOuvert] = useState<string | null>(null)
@@ -196,6 +213,10 @@ export default function Engagements() {
     // destination — un écart qui se lit comme une progression, jamais un retard.
     const dose = resultat.objectiveDoses[o.id]?.dose ?? o.cibleHebdoMinutes
     const fr = dose ? Math.min(1, fait2 / dose) : 0
+    // Les deux premières semaines d'un objectif neuf : des buts
+    // d'apprentissage, pas de chiffre de performance.
+    const ageJours = Math.floor((maintenant.getTime() - new Date(o.creeLe).getTime()) / 86_400_000)
+    const debut = ageJours < 14
     const ou = ouvert === o.id
     return (
       <Pressable key={o.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
@@ -205,21 +226,25 @@ export default function Engagements() {
               <Circle cx={17} cy={17} r={15} fill="none" stroke="rgba(242,242,242,0.1)" strokeWidth={2.5} />
               <Circle cx={17} cy={17} r={15} fill="none" stroke={A.t1} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
             </Svg>
-            <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{`${Math.round(fr * 100)}%`}</Text>
+            <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{debut ? '' : `${Math.round(fr * 100)}%`}</Text>
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
               <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{o.nom}</Text>
-              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(fait2)} / ${hm(dose)}`}</Text>
+              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{debut ? `Week ${Math.floor(ageJours / 7) + 1}` : `${hm(fait2)} / ${hm(dose)}`}</Text>
             </View>
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{dose < o.cibleHebdoMinutes ? `This week ${hm(dose)} · toward ${hm(o.cibleHebdoMinutes)}` : `About ${hm(dose / 7)} a day · this week`}</Text>
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{removalDate(contratSigne, o.id)
+                ? `Leaves ${jourCourt(removalDate(contratSigne, o.id)!)}`
+                : dose < o.cibleHebdoMinutes
+                  ? `This week ${hm(dose)} · toward ${hm(o.cibleHebdoMinutes)}`
+                  : `About ${hm(dose / 7)} a day · this week`}</Text>
           </View>
         </View>
         {ou ? (
           <View style={{ gap: 12, paddingTop: 12 }}>
             {o.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{o.intention}</Text> : null}
             <View style={{ flexDirection: 'row' }}>
-              <Pilule contour onPress={() => garde() && (void d.supprimerObjectif(o.id), toast(`${o.nom} removed.`))}>
+              <Pilule contour onPress={() => garde() && retirerObjectif(o.id, o.nom)}>
                 Remove
               </Pilule>
             </View>
@@ -375,7 +400,8 @@ export default function Engagements() {
             toast('Added.')
           } else if (f.K === 'GOAL') {
             await d.ajouterObjectif({ nom: f.nom, intention: f.plan, couleur: allouerCouleurObjectif(d.objectifs), cibleHebdoMinutes: f.minutes })
-            toast('Added.')
+            // Dit une fois, à la création : 20 h prend presque tout le budget profond.
+            toast(f.minutes >= 18 * 60 ? `Added. ${hm(f.minutes)} a week takes almost all your deep-work time.` : 'Added.')
           } else {
             await d.ajouterAncre({ nom: f.nom, intention: f.plan, declencheur: f.nom, couleur: allouerCouleurAncre(d.ancres), minuteAncrage: f.a, jours: f.jours, dureeMinutes: f.minutes })
             toast('Added.')

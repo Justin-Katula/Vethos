@@ -478,7 +478,9 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
           lever: ajouts.lever,
           sommeilReference: { coucher: ajouts.coucher, lever: ajouts.lever },
           trancheAge: trancheAge ?? actuel.reglages.trancheAge ?? null,
-          contrat: contrat ?? actuel.reglages.contrat ?? null,
+          // Un contrat déjà signé ne se réécrit pas en rejouant l'introduction :
+          // toute modification passe par les 48 h.
+          contrat: actuel.reglages.contrat ?? contrat ?? null,
           introductionFaite: true,
         },
       })

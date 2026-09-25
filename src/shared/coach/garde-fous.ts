@@ -4,7 +4,11 @@
 // langage ont tendance à donner raison à l'utilisateur : un utilisateur qui
 // négocie finirait par gagner si l'IA avait le pouvoir d'accorder. Tout ce
 // qui sort du modèle passe donc par ici AVANT d'être montré, sur le serveur
-// comme sur l'appareil.
+// comme sur l'appareil. En anglais ET en français : le Coach répond dans la
+// langue de l'utilisateur.
+
+/** Bornes de mot qui connaissent les accents (\b ne les connaît pas). */
+const mots = (alternatives: string) => new RegExp(`(?<!\\p{L})(?:${alternatives})(?!\\p{L})`, 'iu')
 
 /**
  * Détresse ou idées noires : le Coach sort du mode discipline et oriente vers
@@ -12,9 +16,12 @@
  * faux négatif peut coûter bien plus — la liste est volontairement large.
  */
 const DETRESSE = [
-  /\b(suicid\w*|kill (my|him|her)self|end (it|my life)|want to die|wanna die|don'?t want to (live|be here)|no reason to live|self[- ]?harm|cut(ting)? myself|hurt myself)\b/i,
-  /\b(hopeless|worthless|can'?t go on|better off (dead|without me))\b/i,
-  /(?<!\p{L})(me suicider|me tuer|en finir|mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien)(?!\p{L})/iu,
+  mots(
+    "suicid\\p{L}*|kill (?:my|him|her)self|end (?:it all|my life)|want to die|wanna die|don'?t want to (?:live|be here)|no reason to live|self[- ]?harm|cut(?:ting)? myself|hurt myself|better off dead|better off without me|can'?t go on|hopeless|worthless",
+  ),
+  mots(
+    'me suicider|me tuer|en finir|envie de mourir|veux mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien|je sers a rien|plus la force',
+  ),
 ]
 
 export function detecteDetresse(texte: string): boolean {
@@ -26,18 +33,26 @@ export const MESSAGE_AIDE =
   'Let’s pause the plan — you matter more than any block. If you might be in danger, call your local emergency number now. ' +
   'In the US or Canada you can call or text 988; in France, call 3114. Talking to someone you trust helps too.'
 
-/** Formes interdites dans tous les modes : humilier, insulter, culpabiliser, menacer, comparer. */
+/** Humilier, insulter, culpabiliser, menacer, comparer aux autres — dans tous les modes. */
 const INTERDITS = [
-  /\b(lazy|pathetic|loser|stupid|idiot|useless|worthless|disappointing|shame on you|you always fail|you never)\b/i,
-  /\b(or else|you'?ll regret|i'?ll punish|punishment)\b/i,
-  /\b(everyone else|other people manage|others can)\b/i,
-  /(?<!\p{L})(paresseux|nul|minable|idiot|honte|tu rates toujours)(?!\p{L})/iu,
+  mots("lazy|pathetic|loser|stupid|idiot|useless|shame on you|you always fail|you never (?:finish|keep|stick)|disappoint(?:ed|ing)? (?:in|with) you|you should be ashamed"),
+  mots("or else|you'?ll regret|i'?ll punish|punish(?:ment)?|you deserve (?:it|this)"),
+  mots('everyone else (?:can|manages|does)|other people (?:manage|can|do)|others (?:can|manage) (?:it|to|do)|why can(?:no|’|\')t you|unlike (?:everyone|others)'),
+  mots('paresseu(?:x|se)|minable|idiot|nul(?:le)? comme|honte à toi|tu devrais avoir honte|tu rates toujours|tu n’y arrives jamais|tu n\'y arrives jamais|tu me déçois|décevant'),
+  mots('sinon tu|tu vas le regretter|tu le mérites|punition'),
+  mots('les autres y arrivent|tout le monde y arrive|contrairement aux autres'),
 ]
 
-/** Le Coach n'accorde rien : toute concession sort d'ici, remplacée par le renvoi au moteur. */
+/** Flatter : l'éloge vide, sans chiffre. */
+const FLATTERIE = [
+  mots("you'?re (?:amazing|incredible|a genius|perfect|the best)|so proud of you|you'?re unstoppable"),
+  mots('tu es (?:génial|géniale|incroyable|parfait|parfaite|le meilleur|la meilleure|un génie)|je suis si fier'),
+]
+
+/** Le Coach n'accorde rien : toute concession sort d'ici, remplacée par la phrase du moteur. */
 const CONCESSIONS = [
-  /\b(i('| a)?ll (let|allow) you|you can skip|skip (it|this|today)|take the (day|rest of the day) off|i('| wi)ll (move|cancel|remove) (it|the block)|i('| ha)ve (moved|cancelled|removed))\b/i,
-  /\b(granted|approved|it'?s fine to stop)\b/i,
+  mots("i(?:'| wi)ll (?:let|allow) you|you can skip|skip (?:it|this|today)|take the (?:day|rest of the day) off|i(?:'| wi)ll (?:move|cancel|remove|delete) (?:it|the block)|i(?:'| ha)ve (?:moved|cancelled|canceled|removed)|it'?s fine to stop|go ahead and stop|granted|approved"),
+  mots("je t'?accorde|je t’accorde|tu peux (?:sauter|arrêter|annuler|laisser tomber)|saute(?:-le)? aujourd|prends ta journée|je (?:déplace|supprime|annule|retire) (?:le|ce) bloc|j'?ai (?:déplacé|supprimé|annulé)|c'est bon, arrête|accordé"),
 ]
 
 export type Verdict = { texte: string; remplace: boolean }
@@ -45,19 +60,29 @@ export type Verdict = { texte: string; remplace: boolean }
 /**
  * Filtre une réponse du modèle :
  * - détresse dans la réponse → message d'aide ;
- * - une forme interdite ou une concession → on ne montre rien de ce texte
- *   (null) : l'appelant retombe sur la phrase du moteur ;
- * - plus d'une question → coupée après la première ;
- * - bornée en longueur.
+ * - une forme interdite, une flatterie ou une concession → rien de ce texte
+ *   n'est montré (null) : l'appelant retombe sur la phrase du moteur ;
+ * - plus d'une question → coupé après la première, en gardant une ligne
+ *   « PLAN: … » finale (le déclencheur de l'entretien WOOP) ;
+ * - les retours à la ligne sont gardés (une partie par ligne, pour le découpage) ;
+ * - borné en longueur.
  */
 export function filtrerReponse(brut: string): Verdict | null {
-  const t = brut.replace(/\s+/g, ' ').trim()
+  const lignes = brut
+    .split(/\r?\n/)
+    .map((l) => l.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+  const t = lignes.join('\n')
   if (!t) return null
   if (detecteDetresse(t)) return { texte: MESSAGE_AIDE, remplace: true }
-  if (INTERDITS.some((r) => r.test(t)) || CONCESSIONS.some((r) => r.test(t))) return null
-  const premiere = t.indexOf('?')
-  const coupe = premiere >= 0 ? t.slice(0, premiere + 1) : t
-  return { texte: coupe.length > 600 ? `${coupe.slice(0, 597).trimEnd()}…` : coupe, remplace: false }
+  if ([...INTERDITS, ...FLATTERIE, ...CONCESSIONS].some((r) => r.test(t))) return null
+
+  const plan = lignes.find((l) => /^PLAN:/i.test(l))
+  const corps = lignes.filter((l) => l !== plan).join('\n')
+  const premiere = corps.indexOf('?')
+  const coupe = premiere >= 0 ? corps.slice(0, premiere + 1) : corps
+  const final = plan ? `${coupe}\n${plan}`.trim() : coupe
+  return { texte: final.length > 800 ? `${final.slice(0, 797).trimEnd()}…` : final, remplace: false }
 }
 
 /** La clé du journal où l'on note une détresse détectée. */

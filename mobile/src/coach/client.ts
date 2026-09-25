@@ -15,9 +15,12 @@ const lire = async () => {
   if (Platform.OS === 'web') return globalThis.localStorage?.getItem(CLE_JETON) ?? null
   return SecureStore.getItemAsync(CLE_JETON)
 }
-const ecrire = async (j: string) => {
-  if (Platform.OS === 'web') globalThis.localStorage?.setItem(CLE_JETON, j)
-  else await SecureStore.setItemAsync(CLE_JETON, j)
+const ecrire = async (j: string | null) => {
+  if (Platform.OS === 'web') {
+    if (j) globalThis.localStorage?.setItem(CLE_JETON, j)
+    else globalThis.localStorage?.removeItem(CLE_JETON)
+  } else if (j) await SecureStore.setItemAsync(CLE_JETON, j)
+  else await SecureStore.deleteItemAsync(CLE_JETON)
 }
 
 let client: ClientCoach | null = null

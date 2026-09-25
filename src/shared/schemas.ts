@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ContractSchema } from './contract'
+import { TRANCHES_AGE } from './sommeil-plancher'
 import { APP_CATEGORIES } from './app-categories'
 import { THEME_MODES } from './theme'
 
@@ -64,6 +65,8 @@ export const SettingsSchema = z.object({
   deepseekApiKey: z.string().max(200).optional(),
   /** Le contrat d'Ulysse et son mode, Allié ou Sergent (spec moteur 2026-09-25). */
   contract: ContractSchema.optional(),
+  /** La tranche d'âge : elle fixe le plancher de sommeil (8 h de 13 à 18 ans, 7 h au-delà). */
+  ageBracket: z.enum(TRANCHES_AGE).optional(),
 })
 export type Settings = z.infer<typeof SettingsSchema>
 

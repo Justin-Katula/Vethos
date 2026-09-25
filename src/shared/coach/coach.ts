@@ -87,7 +87,14 @@ export function revueDimanche(args: {
   }
 }
 
-/** La revue sans le modèle : les mêmes chiffres, une question fixe. */
+const QUESTIONS_REVUE = [
+  'What made the good days good?',
+  'Which block felt easiest to start, and why?',
+  'What got in the way this week?',
+  'What would make Monday’s first block easier?',
+] as const
+
+/** La revue sans le modèle : les mêmes chiffres, une question qui change chaque semaine. */
 export function revueEnClair(r: Revue): string[] {
   const h = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}` : `${m} min`)
   const lignes = [`${h(r.tenu)} held this week.`, `${r.demarrees} of ${r.prevues} sessions started.`]
@@ -97,7 +104,8 @@ export function revueEnClair(r: Revue): string[] {
       : `You hold ${r.moyenne} min on average.`,
   )
   lignes.push(r.ajustement)
-  lignes.push('What made the good days good?')
+  // Varié : une question différente d'une semaine à l'autre, sans hasard.
+  lignes.push(varier(QUESTIONS_REVUE, r.semaine))
   return lignes
 }
 

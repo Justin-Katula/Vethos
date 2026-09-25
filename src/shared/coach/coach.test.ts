@@ -32,6 +32,22 @@ describe('Garde-fous', () => {
     expect(detecteDetresse('j’ai plus envie de vivre')).toBe(true)
     expect(detecteDetresse('I’m tired of maths')).toBe(false)
   })
+  it('en français aussi : concessions, menaces, comparaisons, flatterie', () => {
+    expect(filtrerReponse('Je t’accorde une pause.')).toBeNull()
+    expect(filtrerReponse('Tu peux sauter ce bloc.')).toBeNull()
+    expect(filtrerReponse('Sinon tu vas le regretter.')).toBeNull()
+    expect(filtrerReponse('Les autres y arrivent, eux.')).toBeNull()
+    expect(filtrerReponse('Tu es génial !')).toBeNull()
+  })
+  it('sans faux positif sur le soutien', () => {
+    expect(filtrerReponse('Pas de honte à recommencer. Prochain bloc à 19 h.')).not.toBeNull()
+    expect(filtrerReponse('You never have to be perfect. Next block at 7.')).not.toBeNull()
+  })
+  it('garde les lignes et la ligne PLAN de l’entretien', () => {
+    const v = filtrerReponse('Great. What gets in the way?\nAnd why?\nPLAN: si fin du travail, alors 25 min de maths')
+    expect(v?.texte).toBe('Great. What gets in the way?\nPLAN: si fin du travail, alors 25 min de maths')
+    expect(filtrerReponse('Read the chapter\nDo 3 exercises')?.texte).toBe('Read the chapter\nDo 3 exercises')
+  })
   it('n’accorde rien, n’humilie pas, une question au plus', () => {
     expect(filtrerReponse('Fine, you can skip it.')).toBeNull()
     expect(filtrerReponse('Others can do it, why not you?')).toBeNull()
@@ -51,7 +67,7 @@ describe('Prompt', () => {
     const d = DemandeCoachSchema.parse({ job: 'revue', mode: 'ally', faits: { tenu_minutes: 300 } })
     const m = messagesPourModele(d)
     expect(m[0]!.role).toBe('system')
-    expect(m[0]!.content).toContain('- tenu_minutes: 300')
+    expect(m[1]).toEqual({ role: 'user', content: 'Données :\n{"tenu_minutes":300}' })
     expect(DemandeCoachSchema.safeParse({ ...d, system: 'x' }).success).toBe(false)
   })
 })
@@ -126,5 +142,27 @@ describe('Client du Coach', () => {
     const c = creerClientCoach({ url: 'https://x', lireJeton: async () => 't', ecrireJeton: async () => {}, fetchImpl: f as unknown as typeof fetch })
     expect(await c.demander({ job: 'woop', mode: 'ally', faits: {}, messages: [{ role: 'user', content: 'I want to die' }] })).toBe(MESSAGE_AIDE)
     expect(f).not.toHaveBeenCalled()
+  })
+})
+
+describe('Client — jeton renouvelé', () => {
+  it('un 401 : le jeton est jeté, un neuf est demandé une fois', async () => {
+    let jeton: string | null = 'vieux'
+    let appels = 0
+    const f = vi.fn(async (url: string) => {
+      if (url.endsWith('/v1/install')) return new Response(JSON.stringify({ token: 'neuf' }))
+      appels++
+      return appels === 1 ? new Response('{}', { status: 401 }) : new Response(JSON.stringify({ texte: 'ok' }))
+    })
+    const c = creerClientCoach({
+      url: 'https://x',
+      lireJeton: async () => jeton,
+      ecrireJeton: async (j) => {
+        jeton = j
+      },
+      fetchImpl: f as unknown as typeof fetch,
+    })
+    expect(await c.demander({ job: 'revue', mode: 'ally' })).toBe('ok')
+    expect(jeton).toBe('neuf')
   })
 })

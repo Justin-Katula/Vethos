@@ -9,6 +9,10 @@ import {
   refusesChange,
   requestModeChange,
   signContract,
+  requestObjectiveRemoval,
+  dueRemovals,
+  removalDate,
+  toneSample,
 } from './contract'
 
 const NOW = new Date('2026-09-25T14:00:00.000Z')
@@ -51,5 +55,24 @@ describe('Contrat d’Ulysse', () => {
     expect(afterMissLine('ally', '19:00')).toContain('Next block at 19:00')
     expect(afterMissLine('sergeant', '19:00')).toBe('Missed. Next block 19:00. Go.')
     expect(refusalLine('ally', NOW.toISOString(), 5)).toContain('no changes during a block')
+  })
+})
+
+describe('Contrat — objectifs et cibles', () => {
+  it('retirer un objectif attend 48 h, et reste planifié d’ici là', () => {
+    const r = requestObjectiveRemoval(signContract('ally', NOW), 'obj', NOW, false)
+    if (!r.ok) throw new Error('attendu')
+    expect(dueRemovals(r.contract, new Date(NOW.getTime() + DELAI_MODIFICATION_MS - 1)).refIds).toEqual([])
+    const due = dueRemovals(r.contract, new Date(NOW.getTime() + DELAI_MODIFICATION_MS))
+    expect(due.refIds).toEqual(['obj'])
+    expect(due.contract.pendingRemovals).toEqual([])
+    expect(removalDate(r.contract, 'obj')?.getTime()).toBe(NOW.getTime() + DELAI_MODIFICATION_MS)
+  })
+  it('pas pendant un bloc', () => {
+    expect(requestObjectiveRemoval(signContract('ally', NOW), 'obj', NOW, true)).toEqual({ ok: false, reason: 'during-block' })
+  })
+  it('l’échantillon du ton ne porte aucun chiffre inventé', () => {
+    expect(toneSample('ally')).not.toMatch(/\d/)
+    expect(toneSample('sergeant')).not.toMatch(/\d/)
   })
 })

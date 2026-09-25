@@ -340,4 +340,10 @@ export type PlanningInput = {
    * moteur d'avant, exactement.
    */
   sessionEvents?: SessionEvent[]
+  /**
+   * Les déclencheurs-événements nommés par le plan si-alors de l'entretien
+   * WOOP : les libellés d'obligations ou d'ancres après lesquels l'habitude
+   * s'accroche (phase 2+). Absent = n'importe quelle fin d'obligation.
+   */
+  triggerLabels?: string[]
 }
