@@ -401,6 +401,8 @@ export const SessionEventSchema = z.object({
     .object({
       reason: z.enum(STOP_REASONS).nullable(),
       text: z.string().max(500).optional(),
+      /** Catégorie lue dans le texte (Coach, ou mots-clés hors ligne) : une donnée, jamais un verdict. */
+      textReason: z.enum(STOP_REASONS).optional(),
       /** Temps mis à répondre, en ms : une réponse mécanique est un signal plus faible. */
       answerMs: z.number().int().min(0).optional(),
       /** Tentatives d'ouvrir une app bloquée dans les 10 min avant l'arrêt. */

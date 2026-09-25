@@ -149,6 +149,8 @@ export const ReglagesSchema = z.object({
   /** La tranche d'âge, demandée à l'introduction : elle fixe le plancher de sommeil. */
   /** Le contrat d'Ulysse, signé à la fin de l'introduction (spec 2026-09-25). */
   contrat: ContractSchema.nullish(),
+  /** Le plan si-alors de l'entretien WOOP avec le Coach : le déclencheur-événement de l'habitude. */
+  planSiAlors: z.string().max(200).nullish(),
   trancheAge: z
     .preprocess((v) => (v === 'ado' ? '13-18' : v === 'adulte' ? '25+' : v), z.enum(TRANCHES_AGE))
     .nullish(),

@@ -20,6 +20,7 @@ import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
 import type { SegmentTemps } from '@/plan/lecture'
 import { useSeances } from '@/seances/magasin-seances'
+import { CoachEnLigne } from '@/coach/CoachEnLigne'
 import { RoueHeure } from '@/ui/Roue'
 import { accentApp } from '@/ui/lumiere'
 import {
@@ -386,6 +387,9 @@ function FeuilleSeance({
       </View>
       <Text style={{ marginTop: 20, color: A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>Why here</Text>
       <Text style={{ marginTop: 4, color: A.t1, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>{pourquoi}</Text>
+      <View style={{ marginTop: 16 }}>
+        <CoachEnLigne key={s.id} job="seance" libelle="Plan this block" faits={{ bloc: s.titre, minutes: s.fin - s.debut }} />
+      </View>
       <View style={{ marginTop: 24 }}>
         <BoutonBlanc onPress={fermer}>Done</BoutonBlanc>
       </View>

@@ -294,6 +294,7 @@ export function arreter(args: {
   texte?: string
   reponseMs?: number
   tentativesAvant?: number
+  raisonTexte?: StopReason | null
 }): (EtatSeances & { tenuMinutes: number }) | null {
   const r = applyStop({
     learning: args.etat.apprentissage,
@@ -304,6 +305,7 @@ export function arreter(args: {
     ...(args.texte !== undefined ? { text: args.texte } : {}),
     ...(args.reponseMs !== undefined ? { answerMs: args.reponseMs } : {}),
     ...(args.tentativesAvant !== undefined ? { attemptsBefore: args.tentativesAvant } : {}),
+    textReason: args.raisonTexte ?? null,
   })
   if (!r) return null
   return { apprentissage: r.learning, confirmations: r.confirmations, tenuMinutes: r.heldMinutes }

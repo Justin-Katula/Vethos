@@ -8,6 +8,7 @@ export default defineConfig({
       'src/main/**/*.test.ts',
       'src/renderer/**/*.test.ts',
       'src/shared/**/*.test.ts',
+      'serveur-coach/**/*.test.ts',
     ],
     exclude: ['**/*.manual.test.ts'],
   },

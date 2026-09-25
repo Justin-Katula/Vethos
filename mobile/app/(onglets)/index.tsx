@@ -15,6 +15,7 @@ import type { SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 import { ArretSeance, DemarrerSeance } from '@/seances/ArretSeance'
 import { useSeances } from '@/seances/magasin-seances'
+import { RevueDimanche } from '@/coach/RevueDimanche'
 import { afterMissLine, effectiveContract } from '@shared/contract'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 
@@ -217,6 +218,8 @@ export default function Aujourdhui() {
           <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{maintenantCarte.t}</Text>
         )}
       </View>
+
+      <RevueDimanche />
 
       {ligneRate ? (
         <Text style={{ marginTop: 8, marginHorizontal: 20, color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{ligneRate}</Text>

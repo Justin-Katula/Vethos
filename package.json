@@ -26,7 +26,8 @@
     "lint:audit": "eslint src --ext .ts,.tsx --no-eslintrc -c .eslintrc.audit.cjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coach:build": "esbuild serveur-coach/src/serveur.ts --bundle --platform=node --target=node20 --format=cjs --tsconfig=tsconfig.node.json --outfile=serveur-coach/dist/serveur.js"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",

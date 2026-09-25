@@ -603,6 +603,8 @@ export function applyStop(args: {
   text?: string
   answerMs?: number
   attemptsBefore?: number
+  /** La catégorie lue dans le texte, si elle est déjà connue. */
+  textReason?: StopReason | null
 }): { learning: LearningState; confirmations: SessionConfirmationsState; heldMinutes: number } | null {
   const { confirmations } = args
   const o = confirmations.observedPending
@@ -620,6 +622,7 @@ export function applyStop(args: {
     stop: {
       reason: args.reason,
       ...(text ? { text: text.slice(0, 500) } : {}),
+      ...(args.textReason ? { textReason: args.textReason } : {}),
       ...(args.answerMs !== undefined ? { answerMs: Math.max(0, Math.round(args.answerMs)) } : {}),
       attemptsBefore: args.attemptsBefore ?? 0,
     },
@@ -719,4 +722,9 @@ export function setBlockedAttempts(
   const current = (learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === confirmations.date)
   if (!current || current.blockedAttempts >= count) return learning
   return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: count }))
+}
+
+/** La catégorie lue plus tard dans le texte d'un arrêt (le Coach répond après coup). */
+export function setStopTextReason(learning: LearningState, date: string, blockId: string, reason: StopReason): LearningState {
+  return updateEvent(learning, date, blockId, (e) => (e.stop ? { ...e, stop: { ...e.stop, textReason: reason } } : e))
 }

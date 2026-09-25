@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal'
 import { StopSession } from '@/components/tasks/StopSession'
 import { nexus } from '@/lib/ipc'
 import { overlayDueFor } from '@shared/planning/clock'
+import { revueDimanche, revueEnClair } from '@shared/coach/coach'
 import { IntelligentBlockingReviewModal } from '@/components/blocking/IntelligentBlockingReviewModal'
 import { usePlanning } from '@/lib/use-planning'
 import { MORE_TIME_STEP_MINUTES, usePlanningStore, type TaskDraft } from '@/store/planning.store'
@@ -165,6 +166,18 @@ export default function HomePage() {
       !overlayDueFor({ learning, block: b, nowMinute, today }),
   )
 
+  // La revue du dimanche : 3 chiffres, 1 ajustement, 1 question — tirés du
+  // journal des séances et de la rampe, jamais inventés.
+  const revue =
+    dow === 6
+      ? revueDimanche({
+          events: learning.sessionEvents ?? [],
+          today,
+          doses: plan?.objectiveDoses ?? {},
+          noms: Object.fromEntries(objectives.map((o) => [o.id, o.name])),
+        })
+      : null
+
   // La séance confirmée en cours, s'il y en a une : c'est là que vit « Stop ».
   const running = todayBlocks.find(
     (b) =>
@@ -270,6 +283,16 @@ export default function HomePage() {
               besoin : ce qui est prévu aujourd'hui, ce que l'application a
               remarqué sur la semaine, puis les tâches ouvertes. */}
           <div className="min-w-0 space-y-6">
+            {revue && (
+              <div className="space-y-1 rounded border border-line px-4 py-3">
+                <p className="text-[11px] font-medium tracking-wide text-fg-3">THIS WEEK</p>
+                {revueEnClair(revue).map((l) => (
+                  <p key={l} className="text-[13.5px] text-fg-2">
+                    {l}
+                  </p>
+                ))}
+              </div>
+            )}
             {!running && startable && (
               <div className="flex items-center justify-between gap-4 rounded border border-line px-4 py-3">
                 <span className="text-[13.5px] text-fg">{startable.label}</span>

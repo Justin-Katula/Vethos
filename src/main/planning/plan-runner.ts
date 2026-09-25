@@ -1,4 +1,5 @@
 import log from '@main/logging/setup'
+import { lireTexteArret } from '@shared/coach/coach'
 import type { Storage } from '@shared/storage'
 import { computePlan, PLANNING_HORIZON_DAYS } from '@shared/planning/engine'
 import { addDays, dateKey } from '@shared/planning/dates'
@@ -509,6 +510,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       ...(args.text !== undefined ? { text: args.text } : {}),
       ...(args.answerMs !== undefined ? { answerMs: args.answerMs } : {}),
       attemptsBefore: attempts.filter((t) => now.getTime() - t < 10 * 60_000).length,
+      textReason: args.text ? lireTexteArret(args.text) : null,
     })
     if (!result) return { ok: false, reason: 'Aucune séance en cours.' }
 

@@ -5,7 +5,11 @@ import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
-import { journalContextFor, overlayDueFor, setBlockedAttempts } from '@shared/planning/clock'
+import { journalContextFor, overlayDueFor, setBlockedAttempts, setStopTextReason } from '@shared/planning/clock'
+import { lireTexteArret } from '@shared/coach/coach'
+import { effectiveContract } from '@shared/contract'
+import { STOP_REASONS } from '@shared/schemas'
+import { coach } from '@/coach/client'
 import { pontEcran } from '@/blocage/ecran-natif'
 import { addDays } from '@shared/planning/dates'
 import type { StopReason } from '@shared/schemas'
@@ -119,6 +123,7 @@ function useSourcePlan() {
         ...(texte !== undefined ? { texte } : {}),
         ...(reponseMs !== undefined ? { reponseMs } : {}),
         tentativesAvant: pontEcran().lireTentatives().filter((t) => Date.now() - t < 10 * 60_000).length,
+        raisonTexte: texte ? lireTexteArret(texte) : null,
       })
       if (!r) return false
       const blocId = confirmations.observedPending?.blockId
@@ -126,6 +131,20 @@ function useSourcePlan() {
       const blocage = useBlocage.getState()
       if (blocId && blocage.plagesActives.some((p) => p.blocId === blocId)) {
         await blocage.appliquerPlan(blocage.plagesActives.filter((p) => p.blocId !== blocId))
+      }
+      // Le Coach lit le texte après coup : sa catégorie remplace celle des
+      // mots-clés. Une donnée de plus, jamais un verdict.
+      if (texte && blocId && coach().disponible) {
+        const mode = reglages.contrat ? effectiveContract(reglages.contrat, new Date()).mode : 'ally'
+        const lu = await coach().demander({ job: 'lecture-arret', mode, faits: {}, messages: [{ role: 'user', content: texte }] })
+        const raison = STOP_REASONS.find((x) => lu?.toLowerCase().includes(x))
+        if (raison) {
+          const e = useSeances.getState()
+          await e.poser({
+            apprentissage: setStopTextReason(e.apprentissage, e.confirmations.date, blocId, raison),
+            confirmations: e.confirmations,
+          })
+        }
       }
       return true
     },

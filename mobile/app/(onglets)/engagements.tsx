@@ -15,6 +15,7 @@ import { cleDate } from '@/plan/moteur'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { useSeances } from '@/seances/magasin-seances'
+import { CoachEnLigne } from '@/coach/CoachEnLigne'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
@@ -160,6 +161,7 @@ export default function Engagements() {
         {o ? (
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 50 }}>
             {t.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{t.intention}</Text> : null}
+            <CoachEnLigne job="decoupage" libelle="Break it down" faits={{ tache: t.titre, plan: (t.intention ?? '').slice(0, 200), minutes_restantes: t.minutesRestantes }} />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pilule
                 onPress={() => {
