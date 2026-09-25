@@ -144,6 +144,8 @@ export const ReglagesSchema = z.object({
    * Null tant qu'aucune introduction n'a fixé de référence.
    */
   sommeilReference: z.object({ coucher: z.string(), lever: z.string() }).nullish(),
+  /** La tranche d'âge, demandée à l'introduction : elle fixe le plancher de sommeil. */
+  trancheAge: z.enum(['ado', 'adulte']).nullish(),
 })
 export type Reglages = z.infer<typeof ReglagesSchema>
 
@@ -202,7 +204,7 @@ type EtatDonnees = Contenu & {
   supprimerObligation: (id: string) => Promise<void>
 
   majReglages: (r: Partial<Reglages>) => Promise<void>
-  finaliserIntroduction: (ajouts: AjoutsIntroduction, prenom: string) => Promise<void>
+  finaliserIntroduction: (ajouts: AjoutsIntroduction, prenom: string, trancheAge?: 'ado' | 'adulte' | null) => Promise<void>
 }
 
 async function ecrire(contenu: Contenu): Promise<void> {
@@ -445,7 +447,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       await enregistrer({ reglages: { ...get().reglages, ...r } })
     },
 
-    async finaliserIntroduction(ajouts, prenom) {
+    async finaliserIntroduction(ajouts, prenom, trancheAge) {
       const actuel = get()
       const fusionner = <T extends { id: string }>(existants: T[], nouveaux: T[]) => {
         const ids = new Set(existants.map((x) => x.id))
@@ -462,6 +464,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
           coucher: ajouts.coucher,
           lever: ajouts.lever,
           sommeilReference: { coucher: ajouts.coucher, lever: ajouts.lever },
+          trancheAge: trancheAge ?? actuel.reglages.trancheAge ?? null,
           introductionFaite: true,
         },
       })

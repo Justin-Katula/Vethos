@@ -4,7 +4,16 @@ import { verifierSommeil } from './regle-sommeil'
 const ref = { coucher: '23:00', lever: '08:00' }
 
 describe('la règle du sommeil', () => {
-  it('garde une nuit entre 6 et 10 heures', () => {
+  it('tient le plancher de l’âge : 8 h de 13 à 18 ans, 7 h adulte', () => {
+    const nuit = { coucher: '23:30', lever: '07:00' } // 7 h 30
+    expect(verifierSommeil(nuit, null, 'adulte').ok).toBe(true)
+    const ado = verifierSommeil(nuit, null, 'ado')
+    expect(ado.ok).toBe(false)
+    expect(!ado.ok && ado.raison).toBe('A night is at least 8 hours.')
+    expect(verifierSommeil({ coucher: '00:00', lever: '06:30' }, null).ok).toBe(false) // 6 h 30 < 7 h
+  })
+
+  it('garde une nuit sous 10 heures', () => {
     expect(verifierSommeil({ coucher: '01:00', lever: '06:30' }, null).ok).toBe(false)
     expect(verifierSommeil({ coucher: '21:00', lever: '07:30' }, null).ok).toBe(false)
     expect(verifierSommeil({ coucher: '23:00', lever: '07:00' }, null).ok).toBe(true)

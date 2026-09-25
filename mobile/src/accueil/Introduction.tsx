@@ -44,6 +44,7 @@ import {
 import { EcranBascule, EcranCout, EcranPensee, EcranVethos } from './ecrans-cout'
 import {
   EcranFixes,
+  EcranAge,
   EcranNuit,
   EcranPlace,
   EcranProtection,
@@ -74,6 +75,7 @@ const SCN: Record<string, [number, number, number, number, number, Mode]> = {
   '12a': [0.18, 0.92, 0.8, 2.4, 0.05, 'h'],
   '12b': [0.82, 0.1, 0.8, 2.6, 0.05, 'h'],
   '13': [0.5, 0.5, 0.85, 3.5, 0.03, 'h'],
+  age: [0.5, 0.7, 0.8, 2.4, 0.04, 'h'],
   '14': [0.5, 0.85, 0.9, 2.4, 0.03, 'n'],
   '15': [0.12, 0.3, 0.8, 2.4, 0.05, 'h'],
   '16': [0, 0, 1, 2.4, 0, 'd'],
@@ -233,7 +235,7 @@ function IntroductionSombre() {
       try {
         const r = preparerIntroduction(useDonnees.getState(), b, new Date(), autres)
         setSortie(true)
-        await finaliserIntroduction(r.ajouts, eRef.current.name.trim())
+        await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age)
         // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.
         router.replace('/')
         Animated.timing(monde, { toValue: 0, duration: reduit ? 200 : 650, easing: SORTIE, useNativeDriver: true }).start(() => {
@@ -314,6 +316,8 @@ function IntroductionSombre() {
         return <EcranReglage ctx={ctx} />
       case '13':
         return <EcranProtection ctx={ctx} proteger={proteger} />
+      case 'age':
+        return <EcranAge ctx={ctx} />
       case '14':
         return <EcranNuit ctx={ctx} />
       case '15':

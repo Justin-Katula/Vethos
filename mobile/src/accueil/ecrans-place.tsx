@@ -39,6 +39,7 @@ import {
   vibrer,
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
+import type { TrancheAge } from '@/donnees/regle-sommeil'
 
 export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
@@ -567,6 +568,39 @@ function Heures({ taille, police }: { taille: number; police: number }) {
         )
       })}
     </>
+  )
+}
+
+// ——— L'âge : il fixe le plancher de la nuit ———
+
+const AGES: [TrancheAge, string][] = [
+  ['ado', '13 to 18'],
+  ['adulte', 'Over 18'],
+]
+
+export function EcranAge({ ctx }: { ctx: Ctx }) {
+  const apres = useMinuteries()
+  const occupe = useRef(false)
+  const choisir = (a: TrancheAge) => {
+    if (occupe.current) return
+    occupe.current = true
+    ctx.maj(() => ({ age: a }))
+    vibrer('medium')
+    apres(500, ctx.suivant)
+  }
+  return (
+    <View style={{ position: 'absolute', left: 24, right: 24, top: ctx.haut }}>
+      <Entree dl={150} reduit={ctx.reduit}>
+        <Titre>How old are you?</Titre>
+      </Entree>
+      <View style={{ gap: 8, marginTop: 24 }}>
+        {AGES.map(([a, l], i) => (
+          <Entree key={a} dl={370 + i * 110} reduit={ctx.reduit}>
+            <Ligne titre={l} forme="radio" pris={ctx.e.age === a} onPress={() => choisir(a)} />
+          </Entree>
+        ))}
+      </View>
+    </View>
   )
 }
 

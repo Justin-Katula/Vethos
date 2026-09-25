@@ -400,7 +400,7 @@ function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: (
   const [coucher, setCoucher] = useState(d.reglages.coucher)
   const [lever, setLever] = useState(d.reglages.lever)
   const ref = d.reglages.sommeilReference ?? null
-  const verdict = verifierSommeil({ coucher, lever }, ref)
+  const verdict = verifierSommeil({ coucher, lever }, ref, d.reglages.trancheAge)
   const apresMinuit = enMin(coucher) < 720 && enMin(coucher) > 0
   // Une obligation hebdomadaire est rangée jour par jour ; on la relit comme une seule ligne.
   const lignes = useMemo(() => {
@@ -423,7 +423,7 @@ function FeuilleFixe({ ouverte, fermer, nouveau }: { ouverte: boolean; fermer: (
   }
   const terminer = async () => {
     if (!verdict.ok) {
-      toast('Sleep between 6 and 10 hours.')
+      toast(verdict.raison)
       return
     }
     if (coucher !== d.reglages.coucher || lever !== d.reglages.lever) await d.majReglages({ coucher, lever })

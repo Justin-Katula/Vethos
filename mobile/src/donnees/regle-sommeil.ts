@@ -1,7 +1,9 @@
 /**
  * La règle du sommeil.
  *
- * 1. Une nuit dure entre 6 h et 10 h.
+ * 1. Une nuit dure au plus 10 h, et jamais moins que le plancher de son âge
+ *    (AASM) : 8 h de 13 à 18 ans, 7 h adulte. Ce plancher ne baisse jamais,
+ *    même quand la semaine est en crise.
  * 2. Une fois la nuit déclarée à l'introduction (la référence), elle ne se
  *    déplace que de 2 h AU TOTAL : ce qu'on prend sur le coucher ne se prend
  *    plus sur le lever. Référence 23:00 → 08:00 :
@@ -10,7 +12,9 @@
  *
  * Les écarts se mesurent sur le cercle de 24 h : 23:30 et 00:30 sont à 1 h.
  */
-export const SOMMEIL_MIN = 6 * 60
+export type TrancheAge = 'ado' | 'adulte'
+/** Le plancher par âge. Sans tranche connue, celui d'un adulte. */
+export const plancherSommeil = (tranche?: TrancheAge | null) => (tranche === 'ado' ? 8 * 60 : 7 * 60)
 export const SOMMEIL_MAX = 10 * 60
 export const MARGE_SOMMEIL = 2 * 60
 
@@ -36,7 +40,7 @@ export type VerdictSommeil =
   | { ok: true; duree: number; utilise: number; reste: number | null }
   | { ok: false; duree: number; utilise: number; reste: number | null; raison: string }
 
-export function verifierSommeil(nuit: Nuit, reference: Nuit | null): VerdictSommeil {
+export function verifierSommeil(nuit: Nuit, reference: Nuit | null, tranche?: TrancheAge | null): VerdictSommeil {
   const c = minutesDe(nuit.coucher)
   const l = minutesDe(nuit.lever)
   if (c === null || l === null)
@@ -50,8 +54,9 @@ export function verifierSommeil(nuit: Nuit, reference: Nuit | null): VerdictSomm
     utilise = ecartCirculaire(c, rc) + ecartCirculaire(l, rl)
     reste = Math.max(0, MARGE_SOMMEIL - utilise)
   }
-  if (duree < SOMMEIL_MIN)
-    return { ok: false, duree, utilise, reste, raison: 'A night is at least 6 hours.' }
+  const plancher = plancherSommeil(tranche)
+  if (duree < plancher)
+    return { ok: false, duree, utilise, reste, raison: `A night is at least ${plancher / 60} hours.` }
   if (duree > SOMMEIL_MAX)
     return { ok: false, duree, utilise, reste, raison: 'A night is at most 10 hours.' }
   if (rc !== null && rl !== null && utilise > MARGE_SOMMEIL)

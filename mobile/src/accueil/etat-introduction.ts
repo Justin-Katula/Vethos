@@ -4,6 +4,7 @@
  * une tâche ou une ancre. Pur, testable.
  */
 import type { Activite, BrouillonIntroduction, EngagementIntroduction } from './modele-introduction'
+import { plancherSommeil, type TrancheAge } from '@/donnees/regle-sommeil'
 import {
   besoin,
   FREQ,
@@ -50,6 +51,8 @@ export type EtatIntro = {
   days: { an: number[]; wk: number[]; sc: number[] }
   fixed: Fixe[]
   locked: boolean
+  /** La tranche d'âge : elle fixe le plancher de la nuit. */
+  age: TrancheAge | null
 }
 
 export function etatInitial(prenom: string, dans14: string): EtatIntro {
@@ -80,6 +83,7 @@ export function etatInitial(prenom: string, dans14: string): EtatIntro {
     days: { an: [1, 1, 0, 1, 0, 1, 0], wk: [1, 1, 1, 1, 1, 0, 0], sc: [1, 1, 1, 1, 1, 0, 0] },
     fixed: [],
     locked: false,
+    age: null,
   }
 }
 
@@ -125,7 +129,7 @@ export function parcours(e: EtatIntro, maintenant: Date): Etape[] {
   })
   f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' }, { k: '12a' })
   if (e.things.length && natureDe(e, choisie(e, maintenant)) !== 'GOAL') f.push({ k: '12b' })
-  f.push({ k: '13' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: '17' })
+  f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: '17' })
   return f
 }
 export const indexDe = (f: Etape[], st: Etape) => f.findIndex((x) => x.k === st.k && (x.t ?? 0) === (st.t ?? 0))
@@ -138,7 +142,7 @@ export { enMinutes }
 export const nuitMinutes = (e: EtatIntro) => (((enMinutes(e.w.wake) - enMinutes(e.w.bed)) % 1440) + 1440) % 1440
 export const nuitValide = (e: EtatIntro) => {
   const n = nuitMinutes(e)
-  return n >= 360 && n <= 600
+  return n >= plancherSommeil(e.age) && n <= 600
 }
 
 /** Les réglages par défaut de la choisie, tirés de ce qu'elle demande vraiment (écran 11 → 12). */
