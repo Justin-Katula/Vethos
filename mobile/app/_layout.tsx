@@ -77,9 +77,9 @@ export default function Racine() {
 
   return (
     <SafeAreaProvider>
-      {/* Aucun `force` ici : le thème suit le réglage de l’utilisateur, et à
-          défaut son appareil. `force` ne sert qu’aux captures et aux tests. */}
-      <FournisseurTheme>
+      {/* Vethos est sombre : la maquette n'a qu'une apparence, et la lumière
+          de l'heure n'existe que sur du noir. */}
+      <FournisseurTheme force="sombre">
         <FournisseurPlan><Coque /></FournisseurPlan>
       </FournisseurTheme>
     </SafeAreaProvider>

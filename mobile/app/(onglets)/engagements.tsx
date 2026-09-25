@@ -1,1236 +1,537 @@
-import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import {
-  allouerCouleurAncre,
-  allouerCouleurObjectif,
-  allouerCouleurTache,
-  assainirCouleur,
-  couleurAncre,
-  couleurObjectif,
-  couleurTache,
-} from '@shared/palettes'
-import { useDonnees, type Tache } from '@/donnees/magasin'
-import { useSeances } from '@/seances/magasin-seances'
-import { usePlan } from '@/plan/Plan'
-import { maxTaskMinutesPerDay } from '@shared/planning/placement'
-import { useJetons } from '@/theme/Theme'
-import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
-import { useLargeur } from '@/ui/largeur'
-import { PAS, RAYON } from '@/theme/jetons'
-import { duree, enHeure } from '@/ui/Horloge'
-import { Coche, Croix, GlypheAncre, GlypheObjectif, GlypheTache, Moins, Plus } from '@/ui/icones'
-import {
-  BoutonIris,
-  BoutonPlat,
-  Espace,
-  GEIST,
-  Marque,
-  MONO,
-  Rangee,
-  Section,
-  Texte,
-  TitreEcran,
-  Valeur,
-} from '@/ui/primitives'
-
 /**
- * Engagements : les trois natures, sur un seul écran.
- *
- * Elles répondent à la même question — qu'est-ce que je me suis promis ? — mais
- * obéissent à des lois différentes, et c'est précisément ce que cet écran doit
- * enseigner. Chaque section porte sa loi en toutes lettres : quelqu'un qui ouvre
- * l'application pour la première fois ne connaît pas le vocabulaire du moteur.
- *
- * Les séparer en trois écrans obligeait à trois voyages pour voir une seule
- * chose, et effaçait le contraste qui les rend compréhensibles.
+ * Commitments, comme la maquette : trois cartes — Tasks, Goals, Anchors —
+ * chacune avec sa loi en une ligne, deux engagements visibles, « See all »
+ * pour le reste. Toucher une ligne l'ouvre sur place ; « + » ouvre la feuille
+ * d'ajout de SA nature. Tout ce qui s'affiche est mesuré ou planifié, jamais
+ * déclaré.
  */
-const LIMITE_VISIBLE = 2
+import { useRef, useState } from 'react'
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Circle } from 'react-native-svg'
+import { useDonnees, type Tache } from '@/donnees/magasin'
+import { usePlan } from '@/plan/Plan'
+import { cleDate } from '@/plan/moteur'
+import { dateLocale } from '@/plan/format'
+import { useSeances } from '@/seances/magasin-seances'
+import { maxTaskMinutesPerDay } from '@shared/planning/placement'
+import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
+import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
+import {
+  A,
+  BoutonFermer,
+  Carte,
+  Chevron,
+  Feuille,
+  fmt,
+  GEIST,
+  hm,
+  MONO,
+  Plus,
+  TitrePage,
+  TRAIT,
+  useLumiere,
+  useToast,
+  type NatureApp,
+} from '@/ui/app-briques'
+
+const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const relD = (k: number) => (k <= 0 ? 'today' : k === 1 ? 'tomorrow' : `in ${k} days`)
+const COULEUR: Record<NatureApp, string> = { TASK: '#8d8d8d', GOAL: '#e03131', ANCHOR: '#4b6190' }
+
+const SECTIONS: Record<NatureApp, { titre: string; loi: string; vide: string; cta: string }> = {
+  TASK: {
+    titre: 'Tasks',
+    loi: 'A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first.',
+    vide: 'A task has an end and a date. The engine decides when to do it based on slack.',
+    cta: 'Add a task',
+  },
+  GOAL: {
+    titre: 'Goals',
+    loi: 'A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late.',
+    vide: 'A goal never finishes: it is measured in hours per week and repeated rhythm.',
+    cta: 'Add a goal',
+  },
+  ANCHOR: {
+    titre: 'Anchors',
+    loi: 'A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next.',
+    vide: 'An anchor is an hour you choose once. Vethos plans everything else around it.',
+    cta: 'Add an anchor',
+  },
+}
+const FORM: Record<NatureApp, [string, string, string]> = {
+  TASK: ['New task', 'What needs to be done?', 'Add it, Vethos finds the slack'],
+  GOAL: ['New goal', 'What do you want to keep doing?', 'Add it, Vethos keeps the rhythm'],
+  ANCHOR: ['New anchor', 'What happens at a fixed hour?', 'Add it, it never moves'],
+}
+
+type Groupe = { racine: Tache; parties: Tache[]; total: number; fait: number }
+function grouper(ouvertes: Tache[], fait: Record<string, number>): Groupe[] {
+  const total = (t: Tache) => t.minutesRestantes + t.minutesSupplementaires
+  return ouvertes
+    .filter((t) => t.parentId === null)
+    .map((racine) => {
+      const parties = ouvertes.filter((t) => t.parentId === racine.id)
+      if (!parties.length) return { racine, parties, total: total(racine), fait: fait[racine.id] ?? 0 }
+      return {
+        racine,
+        parties,
+        total: parties.reduce((s, p) => s + total(p), 0),
+        fait: parties.reduce((s, p) => s + (fait[p.id] ?? 0), 0),
+      }
+    })
+    .sort((a, b) => a.racine.echeance.localeCompare(b.racine.echeance))
+}
+
+function Pilule({ children, onPress, contour = false }: { children: React.ReactNode; onPress: () => void; contour?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => ({
+        height: 34,
+        paddingHorizontal: 14,
+        borderRadius: 17,
+        justifyContent: 'center',
+        backgroundColor: contour ? 'transparent' : 'rgba(242,242,242,0.1)',
+        borderWidth: contour ? 1 : 0,
+        borderColor: 'rgba(242,242,242,0.14)',
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
+    >
+      <Text style={{ color: contour ? A.t3 : A.t1, fontFamily: GEIST.moyen, fontSize: 13 }}>{children}</Text>
+    </Pressable>
+  )
+}
 
 export default function Engagements() {
   const marges = useSafeAreaInsets()
-  const j = useJetons()
   const d = useDonnees()
-
-  const [ajout, setAjout] = useState<'aucun' | 'tache' | 'objectif' | 'ancre'>('aucun')
-  const [etenduTaches, setEtenduTaches] = useState(false)
-  const [etenduObjectifs, setEtenduObjectifs] = useState(false)
-  const [etenduAncres, setEtenduAncres] = useState(false)
-
-  const largeur = useLargeur()
-  // Une colonne sous 760 points, deux jusqu'a 1100, trois au-dela — comme le
-  // bureau. La largeur est CALCULEE plutot que laissee a `flex: 1` : avec
-  // `flexWrap`, trois enfants extensibles se serrent sur une seule ligne quoi
-  // qu'il arrive, et on obtiendrait trois colonnes etranglees a 760.
-  // Sur ecran large, la largeur est plafonnee a 1200 points pour eviter le
-  // "canyon" de vide entre libelle et duree (Board.tsx).
-  const colonnes = largeur.troisColonnes ? 3 : largeur.deuxColonnes ? 2 : 1
-  const largeurMax = Math.min(largeur.points, 1200)
-  const dispo = largeurMax - PAS[5] * 2
-  const ecart = PAS[5]
-  const largeurColonne = colonnes === 1 ? undefined : (dispo - ecart * (colonnes - 1)) / colonnes
-
+  const { resultat, maintenant } = usePlan()
+  const { acc } = useLumiere()
+  const toast = useToast()
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
-  const ouvertes = d.taches.filter((t) => !t.terminee)
-  const faites = d.taches.filter((t) => t.terminee)
-  // Le compte affiche les RACINES, pas les lignes : une tache decoupee en
-  // cinq parties reste une tache a faire, pas cinq.
-  const groupes = grouperTaches(ouvertes, fait)
+  const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
+  const [ouvert, setOuvert] = useState<string | null>(null)
+  const [page, setPage] = useState<NatureApp | null>(null)
+  const [finiesOuvertes, setFiniesOuvertes] = useState(false)
+  const [forme, setForme] = useState<NatureApp | null>(null)
+  const defile = useRef<ScrollView>(null)
 
-  // Troncature a 2 elements par defaut pour chaque section
-  const totalTaches = groupes.length + faites.length
-  const tachesCachees = Math.max(0, totalTaches - LIMITE_VISIBLE)
-  const groupesVisibles = etenduTaches ? groupes : groupes.slice(0, LIMITE_VISIBLE)
-  const restePourFaites = etenduTaches ? faites.length : Math.max(0, LIMITE_VISIBLE - groupesVisibles.length)
-  const faitesVisibles = etenduTaches ? faites : faites.slice(0, restePourFaites)
+  const aujourdHui = dateLocale(cleDate(maintenant))
+  const jours = (cle: string) => Math.round((dateLocale(cle).getTime() - aujourdHui.getTime()) / 864e5)
+  const groupes = grouper(d.taches.filter((t) => !t.terminee), fait)
+  const finies = d.taches.filter((t) => t.terminee && t.parentId === null)
+  const couper = <T,>(l: T[]) => (page ? l : l.slice(0, 2))
+  const basculer = (id: string) => setOuvert((x) => (x === id ? null : id))
+  const allerPage = (p: NatureApp | null) => {
+    setPage(p)
+    setOuvert(null)
+    defile.current?.scrollTo({ y: 0, animated: false })
+  }
 
-  const totalObjectifs = d.objectifs.length
-  const objectifsCaches = Math.max(0, totalObjectifs - LIMITE_VISIBLE)
-  const objectifsVisibles = etenduObjectifs ? d.objectifs : d.objectifs.slice(0, LIMITE_VISIBLE)
+  const ligneTache = (g: Groupe) => {
+    const t = g.racine
+    const k = jours(t.echeance)
+    const o = ouvert === t.id
+    const n = Math.max(1, g.parties.length)
+    return (
+      <Pressable key={t.id} accessibilityRole="button" accessibilityState={{ expanded: o }} onPress={() => basculer(t.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+          <View style={{ width: 34, gap: 2 }}>
+            <Text style={{ color: k <= 7 ? acc : A.t1, fontFamily: GEIST.moyen, fontSize: 24, lineHeight: 24, letterSpacing: -1, fontVariant: ['tabular-nums'] }}>{Math.max(0, k)}</Text>
+            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{k === 1 ? 'day left' : 'days left'}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{t.titre}</Text>
+              <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(Math.max(0, g.total - g.fait))} left`}</Text>
+            </View>
+            <View style={{ height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.1)', overflow: 'hidden' }}>
+              <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: A.t1 }} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'} · ${hm(g.total)} total`}</Text>
+              <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+        {o ? (
+          <View style={{ gap: 12, paddingTop: 12, paddingLeft: 50 }}>
+            {t.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{t.intention}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pilule
+                onPress={() => {
+                  const cible = g.parties.length ? g.parties[g.parties.length - 1]! : t
+                  void d.ajouterDuTemps(cible.id, 25)
+                  toast(`25 min more for ${t.titre}.`)
+                }}
+              >
+                +25 min
+              </Pilule>
+              <Pilule
+                contour
+                onPress={() => {
+                  for (const p of g.parties) void d.supprimerTache(p.id)
+                  void d.supprimerTache(t.id)
+                  toast(`${t.titre} removed.`)
+                }}
+              >
+                Remove
+              </Pilule>
+            </View>
+          </View>
+        ) : null}
+      </Pressable>
+    )
+  }
 
-  const totalAncres = d.ancres.length
-  const ancresCachees = Math.max(0, totalAncres - LIMITE_VISIBLE)
-  const ancresVisibles = etenduAncres ? d.ancres : d.ancres.slice(0, LIMITE_VISIBLE)
+  const ligneObjectif = (o: (typeof d.objectifs)[number]) => {
+    const fait2 = servis[o.id] ?? 0
+    const fr = o.cibleHebdoMinutes ? Math.min(1, fait2 / o.cibleHebdoMinutes) : 0
+    const ou = ouvert === o.id
+    return (
+      <Pressable key={o.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+          <View style={{ width: 34, height: 34 }}>
+            <Svg width={34} height={34} viewBox="0 0 34 34" style={{ transform: [{ rotate: '-90deg' }] }}>
+              <Circle cx={17} cy={17} r={15} fill="none" stroke="rgba(242,242,242,0.1)" strokeWidth={2.5} />
+              <Circle cx={17} cy={17} r={15} fill="none" stroke={A.t1} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
+            </Svg>
+            <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{`${Math.round(fr * 100)}%`}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{o.nom}</Text>
+              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(fait2)} / ${hm(o.cibleHebdoMinutes)}`}</Text>
+            </View>
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`About ${hm(o.cibleHebdoMinutes / 7)} a day · this week`}</Text>
+          </View>
+        </View>
+        {ou ? (
+          <View style={{ gap: 12, paddingTop: 12 }}>
+            {o.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{o.intention}</Text> : null}
+            <View style={{ flexDirection: 'row' }}>
+              <Pilule contour onPress={() => (void d.supprimerObjectif(o.id), toast(`${o.nom} removed.`))}>
+                Remove
+              </Pilule>
+            </View>
+          </View>
+        ) : null}
+      </Pressable>
+    )
+  }
+
+  const ligneAncre = (a: (typeof d.ancres)[number]) => {
+    const ou = ouvert === a.id
+    return (
+      <Pressable key={a.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(a.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+          <View style={{ width: 54, gap: 2 }}>
+            <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 18, lineHeight: 22, letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{fmt(a.minuteAncrage)}</Text>
+            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{hm(a.dureeMinutes)}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
+            <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{a.nom}</Text>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              {DOW.map((t, i) => {
+                const on = a.jours.includes((i + 1) % 7)
+                return (
+                  <View key={i} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: on ? COULEUR.ANCHOR : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: on ? A.t1 : A.t4, fontFamily: GEIST.demi, fontSize: 10 }}>{t}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        </View>
+        {ou ? (
+          <View style={{ gap: 12, paddingTop: 12, paddingLeft: 70 }}>
+            {a.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{a.intention}</Text> : null}
+            <View style={{ flexDirection: 'row' }}>
+              <Pilule contour onPress={() => (void d.supprimerAncre(a.id), toast(`${a.nom} removed.`))}>
+                Remove
+              </Pilule>
+            </View>
+          </View>
+        ) : null}
+      </Pressable>
+    )
+  }
+
+  const section = (K: NatureApp, total: number, resumeTxt: string, lignes: React.ReactNode[], extra?: React.ReactNode) => {
+    const s = SECTIONS[K]
+    return (
+      <Carte key={K} style={{ marginTop: K === 'TASK' || page ? 24 : 12, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingBottom: 8 }}>
+          <View style={{ flex: 1, gap: 3 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 2, backgroundColor: COULEUR[K] }} />
+              <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>{s.titre}</Text>
+              <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{total}</Text>
+            </View>
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{resumeTxt || s.loi}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.cta}
+            onPress={() => setForme(K)}
+            style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.92 : 1 }] })}
+          >
+            <Plus />
+          </Pressable>
+        </View>
+        {total ? (
+          <>
+            {lignes}
+            {!page && total > 2 ? (
+              <Pressable accessibilityRole="button" onPress={() => allerPage(K)} style={{ height: 44, borderTopWidth: 1, borderTopColor: A.ligne, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 13 }}>{`See all ${total}`}</Text>
+              </Pressable>
+            ) : null}
+            {extra}
+          </>
+        ) : (
+          <View style={{ alignItems: 'flex-start', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: A.ligne }}>
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20 }}>{s.vide}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setForme(K)} style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(242,242,242,0.1)', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
+              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{s.cta}</Text>
+            </Pressable>
+          </View>
+        )}
+      </Carte>
+    )
+  }
+
+  const finiesBloc =
+    page === 'TASK' && finies.length ? (
+      <>
+        <Pressable onPress={() => setFiniesOuvertes((v) => !v)} style={{ height: 44, borderTopWidth: 1, borderTopColor: A.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>{`${finies.length} finished`}</Text>
+          <View style={{ transform: [{ rotate: finiesOuvertes ? '180deg' : '0deg' }] }}>
+            <Chevron sens="bas" couleur={A.t4} />
+          </View>
+        </Pressable>
+        {finiesOuvertes
+          ? finies.map((t) => {
+              const q = dateLocale(t.echeance)
+              return (
+                <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 40 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: A.t4 }} />
+                  <Text numberOfLines={1} style={{ flex: 1, color: A.t4, fontFamily: GEIST.normal, fontSize: 14, textDecorationLine: 'line-through' }}>{t.titre}</Text>
+                  <Text style={{ color: A.t4, fontFamily: MONO.normal, fontSize: 11 }}>{`${q.getDate()} ${MOIS3[q.getMonth()]}`}</Text>
+                </View>
+              )
+            })
+          : null}
+      </>
+    ) : null
+
+  const sections = [
+    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', couper(groupes).map(ligneTache), finiesBloc),
+    section(
+      'GOAL',
+      d.objectifs.length,
+      d.objectifs.length ? `${hm(d.objectifs.reduce((q, o) => q + o.cibleHebdoMinutes, 0))} a week in total` : '',
+      couper(d.objectifs).map(ligneObjectif),
+    ),
+    section(
+      'ANCHOR',
+      d.ancres.length,
+      d.ancres.length ? `${d.ancres.reduce((q, a) => q + a.jours.length, 0)} fixed slots a week` : '',
+      couper(d.ancres).map(ligneAncre),
+    ),
+  ]
+  const visibles = page ? sections.filter((_, i) => (['TASK', 'GOAL', 'ANCHOR'] as const)[i] === page) : sections
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: j.bg }}
-      contentContainerStyle={{
-        paddingTop: marges.top + PAS[5],
-        paddingBottom: PAS[12],
-        paddingHorizontal: PAS[5],
-        alignItems: 'center',
-      }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ width: '100%', maxWidth: 1200 }}>
-        {/* Titre */}
-        <View style={{ marginBottom: PAS[5] }}>
-          <TitreEcran>Commitments</TitreEcran>
-          <Text
-            style={{
-              fontFamily: GEIST.normal,
-              fontSize: 14,
-              color: j.text3,
-              marginTop: 4,
-              lineHeight: 20,
-            }}
-          >
-            Three natures, one architecture. What you promised yourself, ruled by law.
-          </Text>
-        </View>
-
-        {/* Les trois natures encadrées chacune dans leur boîte (« carré »),
-            côte à côte dès qu'elles tiennent, empilées sur téléphone. */}
-        <View
-          style={
-            colonnes === 1
-              ? { flexDirection: 'column', gap: PAS[5] }
-              : {
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-start',
-                  gap: PAS[5],
-                }
+    <View style={{ flex: 1 }}>
+      <ScrollView ref={defile} contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
+        {page ? (
+          <Pressable accessibilityRole="button" onPress={() => allerPage(null)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, height: 38, alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}>
+            <Chevron sens="gauche" taille={14} />
+            <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 16 }}>Commitments</Text>
+          </Pressable>
+        ) : (
+          <TitrePage>Commitments</TitrePage>
+        )}
+        {visibles}
+      </ScrollView>
+      <Formulaire
+        nature={forme}
+        fermer={() => setForme(null)}
+        creer={async (f) => {
+          if (f.K === 'TASK') {
+            await d.ajouterTache(
+              { titre: f.nom, intention: f.plan, couleur: allouerCouleurTache(d.taches.filter((x) => !x.terminee)), echeance: f.echeance, importance: f.imp, minutesEstimees: f.minutes, nature: f.premiere ? 'nouveau' : 'routine' },
+              { maxParJourMinutes: maxTaskMinutesPerDay(resultat.capacities) },
+            )
+            toast('Added. Vethos will place it by slack.')
+          } else if (f.K === 'GOAL') {
+            await d.ajouterObjectif({ nom: f.nom, intention: f.plan, couleur: allouerCouleurObjectif(d.objectifs), cibleHebdoMinutes: f.minutes })
+            toast('Added. Vethos will keep the rhythm.')
+          } else {
+            await d.ajouterAncre({ nom: f.nom, intention: f.plan, declencheur: f.nom, couleur: allouerCouleurAncre(d.ancres), minuteAncrage: f.a, jours: f.jours, dureeMinutes: f.minutes })
+            toast('Added. It will never move.')
           }
-        >
-          <CarteEngagement
-            largeur={largeurColonne}
-            badge="Slack Engine · Deadlines"
-            badgeCouleur={j.text2}
-          >
-            <Section
-              premiere
-              enColonne
-              titre="Tasks"
-              compte={groupes.length}
-              loi="A deadline and a finite amount of work. Ruled by slack: whatever is due first goes first."
-              action={
-                <BoutonAjout
-                  ouvert={ajout === 'tache'}
-                  quoi="a task"
-                  surPression={() => setAjout(ajout === 'tache' ? 'aucun' : 'tache')}
-                />
-              }
-            >
-              {ajout === 'tache' ? (
-                <FormulaireTache
-                  surFin={() => {
-                    setAjout('aucun')
-                    setEtenduTaches(true)
-                  }}
-                />
-              ) : null}
-
-              {ouvertes.length === 0 && ajout !== 'tache' ? (
-                <EtatVide
-                  icone={<GlypheTache couleur={j.text3} taille={18} />}
-                  titre="No open tasks"
-                  description="A task has an end and a date. The engine decides when to do it based on slack."
-                  actionTexte="Add a task"
-                  surAction={() => setAjout('tache')}
-                />
-              ) : null}
-
-              {groupesVisibles.map((g, i) => (
-                <GroupeTache key={g.racine.id} groupe={g} premiere={i === 0} />
-              ))}
-
-              {faitesVisibles.length > 0 ? (
-                <>
-                  <Espace h={4} />
-                  <Texte ton="eteint" taille={12.5}>
-                    {faites.length} finished
-                  </Texte>
-                  {faitesVisibles.map((t, i) => (
-                    <LigneTache
-                      key={t.id}
-                      tache={t}
-                      premiere={groupesVisibles.length === 0 && i === 0}
-                    />
-                  ))}
-                </>
-              ) : null}
-
-              {tachesCachees > 0 ? (
-                <BoutonVoirPlus
-                  nombreCache={tachesCachees}
-                  ouvert={etenduTaches}
-                  surBasculer={() => setEtenduTaches((v) => !v)}
-                  quoi="tasks"
-                />
-              ) : null}
-            </Section>
-          </CarteEngagement>
-
-          <CarteEngagement
-            largeur={largeurColonne}
-            badge="Rhythm Engine · Habits"
-            badgeCouleur={j.accentEncre}
-          >
-            <Section
-              premiere
-              enColonne
-              titre="Goals"
-              compte={d.objectifs.length}
-              loi="A weekly target, never a deadline. Ruled by rhythm: it moves forward without ever being late."
-              action={
-                <BoutonAjout
-                  ouvert={ajout === 'objectif'}
-                  quoi="a goal"
-                  surPression={() => setAjout(ajout === 'objectif' ? 'aucun' : 'objectif')}
-                />
-              }
-            >
-              {ajout === 'objectif' ? (
-                <FormulaireObjectif
-                  surFin={() => {
-                    setAjout('aucun')
-                    setEtenduObjectifs(true)
-                  }}
-                />
-              ) : null}
-
-              {d.objectifs.length === 0 && ajout !== 'objectif' ? (
-                <EtatVide
-                  icone={<GlypheObjectif couleur={j.text3} taille={18} />}
-                  titre="No weekly goals"
-                  description="A goal never finishes: it is measured in hours per week and repeated rhythm."
-                  actionTexte="Add a goal"
-                  surAction={() => setAjout('objectif')}
-                />
-              ) : null}
-
-              {objectifsVisibles.map((o, i) => {
-                const indexReel = d.objectifs.indexOf(o)
-                return (
-                  <Rangee key={o.id} premiere={i === 0}>
-                    <Marque couleur={assainirCouleur('objective', o.couleur, indexReel >= 0 ? indexReel : i)} />
-                    <View style={{ flex: 1 }}>
-                      <Texte>{o.nom}</Texte>
-                      <Texte ton="eteint" taille={12.5}>
-                        {duree(Math.round(o.cibleHebdoMinutes / 7))} a day
-                      </Texte>
-                    </View>
-                    <Valeur>{duree(o.cibleHebdoMinutes)}</Valeur>
-                    <Supprimer quoi={o.nom} surPression={() => void d.supprimerObjectif(o.id)} />
-                  </Rangee>
-                )
-              })}
-
-              {objectifsCaches > 0 ? (
-                <BoutonVoirPlus
-                  nombreCache={objectifsCaches}
-                  ouvert={etenduObjectifs}
-                  surBasculer={() => setEtenduObjectifs((v) => !v)}
-                  quoi="goals"
-                />
-              ) : null}
-            </Section>
-          </CarteEngagement>
-
-          <CarteEngagement
-            largeur={largeurColonne}
-            badge="Stability Engine · Appointments"
-            badgeCouleur={j.blocEncreAncre}
-          >
-            <Section
-              premiere
-              enColonne
-              titre="Anchors"
-              compte={d.ancres.length}
-              loi="A fixed hour, chosen once. Ruled by stability: it never moves from one day to the next."
-              action={
-                <BoutonAjout
-                  ouvert={ajout === 'ancre'}
-                  quoi="an anchor"
-                  surPression={() => setAjout(ajout === 'ancre' ? 'aucun' : 'ancre')}
-                />
-              }
-            >
-              {ajout === 'ancre' ? (
-                <FormulaireAncre
-                  surFin={() => {
-                    setAjout('aucun')
-                    setEtenduAncres(true)
-                  }}
-                />
-              ) : null}
-
-              {d.ancres.length === 0 && ajout !== 'ancre' ? (
-                <EtatVide
-                  icone={<GlypheAncre couleur={j.text3} taille={18} />}
-                  titre="No fixed anchors"
-                  description="An anchor is an appointment the plan works around, never the other way."
-                  actionTexte="Add an anchor"
-                  surAction={() => setAjout('ancre')}
-                />
-              ) : null}
-
-              {ancresVisibles.map((a, i) => {
-                const indexReel = d.ancres.indexOf(a)
-                return (
-                  <Rangee key={a.id} premiere={i === 0}>
-                    <Marque couleur={assainirCouleur('ancre', a.couleur, indexReel >= 0 ? indexReel : i)} />
-                    <View style={{ flex: 1 }}>
-                      <Texte>{a.nom}</Texte>
-                      <Texte ton="eteint" taille={12.5}>
-                        {joursEnTexte(a.jours)}
-                      </Texte>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Valeur>{enHeure(a.minuteAncrage)}</Valeur>
-                      <Valeur ton="doux" taille={11.5}>
-                        {duree(a.dureeMinutes)}
-                      </Valeur>
-                    </View>
-                    <Supprimer quoi={a.nom} surPression={() => void d.supprimerAncre(a.id)} />
-                  </Rangee>
-                )
-              })}
-
-              {ancresCachees > 0 ? (
-                <BoutonVoirPlus
-                  nombreCache={ancresCachees}
-                  ouvert={etenduAncres}
-                  surBasculer={() => setEtenduAncres((v) => !v)}
-                  quoi="anchors"
-                />
-              ) : null}
-            </Section>
-          </CarteEngagement>
-        </View>
-      </View>
-    </ScrollView>
-  )
-}
-
-/**
- * Une boîte (« carré ») qui encadre et sépare nettement chacune des trois natures.
- *
- * En colonne unique ou sur plusieurs colonnes, chaque section vit
- * dans son propre cadre en surface sombre, avec sa bordure et ses marges.
- */
-function CarteEngagement({
-  largeur,
-  badge,
-  badgeCouleur,
-  children,
-}: {
-  largeur: number | undefined
-  badge: string
-  badgeCouleur: string
-  children: React.ReactNode
-}) {
-  const j = useJetons()
-  return (
-    <View
-      style={{
-        width: largeur ?? '100%',
-        backgroundColor: j.surface,
-        borderWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.12)',
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-        borderLeftColor: 'rgba(255, 255, 255, 0.08)',
-        borderRightColor: 'rgba(255, 255, 255, 0.08)',
-        borderRadius: RAYON.xl,
-        padding: PAS[5],
-      }}
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          marginBottom: PAS[3],
         }}
-      >
-        <View
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: badgeCouleur,
-          }}
-        />
-        <Text
-          style={{
-            fontFamily: MONO.demi,
-            fontSize: 10,
-            letterSpacing: 0.8,
-            color: j.text3,
-            textTransform: 'uppercase',
-          }}
-        >
-          {badge}
-        </Text>
-      </View>
-      {children}
+      />
     </View>
   )
 }
 
+type Saisie = { K: NatureApp; nom: string; plan: string; minutes: number; echeance: string; imp: number; premiere: boolean; a: number; jours: number[] }
 
-/**
- * État vide accueillant avec icône de nature et action directe.
- */
-function EtatVide({
-  icone,
-  titre,
-  description,
-  actionTexte,
-  surAction,
-}: {
-  icone: React.ReactNode
-  titre: string
-  description: string
-  actionTexte: string
-  surAction: () => void
-}) {
-  const j = useJetons()
+function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; fermer: () => void; creer: (f: Saisie) => Promise<void> }) {
+  const [K, setK] = useState<NatureApp>('TASK')
+  const [nom, setNom] = useState('')
+  const [plan, setPlan] = useState('')
+  const [dur, setDur] = useState(120)
+  const [due, setDue] = useState('')
+  const [imp, setImp] = useState(5)
+  const [premiere, setPremiere] = useState(true)
+  const [hebdo, setHebdo] = useState(180)
+  const [a, setA] = useState('18:30')
+  const [len, setLen] = useState(60)
+  const [jours, setJours] = useState<number[]>([])
+  const [err, setErr] = useState('')
+  const [occupe, setOccupe] = useState(false)
+  const ouvert = nature !== null
+  const precedent = useRef<NatureApp | null>(null)
+  if (nature && precedent.current !== nature) {
+    precedent.current = nature
+    setK(nature)
+    setNom('')
+    setPlan('')
+    setJours([])
+    setErr('')
+    const d = new Date()
+    d.setDate(d.getDate() + 6)
+    setDue(cleDate(d))
+  }
+  if (!nature && precedent.current) precedent.current = null
+  const { acc } = useLumiere()
+  const [titre, ph, cta] = FORM[K]
+  const pret = nom.trim().length > 0 && plan.trim().length > 0
+  const champ = { height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 } as const
+  const etiquette = (t: string) => <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 13, textAlign: 'center' }}>{t}</Text>
+  const enregistrer = async () => {
+    if (occupe) return
+    if (!nom.trim()) return setErr('Give it a name.')
+    if (!plan.trim()) return setErr('Explain what you will do.')
+    if (K === 'TASK' && !dur) return setErr('How much work does it need?')
+    if (K === 'GOAL' && !hebdo) return setErr('How much time each week?')
+    if (K === 'ANCHOR' && !len) return setErr('How long does it last?')
+    if (K === 'ANCHOR' && !jours.length) return setErr('Pick at least one day.')
+    const [h, m] = a.split(':').map(Number)
+    setOccupe(true)
+    try {
+      await creer({ K, nom: nom.trim(), plan: plan.trim(), minutes: K === 'TASK' ? dur : K === 'GOAL' ? hebdo : len, echeance: due, imp, premiere, a: (h ?? 0) * 60 + (m ?? 0), jours })
+      Keyboard.dismiss()
+      fermer()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not create.')
+    } finally {
+      setOccupe(false)
+    }
+  }
   return (
-    <View
-      style={{
-        paddingVertical: PAS[5],
-        paddingHorizontal: PAS[3],
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: RAYON.md,
-        borderWidth: 1,
-        borderColor: j.line,
-        borderStyle: 'dashed',
-        backgroundColor: 'rgba(255, 255, 255, 0.01)',
-        gap: PAS[2],
-      }}
-    >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: j.surface2,
-          borderWidth: 1,
-          borderColor: j.line,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icone}
+    <Feuille ouverte={ouvert} fermer={fermer} voile={false} style={{ paddingHorizontal: 14, paddingBottom: 16, maxHeight: 720 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 8, paddingRight: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TRAIT[K] }} />
+          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.3 }}>{titre}</Text>
+        </View>
+        <BoutonFermer onPress={fermer} />
       </View>
-      <Text style={{ fontFamily: GEIST.demi, fontSize: 13, color: j.text2 }}>{titre}</Text>
-      <Text
-        style={{
-          fontFamily: GEIST.normal,
-          fontSize: 11.5,
-          color: j.text3,
-          textAlign: 'center',
-          maxWidth: 240,
-          lineHeight: 16,
-        }}
-      >
-        {description}
-      </Text>
+      <ScrollView style={{ marginTop: 14 }} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{ borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.055)', paddingTop: 14, paddingHorizontal: 14, paddingBottom: 16, gap: 14 }}>
+          <TextInput value={nom} onChangeText={(v) => (setNom(v.slice(0, 60)), setErr(''))} placeholder={ph} placeholderTextColor={A.t4} accessibilityLabel="Name" selectionColor={A.t1} style={champ} />
+          <View>
+            <TextInput value={plan} onChangeText={(v) => (setPlan(v.slice(0, 200)), setErr(''))} placeholder="What exactly will you do?" placeholderTextColor={A.t4} accessibilityLabel="Plan" selectionColor={A.t1} style={[champ, { fontFamily: GEIST.normal }]} />
+            <Text style={{ marginTop: 6, paddingRight: 4, textAlign: 'right', color: A.t4, fontFamily: MONO.normal, fontSize: 10 }}>{`${plan.length} / 200`}</Text>
+          </View>
+          {K === 'TASK' ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  {etiquette('Work needed')}
+                  <RoueDuree minutes={dur} changer={setDur} maxHeures={150} etiquette="Work needed" bande="rgba(242,242,242,0.08)" />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  {etiquette('Due')}
+                  <RoueJour valeur={due} changer={setDue} jours={30} etiquette="Due" bande="rgba(242,242,242,0.08)" />
+                </View>
+              </View>
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>Importance</Text>
+                  <Text style={{ color: A.t1, fontFamily: MONO.normal, fontSize: 13 }}>{`${imp}/10`}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 32 }}>
+                  {Array.from({ length: 10 }, (_, i) => (
+                    <Pressable key={i} accessibilityLabel={`Importance ${i + 1}`} onPress={() => setImp(i + 1)} style={{ flex: 1, height: `${30 + i * 7.8}%`, borderRadius: 3, backgroundColor: i < imp ? (i >= 7 ? acc : A.t1) : 'rgba(242,242,242,0.1)' }} />
+                  ))}
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 18 }}>
+                {([['Done before', false], ['First time', true]] as const).map(([t, v]) => (
+                  <Pressable key={t} accessibilityRole="radio" accessibilityState={{ selected: premiere === v }} onPress={() => setPremiere(v)} style={{ paddingVertical: 2, borderBottomWidth: 1, borderBottomColor: premiere === v ? A.t1 : 'transparent' }}>
+                    <Text style={{ color: premiere === v ? A.t1 : A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+          {K === 'GOAL' ? (
+            <>
+              <View style={{ width: 220, alignSelf: 'center', gap: 2 }}>
+                {etiquette('Every week')}
+                <RoueDuree minutes={hebdo} changer={setHebdo} maxHeures={100} etiquette="Every week" bande="rgba(242,242,242,0.08)" />
+              </View>
+              <Text style={{ minHeight: 18, color: A.t3, fontFamily: GEIST.normal, fontSize: 13, textAlign: 'center' }}>{hebdo ? `About ${hm(hebdo / 7)} a day` : ''}</Text>
+            </>
+          ) : null}
+          {K === 'ANCHOR' ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  {etiquette('At')}
+                  <RoueHeure valeur={a} changer={setA} etiquette="At" bande="rgba(242,242,242,0.08)" />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  {etiquette('For')}
+                  <RoueDuree minutes={len} changer={setLen} maxHeures={8} etiquette="For" bande="rgba(242,242,242,0.08)" />
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {DOW.map((t, i) => {
+                  const g = (i + 1) % 7
+                  const on = jours.includes(g)
+                  return (
+                    <Pressable key={i} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => setJours((j) => (on ? j.filter((x) => x !== g) : [...j, g]))} style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: on ? A.t1 : 'rgba(242,242,242,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: on ? '#000' : A.t3, fontFamily: GEIST.demi, fontSize: 13 }}>{t}</Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </>
+          ) : null}
+        </View>
+        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+      </ScrollView>
       <Pressable
         accessibilityRole="button"
-        onPress={surAction}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: PAS[1],
-          marginTop: PAS[2],
-          paddingVertical: 6,
-          paddingHorizontal: 12,
-          borderRadius: RAYON.sm,
-          borderWidth: 1,
-          borderColor: j.lineForte,
-          backgroundColor: pressed ? j.surface2 : 'transparent',
-          transform: [{ translateY: pressed ? 1 : 0 }],
-        })}
+        onPress={() => void enregistrer()}
+        style={({ pressed }) => ({ marginTop: 4, height: 52, borderRadius: 8, backgroundColor: A.t1, alignItems: 'center', justifyContent: 'center', opacity: pret ? 1 : 0.4, transform: [{ scale: pressed ? 0.975 : 1 }] })}
       >
-        <Plus couleur={j.accentEncre} taille={12} />
-        <Text style={{ fontFamily: GEIST.demi, fontSize: 12, color: j.text2 }}>{actionTexte}</Text>
+        <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 16 }}>{occupe ? 'Adding…' : cta}</Text>
       </Pressable>
-    </View>
+    </Feuille>
   )
-}
-
-/**
- * Bouton discret avec glyphe "+" pour déplier/replier les éléments au-delà de 2.
- */
-function BoutonVoirPlus({
-  nombreCache,
-  ouvert,
-  surBasculer,
-  quoi,
-}: {
-  nombreCache: number
-  ouvert: boolean
-  surBasculer: () => void
-  quoi: string
-}) {
-  const j = useJetons()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={ouvert ? `Show fewer ${quoi}` : `Show ${nombreCache} more ${quoi}`}
-      accessibilityState={{ expanded: ouvert }}
-      onPress={surBasculer}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: PAS[2],
-        paddingVertical: PAS[2] + 2,
-        paddingHorizontal: PAS[3],
-        marginTop: PAS[4],
-        borderRadius: RAYON.md,
-        borderWidth: 1,
-        borderColor: ouvert ? j.lineForte : j.line,
-        backgroundColor: pressed ? j.surface2 : 'rgba(255, 255, 255, 0.02)',
-        transform: [{ translateY: pressed ? 1 : 0 }],
-      })}
-    >
-      <View
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: 9,
-          backgroundColor: j.surface2,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {ouvert ? (
-          <Moins couleur={j.text2} taille={11} />
-        ) : (
-          <Plus couleur={j.accentEncre} taille={11} />
-        )}
-      </View>
-      <Text style={{ fontFamily: GEIST.demi, fontSize: 12.5, color: j.text2 }}>
-        {ouvert ? 'Show less' : `+${nombreCache} more ${quoi}`}
-      </Text>
-    </Pressable>
-  )
-}
-
-// ─── Lignes ────────────────────────────────────────────────────────────────
-
-/** B.5.2 : le pas de « il m'en faut plus », le meme que sur l'accueil. */
-const PAS_DE_TEMPS = 25
-
-type Groupe = {
-  racine: Tache
-  /** Vide si la tache n'a pas ete decoupee. */
-  parties: Tache[]
-  /** Ce qu'il y a a faire en tout, correction et temps accorde compris. */
-  prevu: number
-  /** Ce qui a ete REELLEMENT mesure. Jamais declare. */
-  mesure: number
-}
-
-/**
- * Les parties sous leur tache d'origine, jamais a cote.
- *
- * Mises a plat, « Dossier », « Dossier — Partie 1 » et « Dossier — Partie 2 »
- * se lisent comme trois travaux distincts, et le total de la liste compte deux
- * fois le meme temps. Le regroupement n'est pas une commodite d'affichage : il
- * dit ce qui est vrai.
- */
-function grouperTaches(ouvertes: readonly Tache[], fait: Record<string, number>): Groupe[] {
-  const total = (t: Tache) => t.minutesRestantes + t.minutesSupplementaires
-  const racines = ouvertes.filter((t) => t.parentId === null)
-
-  return racines.map((racine) => {
-    const parties = ouvertes
-      .filter((t) => t.parentId === racine.id)
-      .sort((a, b) => (a.rangPartie ?? 0) - (b.rangPartie ?? 0))
-
-    if (parties.length === 0) {
-      return { racine, parties, prevu: total(racine), mesure: fait[racine.id] ?? 0 }
-    }
-    // La racine d'un groupe ne porte aucun travail propre : tout est passe aux
-    // parties. La compter reviendrait a la compter deux fois.
-    return {
-      racine,
-      parties,
-      prevu: parties.reduce((s, p) => s + total(p), 0),
-      mesure: parties.reduce((s, p) => s + (fait[p.id] ?? 0), 0),
-    }
-  })
-}
-
-/** Le titre d'une partie, sans repeter celui de sa tache. */
-function titreDePartie(partie: Tache, racine: Tache): string {
-  const prefixe = `${racine.titre} — `
-  if (partie.titre.startsWith(prefixe)) return partie.titre.slice(prefixe.length)
-  return partie.rangPartie !== null ? `Part ${partie.rangPartie}` : partie.titre
-}
-
-function GroupeTache({ groupe, premiere }: { groupe: Groupe; premiere?: boolean }) {
-  const j = useJetons()
-  const d = useDonnees()
-  const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
-  const { racine, parties, prevu, mesure } = groupe
-  const part = prevu > 0 ? Math.min(1, mesure / prevu) : 0
-
-  return (
-    <View style={{ borderTopWidth: premiere ? 0 : 1, borderTopColor: j.line, paddingVertical: PAS[3], gap: PAS[2] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[3] }}>
-        <Marque couleur={assainirCouleur('task', racine.couleur, 0)} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Texte>{racine.titre}</Texte>
-          <Texte ton="eteint" taille={12.5}>
-            {quandEcheance(racine.echeance)}
-            {parties.length > 0 ? ` · ${parties.length} parts` : ''}
-            {racine.minutesSupplementaires > 0 ? ` · +${duree(racine.minutesSupplementaires)}` : ''}
-          </Texte>
-        </View>
-
-        <View style={{ alignItems: 'flex-end' }}>
-          <Valeur ton={racine.importance >= 8 ? 'accent' : 'normal'}>{duree(prevu)}</Valeur>
-          <Valeur ton="doux" taille={11.5}>{racine.importance}/10</Valeur>
-        </View>
-
-        {/* B.5.2 : le seul geste qui touche encore a une tache. Il ne la
-            termine pas — il reconnait que l'estimation etait courte. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Grant ${PAS_DE_TEMPS} more minutes to ${racine.titre}`}
-          onPress={() => void d.ajouterDuTemps(parties[0]?.id ?? racine.id, PAS_DE_TEMPS)}
-          hitSlop={6}
-          style={({ pressed }) => ({
-            paddingHorizontal: 8,
-            paddingVertical: 5,
-            borderRadius: RAYON.sm,
-            borderWidth: 1,
-            borderColor: pressed ? j.lineForte : j.line,
-            backgroundColor: pressed ? j.surface3 : j.surface2,
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: [{ translateY: pressed ? 1 : 0 }],
-          })}
-        >
-          <Text style={{ fontFamily: MONO.demi, fontSize: 11, color: j.text2 }}>+{PAS_DE_TEMPS}m</Text>
-        </Pressable>
-
-        <Supprimer quoi={racine.titre} surPression={() => void d.supprimerTache(racine.id)} />
-      </View>
-
-      {/* Ce qui a ete MESURE, pas ce qui a ete promis. La barre ne bouge
-          qu'apres un « Je commence » et une fenetre ecoulee. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2], paddingLeft: PAS[4] }}>
-        <View style={{ flex: 1, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
-          <View style={{ width: `${part * 100}%`, height: 3, borderRadius: 1.5, backgroundColor: j.accent }} />
-        </View>
-        <Text style={{ fontFamily: MONO.normal, fontSize: 10.5, color: j.text3, fontVariant: ['tabular-nums'] }}>
-          {duree(mesure)} done
-        </Text>
-      </View>
-
-      {parties.map((p) => {
-        // B.5.1 : verrouillee tant qu'une soeur de rang anterieur est active.
-        const verrouillee = parties.some(
-          (s) => s.rangPartie !== null && p.rangPartie !== null && s.rangPartie < p.rangPartie,
-        )
-        return (
-          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: PAS[2], paddingLeft: PAS[4] }}>
-            <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: verrouillee ? j.text3 : j.text2 }} />
-            <Text style={{ flex: 1, fontFamily: GEIST.normal, fontSize: 12.5, color: verrouillee ? j.text3 : j.text2 }}>
-              {titreDePartie(p, racine)}
-              {verrouillee ? ' · waiting' : ''}
-            </Text>
-            <Text style={{ fontFamily: MONO.normal, fontSize: 11, color: j.text3, fontVariant: ['tabular-nums'] }}>
-              {duree(fait[p.id] ?? 0)} / {duree(p.minutesRestantes + p.minutesSupplementaires)}
-            </Text>
-          </View>
-        )
-      })}
-    </View>
-  )
-}
-
-function LigneTache({ tache, premiere }: { tache: Tache; premiere?: boolean }) {
-  const j = useJetons()
-  const d = useDonnees()
-  return (
-    <Rangee premiere={premiere}>
-      {/* Une case, pas une commande. La complétion se CONSTATE : elle arrive
-          quand le temps planifié a réellement été fait, mesuré séance après
-          séance (B.5.2). Un clic qui termine une tâche serait une déclaration,
-          et une déclaration n'apprend rien au moteur. */}
-      <View
-        accessible
-        accessibilityLabel={tache.terminee ? 'Finished' : 'In progress'}
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: RAYON.sm,
-          borderWidth: 1,
-          borderColor: tache.terminee ? j.accent : j.lineForte,
-          backgroundColor: tache.terminee ? j.accent : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {tache.terminee ? <Coche couleur={j.accentSur} taille={12} /> : null}
-      </View>
-
-      <View style={{ flex: 1, opacity: tache.terminee ? 0.45 : 1 }}>
-        <Texte>{tache.titre}</Texte>
-        <Texte ton="eteint" taille={12.5}>
-          {tache.terminee ? 'finished — the time was done' : quandEcheance(tache.echeance)}
-        </Texte>
-      </View>
-
-      <View style={{ alignItems: 'flex-end', opacity: tache.terminee ? 0.45 : 1 }}>
-        <Valeur ton={tache.importance >= 8 && !tache.terminee ? 'accent' : 'normal'}>
-          {duree(tache.minutesEstimees)}
-        </Valeur>
-        <Valeur ton="doux" taille={11.5}>
-          {tache.importance}/10
-        </Valeur>
-      </View>
-
-      <Supprimer quoi={tache.titre} surPression={() => void d.supprimerTache(tache.id)} />
-    </Rangee>
-  )
-}
-
-function Supprimer({ surPression, quoi }: { surPression: () => void; quoi: string }) {
-  const j = useJetons()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Delete ${quoi}`}
-      onPress={surPression}
-      hitSlop={10}
-      style={({ pressed }) => ({
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: pressed ? j.surface2 : 'transparent',
-        opacity: pressed ? 1 : 0.65,
-        transform: [{ translateY: pressed ? 1 : 0 }],
-      })}
-    >
-      <Croix couleur={j.text3} taille={14} />
-    </Pressable>
-  )
-}
-
-/**
- * Le « + » d'une section.
- *
- * Il porte un NOM, et c'est obligatoire : un bouton dont le seul contenu est
- * un glyphe dessine n'a rien a annoncer a VoiceOver. Trois boutons identiques
- * et muets sur le meme ecran, c'etait trois « bouton » lus a la suite, sans
- * moyen de savoir lequel ajoutait quoi.
- */
-function BoutonAjout({ ouvert, quoi, surPression }: { ouvert: boolean; quoi: string; surPression: () => void }) {
-  const j = useJetons()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={ouvert ? 'Close the form' : `Add ${quoi}`}
-      accessibilityState={{ expanded: ouvert }}
-      onPress={surPression}
-      hitSlop={10}
-      style={({ pressed }) => ({
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: ouvert ? j.accent : j.lineForte,
-        backgroundColor: ouvert ? j.accentDoux : pressed ? j.surface2 : 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transform: [{ rotate: ouvert ? '45deg' : '0deg' }, { translateY: pressed ? 1 : 0 }],
-      })}
-    >
-      <Plus couleur={ouvert ? j.accentEncre : j.text2} taille={14} />
-    </Pressable>
-  )
-}
-
-// ─── Formulaires ───────────────────────────────────────────────────────────
-
-/**
- * Le formulaire de tache, celui du bureau.
- *
- * Deux champs y sont obligatoires, pas un : le titre **et le plan**. Le
- * bureau l'exige parce qu'une tache sans plan est un vœu — « avancer sur le
- * memoire » ne dit ni ou, ni quoi, ni comment commencer, et c'est exactement
- * la forme qu'on ne demarre jamais.
- *
- * La nature se declare aussi, parce qu'elle change le chiffre : une premiere
- * fois est majoree de 70 %, un travail connu de 40 % (B.1).
- */
-function FormulaireTache({ surFin }: { surFin: () => void }) {
-  const d = useDonnees()
-  const { resultat } = usePlan()
-  const [titre, setTitre] = useState('')
-  const [intention, setIntention] = useState('')
-  const [minutes, setMinutes] = useState('60')
-  // Une tâche se termine dans le mois : on la déplace ensuite si besoin.
-  const [echeance, setEcheance] = useState(() => dansNJours(7))
-  const [importance, setImportance] = useState(5)
-  const [nature, setNature] = useState<Tache['nature']>('routine')
-
-  const complet = !!titre.trim() && !!intention.trim()
-
-  const valider = async () => {
-    if (!complet) return
-    const couleur = allouerCouleurTache(d.taches.filter((x) => !x.terminee))
-    await d.ajouterTache(
-      {
-        titre: titre.trim(),
-        intention: intention.trim(),
-        couleur,
-        echeance,
-        importance,
-        minutesEstimees: Math.max(5, Number(minutes) || 60),
-        nature,
-      },
-      // B.5 : le decoupage a besoin de savoir ce qu'une journee absorbe. Ce
-      // plafond vient du plan courant, jamais d'une constante.
-      { maxParJourMinutes: maxTaskMinutesPerDay(resultat.capacities) },
-    )
-    surFin()
-  }
-
-  return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Task title" valeur={titre} surChangement={setTitre} exemple="Finish the report" premier />
-      <Champ
-        etiquette="The plan: what this concretely involves"
-        valeur={intention}
-        surChangement={setIntention}
-        exemple="Tonight at my desk, I write the first three pages."
-        multiligne
-      />
-      <Etiquetee titre="How long it will take">
-        <RoueDuree minutes={Number(minutes) || 0} changer={(v) => setMinutes(String(v))} etiquette="Estimated duration" maxHeures={150} pasMinutes={15} minimum={15} compact />
-      </Etiquetee>
-      <Etiquetee titre="Done by (at most a month ahead)">
-        <RoueJour valeur={echeance} changer={setEcheance} jours={30} etiquette="Deadline" />
-      </Etiquetee>
-      <Bascule
-        valeur={nature}
-        surChangement={setNature}
-        choix={[
-          ['routine', 'Done before'],
-          ['nouveau', 'First time'],
-        ]}
-      />
-      <Echelle valeur={importance} surChangement={setImportance} />
-    </Formulaire>
-  )
-}
-
-/** Deux cibles exclusives, assez larges pour le pouce. */
-function Bascule<T extends string>({
-  valeur,
-  surChangement,
-  choix,
-}: {
-  valeur: T
-  surChangement: (v: T) => void
-  choix: readonly (readonly [T, string])[]
-}) {
-  const j = useJetons()
-  return (
-    <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-      {choix.map(([cle, nom]) => {
-        const actif = cle === valeur
-        return (
-          <Pressable
-            key={cle}
-            accessibilityRole="button"
-            accessibilityState={{ selected: actif }}
-            onPress={() => surChangement(cle)}
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 40,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: RAYON.sm,
-              borderWidth: 1,
-              borderColor: actif ? j.accent : j.line,
-              backgroundColor: actif ? j.accentDoux : 'transparent',
-              transform: [{ translateY: pressed ? 1 : 0 }],
-            })}
-          >
-            <Texte ton={actif ? 'accent' : 'eteint'} taille={12.5}>
-              {nom}
-            </Texte>
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
-
-function FormulaireObjectif({ surFin }: { surFin: () => void }) {
-  const d = useDonnees()
-  const [nom, setNom] = useState('')
-  const [intention, setIntention] = useState('')
-  const [heures, setHeures] = useState('5')
-
-  const complet = !!nom.trim() && !!intention.trim()
-
-  const valider = async () => {
-    if (!complet) return
-    await d.ajouterObjectif({
-      nom: nom.trim(),
-      intention: intention.trim(),
-      couleur: allouerCouleurObjectif(d.objectifs),
-      cibleHebdoMinutes: Math.max(0, Math.round((Number(heures) || 5) * 60)),
-    })
-    surFin()
-  }
-
-  return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Goal name" valeur={nom} surChangement={setNom} exemple="Guitar, sport, reading…" premier />
-      <Champ
-        etiquette="The plan: what this concretely involves"
-        valeur={intention}
-        surChangement={setIntention}
-        exemple="What does it involve? E.g. every evening at the studio, an hour of scales."
-        multiligne
-      />
-      <Etiquetee titre="Every week">
-        <RoueDuree minutes={Math.round((Number(heures.replace(',', '.')) || 0) * 60)} changer={(v) => setHeures(String(v / 60))} etiquette="Time per week" maxHeures={100} pasMinutes={15} minimum={15} compact />
-      </Etiquetee>
-    </Formulaire>
-  )
-}
-
-function FormulaireAncre({ surFin }: { surFin: () => void }) {
-  const d = useDonnees()
-  const j = useJetons()
-  const [nom, setNom] = useState('')
-  const [intention, setIntention] = useState('')
-  const [heure, setHeure] = useState('12:30')
-  const [minutes, setMinutes] = useState('60')
-  const [jours, setJours] = useState([1, 2, 3, 4, 5])
-  const [erreur, setErreur] = useState('')
-
-  const complet = !!nom.trim() && !!intention.trim() && jours.length > 0
-
-  const valider = async () => {
-    if (!complet) return
-    setErreur('')
-    try {
-      await d.ajouterAncre({
-        nom: nom.trim(),
-        declencheur: nom.trim().toLowerCase(),
-        intention: intention.trim(),
-        couleur: allouerCouleurAncre(d.ancres),
-        minuteAncrage: versMinuteSure(heure),
-        jours,
-        dureeMinutes: Math.max(15, Number(minutes) || 60),
-      })
-      surFin()
-    } catch (e) {
-      // D.3 : l'ancre est REFUSEE, jamais decalee en silence. Le refus doit
-      // donc se lire — une creation qui n'aboutit pas sans un mot passe pour
-      // une panne.
-      setErreur(e instanceof Error ? e.message : 'Could not create.')
-    }
-  }
-
-  return (
-    <Formulaire surAnnuler={surFin} surValider={() => void valider()} peutValider={complet}>
-      <Champ etiquette="Anchor name" valeur={nom} surChangement={setNom} exemple="Sport, reading, meditation…" premier />
-      <Champ
-        etiquette="The plan: what this concretely involves"
-        valeur={intention}
-        surChangement={setIntention}
-        exemple="What does it involve? E.g. tonight at the gym, 45 min upper body."
-        multiligne
-      />
-      <View style={{ flexDirection: 'row', gap: PAS[2] }}>
-        <Etiquetee titre="At">
-          <RoueHeure valeur={heure} changer={setHeure} etiquette="Anchor time" compact />
-        </Etiquetee>
-        <Etiquetee titre="For">
-          <RoueDuree minutes={Number(minutes) || 0} changer={(v) => setMinutes(String(v))} etiquette="Anchor duration" maxHeures={8} minimum={15} compact />
-        </Etiquetee>
-      </View>
-      <ChoixJours valeur={jours} surChangement={setJours} />
-      {erreur ? (
-        <Text accessibilityRole="alert" style={{ fontFamily: GEIST.normal, fontSize: 12.5, lineHeight: 19, color: j.accentEncre }}>
-          {erreur}
-        </Text>
-      ) : null}
-    </Formulaire>
-  )
-}
-
-/** Le cadre commun : un panneau, un seul, jamais imbriqué. */
-function Formulaire({
-  children,
-  surAnnuler,
-  surValider,
-  peutValider,
-}: {
-  children: React.ReactNode
-  surAnnuler: () => void
-  surValider: () => void
-  peutValider: boolean
-}) {
-  const j = useJetons()
-  return (
-    <View
-      style={{
-        borderWidth: 1,
-        borderColor: j.line,
-        borderRadius: RAYON.md,
-        padding: PAS[4],
-        marginBottom: PAS[4],
-        gap: PAS[3],
-        backgroundColor: j.surface2,
-      }}
-    >
-      {children}
-      <View style={{ flexDirection: 'row', gap: PAS[2], marginTop: PAS[1] }}>
-        <BoutonPlat onPress={surAnnuler} style={{ flex: 1 }}>
-          Cancel
-        </BoutonPlat>
-        <BoutonIris onPress={surValider} desactive={!peutValider} style={{ flex: 1 }}>
-          Add
-        </BoutonIris>
-      </View>
-    </View>
-  )
-}
-
-/** Une roue et ce qu'elle règle, au-dessus. */
-function Etiquetee({ titre, children }: { titre: string; children: React.ReactNode }) {
-  return (
-    <View style={{ flex: 1, gap: PAS[2] }}>
-      <Texte ton="eteint" taille={12.5}>
-        {titre}
-      </Texte>
-      {children}
-    </View>
-  )
-}
-
-function Champ({
-  valeur,
-  surChangement,
-  exemple,
-  suffixe,
-  numerique,
-  premier,
-  multiligne,
-  etiquette,
-}: {
-  valeur: string
-  surChangement: (v: string) => void
-  exemple: string
-  suffixe?: string
-  numerique?: boolean
-  premier?: boolean
-  multiligne?: boolean
-  /**
-   * Ce que le champ demande, pour qui ne le voit pas.
-   *
-   * L'exemple sert de repli, mais il ne le remplace pas : un lecteur d'ecran
-   * n'annonce le placeholder que tant que le champ est VIDE. Une fois rempli,
-   * un champ sans etiquette ne dit plus que sa valeur — « 60 », sans jamais
-   * dire 60 quoi.
-   */
-  etiquette?: string
-}) {
-  const j = useJetons()
-  return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: PAS[2] }}>
-      <TextInput
-        accessibilityLabel={etiquette ?? exemple}
-        value={valeur}
-        onChangeText={surChangement}
-        placeholder={exemple}
-        placeholderTextColor={j.text3}
-        keyboardType={numerique ? 'number-pad' : 'default'}
-        multiline={multiligne}
-        numberOfLines={multiligne ? 3 : 1}
-        style={{
-          flex: 1,
-          ...(multiligne ? { minHeight: 68, textAlignVertical: 'top' as const } : {}),
-          backgroundColor: j.champBg,
-          borderWidth: 1,
-          borderColor: j.lineForte,
-          borderRadius: RAYON.md,
-          paddingHorizontal: PAS[3],
-          paddingVertical: PAS[2] + 2,
-          color: j.text,
-          // Les valeurs se saisissent en chiffres alignés, comme elles s'affichent.
-          fontFamily: numerique ? MONO.normal : GEIST.normal,
-          fontSize: premier ? 15 : 14,
-        }}
-      />
-      {suffixe ? <Texte ton="eteint" taille={12.5}>{suffixe}</Texte> : null}
-    </View>
-  )
-}
-
-/**
- * Les sept jours d'une ancre.
- *
- * L'ordre part du lundi, celui de la semaine vecue — pas du dimanche, qui
- * n'est la convention que de JavaScript.
- */
-function ChoixJours({ valeur, surChangement }: { valeur: number[]; surChangement: (v: number[]) => void }) {
-  const j = useJetons()
-  const noms = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const basculer = (n: number) =>
-    surChangement(valeur.includes(n) ? valeur.filter((v) => v !== n) : [...valeur, n])
-
-  return (
-    <View style={{ gap: PAS[2] }}>
-      <Texte ton="eteint" taille={12.5}>Days</Texte>
-      <View style={{ flexDirection: 'row', gap: 3 }}>
-        {[1, 2, 3, 4, 5, 6, 0].map((n) => {
-          const actif = valeur.includes(n)
-          return (
-            <Pressable
-              key={n}
-              accessibilityRole="button"
-              accessibilityLabel={noms[n]}
-              accessibilityState={{ selected: actif }}
-              onPress={() => basculer(n)}
-              style={({ pressed }) => ({
-                flex: 1,
-                minHeight: 40,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: RAYON.sm,
-                borderWidth: 1,
-                borderColor: actif ? j.accent : j.line,
-                backgroundColor: actif ? j.accentDoux : 'transparent',
-                transform: [{ translateY: pressed ? 1 : 0 }],
-              })}
-            >
-              <Texte ton={actif ? 'accent' : 'eteint'} taille={11.5}>{noms[n]![0]!.toUpperCase()}</Texte>
-            </Pressable>
-          )
-        })}
-      </View>
-    </View>
-  )
-}
-
-/** Dix cibles plutôt qu'une glissière : le doigt vise mieux qu'il ne glisse. */
-function Echelle({ valeur, surChangement }: { valeur: number; surChangement: (v: number) => void }) {
-  const j = useJetons()
-  return (
-    <View style={{ gap: PAS[2] }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Texte ton="eteint" taille={12.5}>
-          Importance
-        </Texte>
-        <Valeur ton="doux" taille={12}>
-          {valeur}/10
-        </Valeur>
-      </View>
-      {/* Dix barres de couleur, et RIEN d'autre : sans role ni nom, un lecteur
-          d'ecran ne les voyait pas du tout. L'importance — le champ qui decide
-          de l'ordre de passage de toute la semaine — etait simplement
-          impossible a regler autrement qu'a l'œil. */}
-      <View style={{ flexDirection: 'row', gap: 3 }}>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <Pressable
-            key={n}
-            accessibilityRole="button"
-            accessibilityLabel={`Importance ${n} out of 10`}
-            accessibilityState={{ selected: n === valeur }}
-            onPress={() => surChangement(n)}
-            style={{
-              flex: 1,
-              height: 26,
-              borderRadius: 2,
-              backgroundColor: n <= valeur ? j.accent : j.surface3,
-            }}
-          />
-        ))}
-      </View>
-    </View>
-  )
-}
-
-// ─── Petites conversions ───────────────────────────────────────────────────
-
-function dansNJours(n: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + Math.max(0, n))
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function quandEcheance(iso: string): string {
-  const cible = new Date(`${iso}T00:00:00`)
-  const auj = new Date()
-  auj.setHours(0, 0, 0, 0)
-  const jours = Math.round((cible.getTime() - auj.getTime()) / 86_400_000)
-  if (jours < 0) return `${-jours} d overdue`
-  if (jours === 0) return 'due today'
-  if (jours === 1) return 'due tomorrow'
-  return `due in ${jours} days`
-}
-
-function joursEnTexte(jours: readonly number[]): string {
-  const noms = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  if (jours.length === 7) return 'every day'
-  if (jours.length === 5 && jours.every((n) => n >= 1 && n <= 5)) return 'weekdays'
-  if (jours.length === 2 && jours.includes(0) && jours.includes(6)) return 'weekends'
-  return jours.map((n) => noms[n]).join(' · ')
-}
-
-function versMinuteSure(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number)
-  return Math.min(1439, Math.max(0, (h ?? 12) * 60 + (m ?? 0)))
 }
