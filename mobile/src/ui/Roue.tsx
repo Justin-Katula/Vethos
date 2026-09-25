@@ -13,7 +13,6 @@ import {
   Animated,
   Platform,
   Pressable,
-  Text,
   View,
   type AccessibilityActionEvent,
   type NativeScrollEvent,
@@ -23,7 +22,7 @@ import * as Haptics from 'expo-haptics'
 import { useJetons } from '@/theme/Theme'
 import { GEIST, MONO } from './primitives'
 
-const HAUTEUR = 44
+const HAUTEUR = 36
 const VISIBLES = 5
 /** Copies d'une liste cyclique : assez pour tourner longtemps avant un recentrage invisible. */
 const COPIES = 9
@@ -47,14 +46,14 @@ function Colonne({
   etiquette,
   unite,
   alignement = 'center',
-  taillePolice = 24,
-  mono = true,
+  taillePolice = 21,
+  mono = false,
 }: {
   libelles: string[]
   index: number
   changer: (i: number) => void
   cyclique?: boolean
-  largeur: number
+  largeur?: number
   etiquette: string
   unite?: string
   alignement?: 'center' | 'left' | 'right'
@@ -158,7 +157,7 @@ function Colonne({
           changerRef.current(suivant)
         }
       }}
-      style={{ width: largeur, height: HAUTEUR * VISIBLES, overflow: 'hidden' }}
+      style={{ ...(largeur ? { width: largeur } : { flex: 1 }), height: HAUTEUR * VISIBLES, overflow: 'hidden' }}
     >
       <Animated.ScrollView
         ref={liste as never}
@@ -199,26 +198,19 @@ function Colonne({
                   textAlign: alignement,
                   color: j.text,
                   fontFamily: mono ? MONO.normal : GEIST.moyen,
+                  fontWeight: '500',
                   fontSize: taillePolice,
                   fontVariant: ['tabular-nums'],
                   opacity: y.interpolate({
                     inputRange: ecart,
-                    outputRange: [0.14, 0.38, 1, 0.38, 0.14],
+                    outputRange: [0.35, 0.67, 1, 0.67, 0.35],
                     extrapolate: 'clamp',
                   }),
                   transform: [
-                    { perspective: 600 },
-                    {
-                      rotateX: y.interpolate({
-                        inputRange: ecart,
-                        outputRange: ['52deg', '26deg', '0deg', '-26deg', '-52deg'],
-                        extrapolate: 'clamp',
-                      }),
-                    },
                     {
                       scale: y.interpolate({
                         inputRange: ecart,
-                        outputRange: [0.84, 0.92, 1, 0.92, 0.84],
+                        outputRange: [0.92, 0.96, 1, 0.96, 0.92],
                         extrapolate: 'clamp',
                       }),
                     },
@@ -236,10 +228,10 @@ function Colonne({
 }
 
 /** La bande de sélection : derrière les chiffres, jamais dessus. */
-function Cadre({ children }: { children: React.ReactNode }) {
+function Cadre({ children, bande }: { children: React.ReactNode; bande?: string }) {
   const j = useJetons()
   return (
-    <View style={{ height: HAUTEUR * VISIBLES, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ width: '100%', height: HAUTEUR * VISIBLES, justifyContent: 'center' }}>
       <View
         pointerEvents="none"
         style={{
@@ -247,21 +239,12 @@ function Cadre({ children }: { children: React.ReactNode }) {
           left: 0,
           right: 0,
           height: HAUTEUR,
-          borderRadius: 12,
-          backgroundColor: j.surface2,
+          borderRadius: 8,
+          backgroundColor: bande ?? j.surface,
         }}
       />
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>{children}</View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>{children}</View>
     </View>
-  )
-}
-
-function Unite({ texte }: { texte: string }) {
-  const j = useJetons()
-  return (
-    <Text style={{ width: 40, color: j.text3, fontFamily: GEIST.moyen, fontSize: 15, paddingLeft: 6 }}>
-      {texte}
-    </Text>
   )
 }
 
@@ -281,15 +264,17 @@ export function RoueHeure({
   changer,
   etiquette,
   pasMinutes = 5,
+  bande,
 }: {
   valeur: string
   changer: (v: string) => void
   etiquette: string
   pasMinutes?: number
+  /** Couleur de la bande de sélection (surface du dessous). */
+  bande?: string
   /** Conservé pour compatibilité : les roues ont toujours cinq crans visibles. */
   compact?: boolean
 }) {
-  const j = useJetons()
   const { h, m } = lireHeure(valeur)
   const heures = useMemo(() => Array.from({ length: 24 }, (_, i) => deux(i)), [])
   const minutes = useMemo(
@@ -301,42 +286,34 @@ export function RoueHeure({
   const derniere = useRef({ h, iMin })
   derniere.current = { h, iMin }
   return (
-    <Cadre>
+    <Cadre bande={bande}>
       <Colonne
         libelles={heures}
         index={h}
         cyclique
         changer={(nh) => changer(`${deux(nh)}:${deux(derniere.current.iMin * pasMinutes)}`)}
-        largeur={58}
         etiquette={`${etiquette}, hours`}
-        alignement="right"
       />
-      <Text
-        style={{ color: j.text3, fontFamily: MONO.normal, fontSize: 22, width: 20, textAlign: 'center' }}
-      >
-        :
-      </Text>
       <Colonne
         libelles={minutes}
         index={iMin}
         cyclique
         changer={(ni) => changer(`${deux(derniere.current.h)}:${deux(ni * pasMinutes)}`)}
-        largeur={58}
         etiquette={`${etiquette}, minutes`}
-        alignement="left"
       />
     </Cadre>
   )
 }
 
-/** Une durée : heures | minutes, de `minimum` à `maxHeures` (150 h par défaut). */
+/** Une durée : « 8 h » | « 15 min », de `minimum` à `maxHeures` (150 h par défaut). */
 export function RoueDuree({
   minutes,
   changer,
   etiquette,
   maxHeures = 150,
-  pasMinutes = 5,
+  pasMinutes = 15,
   minimum = 0,
+  bande,
 }: {
   minutes: number
   changer: (v: number) => void
@@ -344,6 +321,7 @@ export function RoueDuree({
   maxHeures?: number
   pasMinutes?: number
   minimum?: number
+  bande?: string
   compact?: boolean
 }) {
   const total = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0
@@ -351,50 +329,47 @@ export function RoueDuree({
   const nbMin = Math.floor(60 / pasMinutes)
   const iMin = Math.round((total % 60) / pasMinutes) % nbMin
   const heures = useMemo(
-    () => Array.from({ length: maxHeures + 1 }, (_, i) => String(i)),
+    () => Array.from({ length: maxHeures + 1 }, (_, i) => `${i} h`),
     [maxHeures],
   )
   const mins = useMemo(
-    () => Array.from({ length: nbMin }, (_, i) => deux(i * pasMinutes)),
+    () => Array.from({ length: nbMin }, (_, i) => `${i * pasMinutes} min`),
     [nbMin, pasMinutes],
   )
   const derniere = useRef({ h, iMin })
   derniere.current = { h, iMin }
   const poser = (nh: number, ni: number) => changer(Math.max(minimum, nh * 60 + ni * pasMinutes))
   return (
-    <Cadre>
+    <Cadre bande={bande}>
       <Colonne
         libelles={heures}
         index={h}
         changer={(nh) => poser(nh, derniere.current.iMin)}
-        largeur={64}
         etiquette={`${etiquette}, hours`}
         unite="hours"
-        alignement="right"
       />
-      <Unite texte="h" />
       <Colonne
         libelles={mins}
         index={iMin}
-        cyclique
         changer={(ni) => poser(derniere.current.h, ni)}
-        largeur={50}
         etiquette={`${etiquette}, minutes`}
         unite="minutes"
-        alignement="right"
       />
-      <Unite texte="min" />
     </Cadre>
   )
 }
 
-/** Un jour parmi les prochains, écrit en toutes lettres. */
+const JOURS_COURTS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MOIS_COURTS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Un jour parmi les prochains : « Wed 30 Sep ». */
 export function RoueJour({
   valeur,
   changer,
   jours,
   depuis = 1,
   etiquette,
+  bande,
 }: {
   valeur: string
   changer: (v: string) => void
@@ -402,6 +377,7 @@ export function RoueJour({
   jours: number
   depuis?: number
   etiquette: string
+  bande?: string
 }) {
   const dates = useMemo(() => {
     const aujourdHui = new Date()
@@ -410,21 +386,17 @@ export function RoueJour({
       d.setHours(12, 0, 0, 0)
       d.setDate(d.getDate() + depuis + i)
       const cle = `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}`
-      const jour = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      return { cle, libelle: depuis + i === 1 ? `Tomorrow · ${jour}` : jour }
+      return { cle, libelle: `${JOURS_COURTS[d.getDay()]} ${d.getDate()} ${MOIS_COURTS[d.getMonth()]}` }
     })
   }, [depuis, jours])
   const index = Math.max(0, dates.findIndex((d) => d.cle === valeur))
   return (
-    <Cadre>
+    <Cadre bande={bande}>
       <Colonne
         libelles={dates.map((d) => d.libelle)}
         index={index}
         changer={(i) => changer(dates[i]!.cle)}
-        largeur={260}
         etiquette={etiquette}
-        taillePolice={20}
-        mono={false}
       />
     </Cadre>
   )

@@ -1,64 +1,96 @@
 /**
- * THESIS: One intention becomes a real place in the user's day.
- * ARC: what matters → "you already know… then why do you keep pushing it?"
- *      turning into "how often do you say 'tomorrow'?" → what gets pushed
- *      (told in the words of his answer) → since when, how much, how fast →
- *      the math, live, one problem at a time → his own sentence, with weight →
- *      Vethos → one thing, really placed.
- * RULES: nothing typed after the name; every answer changes what comes next;
- *      every number comes from his answers and each thing's real nature.
+ * L'introduction de Vethos, telle que l'auteur l'a dessinée (`build/Vethos.html`).
+ *
+ * Trois actes. ÉCOUTER : son prénom, ce qui compte, combien de soirs finissent
+ * sans ce qui était prévu, ce qui est repoussé, depuis quand, pour quoi, à
+ * quel rythme réel, ce qui l'arrête. LE COÛT : chaque chose sur son calendrier,
+ * la pensée qui a tout coûté, l'année qui vient et ce que Vethos en rend.
+ * LA PLACE : ce que Vethos prend en charge, sa nature, ses réglages, la
+ * protection, la nuit, les heures fixes — puis le vrai moteur le pose, et la
+ * vraie semaine apparaît. « Enter Vethos » l'enregistre pour de vrai.
  */
-import { useEffect, useRef, useState } from 'react'
-import { Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Text, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, BackHandler, KeyboardAvoidingView, Modal, Platform, StyleSheet, View } from 'react-native'
+import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useDonnees } from '@/donnees/magasin'
+import { useBlocage } from '@/blocage/etat'
+import { SelecteurApplications } from '@/blocage/SelecteurApplications'
+import { selectionEstVide } from '@/blocage/contrat'
 import { FournisseurTheme } from '@/theme/Theme'
-import { GEIST } from '@/ui/primitives'
-import { SuiteIntroduction, type MemoireIntroduction } from './SuiteIntroduction'
-import { ETAPES_INTRODUCTION, TOTAL_ETAPES_INTRODUCTION } from './modele-introduction'
+import { FondLumiere, type Lueur } from '@/ui/FondLumiere'
+import { accentIntro, accentRvbIntro, encreIntro, heureDecimale, jourDe, teinteIntro } from '@/ui/lumiere'
+import { dateDans, preparerIntroduction } from './modele-introduction'
 import {
-  bilan,
-  CHOSES,
-  chosesPour,
-  DEPUIS,
-  echoFrequence,
-  FREQUENCES,
-  PRIORITES,
-  reponsesCompletes,
-  RYTHME_REPETE,
-  RYTHME_UNIQUE,
-  TRAVAIL,
-  type Option,
-  type Priorite,
-  type Reponses,
-} from './choix-introduction'
+  brouillonsDepuis,
+  etatInitial,
+  indexDe,
+  parcours,
+  type Ctx,
+  type Etape,
+  type EtatIntro,
+} from './etat-introduction'
+import { C, DEPLACEMENT, SORTIE, useReduit, useVers } from './briques-introduction'
 import {
-  ActionIntro,
-  Apparaitre,
-  BarreIntro,
-  ChampIntro,
-  ChoixIntro,
-  DUREE,
-  encre,
-  PageIntro,
-  SORTIE,
-  TitreIntro,
-  useAccessibiliteIntro,
-} from './experience-introduction'
-import { ConstatEnDeux, Frappe, LogoVethos } from './recit-introduction'
-import { CalculEnDirect } from './calcul-introduction'
-import { Bascule } from './frise-introduction'
+  EcranBonjour,
+  EcranDetail,
+  EcranFreins,
+  EcranFrequence,
+  EcranNom,
+  EcranPriorites,
+  EcranRepousse,
+} from './ecrans-ecoute'
+import { EcranBascule, EcranCout, EcranPensee, EcranVethos } from './ecrans-cout'
+import {
+  EcranFixes,
+  EcranNuit,
+  EcranPlace,
+  EcranProtection,
+  EcranReglage,
+  EcranSemaine,
+  EcranUne,
+  type Placement,
+} from './ecrans-place'
 
-type Scene = (typeof ETAPES_INTRODUCTION)[number] | 'suite'
-const ORDRE: Scene[] = [...ETAPES_INTRODUCTION, 'suite']
-
-/** Le fond s'assombrit à mesure que l'histoire se tait, puis se rallume avec Vethos. */
-function tonDuFond(scene: Scene): number {
-  if (scene === 'nom' || scene === 'priorite') return 1
-  if (scene === 'frequence' || scene === 'differe' || scene === 'detail') return 0.45
-  if (scene === 'suite') return 0.5
-  return 0
+/** La lueur de chaque écran : x, y (vers le haut), intensité, étroitesse, dérive, teinte. */
+type Mode = 'h' | 'a' | 'n' | 'd'
+const SCN: Record<string, [number, number, number, number, number, Mode]> = {
+  '1': [0.18, 0.9, 0.9, 2.2, 0.05, 'h'],
+  '1b': [0.5, 0.62, 1.1, 3, 0.03, 'h'],
+  '2': [0.85, 0.82, 0.8, 2.4, 0.05, 'h'],
+  '3': [0.5, 1.02, 0.75, 2.6, 0.04, 'h'],
+  '4': [0.12, 0.62, 0.8, 2.4, 0.05, 'h'],
+  '5g': [0.82, 0.2, 0.8, 2.6, 0.05, 'h'],
+  '5a': [0.88, 0.6, 0.75, 2.6, 0.05, 'h'],
+  '5b': [0.12, 0.4, 0.75, 2.6, 0.05, 'h'],
+  '5c': [0.5, 0.42, 0.55, 5, 0.02, 'h'],
+  '6': [0.5, 0.02, 0.75, 2.6, 0.04, 'h'],
+  '7': [0.5, -0.12, 1.05, 2.4, 0.03, 'a'],
+  '8': [0.5, 0.54, 0.35, 9, 0.01, 'a'],
+  '9': [0.5, 0.18, 1.2, 2.2, 0.02, 'h'],
+  '10': [0.5, 0.56, 1.35, 5.5, 0.015, 'h'],
+  '11': [0.82, 0.92, 0.8, 2.4, 0.05, 'h'],
+  '12a': [0.18, 0.92, 0.8, 2.4, 0.05, 'h'],
+  '12b': [0.82, 0.1, 0.8, 2.6, 0.05, 'h'],
+  '13': [0.5, 0.5, 0.85, 3.5, 0.03, 'h'],
+  '14': [0.5, 0.85, 0.9, 2.4, 0.03, 'n'],
+  '15': [0.12, 0.3, 0.8, 2.4, 0.05, 'h'],
+  '16': [0, 0, 1, 2.4, 0, 'd'],
+  '17': [0.5, 1.05, 1.1, 1.8, 0.03, 'h'],
+}
+function lueurDe(k: string, H: number): Lueur {
+  const g = SCN[k] ?? [0.5, 0.9, 0.8, 2.4, 0.04, 'h']
+  let [x, y] = g
+  const [, , i, lt, derive, m] = g
+  if (m === 'd') {
+    const th = (H / 24) * 2 * Math.PI
+    x = 0.5 + Math.sin(th) * 0.62
+    y = 0.56 + Math.cos(th) * 0.52
+  }
+  const tc = m === 'a' ? accentRvbIntro(H) : m === 'n' ? teinteIntro(2) : teinteIntro(H)
+  const I = i * (m === 'h' || m === 'd' ? 0.35 + 0.65 * jourDe(H) : 1)
+  return { x, y, i: I, lt, tc, derive }
 }
 
 export function Introduction() {
@@ -69,541 +101,273 @@ export function Introduction() {
   )
 }
 
-/** Une question à choix, en grille de deux. */
-function Question({
-  titre,
-  options,
-  valeur,
-  choisir,
-  reduit,
-  grand = false,
-}: {
-  titre: string
-  options: Option[]
-  valeur: number | undefined
-  choisir: (v: number) => void
-  reduit: boolean
-  grand?: boolean
-}) {
+const cle = (st: Etape) => `${st.k}-${st.t ?? 0}`
+
+/** Un écran qui entre de 12 pt à droite, ou sort de 12 pt à gauche, en 530 ms. */
+function Scene({ sortant, glisse, reduit, children }: { sortant: boolean; glisse: boolean; reduit: boolean; children: React.ReactNode }) {
+  const p = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(p, { toValue: sortant ? 2 : 1, duration: 530, easing: SORTIE, useNativeDriver: true }).start()
+  }, [p, sortant])
+  const d = reduit || !glisse ? 0 : 12
   return (
-    <Apparaitre reduit={reduit} style={{ gap: 14 }}>
-      {grand ? (
-        <TitreIntro>{titre}</TitreIntro>
-      ) : (
-        <Text
-          accessibilityRole="header"
-          style={{ color: encre.text, fontFamily: GEIST.demi, fontSize: 22, lineHeight: 28, letterSpacing: -0.5 }}
-        >
-          {titre}
-        </Text>
-      )}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {options.map((o) => (
-          <ChoixIntro
-            key={o.libelle}
-            titre={o.libelle}
-            compact
-            selected={valeur === o.valeur}
-            attenue={valeur !== undefined && valeur !== o.valeur}
-            onPress={() => choisir(o.valeur)}
-            style={{ flexBasis: '47%', flexGrow: 1 }}
-          />
-        ))}
-      </View>
-    </Apparaitre>
+    <Animated.View
+      pointerEvents={sortant ? 'none' : 'auto'}
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          opacity: p.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
+          transform: [{ translateX: p.interpolate({ inputRange: [0, 1, 2], outputRange: [d, 0, -d] }) }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
   )
 }
 
 function IntroductionSombre() {
   const marges = useSafeAreaInsets()
-  const { chargees, reglages, majReglages } = useDonnees()
-  const [scene, setScene] = useState<Scene>('nom')
-  const [nom, setNom] = useState('')
-  const [priorites, setPriorites] = useState<Priorite[]>([])
-  const [choseIds, setChoseIds] = useState<string[]>([])
-  const [soirs, setSoirs] = useState<number | undefined>(undefined)
-  const [reponses, setReponses] = useState<Record<string, Reponses>>({})
-  const [detail, setDetail] = useState(0)
-  const [relecture, setRelecture] = useState(false)
-  const [transition, setTransition] = useState(false)
-  const [logoArrive, setLogoArrive] = useState(false)
-  const [constatLu, setConstatLu] = useState(false)
-  const [frappee, setFrappee] = useState(false)
-  const [calculFini, setCalculFini] = useState(false)
-  const [basculeFinie, setBasculeFinie] = useState(false)
+  const { chargees, reglages, finaliserIntroduction } = useDonnees()
+  const reduit = useReduit()
   const [sortie, setSortie] = useState(false)
-  const { reduit, lecteur } = useAccessibiliteIntro()
-  const visibleAvant = useRef(false)
-  const memoireEngagement = useRef<MemoireIntroduction | null>(null)
-  const aDejaTermine = useRef(false)
-  const verrou = useRef(false)
-  const p = useRef(new Animated.Value(1)).current
-  const fond = useRef(new Animated.Value(1)).current
-  const monde = useRef(new Animated.Value(1)).current
-  const transitionAnimation = useRef<Animated.CompositeAnimation | null>(null)
   const visible = chargees && (!reglages.introductionFaite || sortie)
+  const maintenant = useMemo(() => new Date(), [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+  const H = heureDecimale(maintenant)
+  const acc = accentIntro(H)
+  const ink = encreIntro(H)
+  const [e, setE] = useState<EtatIntro>(() => etatInitial(reglages.prenom, dateDans(14)))
+  const [scenes, setScenes] = useState<{ st: Etape; sortant: boolean }[]>([{ st: { k: '1' }, sortant: false }])
+  const [placement, setPlacement] = useState<Placement | null>(null)
+  const [selecteur, setSelecteur] = useState(false)
+  const [dansApp, setDansApp] = useState(false)
+  const fermeture = useRef<((ok: boolean) => void) | null>(null)
+  const eRef = useRef(e)
+  eRef.current = e
+  const monde = useRef(new Animated.Value(1)).current
+  const visibleAvant = useRef(false)
+  const courant = scenes[scenes.length - 1]!.st
 
   useEffect(() => {
-    if (!chargees) return
-    if (reglages.introductionFaite && !sortie) aDejaTermine.current = true
     if (visible && !visibleAvant.current) {
-      memoireEngagement.current = null
-      setNom(reglages.prenom)
-      setScene('nom')
-      setPriorites([])
-      setChoseIds([])
-      setSoirs(undefined)
-      setReponses({})
-      setDetail(0)
-      setRelecture(aDejaTermine.current)
-      verrou.current = false
-      setTransition(false)
-      p.setValue(1)
+      setE(etatInitial(useDonnees.getState().reglages.prenom, dateDans(14)))
+      setScenes([{ st: { k: '1' }, sortant: false }])
+      setPlacement(null)
+      setDansApp(false)
       monde.setValue(1)
     }
     visibleAvant.current = visible
-  }, [chargees, monde, p, reglages.introductionFaite, reglages.prenom, sortie, visible])
-  useEffect(() => () => transitionAnimation.current?.stop(), [])
+  }, [monde, visible])
+
+  const aller = (st: Etape) => {
+    if (st.k === '16' || st.k === '17') setPlacement((p) => (st.k === '16' || !p ? placer(eRef.current) : p))
+    setScenes((s) => {
+      const actuel = s[s.length - 1]!
+      if (cle(actuel.st) === cle(st)) return s
+      return [{ st: actuel.st, sortant: true }, { st, sortant: false }]
+    })
+  }
+  const suivant = () => {
+    const fl = parcours(eRef.current, maintenant)
+    const i = indexDe(fl, scenesRef.current[scenesRef.current.length - 1]!.st)
+    if (i >= 0 && i < fl.length - 1) aller(fl[i + 1]!)
+  }
+  const scenesRef = useRef(scenes)
+  scenesRef.current = scenes
+  // Les écrans sortis disparaissent une fois leur fondu fini.
   useEffect(() => {
-    const a = Animated.timing(fond, {
-      toValue: tonDuFond(scene),
-      duration: reduit ? DUREE.reduit : DUREE.ui,
-      easing: SORTIE,
-      useNativeDriver: true,
-    })
-    a.start()
-    return () => a.stop()
-  }, [fond, reduit, scene])
+    if (!scenes.some((s) => s.sortant)) return
+    const t = setTimeout(() => setScenes((s) => s.filter((x) => !x.sortant)), 560)
+    return () => clearTimeout(t)
+  }, [scenes])
 
-  const aller = (suivante: Scene, sousPage = 0) => {
-    if (verrou.current) return
-    verrou.current = true
-    setTransition(true)
-    Keyboard.dismiss()
-    transitionAnimation.current = Animated.timing(p, {
-      toValue: 0,
-      duration: reduit ? 80 : DUREE.micro,
-      easing: SORTIE,
-      useNativeDriver: true,
-    })
-    transitionAnimation.current.start(({ finished }) => {
-      if (!finished) return
-      if (suivante === 'activation') {
-        setLogoArrive(false)
-        setBasculeFinie(false)
-      }
-      if (suivante === 'frequence') setConstatLu(false)
-      if (suivante === 'calcul') setCalculFini(false)
-      if (suivante === 'pensee') setFrappee(false)
-      setDetail(sousPage)
-      setScene(suivante)
-      transitionAnimation.current = Animated.timing(p, {
-        toValue: 1,
-        duration: reduit ? DUREE.reduit : DUREE.entree,
-        easing: SORTIE,
-        useNativeDriver: true,
-      })
-      transitionAnimation.current.start(() => {
-        verrou.current = false
-        setTransition(false)
-      })
-    })
-  }
-  const choses = choseIds.map((id) => CHOSES.find((c) => c.id === id)!).filter(Boolean)
-  const fermerRelecture = () => {
-    void majReglages({ introductionFaite: true })
-  }
   const retour = () => {
-    if (scene === 'detail' && detail > 0) return aller('detail', detail - 1)
-    const precedente = ORDRE[Math.max(0, ORDRE.indexOf(scene) - 1)]!
-    aller(precedente, precedente === 'detail' ? Math.max(0, choses.length - 1) : 0)
+    const fl = parcours(eRef.current, maintenant)
+    const i = indexDe(fl, courant)
+    // Les écrans qui se jouent seuls ne se rejouent pas à l'envers.
+    let j = i - 1
+    while (j > 0 && ['1b', '7', '8', '9', '16'].includes(fl[j]!.k)) j--
+    if (j >= 0) aller(fl[j]!)
+    return true
   }
-  /** Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous. */
-  const terminer = () => {
-    router.replace('/')
-    Animated.timing(monde, {
-      toValue: 0,
-      duration: reduit ? DUREE.reduit : DUREE.ui,
-      delay: reduit ? 0 : 60,
-      easing: SORTIE,
-      useNativeDriver: true,
-    }).start(() => setSortie(false))
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'android') return
+    const s = BackHandler.addEventListener('hardwareBackPress', retour)
+    return () => s.remove()
+  })
+
+  function placer(etat: EtatIntro): Placement {
+    const { b, autres } = brouillonsDepuis(etat, maintenant, dateDans)
+    try {
+      const r = preparerIntroduction(useDonnees.getState(), b, maintenant, autres)
+      const principal = new Set([...r.ids].filter((id) => id.startsWith(b.id)))
+      return { jours: r.jours, principal, crees: r.ids, erreur: '' }
+    } catch (cause) {
+      return { jours: [], principal: new Set(), crees: new Set(), erreur: cause instanceof Error ? cause.message : 'Check your commitment and fixed hours.' }
+    }
   }
 
-  const choix = chosesPour(priorites)
-  const bilans = soirs !== undefined ? choses.map((c) => bilan(c, soirs, reponses[c.id] ?? {})) : []
-  const echo = echoFrequence(soirs ?? 3)
-  const demains = Math.max(0, ...bilans.map((b) => b.demains))
-  const actuelle = choses[detail]
-  const repondre = (id: string, cle: keyof Reponses, v: number) =>
-    setReponses((r) => ({ ...r, [id]: { ...r[id], [cle]: v } }))
-  const barreVisible = scene !== 'pensee' && (scene !== 'activation' || (basculeFinie && logoArrive))
+  const proteger = async () => {
+    const blocage = useBlocage.getState()
+    // Hors iPhone (web, Expo Go), Temps d'écran n'existe pas : on montre ce qui se passera.
+    if (blocage.simule) return true
+    try {
+      if (blocage.autorisation !== 'accordee') await blocage.demanderAutorisation()
+      if (useBlocage.getState().autorisation !== 'accordee') return false
+    } catch {
+      return false
+    }
+    return new Promise<boolean>((resoudre) => {
+      fermeture.current = resoudre
+      setSelecteur(true)
+    })
+  }
+
+  const enregistrement = useRef(false)
+  const entrer = () => {
+    if (enregistrement.current) return
+    enregistrement.current = true
+    setDansApp(true)
+    const { b, autres } = brouillonsDepuis(eRef.current, maintenant, dateDans)
+    setTimeout(async () => {
+      try {
+        const r = preparerIntroduction(useDonnees.getState(), b, new Date(), autres)
+        setSortie(true)
+        await finaliserIntroduction(r.ajouts, eRef.current.name.trim())
+        // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.
+        router.replace('/')
+        Animated.timing(monde, { toValue: 0, duration: reduit ? 200 : 650, easing: SORTIE, useNativeDriver: true }).start(() => {
+          enregistrement.current = false
+          setSortie(false)
+        })
+      } catch (cause) {
+        enregistrement.current = false
+        setDansApp(false)
+        setPlacement({
+          jours: [],
+          principal: new Set(),
+          crees: new Set(),
+          erreur: cause instanceof Error ? cause.message : 'Your plan could not be saved. Please try again.',
+        })
+      }
+    }, 900)
+  }
+
+  const fl = parcours(e, maintenant)
+  const fi = Math.max(0, indexDe(fl, courant))
+  const barreX = useVers(fi / Math.max(1, fl.length - 1), 530, DEPLACEMENT)
+  const barreO = useVers(['8', '9', '10'].includes(courant.k) || dansApp ? 0 : 1)
+  const haut = marges.top + 40
+  const bas = Math.max(marges.bottom, 12) + 8
+  const lueur = lueurDe(courant.k, H)
 
   if (!visible) return null
+  const ecran = (st: Etape) => {
+    const ctx: Ctx = {
+      e,
+      maj: (f) => {
+        // Synchrone : un `suivant()` juste après lit déjà la réponse.
+        const n = { ...eRef.current, ...f(eRef.current) }
+        eRef.current = n
+        setE(n)
+      },
+      suivant,
+      aller,
+      etape: st,
+      reduit,
+      haut,
+      bas,
+      acc,
+      ink,
+      maintenant,
+    }
+    switch (st.k) {
+      case '1':
+        return <EcranNom ctx={ctx} />
+      case '1b':
+        return <EcranBonjour ctx={ctx} />
+      case '2':
+        return <EcranPriorites ctx={ctx} />
+      case '3':
+        return <EcranFrequence ctx={ctx} />
+      case '4':
+        return <EcranRepousse ctx={ctx} />
+      case '5a':
+      case '5b':
+      case '5g':
+      case '5c':
+        return <EcranDetail ctx={ctx} />
+      case '6':
+        return <EcranFreins ctx={ctx} />
+      case '7':
+        return <EcranCout ctx={ctx} />
+      case '8':
+        return <EcranPensee ctx={ctx} />
+      case '9':
+        return <EcranBascule ctx={ctx} />
+      case '10':
+        return <EcranVethos ctx={ctx} />
+      case '11':
+        return <EcranUne ctx={ctx} />
+      case '12a':
+      case '12b':
+        return <EcranReglage ctx={ctx} />
+      case '13':
+        return <EcranProtection ctx={ctx} proteger={proteger} />
+      case '14':
+        return <EcranNuit ctx={ctx} />
+      case '15':
+        return <EcranFixes ctx={ctx} />
+      case '16':
+        return placement ? <EcranPlace ctx={ctx} placement={placement} /> : null
+      case '17':
+        return placement ? <EcranSemaine ctx={ctx} placement={placement} entrer={entrer} /> : null
+      default:
+        return null
+    }
+  }
+
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={relecture ? fermerRelecture : retour}
-    >
-      <Animated.View style={{ flex: 1, opacity: monde }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1, backgroundColor: encre.bg }}
-        >
-          <Animated.View
-            pointerEvents="none"
-            style={{ position: 'absolute', inset: 0, backgroundColor: encre.calme, opacity: fond }}
-          />
-          <View
-            style={{
-              flex: 1,
-              paddingTop: marges.top,
-              paddingBottom: Math.max(marges.bottom, 12),
-              overflow: 'hidden',
-            }}
-          >
-            <View style={{ flex: 1, width: '100%', maxWidth: 540, alignSelf: 'center' }}>
-              {scene !== 'suite' ? (
-                <BarreIntro
-                  etapeActuelle={ETAPES_INTRODUCTION.indexOf(scene)}
-                  total={TOTAL_ETAPES_INTRODUCTION}
-                  retour={scene !== 'nom' ? retour : undefined}
-                  quitter={relecture ? fermerRelecture : undefined}
-                  visible={barreVisible}
-                  reduit={reduit}
-                />
-              ) : null}
-              {/* Le contenu défile SOUS la barre, jamais par-dessus : rien n'est coupé en haut. */}
-              <Animated.View
-                pointerEvents={transition ? 'none' : 'auto'}
-                style={{ flex: 1, opacity: p, overflow: 'hidden' }}
-              >
-                {scene === 'nom' ? (
-                  <PageIntro
-                    haut={34}
-                    footer={
-                      <ActionIntro disabled={!nom.trim()} onPress={() => aller('priorite')}>
-                        Let’s begin
-                      </ActionIntro>
-                    }
-                  >
-                    <TitreIntro grand>First, what should I call you?</TitreIntro>
-                    <ChampIntro
-                      label="Your name"
-                      valeur={nom}
-                      changer={setNom}
-                      placeholder="Your name"
-                      grand
-                      autoFocus={!relecture}
-                      maxLength={40}
-                      labelVisible={false}
-                      onSubmit={() => {
-                        if (nom.trim()) aller('priorite')
-                      }}
-                    />
-                  </PageIntro>
-                ) : null}
-
-                {scene === 'priorite' ? (
-                  <PageIntro
-                    footer={
-                      <ActionIntro disabled={!priorites.length} onPress={() => aller('frequence')}>
-                        {priorites.length > 1 ? 'These matter to me' : 'This matters to me'}
-                      </ActionIntro>
-                    }
-                  >
-                    <View style={{ gap: 8 }}>
-                      <TitreIntro>What matters most to you right now?</TitreIntro>
-                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15 }}>
-                        Choose as many as you want.
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      {[0, 1].map((groupe) => (
-                        <Apparaitre key={groupe} reduit={reduit} delai={groupe * 120} style={{ flex: 1, gap: 10 }}>
-                          {PRIORITES.slice(groupe * 3, groupe * 3 + 3).map((option) => {
-                            const pris = priorites.includes(option.nom)
-                            return (
-                              <ChoixIntro
-                                key={option.nom}
-                                titre={option.nom}
-                                detail={option.detail}
-                                selected={pris}
-                                role="checkbox"
-                                onPress={() => {
-                                  setPriorites((v) =>
-                                    pris ? v.filter((x) => x !== option.nom) : [...v, option.nom],
-                                  )
-                                  setChoseIds((ids) =>
-                                    pris
-                                      ? ids.filter((id) => CHOSES.find((c) => c.id === id)?.priorite !== option.nom)
-                                      : ids,
-                                  )
-                                }}
-                                style={{ minHeight: 96 }}
-                              />
-                            )
-                          })}
-                        </Apparaitre>
-                      ))}
-                    </View>
-                  </PageIntro>
-                ) : null}
-
-                {scene === 'differe' ? (
-                  <PageIntro
-                    footer={
-                      <ActionIntro
-                        disabled={!choseIds.length}
-                        onPress={() => {
-                          memoireEngagement.current = null
-                          aller('detail', 0)
-                        }}
-                      >
-                        {choseIds.length > 1 ? 'These are the ones' : 'That’s the one'}
-                      </ActionIntro>
-                    }
-                  >
-                    <View style={{ gap: 10 }}>
-                      {/* Sa réponse d'avant, entendue : l'écran lui parle à partir d'elle. */}
-                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15, lineHeight: 21 }}>
-                        {echo.accuse}
-                      </Text>
-                      <TitreIntro>{echo.titre}</TitreIntro>
-                      <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 15 }}>
-                        Choose everything that’s true.
-                      </Text>
-                    </View>
-                    <View style={{ gap: 18 }}>
-                      {priorites.map((pr, g) => (
-                        <Apparaitre key={pr} reduit={reduit} delai={g * 110} style={{ gap: 8 }}>
-                          {priorites.length > 1 ? (
-                            <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 13 }}>{pr}</Text>
-                          ) : null}
-                          {choix
-                            .filter((c) => c.priorite === pr)
-                            .map((c) => {
-                              const pris = choseIds.includes(c.id)
-                              return (
-                                <ChoixIntro
-                                  key={c.id}
-                                  titre={c.bouton}
-                                  compact
-                                  role="checkbox"
-                                  selected={pris}
-                                  onPress={() =>
-                                    setChoseIds((ids) => (pris ? ids.filter((x) => x !== c.id) : [...ids, c.id]))
-                                  }
-                                />
-                              )
-                            })}
-                        </Apparaitre>
-                      ))}
-                    </View>
-                  </PageIntro>
-                ) : null}
-
-                {/* La reconnaissance monte, « Then » la complète — et devient la question. */}
-                {scene === 'frequence' ? (
-                  <PageIntro
-                    haut={30}
-                    footer={
-                      soirs !== undefined ? (
-                        <Apparaitre reduit={reduit} decalage={0}>
-                          <ActionIntro onPress={() => aller('differe')}>Continue</ActionIntro>
-                        </Apparaitre>
-                      ) : (
-                        <View style={{ height: 56 }} />
-                      )
-                    }
-                  >
-                    <ConstatEnDeux taille={32} reduit={reduit || lecteur} surFin={() => setConstatLu(true)} />
-                    {constatLu ? (
-                      <View style={{ gap: 14 }}>
-                        <Question
-                          titre="How often do you tell yourself “I’ll do it tomorrow”?"
-                          options={FREQUENCES}
-                          valeur={soirs}
-                          choisir={setSoirs}
-                          reduit={reduit}
-                        />
-                        {soirs !== undefined ? (
-                          <Apparaitre key={soirs} reduit={reduit}>
-                            <Text style={{ color: encre.text2, fontFamily: GEIST.moyen, fontSize: 16, lineHeight: 22 }}>
-                              {echo.accuse}
-                            </Text>
-                          </Apparaitre>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </PageIntro>
-                ) : null}
-
-                {/* Pour chaque chose : depuis quand, combien, à quel rythme. Le piège est là. */}
-                {scene === 'detail' && actuelle ? (
-                  <PageIntro
-                    key={actuelle.id}
-                    footer={
-                      <ActionIntro
-                        disabled={!reponsesCompletes(actuelle, reponses[actuelle.id])}
-                        onPress={() =>
-                          detail < choses.length - 1 ? aller('detail', detail + 1) : aller('calcul')
-                        }
-                      >
-                        {detail < choses.length - 1 ? 'Next' : 'Show me what it cost'}
-                      </ActionIntro>
-                    }
-                  >
-                    <Text style={{ color: encre.text3, fontFamily: GEIST.moyen, fontSize: 14 }}>
-                      {choses.length > 1 ? `${detail + 1} of ${choses.length} · ` : ''}
-                      {actuelle.bouton}
-                    </Text>
-                    <Question
-                      titre={
-                        detail === 0
-                          ? echo.detail(actuelle.verbe)
-                          : `Since when have you been meaning to ${actuelle.verbe}?`
-                      }
-                      options={DEPUIS}
-                      valeur={reponses[actuelle.id]?.depuis}
-                      choisir={(v) => repondre(actuelle.id, 'depuis', v)}
-                      reduit={reduit}
-                    />
-                    {actuelle.famille === 'unique' && reponses[actuelle.id]?.depuis !== undefined ? (
-                      <Question
-                        titre="How much work does it really need?"
-                        options={TRAVAIL}
-                        valeur={reponses[actuelle.id]?.travail}
-                        choisir={(v) => repondre(actuelle.id, 'travail', v)}
-                        reduit={reduit}
-                      />
-                    ) : null}
-                    {reponses[actuelle.id]?.depuis !== undefined &&
-                    (actuelle.famille === 'repetee' || reponses[actuelle.id]?.travail !== undefined) ? (
-                      <Question
-                        titre={
-                          actuelle.famille === 'unique'
-                            ? 'How many hours a week do you actually put into it?'
-                            : 'How often do you actually do it now?'
-                        }
-                        options={actuelle.famille === 'unique' ? RYTHME_UNIQUE : RYTHME_REPETE}
-                        valeur={reponses[actuelle.id]?.rythme}
-                        choisir={(v) => repondre(actuelle.id, 'rythme', v)}
-                        reduit={reduit}
-                      />
-                    ) : null}
-                  </PageIntro>
-                ) : null}
-
-                {/* Le calcul en direct, problème par problème, puis tout rangé. */}
-                {scene === 'calcul' ? (
-                  <PageIntro
-                    footer={
-                      calculFini ? (
-                        <Apparaitre reduit={reduit} decalage={0}>
-                          <ActionIntro onPress={() => aller('pensee')}>I don’t want that</ActionIntro>
-                        </Apparaitre>
-                      ) : (
-                        <View style={{ height: 56 }} />
-                      )
-                    }
-                  >
-                    <CalculEnDirect bilans={bilans} reduit={reduit} surFin={() => setCalculFini(true)} />
-                  </PageIntro>
-                ) : null}
-
-                {scene === 'pensee' ? (
-                  <PageIntro
-                    centre
-                    defiler={false}
-                    footer={
-                      frappee ? (
-                        <Apparaitre reduit={reduit} delai={lecteur ? 0 : 1800} decalage={0}>
-                          <ActionIntro onPress={() => aller('activation')}>Not this time</ActionIntro>
-                        </Apparaitre>
-                      ) : (
-                        <View style={{ height: 56 }} />
-                      )
-                    }
-                  >
-                    <Frappe texte="“I’ll start tomorrow.”" reduit={reduit} surFin={() => setFrappee(true)} />
-                    <View style={{ minHeight: 60 }}>
-                      {frappee ? (
-                        <Apparaitre reduit={reduit} delai={lecteur ? 0 : 700} decalage={0}>
-                          <Text style={{ color: encre.text2, fontFamily: GEIST.moyen, fontSize: 20, lineHeight: 27 }}>
-                            {echo.frappe} That’s about {demains} times since you first decided.
-                          </Text>
-                        </Apparaitre>
-                      ) : null}
-                    </View>
-                  </PageIntro>
-                ) : null}
-
-                {/* La bascule : son passé, puis aujourd'hui, puis un futur rendu. Sans bouton. */}
-                {scene === 'activation' && !basculeFinie ? (
-                  <PageIntro centre defiler={false}>
-                    <Bascule bilans={bilans} reduit={reduit} surFin={() => setBasculeFinie(true)} />
-                  </PageIntro>
-                ) : null}
-
-                {scene === 'activation' && basculeFinie ? (
-                  <PageIntro
-                    centre
-                    defiler={false}
-                    footer={
-                      logoArrive ? (
-                        <Apparaitre reduit={reduit} delai={reduit ? 0 : 300} decalage={0}>
-                          <ActionIntro onPress={() => aller('suite')}>Give Vethos one thing</ActionIntro>
-                        </Apparaitre>
-                      ) : (
-                        <View style={{ height: 56 }} />
-                      )
-                    }
-                  >
-                    <LogoVethos taille={168} reduit={reduit} surArrivee={() => setLogoArrive(true)} />
-                    <View style={{ minHeight: 120 }}>
-                      {logoArrive ? (
-                        <Apparaitre reduit={reduit} style={{ gap: 10 }}>
-                          <Text
-                            style={{
-                              color: encre.text3,
-                              fontFamily: GEIST.moyen,
-                              fontSize: 19,
-                              lineHeight: 25,
-                              textAlign: 'center',
-                            }}
-                          >
-                            You already know what matters.
-                          </Text>
-                          <TitreIntro centre>Vethos makes sure your day respects it.</TitreIntro>
-                        </Apparaitre>
-                      ) : null}
-                    </View>
-                  </PageIntro>
-                ) : null}
-
-                {scene === 'suite' && choses.length ? (
-                  <SuiteIntroduction
-                    memoire={memoireEngagement}
-                    mouvementReduit={reduit}
-                    lecteur={lecteur}
-                    prenom={nom.trim()}
-                    choses={choses}
-                    priorites={priorites}
-                    retour={() => aller('activation')}
-                    quitter={relecture ? fermerRelecture : undefined}
-                    preparerSortie={() => setSortie(true)}
-                    terminer={terminer}
-                  />
-                ) : null}
-              </Animated.View>
-            </View>
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={retour}>
+      <StatusBar style="light" />
+      <Animated.View style={{ flex: 1, opacity: monde, backgroundColor: C.bg }}>
+        <FondLumiere lueur={lueur} reduit={reduit} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <View style={{ flex: 1, width: '100%', maxWidth: 540, alignSelf: 'center' }}>
+            {scenes.map((s) => (
+              <Scene key={cle(s.st)} sortant={s.sortant} glisse={s.st.k !== '10'} reduit={reduit}>
+                {ecran(s.st)}
+              </Scene>
+            ))}
           </View>
         </KeyboardAvoidingView>
+        {/* La progression : un fil sous l'île, rempli à la couleur de l'heure. */}
+        <Animated.View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          style={{ position: 'absolute', left: 0, right: 0, top: marges.top, height: 2, backgroundColor: C.s1, opacity: barreO }}
+        >
+          <Animated.View
+            style={{
+              height: 2,
+              width: '100%',
+              backgroundColor: acc,
+              transformOrigin: 'left',
+              transform: [{ scaleX: barreX }],
+            }}
+          />
+        </Animated.View>
       </Animated.View>
+      <SelecteurApplications
+        ouvert={selecteur}
+        surFermeture={() => {
+          setSelecteur(false)
+          const s = useBlocage.getState().selection
+          fermeture.current?.(!!s && !selectionEstVide(s))
+          fermeture.current = null
+        }}
+      />
     </Modal>
   )
 }
+

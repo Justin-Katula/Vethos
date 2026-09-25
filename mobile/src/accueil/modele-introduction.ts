@@ -45,6 +45,12 @@ export type BrouillonIntroduction = {
   fixes: Record<ActiviteFixe, HoraireFixe>
 }
 
+/** Ce qu'il faut pour créer UN engagement. `joursAncre` : 0 = dimanche, comme `Date.getDay()`. */
+export type EngagementIntroduction = Pick<
+  BrouillonIntroduction,
+  'id' | 'nature' | 'nom' | 'echeance' | 'minutes' | 'heuresHebdo' | 'heureAncre' | 'joursAncre'
+>
+
 export type ActiviteFixe = 'work' | 'school'
 export type Activite = ActiviteFixe | 'variable' | 'none'
 export type HoraireFixe = { debut: string; fin: string; jours: number[] }
@@ -112,12 +118,13 @@ export function preparerIntroduction(
   source: Contenu,
   b: BrouillonIntroduction,
   maintenant = new Date(),
+  /** Les autres choses retenues : Vethos les place avec leur meilleure nature, sans question. */
+  autres: EngagementIntroduction[] = [],
 ) {
   const coucher = minuteValide(b.coucher)
   const lever = minuteValide(b.lever)
   if (coucher === null || lever === null || coucher === lever)
     throw new Error('Enter two different sleep times, like 23:00 and 07:00.')
-  if (!b.nom.trim()) throw new Error('Give your commitment a name.')
   const obligations: Obligation[] = []
   for (const activite of ['work', 'school'] as const) {
     if (!b.activites.includes(activite)) continue
@@ -163,86 +170,103 @@ export function preparerIntroduction(
   const reglages = { ...source.reglages, coucher: b.coucher, lever: b.lever }
   const fixes = [...source.obligations, ...obligations]
   const base = calculerPlan({ ...source, obligations: fixes, reglages, maintenant })
-  const nom = b.nom.trim()
-  let taches: Tache[] = []
+  const taches: Tache[] = []
   const objectifs: Objectif[] = []
   const ancres: Ancre[] = []
-  if (b.nature === 'tache') {
-    if (!dateValide(b.echeance) || b.echeance < cleDate(maintenant))
-      throw new Error('Choose a deadline today or later (YYYY-MM-DD).')
-    if (!Number.isInteger(b.minutes) || b.minutes < 5 || b.minutes > 10000)
-      throw new Error('Estimate between 5 and 10,000 minutes.')
-    let index = 0
-    taches = preparerTache(
-      {
-        titre: nom,
-        intention: nom,
-        echeance: b.echeance,
-        minutesEstimees: b.minutes,
-        importance: 5,
-        nature: 'routine',
-        couleur: allouerCouleurTache(source.taches),
-      },
-      {
-        identifiant: () => `${b.id}-task-${index++}`,
-        maintenant,
-        maxParJourMinutes: maxTaskMinutesPerDay(base.capacities),
-      },
-    )
-  } else if (b.nature === 'objectif') {
-    const minutes = Math.round(b.heuresHebdo * 60)
-    if (!Number.isFinite(minutes) || minutes < 15 || minutes > 6000)
-      throw new Error('Choose between 0.25 and 100 hours per week.')
-    objectifs.push({
-      id: `${b.id}-goal`,
-      nom,
-      intention: nom,
-      couleur: allouerCouleurObjectif(source.objectifs),
-      cibleHebdoMinutes: minutes,
-      creeLe: maintenant.toISOString(),
-    })
-  } else {
-    const heure = minuteValide(b.heureAncre)
-    if (
-      heure === null ||
-      !b.joursAncre.length ||
-      !Number.isInteger(b.minutes) ||
-      b.minutes < 15 ||
-      b.minutes > 480 ||
-      heure + b.minutes > 1440
-    )
-      throw new Error(
-        'Check the time, duration and days of your Anchor. It must finish before midnight.',
+  const creer = (e: EngagementIntroduction, strict: boolean) => {
+    const nom = e.nom.trim()
+    if (e.nature === 'tache') {
+      if (!dateValide(e.echeance) || e.echeance < cleDate(maintenant))
+        throw new Error('Choose a deadline today or later (YYYY-MM-DD).')
+      if (!Number.isInteger(e.minutes) || e.minutes < 5 || e.minutes > 10000)
+        throw new Error('Estimate between 5 and 10,000 minutes.')
+      let index = 0
+      taches.push(
+        ...preparerTache(
+          {
+            titre: nom,
+            intention: nom,
+            echeance: e.echeance,
+            minutesEstimees: e.minutes,
+            importance: 5,
+            nature: 'routine',
+            couleur: allouerCouleurTache([...source.taches, ...taches]),
+          },
+          {
+            identifiant: () => `${e.id}-task-${index++}`,
+            maintenant,
+            maxParJourMinutes: maxTaskMinutesPerDay(base.capacities),
+          },
+        ),
       )
-    const conflit = findAncreConflict(
-      { anchorMinute: heure, normalMaxMinutes: b.minutes, daysOfWeek: b.joursAncre, trigger: nom },
-      source.ancres.map((a) => ({
-        id: a.id,
-        name: a.nom,
-        plan: a.intention,
-        color: a.couleur,
-        trigger: a.declencheur || a.nom,
-        anchorMinute: a.minuteAncrage,
-        daysOfWeek: a.jours,
-        normalMaxMinutes: a.dureeMinutes,
-        minimumMinutes: Math.max(20, a.dureeMinutes * 0.4),
-        appsToBlock: [],
-        createdAt: a.creeeLe,
-      })),
-    )
-    if (conflit) throw new Error(`This Anchor overlaps “${conflit.name}”. Change its time or days.`)
-    ancres.push({
-      id: `${b.id}-anchor`,
-      nom,
-      intention: nom,
-      declencheur: nom,
-      couleur: allouerCouleurAncre(source.ancres),
-      minuteAncrage: heure,
-      jours: b.joursAncre,
-      dureeMinutes: b.minutes,
-      creeeLe: maintenant.toISOString(),
-    })
+    } else if (e.nature === 'objectif') {
+      const minutes = Math.round(e.heuresHebdo * 60)
+      if (!Number.isFinite(minutes) || minutes < 15 || minutes > 6000)
+        throw new Error('Choose between 0.25 and 100 hours per week.')
+      objectifs.push({
+        id: `${e.id}-goal`,
+        nom,
+        intention: nom,
+        couleur: allouerCouleurObjectif([...source.objectifs, ...objectifs]),
+        cibleHebdoMinutes: minutes,
+        creeLe: maintenant.toISOString(),
+      })
+    } else {
+      const heure = minuteValide(e.heureAncre)
+      if (
+        heure === null ||
+        !e.joursAncre.length ||
+        !Number.isInteger(e.minutes) ||
+        e.minutes < 15 ||
+        e.minutes > 480 ||
+        heure + e.minutes > 1440
+      )
+        throw new Error(
+          'Check the time, duration and days of your Anchor. It must finish before midnight.',
+        )
+      const existantes = [...source.ancres, ...ancres]
+      const conflitA = (minute: number) =>
+        findAncreConflict(
+          { anchorMinute: minute, normalMaxMinutes: e.minutes, daysOfWeek: e.joursAncre, trigger: nom },
+          existantes.map((a) => ({
+            id: a.id,
+            name: a.nom,
+            plan: a.intention,
+            color: a.couleur,
+            trigger: a.declencheur || a.nom,
+            anchorMinute: a.minuteAncrage,
+            daysOfWeek: a.jours,
+            normalMaxMinutes: a.dureeMinutes,
+            minimumMinutes: Math.max(20, a.dureeMinutes * 0.4),
+            appsToBlock: [],
+            createdAt: a.creeeLe,
+          })),
+        )
+      let minute = heure
+      if (!strict)
+        // Placée par Vethos : on cherche la demi-heure libre suivante plutôt que de refuser.
+        while (conflitA(minute) && minute + 30 + e.minutes <= 1440) minute += 30
+      const conflit = conflitA(minute)
+      if (conflit) {
+        if (!strict) return
+        throw new Error(`This Anchor overlaps “${conflit.name}”. Change its time or days.`)
+      }
+      ancres.push({
+        id: `${e.id}-anchor`,
+        nom,
+        intention: nom,
+        declencheur: nom,
+        couleur: allouerCouleurAncre(existantes),
+        minuteAncrage: minute,
+        jours: e.joursAncre,
+        dureeMinutes: e.minutes,
+        creeeLe: maintenant.toISOString(),
+      })
+    }
   }
+  if (!b.nom.trim()) throw new Error('Give your commitment a name.')
+  creer(b, true)
+  for (const e of autres) creer(e, false)
   const ajouts: AjoutsIntroduction = {
     taches,
     objectifs,
