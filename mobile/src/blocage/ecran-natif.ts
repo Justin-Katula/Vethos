@@ -108,6 +108,10 @@ export function creerPontSimule(): PontEcran {
       return []
     },
 
+    bloquerSauf() {
+      bouclierLeve = true
+    },
+
     async toutLever() {
       await attendre(120)
       programmees = 0

@@ -41,6 +41,7 @@ export const IPC_CHANNELS = {
   PLANNING_STOP_BLOCK: 'planning:stopBlock',
   PLANNING_EXTENSION: 'planning:extension',
   PLANNING_FREE_DAY: 'planning:freeDay',
+  PLANNING_TRUST: 'planning:trust',
   // Poussé par l'horloge de planification (main) chaque fois qu'elle écrit du
   // retard, un raté, ou une confirmation — le renderer n'a sinon aucun moyen
   // de savoir que ce qu'il affiche est devenu périmé sans rouvrir l'app.

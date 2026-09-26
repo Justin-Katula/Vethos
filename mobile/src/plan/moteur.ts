@@ -1,5 +1,6 @@
 import { computePlan } from '@shared/planning/engine'
 import { joursLibresPris } from '@shared/planning/jours-libres'
+import { promessesAPoser } from '@shared/planning/trust'
 import type {
   ActiveSession,
   PlanningInput,
@@ -140,6 +141,7 @@ export function entreeEtPlan({
     ...(seanceActive ? { activeSession: seanceActive } : {}),
     // Jours libres pris : le moteur les vide (ancres minimales exceptées).
     ...(apprentissage ? { freeDays: joursLibresPris(apprentissage) } : {}),
+    ...(apprentissage ? { promises: promessesAPoser(apprentissage) } : {}),
   }
 
   return { entree, resultat: computePlan(entree, maintenant) }

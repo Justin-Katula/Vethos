@@ -16,6 +16,25 @@ import { minutesDe } from '@/donnees/regle-sommeil'
 import { useNomTheme } from '@/theme/Theme'
 import { accepterProlongation, dansLaProlongation, marquerOffre, proposerProlongation } from '@shared/planning/prolongation'
 import { jourLibrePropose } from '@shared/planning/jours-libres'
+import {
+  creerPromesse,
+  deciderStop,
+  DELAI_STOP_SECONDES,
+  finUrgence,
+  fermerPause,
+  niveauConfiance,
+  ouvrirUrgence,
+  prendreSouffle,
+  promesseDuBloc,
+  renoncerAuStop,
+  retourDuSouffle,
+  souffleAvant,
+  souffleDisponible,
+  stopPermis,
+  urgenceCommeAbandon,
+  type OptionRattrapage,
+} from '@shared/planning/trust'
+import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { calculerPlan, cleDate, entreeEtPlan } from './moteur'
 import { lireSemaine } from './lecture'
 
@@ -113,9 +132,18 @@ function useSourcePlan() {
       const vues = pontEcran().lireTentatives().filter((t) => t >= confirmeA && t <= Date.now())
       appris = setBlockedAttempts(appris, tic.confirmations, vues.length, vues.length ? Math.max(...vues) : undefined)
     }
+    // Urgence : ouvrir une app NON choisie arrête la pause tout de suite.
+    let confs = tic.confirmations
+    const pause = confs.pause
+    if (pause?.kind === 'emergency' && pontEcran().lireTentatives().some((t) => t >= pause.startMs)) {
+      const r = finUrgence(appris, confs, { nowMinute: calcul.minute, nowMs: Date.now(), end: 'attempt' })
+      appris = r.learning
+      confs = r.confirmations
+      void useBlocage.getState().reprendre(pause.blockId, calcul.minute)
+    }
     // E.3/E.4 : l'utilisation réelle du jour, pour la fatigue accumulée.
     appris = recordDailyUtilization(appris, calcul.aujourdHui, calcul.resultat.todayFullCapacityMinutes)
-    if (tic.change || appris !== tic.apprentissage) void poser({ apprentissage: appris, confirmations: tic.confirmations })
+    if (tic.change || appris !== tic.apprentissage || confs !== tic.confirmations) void poser({ apprentissage: appris, confirmations: confs })
     if (tic.terminees.length > 0) void terminerTaches(tic.terminees)
   }, [tic, calcul.aujourdHui, calcul.minute, calcul.resultat, poser, terminerTaches])
 
@@ -128,7 +156,9 @@ function useSourcePlan() {
   const overlayDu =
     !suspendu &&
     enAttenteBrut !== null &&
-    overlayDueFor({ learning: apprentissage, block: enAttenteBrut, nowMinute: calcul.minute, today: calcul.aujourdHui })
+    // Une promesse appelle toujours l'overlay : c'est un engagement pris.
+    (enAttenteBrut.promiseId !== undefined ||
+      overlayDueFor({ learning: apprentissage, block: enAttenteBrut, nowMinute: calcul.minute, today: calcul.aujourdHui }))
 
   // ── Prolongation : l'offre des 2 dernières minutes d'une séance ──────────
   const actif = calcul.seanceActive
@@ -190,8 +220,182 @@ function useSourcePlan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chargees, mesuresPretes, taches, objectifs, ancres, obligations, reglages, apprentissage.freeDays, calcul.aujourdHui, heure])
 
+
+  // ── Stop, promesses et confiance ──────────────────────────────────────────
+  const niveau = niveauConfiance(apprentissage.trust)
+  const planApres = (l: typeof apprentissage, c: typeof confirmations) => {
+    const maintenant = new Date()
+    const m = maintenant.getHours() * 60 + maintenant.getMinutes()
+    const { entree, resultat } = entreeEtPlan({
+      taches, objectifs, ancres, obligations, reglages, maintenant,
+      apprentissage: l, seanceActive: seanceActive(c, cleDate(maintenant), m),
+    })
+    return { plan: resultat, input: entree }
+  }
+  const coucher = minutesDe(reglages.coucher)
+  const lever = minutesDe(reglages.lever)
+  const limite = coucher !== null ? coucher - 30 : null
+  const blocage = () => useBlocage.getState()
+  const confirmationsDuJour = confirmations.date === calcul.aujourdHui ? confirmations : null
+
+  const confiance = {
+    niveau,
+    /** Le délai avant que le Stop ne s'ouvre, en secondes. */
+    delaiStop: DELAI_STOP_SECONDES[niveau],
+    /** Pas de Stop dans un rattrapage, ni après un « pas de place ». */
+    stopPermis: !!actif && !!confirmationsDuJour && stopPermis(apprentissage, confirmationsDuJour),
+    /** La pause en cours, ou null. */
+    pause: confirmationsDuJour?.pause ?? null,
+    /** Le souffle est fini : l'overlay attend « Je reprends ». */
+    retourAttendu: confirmationsDuJour?.awaitingReturn ?? null,
+    /** Au-delà d'un arrêt sur trois en urgence, l'urgence compte comme un abandon. */
+    urgenceAbandon: urgenceCommeAbandon(apprentissage, calcul.aujourdHui),
+    /** « J'ai besoin de 15 min » pendant la promesse en cours. */
+    souffleEnCours: !!actif && souffleDisponible(apprentissage, actif.blockId) && !confirmationsDuJour?.pause,
+    /** « J'ai besoin de 15 min » AVANT une promesse qui attend son départ. */
+    souffleAvantPossible: (blockId: string) => souffleDisponible(apprentissage, blockId),
+    /** Le titre du bloc dont on attend le retour. */
+    titreRetour: confirmationsDuJour?.awaitingReturn ? (blocsDuJour.find((b) => b.id === confirmationsDuJour.awaitingReturn!.blockId)?.label ?? '') : '',
+
+    /** Le Stop, décidé par le moteur. `minuteStop` : la fin du délai. */
+    decider: async (raison: StopReason | null, opts: { texte?: string; reponseMs?: number; contreOffreRefusee?: boolean; minuteStop: Date }) => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return { etape: 'rien' as const }
+      const confirmeA = frais.confirmations.confirmedAt[o.blockId]
+      const minute = opts.minuteStop.getHours() * 60 + opts.minuteStop.getMinutes()
+      const r = deciderStop({
+        learning: frais.apprentissage,
+        confirmations: frais.confirmations,
+        nowMs: Date.now(),
+        minute,
+        reason: raison,
+        ...(opts.texte ? { text: opts.texte } : {}),
+        ...(opts.reponseMs !== undefined ? { answerMs: opts.reponseMs } : {}),
+        attemptsBefore: pontEcran()
+          .lireTentatives()
+          .filter((t) => Date.now() - t < 10 * 60_000 && (confirmeA === undefined || t >= confirmeA)).length,
+        textReason: opts.texte ? lireTexteArret(opts.texte) : null,
+        ...(opts.contreOffreRefusee !== undefined ? { contreOffreRefusee: opts.contreOffreRefusee } : {}),
+        sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
+        coucher,
+        deadline: o.kind === 'task' ? (taches.find((t) => t.id === o.refId)?.echeance ?? null) : null,
+        planApres,
+      })
+      if (!r) return { etape: 'rien' as const }
+      if (r.etape === 'contre-offre') return r
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      if (r.etape === 'pas-de-place') {
+        await blocage().pauser(o.blockId, r.confirmations.pause!.endMinute)
+        return { etape: 'pas-de-place' as const, message: r.message }
+      }
+      await blocage().appliquerPlan(blocage().plagesActives.filter((p) => p.blocId !== o.blockId))
+      // Une détresse lue dans le texte : on sort du mode discipline 24 h, et
+      // aucune promesse n'est demandée.
+      if (opts.texte && detecteDetresse(opts.texte)) {
+        const e = useSeances.getState()
+        await e.poser({
+          apprentissage: { ...e.apprentissage, lastSignalAt: { ...e.apprentissage.lastSignalAt, [SUJET_DETRESSE]: new Date().toISOString() } },
+          confirmations: e.confirmations,
+        })
+        return { etape: 'aide' as const, message: MESSAGE_AIDE }
+      }
+      return {
+        etape: 'arrete' as const,
+        options: r.options,
+        minutes: r.minutes,
+        source: { kind: o.kind, refId: o.refId, blockId: o.blockId },
+      }
+    },
+
+    /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
+    renoncer: async () => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return
+      await poser({ apprentissage: renoncerAuStop(frais.apprentissage, frais.confirmations.date, o.blockId), confirmations: frais.confirmations })
+    },
+
+    /** Le rattrapage choisi : une promesse. */
+    promettre: async (option: OptionRattrapage, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }, minutes: number) => {
+      if (source.kind === 'ancre') return
+      const frais = useSeances.getState()
+      const label =
+        source.kind === 'task'
+          ? (taches.find((t) => t.id === source.refId)?.titre ?? '')
+          : (objectifs.find((x) => x.id === source.refId)?.nom ?? '')
+      await poser({
+        apprentissage: creerPromesse(frais.apprentissage, {
+          id: `${source.blockId}-${Date.now().toString(36)}`,
+          kind: source.kind,
+          refId: source.refId,
+          label,
+          fromBlockId: source.blockId,
+          date: option.date,
+          startMinute: option.startMinute,
+          minutes,
+          createdAt: new Date().toISOString(),
+        }),
+        confirmations: frais.confirmations,
+      })
+    },
+
+    /** « Something real came up » : pause de 15 min, jusqu'à 3 apps débloquées. */
+    urgence: async (nbApps: number) => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return false
+      const maintenant = new Date()
+      const r = ouvrirUrgence(frais.apprentissage, frais.confirmations, {
+        nowMinute: maintenant.getHours() * 60 + maintenant.getMinutes(),
+        nowMs: maintenant.getTime(),
+        apps: [],
+        appCount: nbApps,
+        limiteMinute: limite,
+      })
+      if (!r) return false
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      await blocage().pauser(o.blockId, r.confirmations.pause!.endMinute, nbApps > 0 ? IDENTIFIANT_URGENCE : null)
+      return true
+    },
+
+    /** « J'ai besoin de 15 min », une fois par promesse : avant, la séance glisse ; pendant, une pause. */
+    souffle: async (blockId?: string) => {
+      const frais = useSeances.getState()
+      const maintenant = new Date()
+      const minute = maintenant.getHours() * 60 + maintenant.getMinutes()
+      if (blockId) {
+        const p = promesseDuBloc(frais.apprentissage, blockId)
+        const l = p ? souffleAvant(frais.apprentissage, p.id) : null
+        if (l) await poser({ apprentissage: l, confirmations: frais.confirmations })
+        return
+      }
+      const r = prendreSouffle(frais.apprentissage, frais.confirmations, minute, maintenant.getTime(), limite)
+      if (!r) return
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      await blocage().pauser(r.confirmations.pause!.blockId, r.confirmations.pause!.endMinute)
+    },
+
+    /** « Je reprends » : la pause se termine, le bouclier revient. */
+    reprendre: async () => {
+      const frais = useSeances.getState()
+      const maintenant = new Date()
+      const minute = maintenant.getHours() * 60 + maintenant.getMinutes()
+      const c = frais.confirmations
+      let suite: { learning: typeof apprentissage; confirmations: typeof confirmations }
+      if (c.awaitingReturn) suite = retourDuSouffle(frais.apprentissage, c, minute, limite)
+      else if (c.pause?.kind === 'emergency') suite = finUrgence(frais.apprentissage, c, { nowMinute: minute, nowMs: maintenant.getTime(), end: 'voluntary' })
+      else if (c.pause) suite = { learning: frais.apprentissage, confirmations: fermerPause(c, minute) }
+      else return
+      await poser({ apprentissage: suite.learning, confirmations: suite.confirmations })
+      const id = c.pause?.blockId ?? c.awaitingReturn?.blockId
+      if (id) await blocage().reprendre(id, minute)
+    },
+  }
+
   return {
     ...calcul,
+    confiance,
     /** Prolongation proposée pour la séance en cours (minutes), ou null. */
     prolongation: prolongationMontree?.minutes ?? null,
     /** La séance est dans sa prolongation : « Stop » y est simplement la fin. */

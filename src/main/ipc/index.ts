@@ -3,9 +3,15 @@ import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { Storage } from '@shared/storage'
 import { z } from 'zod'
 import { STOP_REASONS, type StopReason } from '@shared/schemas'
+import type { OptionRattrapage, StopResult, TrustView } from '@shared/planning/trust'
 
 const StopBlockArgsSchema = z
-  .object({ reason: z.enum(STOP_REASONS).nullable(), text: z.string().max(500).optional(), answerMs: z.number().int().min(0).max(3_600_000).optional() })
+  .object({
+    reason: z.enum(STOP_REASONS).nullable(),
+    text: z.string().max(500).optional(),
+    answerMs: z.number().int().min(0).max(3_600_000).optional(),
+    counterOfferRefused: z.boolean().optional(),
+  })
   .strict()
 import log, { getLogFilePath } from '@main/logging/setup'
 import { setSleepWindow } from '@main/notifications'
@@ -29,7 +35,7 @@ export type BlockingSessionState = {
 
 export type ConfirmBlockResult = { ok: true; help?: string } | { ok: false; reason: string }
 
-export type StopBlockArgs = { reason: StopReason | null; text?: string; answerMs?: number }
+export type StopBlockArgs = { reason: StopReason | null; text?: string; answerMs?: number; counterOfferRefused?: boolean }
 
 /** Prolongation et jours libres : servis par l'horloge de planification. */
 export type SessionExtras = {
@@ -37,7 +43,27 @@ export type SessionExtras = {
   acceptExtension: () => Promise<ConfirmBlockResult>
   freeDay: () => Promise<string | null>
   decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
+  trust: () => Promise<TrustView>
+  waiveStop: () => Promise<void>
+  promise: (option: OptionRattrapage, minutes: number, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }) => Promise<void>
+  emergency: (apps: string[]) => Promise<ConfirmBlockResult>
+  breather: (blockId?: string) => Promise<ConfirmBlockResult>
+  resume: () => Promise<void>
 }
+
+const TrustArgsSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('get') }),
+  z.object({ action: z.literal('waive') }),
+  z.object({
+    action: z.literal('promise'),
+    option: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), startMinute: z.number().int().min(0).max(1439) }),
+    minutes: z.number().int().min(1).max(600),
+    source: z.object({ kind: z.enum(['task', 'objective', 'ancre']), refId: z.string().min(1), blockId: z.string().min(1) }),
+  }),
+  z.object({ action: z.literal('emergency'), apps: z.array(z.string().min(1)).max(3) }),
+  z.object({ action: z.literal('breather'), blockId: z.string().min(1).optional() }),
+  z.object({ action: z.literal('resume') }),
+])
 
 const ExtensionArgsSchema = z.object({ action: z.enum(['offer', 'accept']) })
 const FreeDayArgsSchema = z.discriminatedUnion('action', [
@@ -54,7 +80,7 @@ export async function registerAllIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
   getBlockingSession: () => BlockingSessionState,
   confirmBlock: (blockId: string) => Promise<ConfirmBlockResult>,
-  stopBlock: (args: StopBlockArgs) => Promise<ConfirmBlockResult> = async () => ({ ok: false, reason: 'Indisponible.' }),
+  stopBlock: (args: StopBlockArgs) => Promise<StopResult> = async () => ({ ok: false, reason: 'Indisponible.' }),
   extras: SessionExtras | null = null,
 ): Promise<void> {
   registerStorageHandlers(storage)
@@ -149,6 +175,30 @@ export async function registerAllIpcHandlers(
     if (parsed.data.action === 'get') return extras.freeDay()
     await extras.decideFreeDay(parsed.data.date, parsed.data.decision)
     return null
+  })
+
+  // Stop, promesses et confiance : l'état, puis chaque geste, validés ici.
+  ipcMain.handle(IPC_CHANNELS.PLANNING_TRUST, async (_e, raw: unknown) => {
+    const parsed = TrustArgsSchema.safeParse(raw)
+    if (!parsed.success || !extras) return null
+    const a = parsed.data
+    switch (a.action) {
+      case 'get':
+        return extras.trust()
+      case 'waive':
+        await extras.waiveStop()
+        return null
+      case 'promise':
+        await extras.promise(a.option, a.minutes, a.source)
+        return null
+      case 'emergency':
+        return extras.emergency(a.apps)
+      case 'breather':
+        return extras.breather(a.blockId)
+      case 'resume':
+        await extras.resume()
+        return null
+    }
   })
 
   // ─── Blocage intelligent par IA ──────────────────────────────────────────

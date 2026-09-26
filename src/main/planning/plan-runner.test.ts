@@ -617,7 +617,10 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     nowRef = new Date(WAKE.getTime() + 20 * 60_000)
     await runner.tickNow()
     // « Stop » touché 1 min avant la réponse : l'arrêt date du toucher.
-    expect(await runner.stopBlock({ reason: 'tired', text: 'so tired', answerMs: 60_000 })).toEqual({ ok: true })
+    const stop = await runner.stopBlock({ reason: 'tired', text: 'so tired', answerMs: 60_000 })
+    // Un Stop repousse le travail, il ne l'efface jamais : des créneaux où le promettre.
+    expect(stop).toMatchObject({ ok: true, step: 'stopped', minutes: expect.any(Number) })
+    expect(stop.ok && stop.step === 'stopped' && stop.options.length).toBeGreaterThan(0)
 
     const rules = storage.__mem.get('blocking_rules') as BlockingRulesState
     expect(rules.block).toBeNull()
@@ -644,7 +647,7 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     await runner.confirmBlock(overlay.shown[0]!.blockId)
     nowRef = new Date(WAKE.getTime() + 10 * 60_000)
     const r = await runner.stopBlock({ reason: null, text: 'I want to die' })
-    expect(r.ok && r.help).toBeTruthy()
+    expect(r.ok && r.step === 'stopped' && r.help).toBeTruthy()
     const avant = overlay.shown.length
     const apprisAvant = (storage as Storage & { __mem: Map<string, unknown> }).__mem.get('learning') as LearningState
     const nonDemarresAvant = apprisAvant.sessionEvents.filter((e) => !e.started).length

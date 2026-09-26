@@ -315,4 +315,12 @@ export type PontEcran = {
    * app écartée. Rangés par l'extension ; ni l'app ni le site ne sortent.
    */
   lireTentatives: () => number[]
+  /**
+   * La pause d'urgence : la séance reste bloquée, sauf les apps choisies
+   * (3 au plus). Le rappel de la surveillance, à la reprise, rebloque tout.
+   */
+  bloquerSauf: (args: { selectionId: string; exceptionId: string; profond: boolean }) => void
 }
+
+/** La liste des apps débloquées pendant une pause d'urgence. */
+export const IDENTIFIANT_URGENCE = 'vethos.urgence'

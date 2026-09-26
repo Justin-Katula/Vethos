@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Modal, Platform, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from './etat'
-import { IDENTIFIANT_GARDEE, IDENTIFIANT_SELECTION } from './contrat'
+import { IDENTIFIANT_GARDEE, IDENTIFIANT_SELECTION, IDENTIFIANT_URGENCE, type Selection } from './contrat'
 import { pontEcran } from './ecran-natif'
 import { useJetons } from '@/theme/Theme'
 import { PAS } from '@/theme/jetons'
@@ -55,7 +55,7 @@ function chargerFeuille(): React.ComponentType<Record<string, unknown>> | null {
  * ignorance de notre côté — seul l'identifiant sous lequel iOS range le jeton
  * change, et c'est lui seul que Vethos manipule.
  */
-export type RoleSelecteur = 'ecarte' | 'garde'
+export type RoleSelecteur = 'ecarte' | 'garde' | 'urgence'
 
 const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied: string }> = {
   ecarte: {
@@ -68,12 +68,19 @@ const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied:
     entete: 'What stays reachable in deep focus',
     pied: 'Everything else is set aside. Keep Vethos itself here, or you will have to lift from iOS Settings.',
   },
+  urgence: {
+    identifiant: IDENTIFIANT_URGENCE,
+    entete: 'Up to 3 apps',
+    pied: '',
+  },
 }
 
-export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte' }: {
+export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', surChoix }: {
   ouvert: boolean
   surFermeture: () => void
   role?: RoleSelecteur
+  /** Pour l'urgence : le choix revient à l'appelant, il n'est pas rangé. */
+  surChoix?: (s: Selection) => void
 }) {
   const j = useJetons()
   const marges = useSafeAreaInsets()
@@ -88,7 +95,16 @@ export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte' }:
   const enregistrer = async () => {
     // Rien de choisi : on referme sans toucher à la sélection précédente.
     // L'effacer parce que l'utilisateur a hésité serait une punition.
-    if (comptes) {
+    if (comptes && surChoix) {
+      surChoix({
+        identifiant: textes.identifiant,
+        nbApplications: comptes.applicationCount,
+        nbCategories: comptes.categoryCount,
+        nbSitesWeb: comptes.webDomainCount,
+        libelle: '',
+        creeeLe: new Date().toISOString(),
+      })
+    } else if (comptes) {
       const poser = role === 'garde' ? poserGardee : poserSelection
       await poser({
         identifiant: textes.identifiant,
@@ -125,7 +141,15 @@ export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte' }:
               Apple’s picker only exists on an iPhone, in a build signed with the Family
               Controls entitlement. Here, the selection is simulated.
             </Texte>
-            <BoutonPlat onPress={surFermeture}>Close</BoutonPlat>
+            <BoutonPlat
+              onPress={() => {
+                // Le simulateur : trois apps, pour que le parcours se regarde.
+                if (surChoix) surChoix({ identifiant: textes.identifiant, nbApplications: 3, nbCategories: 0, nbSitesWeb: 0, libelle: '', creeeLe: new Date().toISOString() })
+                surFermeture()
+              }}
+            >
+              {surChoix ? 'Choose 3 apps' : 'Close'}
+            </BoutonPlat>
           </View>
         )}
       </View>

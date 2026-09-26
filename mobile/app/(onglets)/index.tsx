@@ -237,9 +237,9 @@ export default function Aujourdhui() {
             {maintenantCarte.titre}
           </Text>
         </View>
-        {seanceActive ? (
-          <ArretSeance titre={cur?.titre ?? maintenantCarte.titre} />
-        ) : demarrable ? (
+        {/* Toujours monté : la feuille du rattrapage survit à la fin de la séance. */}
+        <ArretSeance titre={cur?.titre ?? maintenantCarte.titre} pilule={!!seanceActive} />
+        {seanceActive ? null : demarrable ? (
           <DemarrerSeance />
         ) : (
           <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{maintenantCarte.t}</Text>

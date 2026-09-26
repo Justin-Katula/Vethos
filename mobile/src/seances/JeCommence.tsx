@@ -42,18 +42,26 @@ const NATURE: Record<string, string> = {
 export function JeCommence() {
   const j = useJetons()
   const marges = useSafeAreaInsets()
-  const { enAttente, minute, confirmer } = usePlan()
+  const { enAttente, minute, confirmer, confiance } = usePlan()
   const [encours, setEncours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
-  if (!enAttente) return null
+  // Après le souffle d'une promesse, l'overlay revient tout seul : on reprend.
+  const retour = confiance.retourAttendu
+  if (!enAttente && !retour) return null
 
-  const retard = Math.max(0, minute - enAttente.startMinute)
+  const bloc = enAttente ?? { kind: 'task', startMinute: retour!.sinceMinute, label: confiance.titreRetour, id: '', promiseId: 'retour' }
+  const retard = Math.max(0, minute - bloc.startMinute)
+  const souffle = enAttente?.promiseId !== undefined && confiance.souffleAvantPossible(enAttente.id)
 
   const valider = async () => {
     setErreur(null)
     setEncours(true)
     try {
+      if (!enAttente) {
+        await confiance.reprendre()
+        return
+      }
       const r = await confirmer(enAttente)
       if (!r.ok) setErreur(r.raison)
     } catch {
@@ -100,7 +108,7 @@ export function JeCommence() {
             fontVariant: ['tabular-nums'],
           }}
         >
-          {NATURE[enAttente.kind] ?? 'Block'} · planned for {enHeure(enAttente.startMinute)}
+          {enAttente ? `${NATURE[bloc.kind] ?? 'Block'} · planned for ${enHeure(bloc.startMinute)}` : `Back at ${enHeure(bloc.startMinute)}`}
         </Text>
 
         <Text
@@ -114,7 +122,7 @@ export function JeCommence() {
             textAlign: 'center',
           }}
         >
-          {enAttente.label}
+          {bloc.label}
         </Text>
 
         <Text
@@ -131,7 +139,7 @@ export function JeCommence() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Start ${enAttente.label}`}
+          accessibilityLabel={`Start ${bloc.label}`}
           onPress={() => void valider()}
           disabled={encours}
           style={({ pressed }) => ({
@@ -149,9 +157,19 @@ export function JeCommence() {
           })}
         >
           <Text style={{ fontFamily: GEIST.demi, fontSize: 16, color: j.accentSur }}>
-            {encours ? 'Starting…' : 'I’m starting'}
+            {encours ? 'Starting…' : enAttente ? 'I’m starting' : 'I’m back'}
           </Text>
         </Pressable>
+
+        {souffle ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void confiance.souffle(enAttente!.id)}
+            style={({ pressed }) => ({ marginTop: PAS[4], minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={{ fontFamily: GEIST.moyen, fontSize: 15, color: j.text2 }}>I need 15 min</Text>
+          </Pressable>
+        ) : null}
 
         {erreur !== null ? (
           <Text style={{ marginTop: PAS[5], fontFamily: GEIST.normal, fontSize: 12.5, color: j.alerte }}>

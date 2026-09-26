@@ -501,6 +501,7 @@ export function applyConfirmation(
       blockedAttempts: 0,
       load48hMinutes: context.load48hMinutes ?? 0,
       ...(context.hoursAwake !== undefined ? { hoursAwake: context.hoursAwake } : {}),
+      ...(block.promiseId ? { promiseId: block.promiseId } : {}),
       createdAt: new Date(confirmedAtMs).toISOString(),
     }),
     dailyDelayMinutes: {
@@ -580,6 +581,10 @@ function updateEvent(
  * tenue jusqu'au bout. Rien ne change si l'événement est déjà clos (un arrêt
  * a déjà fixé le temps tenu).
  */
+/** Le travail tenu d'une fenêtre refermée : les pauses n'en font pas partie. */
+export const heldOfWindow = (o: Pick<ObservedPendingBlock, 'startMinute' | 'endMinute' | 'workMinutes' | 'pausedMinutes'>) =>
+  Math.max(0, (o.workMinutes ?? o.endMinute - o.startMinute) - (o.pausedMinutes ?? 0))
+
 export function closeSessionEvent(
   learning: LearningState,
   date: string,
@@ -635,12 +640,15 @@ export function applyStop(args: {
   if ((confirmations.stoppedBlockIds ?? []).includes(o.blockId)) return null
   const confirmedAt = confirmations.confirmedAt[o.blockId]
   if (confirmedAt === undefined || args.minute >= o.endMinute) return null
+  // En pause, la séance ne s'arrête pas : on reprend d'abord.
+  if (confirmations.pause) return null
 
   const minute = Math.max(o.startMinute, args.minute)
-  const work = o.workMinutes ?? o.endMinute - o.startMinute
+  const paused = o.pausedMinutes ?? 0
+  const work = (o.workMinutes ?? o.endMinute - o.startMinute) - paused
   const credited = applyWorkCredit(args.learning, confirmations, o, o.startMinute, minute)
   // Arrêté pendant la pause : le travail du bloc était fait — tenu en entier.
-  const held = Math.min(work, Math.max(0, minute - o.startMinute))
+  const held = Math.min(work, Math.max(0, minute - o.startMinute - paused))
   const current = (credited.learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === confirmations.date)
   // Dans une prolongation, le bloc prévu est déjà fait : s'arrêter là n'est
   // ni un arrêt anticipé, ni une raison à donner — seulement la fin.
@@ -667,7 +675,7 @@ export function applyStop(args: {
     confirmations: {
       ...credited.confirmations,
       // workMinutes = ce qui a été tenu : la clôture ne créditera rien de plus.
-      observedPending: { ...o, endMinute: end, workMinutes: held },
+      observedPending: { ...o, endMinute: end, workMinutes: held + paused },
       stoppedBlockIds: [...(confirmations.stoppedBlockIds ?? []), o.blockId],
     },
     heldMinutes: held,

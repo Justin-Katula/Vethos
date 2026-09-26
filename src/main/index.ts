@@ -317,6 +317,14 @@ function startNexusApp(): void {
             planRunner?.acceptExtension() ?? Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
           freeDay: () => planRunner?.freeDay() ?? Promise.resolve(null),
           decideFreeDay: (date, decision) => planRunner?.decideFreeDay(date, decision) ?? Promise.resolve(),
+          trust: () =>
+            planRunner?.trust() ??
+            Promise.resolve({ level: 2, delaySeconds: 60, stopAllowed: false, pause: null, awaitingReturn: false, emergencyAsAbandon: false, breatherNow: false, sessionApps: [] }),
+          waiveStop: () => planRunner?.waiveStop() ?? Promise.resolve(),
+          promise: (option, minutes, source) => planRunner?.promise(option, minutes, source) ?? Promise.resolve(),
+          emergency: (apps) => planRunner?.emergency(apps) ?? Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
+          breather: (blockId) => planRunner?.breather(blockId) ?? Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
+          resume: () => planRunner?.resume() ?? Promise.resolve(),
         },
       )
 

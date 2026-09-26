@@ -39,6 +39,7 @@ export default function SessionStartOverlay(): JSX.Element {
   const label = params.get('label') ?? 'Ce bloc'
   const startMinute = Number(params.get('startMinute') ?? 0)
   const apps = (params.get('apps') ?? '').split(',').filter((a) => a.length > 0)
+  const breather = params.get('breather') === '1'
 
   const [now, setNow] = useState(() => new Date())
   const [confirming, setConfirming] = useState(false)
@@ -123,6 +124,16 @@ export default function SessionStartOverlay(): JSX.Element {
       >
         {confirming ? 'Starting…' : 'I’m starting'}
       </button>
+
+      {breather && (
+        <button
+          type="button"
+          onClick={() => void nexus.planning.breather(blockId)}
+          className="pressable mt-4 px-4 py-2 text-[14px] text-white/60 hover:text-white"
+        >
+          I need 15 min
+        </button>
+      )}
 
       {erreur !== null && <p className="mt-5 text-[12.5px] text-warn">{erreur}</p>}
     </div>

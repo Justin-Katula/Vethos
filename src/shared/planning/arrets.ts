@@ -8,7 +8,7 @@
 
 import type { SessionEvent, StopReason } from '@shared/schemas'
 import { STOP_REASONS } from '@shared/schemas'
-import { betaMean, inheritedPosterior } from './bayes'
+import { apprenable, betaMean, inheritedPosterior } from './bayes'
 import { MIN_OBSERVATIONS } from './learning'
 import { addDays } from './dates'
 
@@ -25,7 +25,7 @@ export { STOP_REASONS }
 
 export type Cause = 'fatigue' | 'evitement' | 'creneau' | 'tropLong'
 
-const arretsDe = (events: SessionEvent[]) => events.filter((e) => e.started && e.stoppedEarly && e.heldMinutes !== null)
+const arretsDe = (events: SessionEvent[]) => events.filter((e) => apprenable(e) && e.started && e.stoppedEarly && e.heldMinutes !== null)
 
 function correlation(xs: number[], ys: number[]): number {
   const n = xs.length
@@ -117,6 +117,32 @@ export function diagnostiquer(events: SessionEvent[]): Record<Cause, number> | '
 }
 
 /**
+ * La raison dite colle-t-elle au comportement ? « Fatigué » après plus de la
+ * moitié du bloc et sans tentative d'app ; « distrait » avec des tentatives ;
+ * « ennuyeux » ou « trop dur » tôt dans le bloc ; « rien ne presse » sur une
+ * tâche. Un fait comparé à un autre, jamais une accusation.
+ */
+export function raisonConcorde(
+  s: { heldMinutes: number; plannedMinutes: number; attemptsBefore: number; kind: SessionEvent['kind'] },
+  raison: StopReason,
+): boolean {
+  const frac = s.heldMinutes / Math.max(1, s.plannedMinutes)
+  switch (raison) {
+    case 'tired':
+      return frac > 0.5 && s.attemptsBefore === 0
+    case 'distracted':
+      return s.attemptsBefore > 0
+    case 'boring':
+    case 'too-hard':
+      return s.heldMinutes < 15
+    case 'no-rush':
+      return s.kind === 'task'
+    case 'real-event':
+      return true
+  }
+}
+
+/**
  * Fiabilité d'une raison, par utilisateur : quand il dit « fatigué », la
  * signature de la fatigue est-elle là ? Une raison fiable pèse plus. On ne
  * punit jamais, on pondère. Une réponse donnée en moins d'une seconde, ou la
@@ -124,22 +150,8 @@ export function diagnostiquer(events: SessionEvent[]): Record<Cause, number> | '
  */
 export function fiabiliteRaison(events: SessionEvent[], raison: StopReason): number {
   const a = arretsDe(events).filter((e) => e.stop?.reason === raison)
-  const concorde = (e: SessionEvent) => {
-    const frac = e.heldMinutes! / e.plannedMinutes
-    switch (raison) {
-      case 'tired':
-        return frac > 0.5 && (e.stop?.attemptsBefore ?? 0) === 0
-      case 'distracted':
-        return (e.stop?.attemptsBefore ?? 0) > 0
-      case 'boring':
-      case 'too-hard':
-        return e.heldMinutes! < 15
-      case 'no-rush':
-        return e.kind === 'task'
-      case 'real-event':
-        return true
-    }
-  }
+  const concorde = (e: SessionEvent) =>
+    raisonConcorde({ heldMinutes: e.heldMinutes!, plannedMinutes: e.plannedMinutes, attemptsBefore: e.stop?.attemptsBefore ?? 0, kind: e.kind }, raison)
   // Une réponse mécanique (moins d'une seconde, ou la même raison que les
   // deux arrêts d'avant) ne compte que pour moitié : on pondère, on ne punit pas.
   // « Les deux arrêts d'avant » : par date et heure, jamais par l'ordre du tableau.

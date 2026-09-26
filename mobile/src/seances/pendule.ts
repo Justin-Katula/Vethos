@@ -5,6 +5,7 @@ import {
   applyStop,
   applyWorkCredit,
   closeSessionEvent,
+  heldOfWindow,
   recordBlockedAttempt,
   type JournalContext,
   closedObservedBlock,
@@ -13,6 +14,7 @@ import {
   tasksToAutoComplete,
 } from '@shared/planning/clock'
 import { activeConfirmedSession } from '@shared/planning/session'
+import { promesseDuBloc, retourDuSouffleAvant, ticConfiance } from '@shared/planning/trust'
 import type { PlacedBlock } from '@shared/planning/types'
 import type { LearningState, SessionConfirmationsState, StopReason } from '@shared/schemas'
 import { versTachesMoteur } from '@/plan/moteur'
@@ -162,7 +164,7 @@ export function tictac(args: {
         r.learning,
         confirmations.date,
         ferme.blockId,
-        ferme.workMinutes ?? ferme.endMinute - ferme.startMinute,
+        heldOfWindow(ferme),
       )
       confirmations = r.confirmations
     }
@@ -254,6 +256,14 @@ export function tictac(args: {
     change = true
   }
 
+  // Stop, promesses et confiance : pauses échues, promesses tenues ou rompues.
+  const t = ticConfiance(apprentissage, confirmations, confirmations.date, minute, args.maintenant.getTime())
+  if (t.change) {
+    apprentissage = t.learning
+    confirmations = t.confirmations
+    change = true
+  }
+
   return { apprentissage, confirmations, terminees, enAttente, change }
 }
 
@@ -283,8 +293,11 @@ export function confirmer(args: {
     minute,
     args.contexte,
   )
+  // Le retour d'un souffle pris AVANT la promesse se juge à cette confirmation.
+  const p = promesseDuBloc(r.learning, args.bloc.id)
+  const learning = p ? retourDuSouffleAvant(r.learning, p.id, minute) : r.learning
   return {
-    apprentissage: r.learning,
+    apprentissage: learning,
     confirmations: r.confirmations,
     retardMinutes: r.delayMinutes,
   }

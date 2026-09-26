@@ -94,6 +94,14 @@ type EtatBlocage = {
    */
   ouvrirSeance: (plage: Plage, contexte?: { theme: NomTheme; titreBloc: string }) => Promise<void>
   toutLever: () => Promise<void>
+  /**
+   * Une pause (urgence, souffle, pas de place) : le bouclier de la séance ne
+   * revient qu'à `reprendMinute`, par la surveillance d'iOS — même si Vethos
+   * dort. Pendant une urgence, seules les apps choisies passent.
+   */
+  pauser: (blocId: string, reprendMinute: number, urgenceId?: string | null) => Promise<void>
+  /** Reprise avant la fin de la pause : le bouclier revient tout de suite. */
+  reprendre: (blocId: string, minute: number) => Promise<void>
 }
 
 export const useBlocage = create<EtatBlocage>((set, get) => ({
@@ -279,6 +287,23 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     } finally {
       set({ occupe: false })
     }
+  },
+
+  async pauser(blocId, reprendMinute, urgenceId) {
+    const plages = get().plagesActives
+    if (!plages.some((p) => p.blocId === blocId)) return
+    await get().appliquerPlan(plages.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(reprendMinute, p.finMinute - 1) } : p)))
+    const selection = get().selection
+    if (urgenceId && selection) {
+      pontEcran().bloquerSauf({ selectionId: selection.identifiant, exceptionId: urgenceId, profond: get().mode === 'profond' })
+      get().verifier()
+    }
+  },
+
+  async reprendre(blocId, minute) {
+    const plages = get().plagesActives
+    if (!plages.some((p) => p.blocId === blocId)) return
+    await get().appliquerPlan(plages.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(minute, p.debutMinute) } : p)))
   },
 
   async toutLever() {

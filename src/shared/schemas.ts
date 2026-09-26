@@ -382,12 +382,62 @@ export const LearningStateSchema = z.object({
     .default([]),
   /** Jours libres proposés : pris, ou gardés normaux (YYYY-MM-DD → décision). */
   freeDays: z.record(z.string().regex(DATE_REGEX), z.enum(['taken', 'kept'])).default({}),
+  /**
+   * Stop, promesses et confiance : la confiance se gagne en tenant ses
+   * promesses. Des comptes avec oubli progressif ; la loi est
+   * Beta(succès + 2, échecs + 1), soit le niveau 2 au départ.
+   */
+  trust: z.object({ successes: z.number().min(0), failures: z.number().min(0) }).optional(),
+  /** Les rattrapages choisis après un Stop. Chacun est une promesse. */
+  promises: z.array(z.lazy(() => PromiseSchema)).max(300).optional(),
+  /** Chaque pause d'urgence : début, fin, apps débloquées, tentatives. */
+  emergencyPauses: z.array(z.lazy(() => EmergencyPauseSchema)).max(300).optional(),
 })
 export type LearningState = z.infer<typeof LearningStateSchema>
 
 /** Les six raisons d'arrêt proposées en un tap (Steel, 2007). */
 export const STOP_REASONS = ['too-hard', 'boring', 'no-rush', 'distracted', 'tired', 'real-event'] as const
 export type StopReason = (typeof STOP_REASONS)[number]
+
+export const PromiseSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(['task', 'objective']),
+  refId: z.string().min(1),
+  label: z.string().max(200).default(''),
+  /** Le bloc arrêté qui l'a fait naître. */
+  fromBlockId: z.string().min(1),
+  date: z.string().regex(DATE_REGEX),
+  startMinute: z.number().int().min(0).max(1439),
+  minutes: z.number().int().min(1).max(600),
+  createdAt: z.string().datetime(),
+  status: z.enum(['pending', 'kept', 'broken']).default('pending'),
+  /** Heure de début réelle (confirmation). */
+  startedMinute: z.number().int().min(0).max(1440).optional(),
+  /** « J'ai besoin de 15 min » : une fois, avant ou pendant. */
+  breather: z
+    .object({
+      phase: z.enum(['before', 'during']),
+      minutes: z.number().int().min(0).max(15),
+      /** Minutes de retard au retour ; absent tant qu'on n'est pas revenu. */
+      lateMinutes: z.number().int().min(0).max(1440).optional(),
+    })
+    .optional(),
+})
+export type SessionPromise = z.infer<typeof PromiseSchema>
+
+export const EmergencyPauseSchema = z.object({
+  date: z.string().regex(DATE_REGEX),
+  blockId: z.string().min(1),
+  startMs: z.number().int(),
+  endMs: z.number().int().optional(),
+  /** Retour volontaire, automatique après 15 min, ou coupé par une tentative. */
+  end: z.enum(['voluntary', 'auto', 'attempt']).optional(),
+  /** Jusqu'à 3 apps débloquées (identifiants ; sur iPhone, leur nombre seulement). */
+  apps: z.array(z.string()).max(3).default([]),
+  appCount: z.number().int().min(0).max(3).default(0),
+  attempts: z.number().int().min(0).default(0),
+})
+export type EmergencyPause = z.infer<typeof EmergencyPauseSchema>
 
 export const SessionEventSchema = z.object({
   /** Id stable du bloc (engine.ts) — un seul événement par bloc et par jour. */
@@ -420,8 +470,22 @@ export const SessionEventSchema = z.object({
       answerMs: z.number().int().min(0).optional(),
       /** Tentatives d'ouvrir une app bloquée dans les 10 min avant l'arrêt. */
       attemptsBefore: z.number().int().min(0).default(0),
+      /** Niveau de confiance au moment du Stop (1 à 4). */
+      level: z.number().int().min(1).max(4).optional(),
+      /** Ce que le moteur a tranché. */
+      verdict: z.enum(['postponed', 'abandoned', 'no-room']).optional(),
     })
     .optional(),
+  /** « Je continue » pendant le délai du Stop : autant de Stop renoncés. */
+  stopsWaived: z.number().int().min(0).optional(),
+  /**
+   * Séance de rattrapage (promesse) ou reprise forcée après un « pas de
+   * place » : sans Stop, elle ne dit rien de ce que la personne tient quand
+   * elle est libre. Exclue de toute la courbe d'apprentissage ; elle ne sert
+   * qu'à la confiance.
+   */
+  promiseId: z.string().optional(),
+  forced: z.boolean().optional(),
   /** Tentatives d'ouvrir une app bloquée pendant la séance. */
   blockedAttempts: z.number().int().min(0).default(0),
   /**
@@ -535,6 +599,24 @@ export const SessionConfirmationsStateSchema = z.object({
    * (une ancre, par exemple) reste le même dans le plan.
    */
   stoppedBlockIds: z.array(z.string()).max(200).default([]),
+  /**
+   * La séance en cours est en pause : urgence (3 apps débloquées, reprise
+   * seule après 15 min), souffle d'une promesse (« J'ai besoin de 15 min »,
+   * reprise à confirmer), ou pas de place (15 min, puis on finit).
+   */
+  pause: z
+    .object({
+      kind: z.enum(['emergency', 'breather', 'no-room']),
+      blockId: z.string().min(1),
+      startMinute: z.number().int().min(0).max(1440),
+      endMinute: z.number().int().min(0).max(1440),
+      startMs: z.number().int(),
+      apps: z.array(z.string()).max(3).default([]),
+    })
+    .nullable()
+    .optional(),
+  /** Le souffle est fini mais la reprise n'est pas encore confirmée. */
+  awaitingReturn: z.object({ blockId: z.string().min(1), sinceMinute: z.number().int().min(0).max(1440) }).nullable().optional(),
   /** Blocs à qui une prolongation a déjà été offerte aujourd'hui (1 par bloc). */
   extensionOfferedBlockIds: z.array(z.string()).max(200).default([]),
   /**
@@ -572,6 +654,8 @@ export const SessionConfirmationsStateSchema = z.object({
       category: z.string().max(60).optional(),
       /** Heure de début PRÉVUE, avant tout retard : le journal la garde. */
       plannedStartMinute: z.number().int().min(0).max(1439).optional(),
+      /** Minutes de pause déjà réservées dans la fenêtre (pas du travail). */
+      pausedMinutes: z.number().int().min(0).max(1440).optional(),
     })
     .nullable()
     .default(null),

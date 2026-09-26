@@ -23,6 +23,8 @@ export type PendingBlockView = {
   label: string
   startMinute: number
   appsToBlock: string[]
+  /** Une promesse dont le souffle (« J'ai besoin de 15 min ») est encore libre. */
+  breather?: boolean
 }
 
 export type ConfirmationOverlay = {
@@ -85,6 +87,7 @@ export function createConfirmationOverlay(): ConfirmationOverlay {
       label: block.label,
       startMinute: String(block.startMinute),
       apps: block.appsToBlock.join(','),
+      ...(block.breather ? { breather: '1' } : {}),
     })
     return {
       devHash: `#/session-start?${params.toString()}`,

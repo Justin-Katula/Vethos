@@ -37,7 +37,7 @@ import {
   type DayCapacityPoint,
 } from './feasibility'
 import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
-import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe, trancheDe, type Tranche } from './bayes'
+import { apprenable, BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe, trancheDe, type Tranche } from './bayes'
 import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue, TOLERANCE_DEPART_MINUTES } from './habitudes'
 import { ajustementPour, diagnostiquer, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
@@ -111,7 +111,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     }
     // Figée pour la semaine : mesurée sur ce qui précède le lundi, jamais
     // recalculée d'un jour à l'autre.
-    const t = tenue(events, o.id, startOfWeek(rawInput.today))
+    const t = tenue(events.filter(apprenable), o.id, startOfWeek(rawInput.today))
     objectiveDoses[o.id] = {
       dose: doseSemaine(o.weeklyTargetMinutes, t.tenuRecent, t.tauxTenue, t.observations),
       cible: o.weeklyTargetMinutes,
@@ -121,7 +121,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     ...rawInput,
     objectives: rawInput.objectives.map((o) => ({ ...o, weeklyTargetMinutes: objectiveDoses[o.id]!.dose })),
   }
-  const learn = events ? buildLearningContext(events, rawInput.today, rawInput.schedule, objectiveDoses) : null
+  const learn = events ? buildLearningContext(events.filter(apprenable), rawInput.today, rawInput.schedule, objectiveDoses) : null
 
   const dates = datesBetween(input.today, input.rangeEnd)
   const nowMinute = dateKey(now) === input.today ? now.getHours() * 60 + now.getMinutes() : 0
@@ -374,6 +374,29 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // la comptabilité en partie double divergeraient d'exactement ce montant.
   let pinnedWorkMinutes = 0
 
+  // Les promesses débitent leur source AVANT tout placement : sinon les jours
+  // qui les précèdent placeraient déjà ce travail, et il le serait deux fois.
+  for (const p of input.promises ?? []) {
+    if (!dates.includes(p.date)) continue
+    const end = Math.min(1440, p.startMinute + p.minutes)
+    if (p.date === input.today && end <= nowMinute) continue
+    const work = end - p.startMinute
+    if (p.kind === 'task') {
+      if (!activeTasks.some((t) => t.id === p.refId)) continue
+      const left = remainingNeed.get(p.refId)
+      if (left !== undefined) {
+        const debit = Math.min(left, work)
+        remainingNeed.set(p.refId, left - debit)
+        placedByTask.set(p.refId, (placedByTask.get(p.refId) ?? 0) + debit)
+        pinnedWorkMinutes += debit
+      }
+    } else if (input.objectives.some((o) => o.id === p.refId)) {
+      const key = servedKey(startOfWeek(p.date), p.refId)
+      objectiveServed.set(key, (objectiveServed.get(key) ?? 0) + work)
+      pinnedWorkMinutes += work
+    }
+  }
+
   // Placement par score : le chronotype s'estime sans question, depuis le
   // milieu du sommeil — celui des jours libres d'abord (méthode de Munich).
   const midSleepMinute = estimateMidSleep(input.schedule, dates)
@@ -561,6 +584,40 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           pinnedWorkMinutes += stillToCome
         }
       }
+    }
+
+    // D.1.1ter LES PROMESSES — un rattrapage choisi après un Stop se tient à
+    // l'heure choisie. Posé comme une ancre ; il débite le besoin de sa
+    // source comme la session en cours, pour ne pas être placé deux fois.
+    for (const p of input.promises ?? []) {
+      if (p.date !== date) continue
+      const id = `promesse-${p.id}`
+      if (session?.blockId === id) continue
+      const end = Math.min(1440, p.startMinute + p.minutes)
+      if (date === input.today && end <= nowMinute) continue
+      const source =
+        p.kind === 'task' ? activeTasks.find((t) => t.id === p.refId) : input.objectives.find((o) => o.id === p.refId)
+      if (source === undefined) continue
+      allocator.reserve(p.startMinute, end)
+      const work = end - p.startMinute
+      blocks.push({
+        id,
+        date,
+        startMinute: p.startMinute,
+        endMinute: end,
+        durationMinutes: work,
+        breakMinutes: 0,
+        workMinutes: work,
+        kind: p.kind,
+        refId: p.refId,
+        label: 'title' in source ? source.title : source.name,
+        color: 'color' in source && typeof source.color === 'string' ? source.color : COULEUR_TACHE,
+        cognitiveWindow: windowAt(Math.floor(p.startMinute / 60)),
+        appsToBlock: source.appsToBlock,
+        promiseId: p.id,
+      })
+      budget = Math.max(0, budget - work)
+      placedToday.push({ refId: p.refId, startMinute: p.startMinute, endMinute: end, work })
     }
 
     // D.1.2 ANCRES — heure fixe, gelées, jamais déplacées.
@@ -873,7 +930,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // n'aurait jamais rien pu attraper.
   const totalPlaced =
     blocks
-      .filter((b) => b.kind !== 'ancre' && b.confirmed !== true)
+      .filter((b) => b.kind !== 'ancre' && b.confirmed !== true && b.promiseId === undefined)
       .reduce((s, b) => s + b.workMinutes, 0) + pinnedWorkMinutes
 
   const debitedFromTasks = [...needByTask].reduce(

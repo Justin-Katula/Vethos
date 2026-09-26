@@ -7,6 +7,7 @@ import type {
 import type { AppCategory } from '@shared/app-categories'
 import type { Theme } from '@shared/theme'
 import type { StopReason } from '@shared/schemas'
+import type { OptionRattrapage, StopResult, TrustView } from '@shared/planning/trust'
 
 export type StorageWriteResult = { ok: true } | { ok: false; error: string }
 
@@ -195,8 +196,22 @@ const api = {
     confirmBlock: (blockId: string): Promise<ConfirmBlockResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_CONFIRM_BLOCK, blockId),
     /** « Stop » : arrête la séance en cours, avec une raison en un tap (spec 2026-09-25). */
-    stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number }): Promise<ConfirmBlockResult> =>
+    stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number; counterOfferRefused?: boolean }): Promise<StopResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_STOP_BLOCK, args),
+    /** Stop, promesses et confiance : niveau, délai, pause en cours. */
+    trust: (): Promise<TrustView | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'get' }),
+    /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
+    waiveStop: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'waive' }),
+    /** Le rattrapage choisi : une promesse. */
+    promise: (option: OptionRattrapage, minutes: number, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }): Promise<null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'promise', option, minutes, source }),
+    /** « Something real came up » : 15 min, jusqu'à 3 apps débloquées. */
+    emergency: (apps: string[]): Promise<ConfirmBlockResult | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'emergency', apps }),
+    /** « J'ai besoin de 15 min ». */
+    breather: (blockId?: string): Promise<ConfirmBlockResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, blockId ? { action: 'breather', blockId } : { action: 'breather' }),
+    /** « Je reprends ». */
+    resume: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'resume' }),
     /** Prolongation : l'offre du moment, comptée dès qu'elle est lue. */
     extensionOffer: (): Promise<{ minutes: number } | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_EXTENSION, { action: 'offer' }),

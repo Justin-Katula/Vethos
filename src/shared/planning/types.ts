@@ -189,6 +189,8 @@ export type PlacedBlock = {
    * placer la pause parce que la personne décroche d'habitude juste après.
    */
   breakAtMinute?: number
+  /** Séance de rattrapage : une promesse, sans bouton Stop. */
+  promiseId?: string
 }
 
 export type SeverityLevel = 'info' | 'passive' | 'high'
@@ -340,6 +342,11 @@ export type PlanningInput = {
    * dans le plan du jour au lieu d'être replacée — voir `ActiveSession`.
    */
   activeSession?: ActiveSession | null
+  /**
+   * Les rattrapages promis, encore à tenir. Posés comme une ancre, à l'heure
+   * choisie : une promesse ne se déplace pas.
+   */
+  promises?: Array<{ id: string; kind: 'task' | 'objective'; refId: string; date: string; startMinute: number; minutes: number }>
   /**
    * Le journal des séances (spec 2026-09-25). Absent = aucun apprentissage :
    * la cible complète, les durées par défaut, le score sans Thompson — le

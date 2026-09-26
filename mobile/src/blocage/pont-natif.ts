@@ -71,6 +71,7 @@ export type ModuleEcran = {
     declenchePar?: string,
   ) => void
   clearWhitelistAndUpdateBlock: (declenchePar?: string) => void
+  unblockSelection: (selection: { activitySelectionId: string }, declenchePar?: string) => void
 
   setWebContentFilterPolicy: (politique: PolitiqueWeb, declenchePar?: string) => void
   clearWebContentFilterPolicy: (declenchePar?: string) => void
@@ -300,6 +301,17 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       // comme un signal parmi d'autres.
       const brut = natif.userDefaultsGet?.<unknown>('vethos_tentatives')
       return Array.isArray(brut) ? brut.filter((t): t is number => typeof t === 'number') : []
+    },
+
+    bloquerSauf({ selectionId, exceptionId, profond }) {
+      const parQui = 'vethos:urgence'
+      if (profond) {
+        natif.addSelectionToWhitelistAndUpdateBlock({ activitySelectionId: exceptionId }, parQui)
+        natif.enableBlockAllMode(parQui)
+      } else {
+        natif.blockSelection({ activitySelectionId: selectionId }, parQui)
+        natif.unblockSelection({ activitySelectionId: exceptionId }, parQui)
+      }
     },
 
     async toutLever() {

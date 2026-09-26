@@ -160,8 +160,16 @@ export const trancheDe = (minute: number): Tranche => (minute < 12 * 60 ? 'matin
  * Les observations de survie d'une catégorie, tirées du journal — par type de
  * fenêtre (matin, après-midi, soir) quand il y en a assez (5), sinon toutes.
  */
+/**
+ * Un rattrapage (promesse) ou une reprise forcée après un « pas de place »
+ * n'a pas de Stop : il dirait que la personne tient plus longtemps qu'elle ne
+ * le fait quand elle est libre. Hors de toute la courbe d'apprentissage ; il
+ * ne sert qu'à la confiance.
+ */
+export const apprenable = (e: SessionEvent) => e.promiseId === undefined && !e.forced
+
 export function survieDe(events: SessionEvent[], category: string, tranche?: Tranche): Survie[] {
-  const cat = events.filter((e) => e.category === category && e.started && e.heldMinutes !== null)
+  const cat = events.filter((e) => apprenable(e) && e.category === category && e.started && e.heldMinutes !== null)
   const dans = tranche ? cat.filter((e) => trancheDe(e.plannedStartMinute) === tranche) : cat
   const retenus = dans.length >= 5 ? dans : cat
   // Une prolongation lâchée avant sa fin est un arrêt pour la courbe (elle

@@ -317,17 +317,18 @@ export default function HomePage() {
                 </button>
               </div>
             )}
-            {running && (
-              <div className="flex items-center justify-between gap-4 rounded border border-line px-4 py-3">
+            {/* Toujours monté : la feuille du rattrapage survit à la fin de la séance. */}
+            <div className={running ? 'flex items-center justify-between gap-4 rounded border border-line px-4 py-3' : 'contents'}>
+              {running && (
                 <span className="text-[13.5px] text-fg">
                   {running.label}
                   <span className="ml-2 text-fg-3">
                     {duration(Math.max(0, running.workMinutes - (nowMinute - running.startMinute)))} left
                   </span>
                 </span>
-                <StopSession label={running.label} inExtension={inExtension} />
-              </div>
-            )}
+              )}
+              <StopSession label={running?.label ?? ''} inExtension={inExtension} showButton={!!running} />
+            </div>
             {running && <ExtensionBanner blockId={running.id} />}
             <FreeDayCard refreshKey={`${today}|${Math.floor(nowMinute / 60)}`} />
             <Board columns={['Time', 'Commitment', 'Duration']}>
