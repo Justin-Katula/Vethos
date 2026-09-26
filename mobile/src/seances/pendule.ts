@@ -322,6 +322,6 @@ export function arreter(args: {
 }
 
 /** Une tentative d'ouvrir une app bloquée, pendant la séance en cours. */
-export function tentativeBloquee(etat: EtatSeances): EtatSeances {
-  return { ...etat, apprentissage: recordBlockedAttempt(etat.apprentissage, etat.confirmations) }
+export function tentativeBloquee(etat: EtatSeances, maintenant = Date.now()): EtatSeances {
+  return { ...etat, apprentissage: recordBlockedAttempt(etat.apprentissage, etat.confirmations, maintenant) }
 }

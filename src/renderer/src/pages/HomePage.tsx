@@ -9,6 +9,8 @@ import { TaskHierarchyList } from '@/components/tasks/TaskHierarchy'
 import { Bracket, GlowCard, MetricPill } from '@/components/ui/Iris'
 import { Modal } from '@/components/ui/Modal'
 import { StopSession } from '@/components/tasks/StopSession'
+import { ExtensionBanner, FreeDayCard } from '@/components/tasks/SessionExtras'
+import { dansLaProlongation } from '@shared/planning/prolongation'
 import { nexus } from '@/lib/ipc'
 import { overlayDueFor } from '@shared/planning/clock'
 import { activeConfirmedSession } from '@shared/planning/session'
@@ -189,6 +191,13 @@ export default function HomePage() {
   // pas d'un bloc du plan : une ancre arrêtée garde son créneau.
   const session = activeConfirmedSession(sessionConfirmations ?? null, today, nowMinute)
   const running = session ? todayBlocks.find((b) => b.id === session.blockId) : undefined
+  const inExtension =
+    !!session &&
+    dansLaProlongation(
+      (learning.sessionEvents ?? []).find((e) => e.blockId === session.blockId && e.date === today),
+      session.startMinute,
+      nowMinute,
+    )
 
   return (
     <PageTransition>
@@ -316,9 +325,11 @@ export default function HomePage() {
                     {duration(Math.max(0, running.workMinutes - (nowMinute - running.startMinute)))} left
                   </span>
                 </span>
-                <StopSession label={running.label} />
+                <StopSession label={running.label} inExtension={inExtension} />
               </div>
             )}
+            {running && <ExtensionBanner blockId={running.id} />}
+            <FreeDayCard refreshKey={`${today}|${Math.floor(nowMinute / 60)}`} />
             <Board columns={['Time', 'Commitment', 'Duration']}>
               {todayBlocks.length === 0 ? (
                 <BoardEmpty>

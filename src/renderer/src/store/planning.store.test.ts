@@ -69,6 +69,8 @@ beforeEach(() => {
       workedMinutesByRef: {},
       dailyDelayMinutes: {},
       sessionEvents: [],
+      extensionOffers: [],
+      freeDays: {},
     },
   })
 })

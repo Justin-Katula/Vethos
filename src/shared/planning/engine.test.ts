@@ -1897,3 +1897,21 @@ describe('D.5 — une tâche découpée ne s’empile pas sur son dernier jour',
     }
   })
 })
+
+describe('D.5 — une échéance au-delà de l’horizon', () => {
+  it('les jours après l’horizon comptent : 28 h dues dans 10 jours ne se tassent pas dans les 7 visibles', () => {
+    const GROUP = uuid(60)
+    const deadline = addDays(TODAY, 9)
+    const tasks = [
+      task({ id: GROUP, title: 'Devoir', remainingMinutes: 0, deadline }),
+      ...Array.from({ length: 6 }, (_, i) =>
+        task({ id: uuid(61 + i), title: `Devoir — Part ${i + 1}`, parentTaskId: GROUP, partOrder: i + 1, estimatedMinutes: 280, remainingMinutes: 280, deadline }),
+      ),
+    ]
+    const plan = computePlan(input({ schedule: sleepScheduleEntries('23:30', '07:30'), tasks }), NOW)
+    const parJour = new Map<string, number>()
+    for (const b of plan.blocks) if (b.kind === 'task') parJour.set(b.date, (parJour.get(b.date) ?? 0) + b.workMinutes)
+    const moyenne = 1680 / 10
+    for (const m of parJour.values()) expect(m).toBeLessThanOrEqual(moyenne * 1.25)
+  })
+})

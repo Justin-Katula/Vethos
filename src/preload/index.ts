@@ -197,6 +197,16 @@ const api = {
     /** « Stop » : arrête la séance en cours, avec une raison en un tap (spec 2026-09-25). */
     stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number }): Promise<ConfirmBlockResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_STOP_BLOCK, args),
+    /** Prolongation : l'offre du moment, comptée dès qu'elle est lue. */
+    extensionOffer: (): Promise<{ minutes: number } | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_EXTENSION, { action: 'offer' }),
+    /** « Oui » : la séance et son blocage s'allongent. */
+    acceptExtension: (): Promise<ConfirmBlockResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_EXTENSION, { action: 'accept' }),
+    /** Le jour libre proposable cette semaine (YYYY-MM-DD), ou null. */
+    freeDay: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_FREE_DAY, { action: 'get' }),
+    decideFreeDay: (date: string, decision: 'taken' | 'kept'): Promise<null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_FREE_DAY, { action: 'decide', date, decision }),
     /** Poussé par l'horloge de planification dès qu'elle écrit du retard, un raté, ou une confirmation. */
     onChanged: (cb: () => void): (() => void) => {
       const listener = () => cb()

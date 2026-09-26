@@ -164,7 +164,12 @@ export function survieDe(events: SessionEvent[], category: string, tranche?: Tra
   const cat = events.filter((e) => e.category === category && e.started && e.heldMinutes !== null)
   const dans = tranche ? cat.filter((e) => trancheDe(e.plannedStartMinute) === tranche) : cat
   const retenus = dans.length >= 5 ? dans : cat
-  return retenus.map((e) => ({ minutes: e.heldMinutes!, arret: e.stoppedEarly }))
+  // Une prolongation lâchée avant sa fin est un arrêt pour la courbe (elle
+  // sait jusqu'où l'on tient), jamais pour la discipline.
+  return retenus.map((e) => ({
+    minutes: e.heldMinutes!,
+    arret: e.stoppedEarly || (e.extensionMinutes !== undefined && e.heldMinutes! < e.plannedMinutes + e.extensionMinutes),
+  }))
 }
 
 // ─── BOCPD (Adams & MacKay, 2007) ─────────────────────────────────────────

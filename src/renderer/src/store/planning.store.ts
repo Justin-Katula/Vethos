@@ -48,6 +48,8 @@ const EMPTY_LEARNING: LearningState = {
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
   sessionEvents: [],
+  extensionOffers: [],
+  freeDays: {},
 }
 
 /**

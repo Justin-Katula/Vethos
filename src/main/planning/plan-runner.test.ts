@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createPlanRunner } from './plan-runner'
+import { LearningStateSchema } from '@shared/schemas'
 import type { ConfirmationOverlay, PendingBlockView } from './confirmation-overlay'
 import type { Storage } from '@shared/storage'
 import type {
@@ -668,5 +669,56 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     await Promise.all([runner.recordBlockedAttempt(), runner.tickNow(), runner.recordBlockedAttempt()])
     const learning = storage.__mem.get('learning') as LearningState
     expect(learning.sessionEvents.find((x) => x.blockId === blockId)!.blockedAttempts).toBe(2)
+  })
+})
+
+describe('Prolongation (spec moteur 2026-09-25)', () => {
+  it('l’offre vient dans les 2 dernières minutes ; « Oui » allonge la séance et son blocage', async () => {
+    const passe = Array.from({ length: 8 }, (_, i) => ({
+      blockId: `p${i}`,
+      date: `2026-08-0${i + 1}`,
+      kind: 'task' as const,
+      refId: 'autre',
+      category: 'général',
+      plannedStartMinute: 9 * 60 + 30,
+      plannedMinutes: 90,
+      started: true,
+      delayMinutes: 0,
+      spontaneous: false,
+      heldMinutes: 90,
+      stoppedEarly: false,
+      blockedAttempts: 0,
+      load48hMinutes: 0,
+      createdAt: '2026-08-01T09:30:00.000Z',
+    }))
+    let nowRef = WAKE
+    const storage = fakeStorage({
+      ...oneTaskSeed({ estimatedMinutes: 60, remainingMinutes: 60 }),
+      learning: LearningStateSchema.parse({ sessionEvents: passe }),
+    }) as Storage & { __mem: Map<string, unknown> }
+    const overlay = fakeOverlay()
+    const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
+    await runner.tickNow()
+    const blockId = overlay.shown[0]!.blockId
+    expect(await runner.confirmBlock(blockId)).toEqual({ ok: true })
+    const avant = (storage.__mem.get('blocking_rules') as BlockingRulesState).block!.endsAt
+
+    // Trop tôt : rien.
+    nowRef = new Date(WAKE.getTime() + 20 * 60_000)
+    expect(await runner.extensionOffer()).toBeNull()
+
+    const conf = storage.__mem.get('session_confirmations') as { observedPending: { workMinutes: number } }
+    nowRef = new Date(WAKE.getTime() + (conf.observedPending.workMinutes - 1) * 60_000)
+    const offre = await runner.extensionOffer()
+    expect(offre?.minutes).toBeGreaterThan(0)
+    // Relue, la même offre revient sans être recomptée.
+    expect(await runner.extensionOffer()).toEqual(offre)
+
+    expect(await runner.acceptExtension()).toEqual({ ok: true })
+    const learning = storage.__mem.get('learning') as LearningState
+    expect(learning.sessionEvents.find((e) => e.blockId === blockId)!.extensionMinutes).toBe(offre!.minutes)
+    expect(learning.extensionOffers).toEqual([{ date: '2026-08-17', accepted: true }])
+    const apres = (storage.__mem.get('blocking_rules') as BlockingRulesState).block!.endsAt
+    expect(apres).toBeGreaterThan(avant)
   })
 })

@@ -14,7 +14,9 @@ import { addDays } from '@shared/planning/dates'
 import type { StopReason } from '@shared/schemas'
 import { minutesDe } from '@/donnees/regle-sommeil'
 import { useNomTheme } from '@/theme/Theme'
-import { calculerPlan, cleDate } from './moteur'
+import { accepterProlongation, dansLaProlongation, marquerOffre, proposerProlongation } from '@shared/planning/prolongation'
+import { jourLibrePropose } from '@shared/planning/jours-libres'
+import { calculerPlan, cleDate, entreeEtPlan } from './moteur'
 import { lireSemaine } from './lecture'
 
 function useSourcePlan() {
@@ -108,8 +110,8 @@ function useSourcePlan() {
     const o = tic.confirmations.observedPending
     const confirmeA = o ? tic.confirmations.confirmedAt[o.blockId] : undefined
     if (confirmeA !== undefined) {
-      const n = pontEcran().lireTentatives().filter((t) => t >= confirmeA && t <= Date.now()).length
-      appris = setBlockedAttempts(appris, tic.confirmations, n)
+      const vues = pontEcran().lireTentatives().filter((t) => t >= confirmeA && t <= Date.now())
+      appris = setBlockedAttempts(appris, tic.confirmations, vues.length, vues.length ? Math.max(...vues) : undefined)
     }
     if (tic.change || appris !== tic.apprentissage) void poser({ apprentissage: appris, confirmations: tic.confirmations })
     if (tic.terminees.length > 0) void terminerTaches(tic.terminees)
@@ -126,8 +128,104 @@ function useSourcePlan() {
     enAttenteBrut !== null &&
     overlayDueFor({ learning: apprentissage, block: enAttenteBrut, nowMinute: calcul.minute, today: calcul.aujourdHui })
 
+  // ── Prolongation : l'offre des 2 dernières minutes d'une séance ──────────
+  const actif = calcul.seanceActive
+  const evenementActif = actif
+    ? apprentissage.sessionEvents.find((e) => e.blockId === actif.blockId && e.date === calcul.aujourdHui)
+    : undefined
+  // Le prochain engagement après la séance : bloc, ancre ou obligation du jour.
+  const prochainDebut = (apresMinute: number): number | null => {
+    const debuts = (calcul.jours.find((j) => j.date === calcul.aujourdHui)?.segments ?? [])
+      .filter((g) => g.nature !== 'sleep' && g.id !== actif?.blockId && g.bloc?.confirmed !== true)
+      .map((g) => g.debut)
+      .filter((m) => m >= apresMinute)
+    return debuts.length ? Math.min(...debuts) : null
+  }
+  const offre = useMemo(() => {
+    if (!actif || !evenementActif || suspendu) return null
+    const o = confirmations.observedPending
+    if (!o || o.blockId !== actif.blockId) return null
+    const finTravail = o.startMinute + (o.workMinutes ?? o.endMinute - o.startMinute)
+    const cap = calcul.resultat.capacities.find((c) => c.date === calcul.aujourdHui)
+    const d = proposerProlongation({
+      event: evenementActif,
+      session: { blockId: o.blockId, startMinute: o.startMinute, workMinutes: o.workMinutes ?? o.endMinute - o.startMinute },
+      nowMinute: calcul.minute,
+      nowMs: calcul.maintenant.getTime(),
+      today: calcul.aujourdHui,
+      events: apprentissage.sessionEvents,
+      historique: apprentissage.extensionOffers,
+      dejaOfferte: confirmations.extensionOfferedBlockIds.includes(o.blockId),
+      prochainDebut: prochainDebut(finTravail),
+      coucher: minutesDe(reglages.coucher),
+      travailDuJour:
+        Math.max(0, finTravail - calcul.minute) +
+        blocsDuJour.filter((b) => b.kind !== 'ancre' && b.id !== o.blockId && b.confirmed !== true).reduce((t, b) => t + b.workMinutes, 0),
+      capaciteDuJour: cap?.effectiveCapacityMinutes ?? 0,
+    })
+    return d === null ? null : { blocId: o.blockId, minutes: d }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actif, evenementActif, suspendu, confirmations, calcul, apprentissage, blocsDuJour, reglages.coucher])
+  // Montrée = comptée : une offre par bloc, et le plafond du jour.
+  const [offreVisible, setOffreVisible] = useState<{ blocId: string; minutes: number } | null>(null)
+  useEffect(() => {
+    if (!offre || offreVisible?.blocId === offre.blocId) return
+    setOffreVisible(offre)
+    const frais = useSeances.getState()
+    const m = marquerOffre(frais.apprentissage, frais.confirmations, offre.blocId)
+    void poser({ apprentissage: m.learning, confirmations: m.confirmations })
+  }, [offre, offreVisible, poser])
+  const finDeSeance = actif ? calcul.minute >= actif.endMinute : true
+  const prolongationMontree = offreVisible && actif?.blockId === offreVisible.blocId && !finDeSeance ? offreVisible : null
+
+  // ── Jour libre : recalculé à l'heure, pas à la minute (plusieurs plans d'essai) ──
+  const heure = Math.floor(calcul.minute / 60)
+  const jourLibre = useMemo(() => {
+    if (!chargees || !mesuresPretes) return null
+    const maintenant = new Date(calcul.maintenant)
+    const { entree, resultat } = entreeEtPlan({ taches, objectifs, ancres, obligations, reglages, maintenant, apprentissage })
+    return jourLibrePropose({ input: entree, learning: apprentissage, plan: resultat, now: maintenant })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chargees, mesuresPretes, taches, objectifs, ancres, obligations, reglages, apprentissage.freeDays, calcul.aujourdHui, heure])
+
   return {
     ...calcul,
+    /** Prolongation proposée pour la séance en cours (minutes), ou null. */
+    prolongation: prolongationMontree?.minutes ?? null,
+    /** La séance est dans sa prolongation : « Stop » y est simplement la fin. */
+    enProlongation: !!actif && dansLaProlongation(evenementActif, actif.startMinute, calcul.minute),
+    /** « Oui » : la séance s'allonge, le bouclier aussi. */
+    prolonger: async () => {
+      if (!prolongationMontree) return
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return
+      const finTravail = o.startMinute + (o.workMinutes ?? o.endMinute - o.startMinute) + prolongationMontree.minutes
+      const r = accepterProlongation({
+        learning: frais.apprentissage,
+        confirmations: frais.confirmations,
+        minutes: prolongationMontree.minutes,
+        prochainDebut: prochainDebut(finTravail - prolongationMontree.minutes),
+      })
+      setOffreVisible(null)
+      if (!r) return
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      const blocage = useBlocage.getState()
+      const plage = blocage.plagesActives.find((p) => p.blocId === o.blockId)
+      const fin = r.confirmations.observedPending?.endMinute
+      if (plage && fin) await blocage.ouvrirSeance({ ...plage, finMinute: Math.max(plage.finMinute, fin) }, { theme, titreBloc: blocage.titreSeance ?? '' })
+    },
+    /** « Non, j'arrête là » : jamais un échec, jamais un signal négatif. */
+    declinerProlongation: () => setOffreVisible(null),
+    /** Le jour libre proposable cette semaine (YYYY-MM-DD), ou null. */
+    jourLibre,
+    decideJourLibre: async (date: string, decision: 'taken' | 'kept') => {
+      const frais = useSeances.getState()
+      await poser({
+        apprentissage: { ...frais.apprentissage, freeDays: { ...frais.apprentissage.freeDays, [date]: decision } },
+        confirmations: frais.confirmations,
+      })
+    },
     /** D.8 : le bloc qui attend son « Je commence » PAR L'OVERLAY. Au plus un à la fois. */
     enAttente: overlayDu ? enAttenteBrut : null,
     /** Le bloc démarrable sans overlay (phases 3-4) : le raccourci de Today. */

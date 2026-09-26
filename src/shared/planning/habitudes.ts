@@ -193,9 +193,12 @@ export function tenue(
   const semaine = ev.filter((e) => e.date >= addDays(today, -7))
   const quinzaine = ev.filter((e) => e.date >= addDays(today, -14))
   const prevu = quinzaine.reduce((t, e) => t + e.plannedMinutes, 0)
-  const tenu = quinzaine.reduce((t, e) => t + (e.started ? (e.heldMinutes ?? 0) : 0), 0)
+  // Anti-cliquet : seul le PLANIFIÉ tenu compte. Une prolongation acceptée ne
+  // fait jamais monter la dose des semaines suivantes.
+  const tenuPlanifie = (e: SessionEvent) => (e.started ? Math.min(e.heldMinutes ?? 0, e.plannedMinutes) : 0)
+  const tenu = quinzaine.reduce((t, e) => t + tenuPlanifie(e), 0)
   return {
-    tenuRecent: semaine.reduce((t, e) => t + (e.started ? (e.heldMinutes ?? 0) : 0), 0),
+    tenuRecent: semaine.reduce((t, e) => t + tenuPlanifie(e), 0),
     tauxTenue: prevu ? tenu / prevu : 0,
     // La part de BLOCS tenus (≥ 80 % de leur durée) : c'est elle que vise la
     // difficulté (~85 %), pas une part de minutes.

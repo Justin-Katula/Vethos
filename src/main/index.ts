@@ -311,6 +311,13 @@ function startNexusApp(): void {
         (args) =>
           planRunner?.stopBlock(args) ??
           Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
+        {
+          extensionOffer: () => planRunner?.extensionOffer() ?? Promise.resolve(null),
+          acceptExtension: () =>
+            planRunner?.acceptExtension() ?? Promise.resolve({ ok: false, reason: "Le planificateur n'est pas encore prêt." }),
+          freeDay: () => planRunner?.freeDay() ?? Promise.resolve(null),
+          decideFreeDay: (date, decision) => planRunner?.decideFreeDay(date, decision) ?? Promise.resolve(),
+        },
       )
 
       mainWindow = createMainWindow()

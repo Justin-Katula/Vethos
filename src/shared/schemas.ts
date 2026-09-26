@@ -372,6 +372,16 @@ export const LearningStateSchema = z.object({
    * prend que comme un signal faible.
    */
   sessionEvents: z.array(z.lazy(() => SessionEventSchema)).max(3000).default([]),
+  /**
+   * Prolongation : chaque offre faite, acceptée ou non. Le bandit y lit
+   * combien d'offres par jour garder (1 au départ).
+   */
+  extensionOffers: z
+    .array(z.object({ date: z.string().regex(DATE_REGEX), accepted: z.boolean() }))
+    .max(200)
+    .default([]),
+  /** Jours libres proposés : pris, ou gardés normaux (YYYY-MM-DD → décision). */
+  freeDays: z.record(z.string().regex(DATE_REGEX), z.enum(['taken', 'kept'])).default({}),
 })
 export type LearningState = z.infer<typeof LearningStateSchema>
 
@@ -414,6 +424,14 @@ export const SessionEventSchema = z.object({
     .optional(),
   /** Tentatives d'ouvrir une app bloquée pendant la séance. */
   blockedAttempts: z.number().int().min(0).default(0),
+  /**
+   * Prolongation acceptée, en minutes. `plannedMinutes` ne bouge pas : la dose
+   * des semaines suivantes ne se base que sur le planifié (anti-cliquet) ; la
+   * prolongation ne nourrit que la courbe de survie.
+   */
+  extensionMinutes: z.number().int().min(0).max(240).optional(),
+  /** Instant de la dernière tentative d'app bloquée (epoch ms). */
+  lastAttemptAt: z.number().int().optional(),
   /** Minutes de charge des 48 dernières heures au moment du bloc. */
   load48hMinutes: z.number().int().min(0).default(0),
   /** Heures éveillé au début du bloc. */
@@ -517,6 +535,8 @@ export const SessionConfirmationsStateSchema = z.object({
    * (une ancre, par exemple) reste le même dans le plan.
    */
   stoppedBlockIds: z.array(z.string()).max(200).default([]),
+  /** Blocs à qui une prolongation a déjà été offerte aujourd'hui (1 par bloc). */
+  extensionOfferedBlockIds: z.array(z.string()).max(200).default([]),
   /**
    * Le bloc actuellement surveillé — celui que le dernier tic a trouvé actif
    * et non confirmé — ou `null`. C'est la mémoire qui permet de détecter

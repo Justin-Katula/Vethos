@@ -245,6 +245,10 @@ function createBrowserStub(): NexusApi {
     planning: {
       confirmBlock: async () => ({ ok: true as const }),
       stopBlock: async () => ({ ok: true as const }),
+      extensionOffer: async () => null,
+      acceptExtension: async () => ({ ok: true as const }),
+      freeDay: async () => null,
+      decideFreeDay: async () => null,
       onChanged: () => () => undefined,
     },
   }

@@ -97,6 +97,8 @@ export type ActiveSession = {
 
 export type DayCapacity = {
   date: string
+  /** Jour libre accepté : rien n'y est placé, sauf les ancres minimales. */
+  freeDay?: boolean
   /** 0=lundi … 6=dimanche. */
   dayOfWeek: number
   /** A.1 : 1440 − sommeil − obligations − trajets − ancres. */
@@ -318,6 +320,8 @@ export type PlanningInput = {
   consecutiveDelays: Record<string, number>
   /** Utilisation réelle par jour, mesurée (E.3/E.4). */
   dailyUtilization: Record<string, number>
+  /** Jours libres acceptés (YYYY-MM-DD). */
+  freeDays?: string[]
   /** Minutes déjà servies par objectif cette semaine (D.4). */
   weeklyObjectiveServed: Record<string, number>
   /** Dernier jour de service par objectif (D.4). */

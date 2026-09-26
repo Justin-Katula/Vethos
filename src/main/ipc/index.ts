@@ -31,12 +31,31 @@ export type ConfirmBlockResult = { ok: true; help?: string } | { ok: false; reas
 
 export type StopBlockArgs = { reason: StopReason | null; text?: string; answerMs?: number }
 
+/** Prolongation et jours libres : servis par l'horloge de planification. */
+export type SessionExtras = {
+  extensionOffer: () => Promise<{ minutes: number } | null>
+  acceptExtension: () => Promise<ConfirmBlockResult>
+  freeDay: () => Promise<string | null>
+  decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
+}
+
+const ExtensionArgsSchema = z.object({ action: z.enum(['offer', 'accept']) })
+const FreeDayArgsSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('get') }),
+  z.object({
+    action: z.literal('decide'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    decision: z.enum(['taken', 'kept']),
+  }),
+])
+
 export async function registerAllIpcHandlers(
   storage: Storage,
   getMainWindow: () => BrowserWindow | null,
   getBlockingSession: () => BlockingSessionState,
   confirmBlock: (blockId: string) => Promise<ConfirmBlockResult>,
   stopBlock: (args: StopBlockArgs) => Promise<ConfirmBlockResult> = async () => ({ ok: false, reason: 'Indisponible.' }),
+  extras: SessionExtras | null = null,
 ): Promise<void> {
   registerStorageHandlers(storage)
 
@@ -114,6 +133,22 @@ export async function registerAllIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.PLANNING_STOP_BLOCK, (_e, raw: unknown) => {
     const parsed = StopBlockArgsSchema.safeParse(raw)
     return parsed.success ? stopBlock(parsed.data) : { ok: false, reason: 'Arrêt invalide.' }
+  })
+
+  // Prolongation : l'offre des 2 dernières minutes, puis le « Oui ».
+  ipcMain.handle(IPC_CHANNELS.PLANNING_EXTENSION, async (_e, raw: unknown) => {
+    const parsed = ExtensionArgsSchema.safeParse(raw)
+    if (!parsed.success || !extras) return null
+    return parsed.data.action === 'offer' ? extras.extensionOffer() : extras.acceptExtension()
+  })
+
+  // Jours libres : le jour proposable, puis la décision de la personne.
+  ipcMain.handle(IPC_CHANNELS.PLANNING_FREE_DAY, async (_e, raw: unknown) => {
+    const parsed = FreeDayArgsSchema.safeParse(raw)
+    if (!parsed.success || !extras) return null
+    if (parsed.data.action === 'get') return extras.freeDay()
+    await extras.decideFreeDay(parsed.data.date, parsed.data.decision)
+    return null
   })
 
   // ─── Blocage intelligent par IA ──────────────────────────────────────────

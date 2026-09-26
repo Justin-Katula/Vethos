@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal'
  * et un texte optionnel. Le temps de réponse est mesuré : une réponse
  * mécanique compte comme un signal plus faible.
  */
-export function StopSession({ label }: { label: string }) {
+export function StopSession({ label, inExtension = false }: { label: string; inExtension?: boolean }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -45,7 +45,10 @@ export function StopSession({ label }: { label: string }) {
         className="pressable inline-flex items-center gap-2 rounded border border-line px-3 py-1.5 text-[12.5px] text-fg-2 hover:text-fg"
         onClick={() => {
           openedAt.current = performance.now()
-          setOpen(true)
+          // Dans la prolongation, le bloc prévu est fait : « Stop » est la fin,
+          // sans raison à donner.
+          if (inExtension) void stop(null)
+          else setOpen(true)
         }}
       >
         <Square size={12} strokeWidth={2.4} />

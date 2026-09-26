@@ -13,7 +13,7 @@ import { usePlan } from '@/plan/Plan'
 import { dateLocale } from '@/plan/format'
 import type { SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
-import { ArretSeance, DemarrerSeance } from '@/seances/ArretSeance'
+import { ArretSeance, BanniereProlongation, CarteJourLibre, DemarrerSeance } from '@/seances/ArretSeance'
 import { useSeances } from '@/seances/magasin-seances'
 import { RevueDimanche } from '@/coach/RevueDimanche'
 import { afterMissLine, effectiveContract } from '@shared/contract'
@@ -246,6 +246,8 @@ export default function Aujourdhui() {
         )}
       </View>
 
+      <BanniereProlongation />
+      <CarteJourLibre />
       <RevueDimanche />
 
       {ligneRate ? (

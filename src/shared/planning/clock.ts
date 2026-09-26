@@ -252,6 +252,7 @@ const EMPTY_CONFIRMATIONS_FOR = (date: string): SessionConfirmationsState => ({
   workCreditedRanges: [],
   streakBumpedRefs: [],
   stoppedBlockIds: [],
+  extensionOfferedBlockIds: [],
   observedPending: null,
 })
 
@@ -593,10 +594,15 @@ export function closeSessionEvent(
 export function recordBlockedAttempt(
   learning: LearningState,
   confirmations: SessionConfirmationsState,
+  nowMs?: number,
 ): LearningState {
   const o = confirmations.observedPending
   if (!o || !(o.blockId in confirmations.confirmedAt)) return learning
-  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: e.blockedAttempts + 1 }))
+  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({
+    ...e,
+    blockedAttempts: e.blockedAttempts + 1,
+    ...(nowMs !== undefined ? { lastAttemptAt: nowMs } : {}),
+  }))
 }
 
 /**
@@ -634,9 +640,15 @@ export function applyStop(args: {
   const credited = applyWorkCredit(args.learning, confirmations, o, o.startMinute, minute)
   // Arrêté pendant la pause : le travail du bloc était fait — tenu en entier.
   const held = Math.min(work, Math.max(0, minute - o.startMinute))
-  const early = minute - o.startMinute < work
+  const current = (credited.learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === confirmations.date)
+  // Dans une prolongation, le bloc prévu est déjà fait : s'arrêter là n'est
+  // ni un arrêt anticipé, ni une raison à donner — seulement la fin.
+  const planned = work - (current?.extensionMinutes ?? 0)
+  const inExtension = current?.extensionMinutes !== undefined && held >= planned
+  const early = held < planned
   const text = args.text?.trim()
-  const learning = updateEvent(credited.learning, confirmations.date, o.blockId, (e) => ({
+  const learning = updateEvent(credited.learning, confirmations.date, o.blockId, (e) =>
+    inExtension ? { ...e, heldMinutes: held, stoppedEarly: false } : {
     ...e,
     heldMinutes: held,
     stoppedEarly: early,
@@ -647,7 +659,7 @@ export function applyStop(args: {
       ...(args.answerMs !== undefined ? { answerMs: Math.max(0, Math.round(args.answerMs)) } : {}),
       attemptsBefore: args.attemptsBefore ?? 0,
     },
-  }))
+  })
   const end = Math.max(o.startMinute + 1, minute)
   return {
     learning,
@@ -729,11 +741,16 @@ export function setBlockedAttempts(
   learning: LearningState,
   confirmations: SessionConfirmationsState,
   count: number,
+  nowMs?: number,
 ): LearningState {
   const o = confirmations.observedPending
   if (!o || !(o.blockId in confirmations.confirmedAt)) return learning
   const current = (learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === confirmations.date)
   if (!current || current.blockedAttempts >= count) return learning
-  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: count }))
+  return updateEvent(learning, confirmations.date, o.blockId, (e) => ({
+    ...e,
+    blockedAttempts: count,
+    ...(nowMs !== undefined ? { lastAttemptAt: nowMs } : {}),
+  }))
 }
 

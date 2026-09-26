@@ -169,15 +169,23 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // `crisisDates` ne contient que des jours dont la crise est PROUVÉE (densité
   // > 1, C.2). C'est la seule clé qui ouvre les deux réductions permises : la
   // version minimale d'une ancre (D.3) et la zone de réveil rognée (A.2).
+  // Jours libres acceptés : aucune tâche, aucun objectif ; les ancres restent
+  // en version minimale (D.3) — ce sont les déclencheurs des habitudes.
+  const freeDays = new Set(input.freeDays ?? [])
   const buildDayFor = (date: string, crisisDates: Set<string>, fullDay = false): DayCapacity => {
+    const day = buildDayForRaw(date, crisisDates, fullDay)
+    return freeDays.has(date) ? { ...day, effectiveCapacityMinutes: 0, freeDay: true } : day
+  }
+  const buildDayForRaw = (date: string, crisisDates: Set<string>, fullDay = false): DayCapacity => {
     const dow = dayOfWeek(date)
     // Une occurrence unique (date renseignée) ne compte que ce jour-là ; une
     // entrée récurrente (le défaut historique) compte chaque semaine.
     const entries = scheduleEntriesForDate(input.schedule, date, dow)
     const isCrisis = crisisDates.has(date)
     const dayAncres = ancresFor(dow).map((a) =>
-      // D.3 : la version minimale ne répond qu'à la saturation réelle du jour.
-      isCrisis ? { ...a, normalMaxMinutes: a.minimumMinutes } : a,
+      // D.3 : la version minimale ne répond qu'à la saturation réelle du jour,
+      // ou à un jour libre accepté.
+      isCrisis || freeDays.has(date) ? { ...a, normalMaxMinutes: a.minimumMinutes } : a,
     )
     // A.2 : 30 min protégées après le lever ; 10 seulement si la crise est
     // prouvée — jamais moins, et l'écart reste chiffré sur le jour (C.3).
@@ -557,7 +565,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
 
     // D.1.2 ANCRES — heure fixe, gelées, jamais déplacées.
     for (const ancre of ancresFor(dow)) {
-      const reduced = saturated.has(date)
+      const reduced = saturated.has(date) || freeDays.has(date)
       const duration = reduced ? ancre.minimumMinutes : ancre.normalMaxMinutes
       allocator.reserve(ancre.anchorMinute, ancre.anchorMinute + duration)
       blocks.push({
@@ -738,6 +746,13 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const remainingDayCapacities = capacities
           .filter((c) => c.date >= date && c.date <= deadline)
           .map((c) => c.effectiveCapacityMinutes)
+        // Une échéance au-delà de l'horizon calculé : les jours qui manquent
+        // comptent aussi, à la capacité moyenne de l'horizon. Sans eux, 28 h
+        // dues dans 10 jours se tassaient dans les 7 jours visibles.
+        if (deadline > input.rangeEnd && capacities.length > 0) {
+          const moyenne = capacities.reduce((t, c) => t + c.effectiveCapacityMinutes, 0) / capacities.length
+          for (let k = daysBetween(input.rangeEnd, deadline); k > 0; k--) remainingDayCapacities.push(moyenne)
+        }
         const { target, capOverride } = computeTaskDayTarget({
           remainingNeed: members.reduce((s, t) => s + (remainingNeed.get(t.id) ?? 0), 0),
           dayCapacity: cap.effectiveCapacityMinutes,

@@ -1,3 +1,4 @@
+import { joursLibresPris } from '@shared/planning/jours-libres'
 import { useMemo } from 'react'
 import { usePlanningStore } from '@/store/planning.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -46,6 +47,8 @@ export function usePlanning(now: Date = new Date()): PlanningResult | null {
       consecutiveDelays: learning.consecutiveDelays,
       // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
       sessionEvents: learning.sessionEvents,
+      // Jours libres pris : le même plan que le processus main.
+      freeDays: joursLibresPris(learning),
       // D.7 : le retard est une MESURE de la confirmation « Je commence », pas
       // une déduction du moteur. Tant que rien n'est mesuré pour un jour, il
       // n'y a pas de retard — surtout pas un retard supposé (G.3).

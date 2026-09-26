@@ -8,6 +8,10 @@ import { sleepScheduleEntries } from '@shared/sleep'
 import type { PlacedBlock, PlanningInput } from '@shared/planning/types'
 import type { BlockingRulesState, LearningState, StopReason } from '@shared/schemas'
 import { blockSessionIsActiveAt } from '@main/blocking/schedule'
+import { accepterProlongation, marquerOffre, proposerProlongation } from '@shared/planning/prolongation'
+import { jourLibrePropose, joursLibresPris } from '@shared/planning/jours-libres'
+import { scheduleEntriesForDate } from '@shared/planning/capacity'
+import { dayOfWeek } from '@shared/planning/dates'
 import {
   activeBlockFor,
   activeConfirmedSession,
@@ -50,6 +54,8 @@ const EMPTY_LEARNING: LearningState = {
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
   sessionEvents: [],
+  extensionOffers: [],
+  freeDays: {},
 }
 
 /** « 07:30 » → 450 ; null si absent ou illisible. */
@@ -92,6 +98,14 @@ export type PlanRunner = {
   stopBlock: (args: StopArgs) => Promise<ConfirmResult>
   /** Une tentative d'ouvrir une app ou un site bloqué pendant la séance. */
   recordBlockedAttempt: () => Promise<void>
+  /** Prolongation : l'offre du moment (comptée dès qu'elle est lue), ou null. */
+  extensionOffer: () => Promise<{ minutes: number } | null>
+  /** « Oui » : la séance et son blocage s'allongent. */
+  acceptExtension: () => Promise<ConfirmResult>
+  /** Le jour libre proposable cette semaine, ou null. */
+  freeDay: () => Promise<string | null>
+  /** Le jour libre pris, ou la journée gardée normale. */
+  decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
 }
 
 export type StopArgs = {
@@ -167,6 +181,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
         getActualMinutes: (taskId) => learning.workedMinutesByRef[taskId] ?? null,
       },
       activeSession,
+      // Jours libres pris : le moteur les vide (ancres minimales exceptées).
+      freeDays: joursLibresPris(learning),
     }
 
     const plan = computePlan(input, now)
@@ -186,7 +202,112 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       todayBlocks,
       tasks: tasksState?.tasks ?? [],
       wakeMinute: minuteOf(settings?.sleepEnd),
+      sleepMinute: minuteOf(settings?.sleepStart),
+      input,
+      plan,
     }
+  }
+
+  /** Le prochain engagement du jour après `after` : bloc, ancre ou obligation (sommeil exclu). */
+  function nextStartAfter(state: Awaited<ReturnType<typeof loadTodayState>>, after: number, excludeId: string): number | null {
+    const starts = [
+      ...state.todayBlocks.filter((b) => b.id !== excludeId && b.confirmed !== true).map((b) => b.startMinute),
+      ...scheduleEntriesForDate(state.input.schedule, state.today, dayOfWeek(state.today))
+        .filter((e) => e.categoryType !== 'sleep')
+        .map((e) => e.startMinute),
+    ].filter((m) => m >= after)
+    return starts.length ? Math.min(...starts) : null
+  }
+
+  async function extensionOffer(): Promise<{ minutes: number } | null> {
+    const now = deps.now()
+    const state = await loadTodayState(now)
+    const { learning, confirmations, activeSession, nowMinute, today } = state
+    if (!activeSession || disciplineSuspendue(learning.lastSignalAt, now)) return null
+    const o = confirmations.observedPending
+    if (!o || o.blockId !== activeSession.blockId) return null
+    const event = (learning.sessionEvents ?? []).find((e) => e.blockId === o.blockId && e.date === today)
+    if (!event) return null
+    // Déjà montrée pour cette séance : on la rend telle quelle, sans la recompter.
+    if (offered?.blockId === o.blockId) return event.extensionMinutes === undefined ? { minutes: offered.minutes } : null
+    const work = o.workMinutes ?? o.endMinute - o.startMinute
+    const workEnd = o.startMinute + work
+    const cap = state.plan.capacities.find((c) => c.date === today)
+    const minutes = proposerProlongation({
+      event,
+      session: { blockId: o.blockId, startMinute: o.startMinute, workMinutes: work },
+      nowMinute,
+      nowMs: now.getTime(),
+      today,
+      events: learning.sessionEvents ?? [],
+      historique: learning.extensionOffers ?? [],
+      dejaOfferte: (confirmations.extensionOfferedBlockIds ?? []).includes(o.blockId),
+      prochainDebut: nextStartAfter(state, workEnd, o.blockId),
+      coucher: state.sleepMinute,
+      travailDuJour:
+        Math.max(0, workEnd - nowMinute) +
+        state.todayBlocks
+          .filter((b) => b.kind !== 'ancre' && b.id !== o.blockId && b.confirmed !== true)
+          .reduce((t, b) => t + b.workMinutes, 0),
+      capaciteDuJour: cap?.effectiveCapacityMinutes ?? 0,
+    })
+    if (minutes === null) return null
+    const marked = marquerOffre(learning, confirmations, o.blockId)
+    await Promise.all([
+      deps.storage.write('learning', marked.learning),
+      deps.storage.write('session_confirmations', marked.confirmations),
+    ])
+    offered = { blockId: o.blockId, minutes }
+    return { minutes }
+  }
+
+  // L'offre montrée, gardée pour le « Oui » : une fois comptée, elle ne se
+  // recalcule plus (la proposer à nouveau la refuserait — une par bloc).
+  let offered: { blockId: string; minutes: number } | null = null
+
+  async function acceptExtension(): Promise<ConfirmResult> {
+    const now = deps.now()
+    const state = await loadTodayState(now)
+    const o = state.confirmations.observedPending
+    if (!o || !offered || offered.blockId !== o.blockId) return { ok: false, reason: 'Aucune offre en cours.' }
+    const workEnd = o.startMinute + (o.workMinutes ?? o.endMinute - o.startMinute)
+    const result = accepterProlongation({
+      learning: state.learning,
+      confirmations: state.confirmations,
+      minutes: offered.minutes,
+      prochainDebut: nextStartAfter(state, workEnd, o.blockId),
+    })
+    offered = null
+    if (!result) return { ok: false, reason: 'Aucune séance en cours.' }
+    const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
+    const end = result.confirmations.observedPending?.endMinute ?? o.endMinute
+    const midnight = new Date(now)
+    midnight.setHours(0, 0, 0, 0)
+    const endsAt = midnight.getTime() + end * 60_000
+    await Promise.all([
+      deps.storage.write('learning', result.learning),
+      deps.storage.write('session_confirmations', result.confirmations),
+      // Le blocage suit la séance prolongée.
+      ...(rules.block && rules.block.blockId === o.blockId
+        ? [deps.storage.write('blocking_rules', { ...rules, block: { ...rules.block, endsAt: Math.max(rules.block.endsAt, endsAt) } })]
+        : []),
+    ])
+    log.info('[planning] séance prolongée', { blockId: o.blockId })
+    deps.onBlockConfirmed?.()
+    deps.onPlanningDataChanged?.()
+    return { ok: true }
+  }
+
+  async function freeDay(): Promise<string | null> {
+    const now = deps.now()
+    const state = await loadTodayState(now)
+    return jourLibrePropose({ input: state.input, learning: state.learning, plan: state.plan, now })
+  }
+
+  async function decideFreeDay(date: string, decision: 'taken' | 'kept'): Promise<void> {
+    const learning = (await deps.storage.read('learning')) ?? EMPTY_LEARNING
+    await deps.storage.write('learning', { ...learning, freeDays: { ...(learning.freeDays ?? {}), [date]: decision } })
+    deps.onPlanningDataChanged?.()
   }
 
   function viewFor(block: PlacedBlock) {
@@ -528,7 +649,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     const now = deps.now()
     attempts = [...attempts.filter((t) => now.getTime() - t < 10 * 60_000), now.getTime()]
     const { learning, confirmations } = await loadTodayState(now)
-    const next = recordBlockedAttempt(learning, confirmations)
+    const next = recordBlockedAttempt(learning, confirmations, now.getTime())
     if (next !== learning) await deps.storage.write('learning', next)
   }
 
@@ -588,5 +709,9 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     confirmBlock: (blockId: string) => serialize(() => confirmBlock(blockId)),
     stopBlock: (args: StopArgs) => serialize(() => stopBlock(args)),
     recordBlockedAttempt: () => serialize(recordAttempt),
+    extensionOffer: () => serialize(extensionOffer),
+    acceptExtension: () => serialize(acceptExtension),
+    freeDay: () => serialize(freeDay),
+    decideFreeDay: (date: string, decision: 'taken' | 'kept') => serialize(() => decideFreeDay(date, decision)),
   }
 }

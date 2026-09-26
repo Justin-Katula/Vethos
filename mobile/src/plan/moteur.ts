@@ -1,4 +1,5 @@
 import { computePlan } from '@shared/planning/engine'
+import { joursLibresPris } from '@shared/planning/jours-libres'
 import type {
   ActiveSession,
   PlanningInput,
@@ -39,7 +40,7 @@ import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/mag
  *   seul groupe au lieu d'un par domaine — moins fin que le bureau, mais
  *   jamais faux.
  */
-export function calculerPlan({
+export function entreeEtPlan({
   taches,
   objectifs,
   ancres,
@@ -62,7 +63,7 @@ export function calculerPlan({
   /** Horizon, en jours. Sept couvre la semaine que le moteur raisonne. */
   jours?: number
   maintenant?: Date
-}): PlanningResult {
+}): { entree: PlanningInput; resultat: PlanningResult } {
   const aujourdhui = cleDate(maintenant)
   const fin = new Date(maintenant)
   fin.setDate(fin.getDate() + Math.max(0, jours - 1))
@@ -137,9 +138,15 @@ export function calculerPlan({
         }
       : {}),
     ...(seanceActive ? { activeSession: seanceActive } : {}),
+    // Jours libres pris : le moteur les vide (ancres minimales exceptées).
+    ...(apprentissage ? { freeDays: joursLibresPris(apprentissage) } : {}),
   }
 
-  return computePlan(entree, maintenant)
+  return { entree, resultat: computePlan(entree, maintenant) }
+}
+
+export function calculerPlan(args: Parameters<typeof entreeEtPlan>[0]): PlanningResult {
+  return entreeEtPlan(args).resultat
 }
 
 function sourceConfirmation(apprentissage: LearningState): SessionConfirmationSource {

@@ -371,6 +371,8 @@ const emptyLearning = (over: Partial<LearningState> = {}): LearningState => ({
   workedMinutesByRef: {},
   dailyDelayMinutes: {},
   sessionEvents: [],
+  extensionOffers: [],
+  freeDays: {},
   ...over,
 })
 
@@ -381,6 +383,7 @@ const emptyConfirmations = (date: string): SessionConfirmationsState => ({
   workCreditedRanges: [],
   streakBumpedRefs: [],
   stoppedBlockIds: [],
+  extensionOfferedBlockIds: [],
   observedPending: null,
 })
 
@@ -397,6 +400,7 @@ describe('confirmationsFor — le bookkeeping ne franchit jamais le jour', () =>
       workCreditedRanges: [],
       streakBumpedRefs: ['ref-1'],
       stoppedBlockIds: [],
+      extensionOfferedBlockIds: [],
       observedPending: observed(),
     }
     expect(confirmationsFor(stored, TODAY)).toBe(stored)
@@ -410,6 +414,7 @@ describe('confirmationsFor — le bookkeeping ne franchit jamais le jour', () =>
       workCreditedRanges: [],
       streakBumpedRefs: ['ref-1'],
       stoppedBlockIds: [],
+      extensionOfferedBlockIds: [],
       observedPending: observed(),
     }
     expect(confirmationsFor(stored, TODAY)).toEqual(emptyConfirmations(TODAY))
