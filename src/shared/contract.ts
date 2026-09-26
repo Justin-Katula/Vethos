@@ -99,6 +99,11 @@ export function requestObjectiveRemoval(
   }
 }
 
+/** Annuler un retrait en instance : garder l'objectif n'attend pas 48 h. */
+export function cancelObjectiveRemoval(c: Contract, refId: string): Contract {
+  return { ...c, pendingRemovals: (c.pendingRemovals ?? []).filter((r) => r.refId !== refId) }
+}
+
 /** Les retraits échus à `now`, et le contrat qui n'en garde plus trace. */
 export function dueRemovals(c: Contract, now: Date): { refIds: string[]; contract: Contract } {
   const due = (c.pendingRemovals ?? []).filter((r) => new Date(r.effectiveAt).getTime() <= now.getTime())

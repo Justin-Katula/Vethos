@@ -133,7 +133,7 @@ export default function SettingsPage() {
               </p>
             </Row>
 
-            <Row label="Age" hint="Sets your sleep floor: 8 hours from 13 to 18, 7 hours after.">
+            <Row label="Age" hint="Your sleep floor.">
               <AgeChoice />
             </Row>
 

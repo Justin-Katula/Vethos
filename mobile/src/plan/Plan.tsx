@@ -67,6 +67,7 @@ function useSourcePlan() {
     () => (mesuresPretes && chargees
       ? tictac({ maintenant: calcul.maintenant, aujourdHui: calcul.aujourdHui,
           blocsDuJour, taches, etat: { apprentissage, confirmations },
+          suspendu: disciplineSuspendue(apprentissage.lastSignalAt, calcul.maintenant),
           contexteRate: journalContextFor({
             learning: apprentissage,
             today: calcul.aujourdHui,

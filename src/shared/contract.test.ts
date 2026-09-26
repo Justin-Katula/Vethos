@@ -13,6 +13,7 @@ import {
   dueRemovals,
   removalDate,
   toneSample,
+  cancelObjectiveRemoval,
 } from './contract'
 
 const NOW = new Date('2026-09-25T14:00:00.000Z')
@@ -74,5 +75,13 @@ describe('Contrat — objectifs et cibles', () => {
   it('l’échantillon du ton ne porte aucun chiffre inventé', () => {
     expect(toneSample('ally')).not.toMatch(/\d/)
     expect(toneSample('sergeant')).not.toMatch(/\d/)
+  })
+})
+
+describe('Contrat — annuler un retrait', () => {
+  it('garder l’objectif n’attend pas 48 h', () => {
+    const r = requestObjectiveRemoval(signContract('ally', NOW), 'obj', NOW, false)
+    if (!r.ok) throw new Error('attendu')
+    expect(cancelObjectiveRemoval(r.contract, 'obj').pendingRemovals).toEqual([])
   })
 })

@@ -14,7 +14,7 @@ import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
-import { effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
+import { cancelObjectiveRemoval, effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
 import { useSeances } from '@/seances/magasin-seances'
 import { CoachEnLigne } from '@/coach/CoachEnLigne'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
@@ -244,6 +244,11 @@ export default function Engagements() {
           <View style={{ gap: 12, paddingTop: 12 }}>
             {o.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{o.intention}</Text> : null}
             <View style={{ flexDirection: 'row' }}>
+              {removalDate(contratSigne, o.id) ? (
+                <Pilule onPress={() => contratSigne && void d.majReglages({ contrat: cancelObjectiveRemoval(contratSigne, o.id) })}>
+                  Keep
+                </Pilule>
+              ) : null}
               <Pilule contour onPress={() => garde() && retirerObjectif(o.id, o.nom)}>
                 Remove
               </Pilule>

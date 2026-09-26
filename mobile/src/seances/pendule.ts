@@ -101,6 +101,8 @@ export function tictac(args: {
   etat: EtatSeances
   /** Le contexte d'un raté (charge, heures éveillé) : le journal le garde. */
   contexteRate?: JournalContext
+  /** Détresse vue il y a moins de 24 h : rien n'est compté comme raté. */
+  suspendu?: boolean
 }): ResultatTic {
   const minute = minuteDuJour(args.maintenant)
   const confirmationsDuJour = pourAujourdHui(args.etat.confirmations, args.aujourdHui)
@@ -139,7 +141,9 @@ export function tictac(args: {
 
   if (ferme !== null) {
     const confirmeA = confirmations.confirmedAt[ferme.blockId]
-    if (confirmeA === undefined) {
+    if (confirmeA === undefined && args.suspendu) {
+      // L'app n'exige rien pendant la pause de détresse : ni retard, ni raté.
+    } else if (confirmeA === undefined) {
       // D.7 : jamais confirmé — toute la fenêtre compte comme du retard.
       const r = applyLapsedCredit(apprentissage, confirmations, ferme, args.maintenant.getTime(), args.contexteRate)
       apprentissage = r.learning

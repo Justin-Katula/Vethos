@@ -16,6 +16,7 @@ const cfg: Config = {
   parInstallationParJour: Number(env('COACH_PAR_INSTALLATION_PAR_JOUR') ?? 40),
   globalParJour: Number(env('COACH_GLOBAL_PAR_JOUR') ?? 2000),
   installationsParIpParHeure: Number(env('COACH_INSTALLATIONS_PAR_IP_PAR_HEURE') ?? 5),
+  parAdresseParJour: Number(env('COACH_PAR_ADRESSE_PAR_JOUR') ?? 120),
   joursJeton: Number(env('COACH_JOURS_JETON') ?? 30),
 }
 const erreur = validerConfig(cfg)

@@ -3,6 +3,7 @@ import { useSettingsStore } from './settings.store'
 import { useToastStore } from './toast.store'
 import { dueRemovals, effectiveContract, refusalLine, refusesChange, removalDate, requestObjectiveRemoval } from '@shared/contract'
 import { activeConfirmedSession } from '@shared/planning/session'
+import { disciplineSuspendue } from '@shared/coach/garde-fous'
 import { nexus } from '@/lib/ipc'
 import { assertStorageWrite } from '@/lib/storage-write'
 import { computeAncreMinimum, findAncreConflict } from '@shared/planning/placement'
@@ -131,10 +132,12 @@ export type TaskDraft = Creatable<
  * une séance confirmée, le plan ne change pas — refusé avec les mots du
  * contrat signé. Rend `true` quand l'action peut avoir lieu.
  */
-function contractAllows(confirmations: SessionConfirmationsState | null): boolean {
+function contractAllows(confirmations: SessionConfirmationsState | null, learning: LearningState): boolean {
   const raw = useSettingsStore.getState().contract
   const now = new Date()
   if (!raw) return true
+  // Détresse récente : l'app arrête d'exiger — aucun refus pendant 24 h.
+  if (disciplineSuspendue(learning.lastSignalAt, now)) return true
   const contract = effectiveContract(raw, now)
   const minute = now.getHours() * 60 + now.getMinutes()
   const session = activeConfirmedSession(confirmations, dateKey(now), minute)
@@ -198,7 +201,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async addTask(input, options) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     // B.1/B.4 : la durée retenue est l'estimation CORRIGÉE par ce que les
     // tâches passées de cette catégorie ont réellement coûté. L'utilisateur
     // donne son estimation ; l'application ne la prend jamais au mot.
@@ -301,14 +304,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async deleteTask(id) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     const tasks = get().tasks.filter((t) => t.id !== id && t.parentTaskId !== id)
     set({ tasks })
     assertStorageWrite(await nexus.storage.write('tasks', { tasks }), 'tasks')
   },
 
   async addObjective(input) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     const color =
       input.color && estCouleurDansFamille('objective', input.color)
         ? input.color
@@ -334,7 +337,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async deleteObjective(id) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     // Retirer un objectif modifie le contrat : effectif 48 h plus tard.
     const settings = useSettingsStore.getState()
     if (settings.contract) {
@@ -345,7 +348,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
         useToastStore.getState().push({
           variant: 'info',
           title: 'Leaves in 48 hours',
-          description: when ? `It stays planned until ${when.toLocaleString('en-GB')}.` : '',
+          description: when ? when.toLocaleString('en-GB') : '',
         })
       }
       return
@@ -367,7 +370,7 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async addAncre(input) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     // D.3 : conflit d'heure ou de déclencheur → création REFUSÉE, sans
     // exception. Pas de fusion, pas de décalage automatique : c'est à
     // l'utilisateur de changer l'heure.
@@ -399,14 +402,14 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
   },
 
   async deleteAncre(id) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     const ancres = get().ancres.filter((a) => a.id !== id)
     set({ ancres })
     assertStorageWrite(await nexus.storage.write('ancres', { ancres }), 'ancres')
   },
 
   async setSchedule(entries) {
-    if (!contractAllows(get().sessionConfirmations)) return
+    if (!contractAllows(get().sessionConfirmations, get().learning)) return
     set({ schedule: entries })
     assertStorageWrite(await nexus.storage.write('schedule', { entries }), 'schedule')
   },

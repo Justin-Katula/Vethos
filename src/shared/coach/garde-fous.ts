@@ -17,10 +17,10 @@ const mots = (alternatives: string) => new RegExp(`(?<!\\p{L})(?:${alternatives}
  */
 const DETRESSE = [
   mots(
-    "suicid\\p{L}*|kill (?:my|him|her)self|end (?:it all|my life)|want to die|wanna die|don'?t want to (?:live|be here)|no reason to live|self[- ]?harm|cut(?:ting)? myself|hurt myself|better off dead|better off without me|can'?t go on|hopeless|worthless",
+    "suicid\\p{L}*|kill (?:my|him|her)self|end (?:it all|my life)|want to die|wanna die|don'?t want to (?:live|be here)|no reason to live|self[- ]?harm|cut(?:ting)? myself|hurt myself|better off dead|better off without me|can'?t go on|hopeless|worthless|end it|kms|unalive(?: myself)?|disappear forever",
   ),
   mots(
-    'me suicider|me tuer|en finir|envie de mourir|veux mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien|je sers a rien|plus la force',
+    'me suicider|me tuer|en finir|envie de mourir|veux mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien|je sers a rien|plus la force|mourir|disparaître|disparaitre pour toujours|plus envie de rien',
   ),
 ]
 

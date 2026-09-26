@@ -39,7 +39,16 @@ export function FeuilleCoach({ ouverte, fermer }: { ouverte: boolean; fermer: ()
     setAttente(true)
     // La conversation garde ses tours dans l'ordre et commence par l'utilisateur :
     // le premier message du Coach (sans question posée) n'y entre pas.
-    const envoyes = historique.slice(historique[0]?.role === 'assistant' ? 1 : 0).slice(-11)
+    // On n'envoie que la conversation qui suit le dernier tour NON signé (le
+    // message d'aide, une réponse refiltrée sur l'appareil) : le serveur
+    // refuse un tour qu'il n'a pas signé, et une détresse passée ne doit pas
+    // ramener l'aide à chaque message.
+    let debut = 0
+    historique.forEach((m, i) => {
+      if (m.role === 'assistant' && !m.sig) debut = i + 1
+    })
+    const suite0 = historique.slice(debut)
+    const envoyes = suite0.slice(suite0[0]?.role === 'assistant' ? 1 : 0).slice(-11)
     const r = await coach().converser({ job: 'woop', mode, faits: {}, messages: envoyes })
     setAttente(false)
     if (r === null) {

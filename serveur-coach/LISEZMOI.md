@@ -20,6 +20,7 @@ Pour aller plus loin contre l'abus (fabrication de jetons en masse) : exiger une
 | `COACH_PAR_INSTALLATION_PAR_JOUR` | non | 40 |
 | `COACH_GLOBAL_PAR_JOUR` | non | 2000 |
 | `COACH_INSTALLATIONS_PAR_IP_PAR_HEURE` | non | 5 |
+| `COACH_PAR_ADRESSE_PAR_JOUR` | non : appels par adresse et par jour, tous jetons confondus | 120 |
 | `COACH_PROXYS` | non : nombre de proxys de confiance devant le serveur (l'adresse est lue à droite de `X-Forwarded-For`) | 0 |
 | `COACH_JOURS_JETON` | non : durée de vie d'un jeton | 30 |
 | `PORT` | non | 8787 |

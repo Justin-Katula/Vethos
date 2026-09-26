@@ -10,6 +10,7 @@ import type { SessionEvent, StopReason } from '@shared/schemas'
 import { STOP_REASONS } from '@shared/schemas'
 import { betaMean, inheritedPosterior } from './bayes'
 import { MIN_OBSERVATIONS } from './learning'
+import { addDays } from './dates'
 
 /** Ce que l'utilisateur lit, et la cause selon Steel (2007). */
 export const RAISONS: Record<StopReason, { libelle: string; cause: string }> = {
@@ -94,6 +95,24 @@ export function diagnostiquer(events: SessionEvent[]): Record<Cause, number> | '
     creneau: concentration(a.map((e) => Math.floor(e.plannedStartMinute / 60))),
     tropLong: 1 - dispersion(a.map((e) => e.heldMinutes! / e.plannedMinutes)),
   }
+  // Le comportement des AUTRES engagements dans le même état départage
+  // fatigue et évitement.
+  const autres = a.map((e) => autresTiennent(events, e)).filter((x): x is number => x !== null)
+  if (autres.length) {
+    const m = autres.reduce((t, x) => t + x, 0) / autres.length
+    s.evitement += m
+    s.fatigue += 1 - m
+  }
+  // La raison dite, pondérée par sa fiabilité chez CETTE personne — un signal
+  // faible, qui ne pèse que s'il est fiable.
+  const part = (r: StopReason) => a.filter((e) => e.stop?.reason === r).length / a.length
+  s.fatigue += 0.5 * part('tired') * fiabiliteRaison(events, 'tired')
+  s.evitement += 0.5 * (part('boring') * fiabiliteRaison(events, 'boring') + part('too-hard') * fiabiliteRaison(events, 'too-hard') + part('distracted') * fiabiliteRaison(events, 'distracted'))
+  // Une raison anormalement fréquente ces 14 jours renforce sa cause.
+  const dernier = a.reduce((m, e) => (e.date > m ? e.date : m), a[0]!.date)
+  const anormales = raisonsAnormales(events, dernier)
+  if (anormales.includes('tired')) s.fatigue += 0.3
+  if (anormales.some((r) => r === 'boring' || r === 'too-hard' || r === 'distracted')) s.evitement += 0.3
   return softmax(s)
 }
 
@@ -121,7 +140,54 @@ export function fiabiliteRaison(events: SessionEvent[], raison: StopReason): num
         return true
     }
   }
-  return betaMean(inheritedPosterior([a.map(concorde)]))
+  // Une réponse mécanique (moins d'une seconde, ou la même raison que les
+  // deux arrêts d'avant) ne compte que pour moitié : on pondère, on ne punit pas.
+  const tous = arretsDe(events)
+  let succes = 0
+  let poids = 0
+  for (const e of a) {
+    const i = tous.indexOf(e)
+    const avant = tous.slice(Math.max(0, i - 2), i)
+    const mecanique = (e.stop?.answerMs ?? 5000) < 1000 || (avant.length === 2 && avant.every((x) => x.stop?.reason === raison))
+    const w = mecanique ? 0.5 : 1
+    poids += w
+    if (concorde(e)) succes += w
+  }
+  return (1 + succes) / (2 + poids)
+}
+
+/**
+ * Le taux d'une raison sur 14 jours, comparé à sa normale (tout le journal) :
+ * au-dessus de 1,5 fois, elle est « anormale » cette quinzaine.
+ */
+export function raisonsAnormales(events: SessionEvent[], today: string): StopReason[] {
+  const a = arretsDe(events)
+  const recents = a.filter((e) => e.date > addDays(today, -14) && e.date <= today)
+  if (recents.length < MIN_OBSERVATIONS || a.length < 2 * MIN_OBSERVATIONS) return []
+  return STOP_REASONS.filter((r) => {
+    const normale = a.filter((e) => e.stop?.reason === r).length / a.length
+    const quinzaine = recents.filter((e) => e.stop?.reason === r).length / recents.length
+    return quinzaine > 0.2 && quinzaine > 1.5 * normale
+  })
+}
+
+/**
+ * Les autres engagements tiennent-ils dans le même état (même jour, même
+ * tranche horaire) ? Oui → l'arrêt vise CETTE tâche (évitement) ; non → c'est
+ * l'état qui lâche (fatigue).
+ */
+function autresTiennent(tous: SessionEvent[], e: SessionEvent): number | null {
+  const pareil = tous.filter(
+    (x) =>
+      x !== e &&
+      x.refId !== e.refId &&
+      x.date === e.date &&
+      x.started &&
+      x.heldMinutes !== null &&
+      Math.abs(x.plannedStartMinute - e.plannedStartMinute) <= 180,
+  )
+  if (!pareil.length) return null
+  return pareil.filter((x) => !x.stoppedEarly).length / pareil.length
 }
 
 /**
@@ -129,8 +195,15 @@ export function fiabiliteRaison(events: SessionEvent[], raison: StopReason): num
  * pause du bloc tombe à la minute 34. Un abandon devient une pause prévue.
  * Rend la minute (depuis le début du bloc) où placer la pause, ou null.
  */
-export function pauseAnticipee(events: SessionEvent[], refId: string): number | null {
-  const a = arretsDe(events).filter((e) => e.refId === refId && e.stop?.reason !== 'real-event')
+export function pauseAnticipee(events: SessionEvent[], refId: string, dureeBloc?: number): number | null {
+  // Comparé à l'intérieur d'une même tranche de durée : décrocher à 40 min
+  // sur un bloc de 50 n'est pas le même signal que sur un bloc de 90.
+  const a = arretsDe(events).filter(
+    (e) =>
+      e.refId === refId &&
+      e.stop?.reason !== 'real-event' &&
+      (dureeBloc === undefined || Math.abs(e.plannedMinutes - dureeBloc) <= 20),
+  )
   if (a.length < MIN_OBSERVATIONS) return null
   const s = a.map((e) => e.heldMinutes!).sort((x, y) => x - y)
   const mediane = s[Math.floor(s.length / 2)]!

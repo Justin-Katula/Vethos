@@ -242,6 +242,8 @@ export const SCORE_DEFAULTS = {
   /** Une tâche aussi s'écarte d'un bloc de la même tâche, sans interdiction. */
   softGapPerHour: 20,
   fatiguePerMinute: 0.05,
+  /** Un bloc est « exigeant » à partir de cette durée (inertie stricte, fatigue du soir). */
+  demandingMinutes: 45,
   /** Phase 2+ : partir juste après un déclencheur-événement. */
   triggerBonus: 15,
   quality: { PROFONDE: 30, NORMALE: 0, BASSE: -30 } as Record<CognitiveWindow, number>,
@@ -307,14 +309,17 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
   if (c.habitualStart !== null) s -= SCORE_DEFAULTS.constancyPerHour * circularHours(start, c.habitualStart)
   if (c.wakeMinute !== null) {
     const after = start - c.wakeMinute
-    if (c.inertiaHard && after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes) return -Infinity
+    // « Exigeant » = un bloc de 45 min ou plus : la règle est stricte pour lui,
+    // une simple pénalité pour un bloc court.
+    const exigeant = minutes >= SCORE_DEFAULTS.demandingMinutes
+    if (c.inertiaHard && exigeant && after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes) return -Infinity
     if (after >= 0 && after < SCORE_DEFAULTS.inertiaMinutes)
       s -= (SCORE_DEFAULTS.inertiaPenalty * (SCORE_DEFAULTS.inertiaMinutes - after)) / SCORE_DEFAULTS.inertiaMinutes
   }
   if (c.hardGapMinutes === 0 && c.softGap && gap < SCORE_DEFAULTS.minGapSameObjective)
     s -= (SCORE_DEFAULTS.softGapPerHour * (SCORE_DEFAULTS.minGapSameObjective - Math.max(0, gap))) / 60
   s -= SCORE_DEFAULTS.fatiguePerMinute * c.loadBefore(start)
-  if (c.eveningPenalty && start >= 18 * 60) s -= c.eveningPenalty
+  if (c.eveningPenalty && minutes >= SCORE_DEFAULTS.demandingMinutes && start >= 18 * 60) s -= c.eveningPenalty
   if (c.triggerStarts?.some((t) => start >= t && start - t <= 5)) s += SCORE_DEFAULTS.triggerBonus
   return s
 }

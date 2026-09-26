@@ -737,7 +737,3 @@ export function setBlockedAttempts(
   return updateEvent(learning, confirmations.date, o.blockId, (e) => ({ ...e, blockedAttempts: count }))
 }
 
-/** La catégorie lue plus tard dans le texte d'un arrêt (le Coach répond après coup). */
-export function setStopTextReason(learning: LearningState, date: string, blockId: string, reason: StopReason): LearningState {
-  return updateEvent(learning, date, blockId, (e) => (e.stop ? { ...e, stop: { ...e.stop, textReason: reason } } : e))
-}

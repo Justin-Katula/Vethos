@@ -9,6 +9,7 @@ const CFG = {
   parInstallationParJour: 2,
   globalParJour: 100,
   installationsParIpParHeure: 2,
+  parAdresseParJour: 50,
 }
 const modele = (texte: string) =>
   vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: texte } }] }), { status: 200 }))
@@ -124,7 +125,7 @@ describe('Serveur du Coach', () => {
       mode: 'ally',
       messages: [
         { role: 'user', content: 'hi' },
-        { role: 'assistant', content: 'Hello.', sig: c.signerTour('Hello.') },
+        { role: 'assistant', content: 'Hello.', sig: c.signerTour(jeton.split('.')[0]!, 'Hello.') },
         { role: 'user', content: 'ok' },
       ],
     }
@@ -149,5 +150,24 @@ describe('Serveur du Coach', () => {
     const c = creerCoeur(CFG, { fetchImpl: modele('ok') })
     for (let i = 0; i < 20; i++) await c.coach('Bearer x.1.y', demande, '9.9.9.9')
     expect((await c.coach('Bearer x.1.y', demande, '9.9.9.9')).status).toBe(429)
+  })
+
+  it('une seule adresse ne vide pas le plafond global en fabriquant des jetons', async () => {
+    const c = creerCoeur({ ...CFG, parAdresseParJour: 3, installationsParIpParHeure: 10 }, { fetchImpl: modele('ok') })
+    const statuts: number[] = []
+    for (let i = 0; i < 4; i++) {
+      const jeton = c.installer('5.5.5.5').corps.token as string
+      statuts.push((await c.coach(`Bearer ${jeton}`, demande, '5.5.5.5')).status)
+    }
+    expect(statuts).toEqual([200, 200, 200, 429])
+  })
+
+  it('un tour signé pour une installation ne se rejoue pas dans une autre', async () => {
+    const c = creerCoeur(CFG, { fetchImpl: modele('ok') })
+    const a = c.installer('1.1.1.1').corps.token as string
+    const b = c.installer('2.2.2.2').corps.token as string
+    const tour = { role: 'assistant', content: 'Hello.', sig: c.signerTour(a.split('.')[0]!, 'Hello.') }
+    const d = { job: 'woop', mode: 'ally', messages: [{ role: 'user', content: 'hi' }, tour, { role: 'user', content: 'ok' }] }
+    expect((await c.coach(`Bearer ${b}`, d, '2.2.2.2')).status).toBe(400)
   })
 })

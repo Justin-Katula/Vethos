@@ -153,10 +153,18 @@ export function dureeCible(obs: Survie[], seuil = 0.8, defaut = BLOC_MAX): numbe
 }
 
 /** Les observations de survie d'une catégorie, tirées du journal. */
-export function survieDe(events: SessionEvent[], category: string): Survie[] {
-  return events
-    .filter((e) => e.category === category && e.started && e.heldMinutes !== null)
-    .map((e) => ({ minutes: e.heldMinutes!, arret: e.stoppedEarly }))
+export type Tranche = 'matin' | 'apres-midi' | 'soir'
+export const trancheDe = (minute: number): Tranche => (minute < 12 * 60 ? 'matin' : minute < 18 * 60 ? 'apres-midi' : 'soir')
+
+/**
+ * Les observations de survie d'une catégorie, tirées du journal — par type de
+ * fenêtre (matin, après-midi, soir) quand il y en a assez (5), sinon toutes.
+ */
+export function survieDe(events: SessionEvent[], category: string, tranche?: Tranche): Survie[] {
+  const cat = events.filter((e) => e.category === category && e.started && e.heldMinutes !== null)
+  const dans = tranche ? cat.filter((e) => trancheDe(e.plannedStartMinute) === tranche) : cat
+  const retenus = dans.length >= 5 ? dans : cat
+  return retenus.map((e) => ({ minutes: e.heldMinutes!, arret: e.stoppedEarly }))
 }
 
 // ─── BOCPD (Adams & MacKay, 2007) ─────────────────────────────────────────

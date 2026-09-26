@@ -18,6 +18,7 @@ import { useSeances } from '@/seances/magasin-seances'
 import { RevueDimanche } from '@/coach/RevueDimanche'
 import { afterMissLine, effectiveContract } from '@shared/contract'
 import { peutParler } from '@shared/coach/coach'
+import { autonomie } from '@shared/planning/habitudes'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -142,11 +143,15 @@ export default function Aujourdhui() {
     .filter((fin) => N >= fin && N - fin < 90)
     .sort((a, b) => b - a)[0]
   const contrat = reglages.contrat ? effectiveContract(reglages.contrat, maintenant) : null
+  // Plus la personne est autonome, plus les messages se font rares.
+  const autonomieMoyenne = objectifs.length
+    ? objectifs.reduce((t, o) => t + autonomie(evenements, o.id, cleJour), 0) / objectifs.length
+    : 0
   // 72 h par sujet : le même constat ne revient pas chaque soir.
   const sujetRate = 'coach:rate'
   const dejaDit = apprentissageSignaux[sujetRate]
   const ligneRate =
-    rate !== undefined && contrat && (!dejaDit || maintenant.getTime() - new Date(dejaDit).getTime() < 90 * 60_000 || peutParler({ dernier: dejaDit, maintenant, autonomie: 0 }))
+    rate !== undefined && contrat && (!dejaDit || maintenant.getTime() - new Date(dejaDit).getTime() < 90 * 60_000 || peutParler({ dernier: dejaDit, maintenant, autonomie: autonomieMoyenne }))
       ? afterMissLine(contrat.mode, nxt ? fmt(nxt.debut) : null)
       : null
   ligneMontree.current = !!ligneRate

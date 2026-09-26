@@ -645,9 +645,17 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     const r = await runner.stopBlock({ reason: null, text: 'I want to die' })
     expect(r.ok && r.help).toBeTruthy()
     const avant = overlay.shown.length
-    nowRef = new Date(WAKE.getTime() + 180 * 60_000)
-    await runner.tickNow()
+    const apprisAvant = (storage as Storage & { __mem: Map<string, unknown> }).__mem.get('learning') as LearningState
+    const nonDemarresAvant = apprisAvant.sessionEvents.filter((e) => !e.started).length
+    for (const m of [180, 240, 300, 360]) {
+      nowRef = new Date(WAKE.getTime() + m * 60_000)
+      await runner.tickNow()
+    }
     expect(overlay.shown.length).toBe(avant)
+    // Pendant la pause de détresse, rien n'est compté : ni raté, ni retard.
+    const apres = (storage as Storage & { __mem: Map<string, unknown> }).__mem.get('learning') as LearningState
+    expect(apres.sessionEvents.filter((e) => !e.started).length).toBe(nonDemarresAvant)
+    expect(Object.values(apres.consecutiveDelays).every((n) => n === 0)).toBe(true)
   })
 
   it('les tentatives d’apps bloquées comptent dans la séance en cours, sous le même verrou', async () => {

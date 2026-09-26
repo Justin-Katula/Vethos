@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computePlan } from './engine'
+import { computePlan, PLANNING_HORIZON_DAYS } from './engine'
 import { TASK_CONSTANTS } from './placement'
 import { sleepScheduleEntries } from '@shared/sleep'
 import type {
@@ -1734,7 +1734,22 @@ describe('Revue du moteur — correctifs (spec moteur 2026-09-25)', () => {
   it('la première heure après le réveil est interdite, même face à une fenêtre PROFONDE', () => {
     const obs = Array.from({ length: 5 }, () => ({ startHour: 7, completed: true, createdAt: '2026-08-01T10:00:00.000Z' }))
     const plan = computePlan(libre({ objectives: [OBJ], observations: obs, sessionEvents: [] }), NOW)
-    for (const b of plan.blocks.filter((x) => x.date === '2026-08-12')) expect(b.startMinute).toBeGreaterThanOrEqual(8 * 60)
+    // « Exigeant » = 45 min et plus : ceux-là, jamais dans la première heure.
+    for (const b of plan.blocks.filter((x) => x.date === '2026-08-12' && x.workMinutes >= 45))
+      expect(b.startMinute).toBeGreaterThanOrEqual(8 * 60)
+  })
+
+  it('jours off stables avec l’horizon réel (7 jours) : aujourd’hui n’est pas choisi parce qu’il est rogné', () => {
+    const OBJ2 = objective({ weeklyTargetMinutes: 360 })
+    const hist = Array.from({ length: 25 }, (_, i) =>
+      ev({ refId: OBJ2.id, category: `objectif:${OBJ2.id}`, date: addDays(TODAY, -(i + 1)), blockId: `j${i}` }),
+    )
+    const entree = libre({ objectives: [OBJ2], sessionEvents: hist, rangeEnd: addDays(TODAY, PLANNING_HORIZON_DAYS) })
+    const actifs = (p: ReturnType<typeof computePlan>) =>
+      [...new Set(p.blocks.filter((b) => b.kind === 'objective' && b.date > TODAY).map((b) => b.date))].sort()
+    const matin = computePlan(entree, new Date(2026, 7, 11, 8, 0))
+    const soir = computePlan(entree, new Date(2026, 7, 11, 21, 0))
+    expect(actifs(soir)).toEqual(actifs(matin))
   })
 
   it('la constance vient de l’histoire : le plan ne bouge pas entre un calcul à 9 h et un à 20 h', () => {

@@ -38,9 +38,15 @@ export type Discipline = {
   observations: number
 }
 
+/** Mémoire effective de l'oubli progressif (gamma 0,97 ≈ 33 événements). */
+const MEMOIRE = 33
+
 export function discipline(events: SessionEvent[], refId: string): Discipline {
-  const ev = eventsDe(events, refId)
-  const departs = ev.map((e) => e.started && (e.delayMinutes ?? 0) <= 5)
+  const tous = eventsDe(events, refId)
+  // Les quatre mesures oublient le vieux : la fiabilité par sa loi Beta, les
+  // trois autres sur la mémoire effective (les 33 derniers événements).
+  const ev = tous.slice(-MEMOIRE)
+  const departs = tous.map((e) => e.started && (e.delayMinutes ?? 0) <= 5)
   const tenues = ev.filter((e) => e.started && e.heldMinutes !== null)
   const survie: Survie[] = tenues.map((e) => ({ minutes: e.heldMinutes!, arret: e.stoppedEarly }))
   const heures = tenues.reduce((t, e) => t + e.heldMinutes!, 0) / 60
@@ -52,7 +58,7 @@ export function discipline(events: SessionEvent[], refId: string): Discipline {
     endurance: dureeCible(survie),
     pressionDistraction: heures > 0 ? tentatives / heures : 0,
     regularite: debuts.length ? Math.sqrt(debuts.reduce((t, d) => t + (d - m) ** 2, 0) / debuts.length) : 0,
-    observations: ev.length,
+    observations: tous.length,
   }
 }
 
@@ -204,6 +210,27 @@ export function facteurDifficulte(tauxTenue14j: number, observations: number): n
   if (tauxTenue14j > 0.92) return 1.1
   if (tauxTenue14j < 0.75) return 0.9
   return 1
+}
+
+/**
+ * Le NIVEAU de difficulté, qui se construit semaine après semaine : chaque
+ * semaine passée tenue à plus de 92 % le monte de 10 %, sous 75 % le baisse
+ * de 10 %, entre les deux il se garde (zone d'étirement). Borné 0,6 – 1,4.
+ */
+export function niveauDifficulte(events: SessionEvent[], refId: string, today: string, semaines = 8): number {
+  const ev = eventsDe(events, refId)
+  let niveau = 1
+  for (let w = semaines; w >= 1; w--) {
+    const de = addDays(today, -7 * w)
+    const a = addDays(today, -7 * (w - 1))
+    const sem = ev.filter((e) => e.date >= de && e.date < a)
+    if (sem.length < 3) continue
+    const taux = sem.filter((e) => e.started && (e.heldMinutes ?? 0) >= 0.8 * e.plannedMinutes).length / sem.length
+    if (taux > 0.92) niveau *= 1.1
+    else if (taux < 0.75) niveau *= 0.9
+    niveau = Math.max(0.6, Math.min(1.4, niveau))
+  }
+  return niveau
 }
 
 // ─── Rupture de régime ────────────────────────────────────────────────────

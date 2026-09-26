@@ -24,6 +24,8 @@ export type Config = {
   parInstallationParJour: number
   globalParJour: number
   installationsParIpParHeure: number
+  /** Appels par adresse (IPv6 : par /64) et par jour, tous jetons confondus. */
+  parAdresseParJour: number
   /** Durée de vie d'un jeton, en jours. */
   joursJeton?: number
 }
@@ -49,6 +51,7 @@ export function validerConfig(c: Config): string | null {
     ['globalParJour', c.globalParJour],
     ['installationsParIpParHeure', c.installationsParIpParHeure],
     ['joursJeton', c.joursJeton ?? 30],
+    ['parAdresseParJour', c.parAdresseParJour],
   ] as const) {
     if (!Number.isInteger(v) || v <= 0) return `${k} doit être un entier positif`
   }
@@ -64,6 +67,9 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
 
   let jour = ''
   const parInstallation = new Map<string, number>()
+  // Par adresse et par jour : une seule adresse ne peut pas vider le plafond
+  // global pour tout le monde en fabriquant des jetons.
+  const parAdresseJour = new Map<string, number>()
   let global = 0
   // Par heure : jetons délivrés et échecs d'authentification, par adresse.
   let heureCourante = -1
@@ -97,13 +103,15 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
     if (jour !== j) {
       jour = j
       parInstallation.clear()
+      parAdresseJour.clear()
       global = 0
     }
   }
 
   return {
     /** Signature d'un tour produit par le serveur : l'app la renvoie telle quelle. */
-    signerTour: (contenu: string) => hmac(`tour:${contenu}`),
+    /** Un tour est lié à l'installation qui l'a reçu : il ne se rejoue pas ailleurs. */
+    signerTour: (installation: string, contenu: string) => hmac(`tour:${installation}:${contenu}`),
 
     /** Un jeton d'installation anonyme. Aucune donnée personnelle, aucun compte. */
     installer(ip: string): Reponse {
@@ -132,19 +140,25 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
       if (!d.success) return { status: 400, corps: { erreur: 'demande invalide' } }
       // Un tour « assistant » que ce serveur n'a pas produit ne passe pas.
       for (const m of d.data.messages) {
-        if (m.role === 'assistant' && (!m.sig || !egal(hmac(`tour:${m.content}`), m.sig)))
+        if (m.role === 'assistant' && (!m.sig || !egal(hmac(`tour:${id}:${m.content}`), m.sig)))
           return { status: 400, corps: { erreur: 'tour non signé' } }
       }
 
       // La détresse ne coûte rien et ne dépend pas du modèle.
       if (d.data.messages.some((m) => m.role === 'user' && detecteDetresse(m.content)))
-        return { status: 200, corps: { texte: MESSAGE_AIDE, sig: hmac(`tour:${MESSAGE_AIDE}`) } }
+        return { status: 200, corps: { texte: MESSAGE_AIDE, sig: hmac(`tour:${id}:${MESSAGE_AIDE}`) } }
 
       tournerJour()
       const utilise = parInstallation.get(id) ?? 0
-      if (utilise >= cfg.parInstallationParJour || global >= cfg.globalParJour)
+      const parAdresse = parAdresseJour.get(cle) ?? 0
+      if (
+        utilise >= cfg.parInstallationParJour ||
+        parAdresse >= cfg.parAdresseParJour ||
+        global >= cfg.globalParJour
+      )
         return { status: 429, corps: { erreur: 'plafond atteint' } }
       parInstallation.set(id, utilise + 1)
+      parAdresseJour.set(cle, parAdresse + 1)
       global++
 
       const ctrl = new AbortController()
@@ -165,7 +179,7 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
         const j = (await r.json()) as { choices?: Array<{ message?: { content?: unknown } }> }
         const brutTexte = j.choices?.[0]?.message?.content
         const v = typeof brutTexte === 'string' ? filtrerReponse(brutTexte) : null
-        return { status: 200, corps: v ? { texte: v.texte, sig: hmac(`tour:${v.texte}`) } : { texte: null } }
+        return { status: 200, corps: v ? { texte: v.texte, sig: hmac(`tour:${id}:${v.texte}`) } : { texte: null } }
       } catch {
         return { status: 504, corps: { erreur: 'délai dépassé' } }
       } finally {

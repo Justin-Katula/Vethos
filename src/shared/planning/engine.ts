@@ -38,7 +38,7 @@ import {
 } from './feasibility'
 import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
 import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe } from './bayes'
-import { doseSemaine, facteurDifficulte, phaseHabitude, rupturePossible, tenue } from './habitudes'
+import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue } from './habitudes'
 import { ajustementPour, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
 import {
@@ -371,6 +371,13 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // lue dans l'HISTOIRE — la médiane des vrais départs. Jamais tirée du
   // placement du jour, qui dépend de l'heure du calcul.
   const habitual = learn ? learn.habitual : new Map<string, number>()
+  // Les jours off se choisissent sur des journées ENTIÈRES : aujourd'hui,
+  // rogné par « maintenant », serait sinon choisi comme jour off chaque soir.
+  // Sa capacité pleine est celle du même jour la semaine prochaine (l'horaire
+  // est hebdomadaire) — jamais celle qui reste.
+  const capaciteJourEntier = learn
+    ? capacities.map((c) => (c.date === input.today ? { ...buildDayFor(addDays(c.date, 7), saturated), date: c.date } : c))
+    : capacities
 
   for (let di = 0; di < dates.length; di++) {
     const date = dates[di]!
@@ -399,7 +406,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     const stoppedUntil = new Map<string, number>()
     if (date === input.today && events) {
       for (const e of events) {
-        if (e.date !== date || !e.stoppedEarly) continue
+        if (e.date !== date || !e.stop) continue
         const end = e.plannedStartMinute + (e.delayMinutes ?? 0) + (e.heldMinutes ?? 0)
         stoppedUntil.set(e.refId, Math.max(stoppedUntil.get(e.refId) ?? 0, end + 60))
       }
@@ -607,7 +614,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         daysSinceLastService: lastServed ? Math.max(0, daysBetween(lastServed, date)) : 0,
         activeDaysPerWeek: learn ? learn.activeDays(objective.id) : undefined,
       })
-      if (learn && learn.isDayOff(objective.id, date, capacities)) quota = 0
+      if (learn && learn.isDayOff(objective.id, date, capaciteJourEntier)) quota = 0
 
       // D.2 : part progressive cédée à la tâche en tension (85-100 % de
       // densité C.2). Débit AVANT celui de D.7 juste en dessous : deux causes
@@ -1108,7 +1115,8 @@ function buildLearningContext(
   const events = [...rawEvents].sort(chrono)
   // Une rupture probable (examens, vacances, nouveau travail) : l'ancien
   // régime s'oublie plus vite.
-  const gamma = rupturePossible(events, today) ? 0.9 : GAMMA
+  const rupture = rupturePossible(events, today)
+  const gamma = rupture ? 0.9 : GAMMA
   const byCategory = new Map<string, SessionEvent[]>()
   for (const e of events) {
     const arr = byCategory.get(e.category) ?? []
@@ -1161,8 +1169,8 @@ function buildLearningContext(
     const k = `${refId}|${category}`
     if (!blockMaxCache.has(k)) {
       const base = dureeCible(survieDe(events, category))
-      const t = tenue(events, refId, today)
-      const d = facteurDifficulte(t.tauxBlocs, t.observations)
+      // Le niveau de difficulté, construit semaine après semaine (~85 % tenu).
+      const d = niveauDifficulte(events, refId, today)
       const adj = ajustementPour(events, refId)
       const len = Math.max(BLOC_MIN, Math.min(BLOC_MAX, Math.round(base * d)))
       blockMaxCache.set(k, adj.blocMax ? Math.min(len, adj.blocMax) : len)
@@ -1234,8 +1242,11 @@ function buildLearningContext(
           b = betaMean(pT)
         } else {
           const r = rng(seedFrom(`${category}|${date}|${hour}`))
-          a = sampleBeta(pS, r)
-          b = sampleBeta(pT, r)
+          // Après une rupture probable, on explore davantage quelques jours :
+          // des lois aplaties, donc des tirages plus larges.
+          const aplatir = (p: { a: number; b: number }) => (rupture ? { a: p.a * 0.5 + 0.5, b: p.b * 0.5 + 0.5 } : p)
+          a = sampleBeta(aplatir(pS), r)
+          b = sampleBeta(aplatir(pT), r)
         }
         return a * (V_START + b * V_TIENT) - V_NEUTRE
       }
@@ -1252,7 +1263,7 @@ function buildLearningContext(
     },
     /** Pause anticipée, si elle tombe dans le bloc. */
     pause(refId: string, size: number) {
-      const p = pauseAnticipee(events, refId)
+      const p = pauseAnticipee(events, refId, size)
       return p !== null && p < size ? p : undefined
     },
     activeDays,

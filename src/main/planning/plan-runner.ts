@@ -255,7 +255,10 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
 
     if (closed !== null) {
       const confirmedAtMs = confirmations.confirmedAt[closed.blockId]
-      if (confirmedAtMs === undefined) {
+      if (confirmedAtMs === undefined && disciplineSuspendue(workingLearning.lastSignalAt, now)) {
+        // Détresse vue il y a moins de 24 h : l'app n'exige rien — un bloc
+        // non démarré n'est ni un retard, ni un raté, ni un recul de phase.
+      } else if (confirmedAtMs === undefined) {
         // D.7 : jamais confirmé — la fenêtre entière compte comme du retard.
         const result = applyLapsedCredit(
           workingLearning,

@@ -4,6 +4,7 @@ import { usePlan } from '@/plan/Plan'
 import { useToast } from '@/ui/app-briques'
 import { useSeances } from '@/seances/magasin-seances'
 import { disciplineSuspendue } from '@shared/coach/garde-fous'
+import { coach } from '@/coach/client'
 
 /**
  * Le contrat d'Ulysse, au moment d'agir (spec moteur 2026-09-25) : pendant
@@ -21,7 +22,19 @@ export function useGardeContrat(): () => boolean {
     // Détresse récente : l'app arrête d'exiger — aucun refus.
     if (disciplineSuspendue(signaux, maintenant)) return true
     if (!c || !refusesChange(c, !!seanceActive)) return true
-    toast(refusalLine(c.mode, c.signedAt, (seanceActive?.endMinute ?? minute) - minute))
+    const reste = (seanceActive?.endMinute ?? minute) - minute
+    // Les mots du contrat, tout de suite ; puis, si le Coach existe, le même
+    // refus dit par lui (job « refus ») — jamais une concession.
+    toast(refusalLine(c.mode, c.signedAt, reste))
+    if (coach().disponible) {
+      void coach()
+        .demander({
+          job: 'refus',
+          mode: c.mode,
+          faits: { minutes_restantes: Math.max(1, Math.round(reste)), signe_le: c.signedAt.slice(0, 10), regle: 'no changes during a block' },
+        })
+        .then((t) => t && toast(t))
+    }
     return false
   }
 }

@@ -11,8 +11,8 @@ import {
   seedFrom,
   updateBeta,
 } from './bayes'
-import { autonomie, discipline, doseSemaine, estJourTest, facteurDifficulte, phaseHabitude, RAMPE, tenue } from './habitudes'
-import { ajustementPour, diagnostiquer, fiabiliteRaison, pauseAnticipee } from './arrets'
+import { autonomie, discipline, doseSemaine, estJourTest, facteurDifficulte, niveauDifficulte, phaseHabitude, RAMPE, tenue } from './habitudes'
+import { ajustementPour, diagnostiquer, fiabiliteRaison, pauseAnticipee, raisonsAnormales } from './arrets'
 import { addDays } from './dates'
 
 const TODAY = '2026-09-25'
@@ -227,5 +227,38 @@ describe('Revue — correctifs', () => {
     const peu = [...serie(6, () => ({ stoppedEarly: true, heldMinutes: 30, stop: { reason: 'tired', attemptsBefore: 0 } })), reel(9)]
     expect(diagnostiquer(peu)).not.toBe('pas assez de données')
     expect(diagnostiquer([reel(1), reel(2), reel(3), reel(4)])).toBe('pas assez de données')
+  })
+})
+
+describe('Revue 2 — correctifs', () => {
+  it('le niveau de difficulté se construit semaine après semaine, borné', () => {
+    const tenu = Array.from({ length: 28 }, (_, i) => ev({ date: addDays(TODAY, -(i + 1)), heldMinutes: 60 }))
+    expect(niveauDifficulte(tenu, 'obj', TODAY)).toBe(1.4) // 1,1⁴ plafonné à 1,4
+    const lache = Array.from({ length: 56 }, (_, i) => ev({ date: addDays(TODAY, -(i + 1)), heldMinutes: 10, stoppedEarly: true }))
+    expect(niveauDifficulte(lache, 'obj', TODAY)).toBe(0.6)
+  })
+
+  it('une réponse mécanique pèse moitié moins dans la fiabilité d’une raison', () => {
+    const vite = serie(8, () => ({ stoppedEarly: true, heldMinutes: 20, stop: { reason: 'distracted', attemptsBefore: 0, answerMs: 300 } }))
+    const lent = serie(8, () => ({ stoppedEarly: true, heldMinutes: 20, stop: { reason: 'distracted', attemptsBefore: 0, answerMs: 4000 } }))
+    // Aucune ne concorde (pas de tentative d'app) ; la réponse mécanique fait moins baisser la fiabilité.
+    expect(fiabiliteRaison(vite, 'distracted')).toBeGreaterThan(fiabiliteRaison(lent, 'distracted'))
+  })
+
+  it('une raison anormalement fréquente sur 14 jours', () => {
+    const vieux = Array.from({ length: 12 }, (_, i) => ev({ date: addDays(TODAY, -40 - i), stoppedEarly: true, heldMinutes: 20, stop: { reason: 'boring', attemptsBefore: 0 } }))
+    const recent = Array.from({ length: 6 }, (_, i) => ev({ date: addDays(TODAY, -i - 1), stoppedEarly: true, heldMinutes: 20, stop: { reason: 'tired', attemptsBefore: 0 } }))
+    expect(raisonsAnormales([...vieux, ...recent], TODAY)).toEqual(['tired'])
+  })
+
+  it('la pause anticipée se lit dans la même tranche de durée', () => {
+    const courts = serie(6, () => ({ plannedMinutes: 30, stoppedEarly: true, heldMinutes: 22, stop: { reason: 'tired', attemptsBefore: 0 } }))
+    expect(pauseAnticipee(courts, 'obj', 90)).toBeNull()
+    expect(pauseAnticipee(courts, 'obj', 30)).toBe(18)
+  })
+
+  it('les mesures de discipline oublient le vieux', () => {
+    const vieux = serie(40, (i) => ({ blockedAttempts: i < 5 ? 10 : 0 }))
+    expect(discipline(vieux, 'obj').pressionDistraction).toBe(0)
   })
 })
