@@ -33,7 +33,6 @@ import {
 } from '@shared/planning/clock'
 import type { ConfirmationOverlay } from './confirmation-overlay'
 import {
-  creerPromesse,
   ATTENTE_STOP_MINUTES,
   choisirRattrapage,
   continuer,
@@ -53,7 +52,6 @@ import {
   prendreSouffle,
   promessesAPoser,
   promesseDuBloc,
-  renoncerAuStop,
   retourDuSouffle,
   retourDuSouffleAvant,
   souffleAvant,
