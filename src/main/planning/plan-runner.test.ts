@@ -616,26 +616,37 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
 
     nowRef = new Date(WAKE.getTime() + 20 * 60_000)
     await runner.tickNow()
-    // « Stop » touché 1 min avant la réponse : l'arrêt date du toucher.
-    const stop = await runner.stopBlock({ reason: 'tired', text: 'so tired', answerMs: 60_000 })
-    // Un Stop repousse le travail, il ne l'efface jamais : des créneaux où le promettre.
-    expect(stop).toMatchObject({ ok: true, step: 'stopped', minutes: expect.any(Number) })
-    expect(stop.ok && stop.step === 'stopped' && stop.options.length).toBeGreaterThan(0)
+    // La raison d'abord : l'app montre sa réaction, rien n'est arrêté.
+    const r = await runner.stopBlock({ reason: 'tired', text: 'so tired' })
+    expect(r).toMatchObject({ ok: true, step: 'reaction', waitMinutes: 5 })
+    expect((storage.__mem.get('blocking_rules') as BlockingRulesState).block).not.toBeNull()
+    // « Oui » : l'attente de 5 min commence, la séance reste bloquée jusque-là.
+    expect(await runner.confirmStop({ reason: 'tired', text: 'so tired' })).toEqual({ ok: true })
+    const pendant = storage.__mem.get('blocking_rules') as BlockingRulesState
+    expect(pendant.block!.endsAt).toBe(WAKE.getTime() + 25 * 60_000)
+    // L'attente finie, le tic arrête la séance : tenue jusqu'au bout de l'attente.
+    nowRef = new Date(WAKE.getTime() + 25 * 60_000)
+    await runner.tickNow()
 
     const rules = storage.__mem.get('blocking_rules') as BlockingRulesState
     expect(rules.block).toBeNull()
     const learning = storage.__mem.get('learning') as LearningState
     const e = learning.sessionEvents.find((x) => x.blockId === blockId)!
-    expect(e).toMatchObject({ stoppedEarly: true, heldMinutes: 19, stop: { reason: 'tired', text: 'so tired', textReason: 'tired' } })
+    expect(e).toMatchObject({ stoppedEarly: true, heldMinutes: 25, stop: { reason: 'tired', text: 'so tired', textReason: 'tired', verdict: 'postponed' } })
 
     const avant = overlay.shown.length
-    for (const m of [21, 30, 60]) {
+    for (const m of [26, 30, 60]) {
       nowRef = new Date(WAKE.getTime() + m * 60_000)
       await runner.tickNow()
     }
     expect(overlay.shown.length).toBe(avant)
     // Un second « Stop » sur une séance déjà arrêtée ne fait rien.
     expect((await runner.stopBlock({ reason: 'boring' })).ok).toBe(false)
+    // Un Stop repousse le travail, il ne l'efface jamais : le rattrapage reste à choisir.
+    const view = await runner.trust()
+    expect(view.promiseChoice!.options.length).toBeGreaterThan(0)
+    expect(await runner.choosePromise(view.promiseChoice!.options[0]!)).toEqual({ ok: true })
+    expect((storage.__mem.get('learning') as LearningState).promises!.length).toBeGreaterThan(0)
   })
 
   it('un texte de détresse : l’aide humaine, et plus d’overlay pendant 24 h', async () => {
@@ -646,8 +657,9 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     await runner.tickNow()
     await runner.confirmBlock(overlay.shown[0]!.blockId)
     nowRef = new Date(WAKE.getTime() + 10 * 60_000)
-    const r = await runner.stopBlock({ reason: null, text: 'I want to die' })
-    expect(r.ok && r.step === 'stopped' && r.help).toBeTruthy()
+    // Une détresse : on arrête tout de suite, sans attente, et l'aide humaine.
+    const r = await runner.stopBlock({ reason: 'tired', text: 'I want to die' })
+    expect(r).toMatchObject({ ok: true, step: 'help' })
     const avant = overlay.shown.length
     const apprisAvant = (storage as Storage & { __mem: Map<string, unknown> }).__mem.get('learning') as LearningState
     const nonDemarresAvant = apprisAvant.sessionEvents.filter((e) => !e.started).length

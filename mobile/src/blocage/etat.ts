@@ -102,6 +102,12 @@ type EtatBlocage = {
   pauser: (blocId: string, reprendMinute: number, urgenceId?: string | null) => Promise<void>
   /** Reprise avant la fin de la pause : le bouclier revient tout de suite. */
   reprendre: (blocId: string, minute: number) => Promise<void>
+  /**
+   * La plage d'un bloc remplacée (ou retirée, `null`) : l'attente d'un Stop
+   * (le bouclier se lève à la fin de l'attente, même app fermée), l'urgence
+   * (tout écarté sauf les apps choisies, jusqu'à l'heure de reprise).
+   */
+  remplacerPlage: (blocId: string, nouvelle: Plage | null) => Promise<void>
 }
 
 export const useBlocage = create<EtatBlocage>((set, get) => ({
@@ -304,6 +310,11 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     const plages = get().plagesActives
     if (!plages.some((p) => p.blocId === blocId)) return
     await get().appliquerPlan(plages.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(minute, p.debutMinute) } : p)))
+  },
+
+  async remplacerPlage(blocId, nouvelle) {
+    const autres = get().plagesActives.filter((p) => p.blocId !== blocId)
+    await get().appliquerPlan(nouvelle ? [...autres, nouvelle] : autres)
   },
 
   async toutLever() {

@@ -3,9 +3,20 @@ import { LearningStateSchema, SessionConfirmationsStateSchema, type SessionEvent
 import {
   ajusterConfiance,
   confiance,
-  contreOffre,
+  ATTENTE_STOP_MINUTES,
+  choisirRattrapage,
+  comparaison,
+  continuer,
+  demanderStop,
+  executerStop,
+  optionsUrgence,
+  preparerStop,
+  reactionRaison,
+  reporterEnUrgence,
+  stopEchu,
+  tentativePendantUrgence,
+  ticConfiance,
   creerPromesse,
-  deciderStop,
   finUrgence,
   idBlocPromesse,
   niveauConfiance,
@@ -19,8 +30,7 @@ import {
   stopPermis,
   suivrePromesses,
   ticPauses,
-  urgenceCommeAbandon,
-  verdictStop,
+  urgenceTropFrequente,
   type FaitsDuStop,
 } from './trust'
 import { applyStop, applyWorkCredit } from './clock'
@@ -55,29 +65,50 @@ describe('Confiance et niveaux', () => {
   })
 })
 
-describe('Le Stop : contre-offre et verdict', () => {
-  it('la contre-offre compare la raison aux faits, seulement quand elle ne colle pas', () => {
-    const msg = contreOffre('tired', faits({ attemptsBefore: 3, sleptHours: 8 }))
-    expect(msg).toBe(
-      'You say tired. It’s 16:50, you slept 8 h, and you tried to open a blocked app 3 times in 10 min. That looks more like distraction. 10 more minutes.',
+describe('Le Stop : chaque raison a sa réaction', () => {
+  it('la comparaison aux faits, seulement quand la raison ne colle pas', () => {
+    expect(comparaison('tired', faits({ attemptsBefore: 3, sleptHours: 8 }))).toBe(
+      'You say tired. It’s 16:50, you slept 8 h, and you tried to open a blocked app 3 times in 10 min. That looks more like distraction.',
     )
-    expect(contreOffre('distracted', faits({ attemptsBefore: 2 }))).toBeNull()
+    expect(comparaison('distracted', faits({ attemptsBefore: 2 }))).toBeNull()
   })
 
-  it('le moteur tranche : pas de place, report, abandon', () => {
-    const f = faits()
-    expect(verdictStop({ niveau: 2, place: false, raison: 'tired', faits: f })).toBe('no-room')
-    expect(verdictStop({ niveau: 1, place: true, raison: null, faits: f })).toBe('postponed')
-    expect(verdictStop({ niveau: 2, place: true, raison: 'no-rush', faits: f })).toBe('postponed')
-    expect(verdictStop({ niveau: 2, place: true, raison: 'boring', faits: f })).toBe('abandoned')
-    expect(verdictStop({ niveau: 3, place: true, raison: 'no-rush', faits: f, contreOffreRefusee: true })).toBe('abandoned')
+  it('too hard → blocs de 25 min en fenêtre profonde ; boring → 10 min d’abord', () => {
+    expect(reactionRaison('too-hard', faits(), { niveau: 2 }).placement).toEqual({ morceau: 25, preference: 'profonde' })
+    const b = reactionRaison('boring', faits({ heldMinutes: 5 }), { niveau: 2 })
+    expect(b.dixMinutes).toBe(true)
+    expect(b.placement).toEqual({ morceau: 25, preference: 'tot' })
   })
 
-  it('au-delà d’un arrêt sur trois en urgence, l’urgence compte comme un abandon', () => {
+  it('no rush → les vrais chiffres ; distracted → les tentatives, et le mode profond', () => {
+    const n = reactionRaison('no-rush', faits(), { niveau: 2, echeance: { jours: 4, resteMinutes: 600, libreMinutes: 1200 } })
+    expect(n.lignes).toEqual(['Due in 4 days. 10 h left, 20 h free until then.'])
+    const d = reactionRaison('distracted', faits({ attemptsBefore: 2 }), { niveau: 2 })
+    expect(d.lignes).toEqual(['2 blocked-app attempts in the last 10 min.'])
+    expect(d.placement.deep).toBe(true)
+  })
+
+  it('tired → un matin reposé si les faits collent ; sinon la comparaison, traité comme une distraction', () => {
+    expect(reactionRaison('tired', faits({ heldMinutes: 40 }), { niveau: 2 })).toEqual({ lignes: [], dixMinutes: false, placement: { preference: 'repose' } })
+    const faux = reactionRaison('tired', faits({ attemptsBefore: 1 }), { niveau: 2 })
+    expect(faux.lignes[0]).toMatch(/looks more like distraction/)
+    expect(faux.placement).toEqual({ preference: 'tot', deep: true })
+  })
+
+  it('aux niveaux 3-4, une raison qui ne colle pas montre aussi la comparaison', () => {
+    expect(reactionRaison('boring', faits(), { niveau: 2 }).lignes).toEqual([])
+    expect(reactionRaison('boring', faits(), { niveau: 3 }).lignes[0]).toMatch(/You say boring/)
+  })
+
+  it('au-delà d’un arrêt sur trois en urgence, l’urgence n’en est plus une', () => {
     const stop = { date: TODAY, stop: { reason: 'tired', attemptsBefore: 0 }, stoppedEarly: true } as unknown as SessionEvent
     const urgence = { date: TODAY, blockId: 'b', startMs: 0, apps: [], appCount: 0, attempts: 0 }
-    expect(urgenceCommeAbandon({ sessionEvents: [stop, stop], emergencyPauses: [urgence] }, TODAY)).toBe(false)
-    expect(urgenceCommeAbandon({ sessionEvents: [stop, stop], emergencyPauses: [urgence, urgence] }, TODAY)).toBe(true)
+    expect(urgenceTropFrequente({ sessionEvents: [stop, stop], emergencyPauses: [urgence] }, TODAY)).toBe(false)
+    expect(urgenceTropFrequente({ sessionEvents: [stop, stop], emergencyPauses: [urgence, urgence] }, TODAY)).toBe(true)
+  })
+
+  it('l’attente : 5 min, plus quand la confiance baisse', () => {
+    expect(ATTENTE_STOP_MINUTES).toEqual({ 1: 5, 2: 5, 3: 10, 4: 15 })
   })
 })
 
@@ -237,7 +268,7 @@ describe('Promesses', () => {
   })
 })
 
-describe('deciderStop', () => {
+describe('Le Stop, de bout en bout', () => {
   const learning = () =>
     LearningStateSchema.parse({
       sessionEvents: [{ blockId: 'b', date: TODAY, kind: 'task', refId: 't', plannedStartMinute: 540, plannedMinutes: 60, started: true, createdAt: '2026-09-21T09:00:00.000Z' }],
@@ -245,46 +276,68 @@ describe('deciderStop', () => {
   const plan = (faisable: boolean) =>
     ({
       blocks: [],
-      capacities: [{ date: TODAY, slots: [{ startMinute: 600, endMinute: 900, durationMinutes: 300, cognitiveWindow: 'NORMALE' }] }],
+      capacities: [
+        { date: TODAY, slots: [{ startMinute: 600, endMinute: 900, durationMinutes: 300, cognitiveWindow: 'NORMALE' }] },
+        { date: '2026-09-22', slots: [{ startMinute: 480, endMinute: 1200, durationMinutes: 720, cognitiveWindow: 'PROFONDE' }] },
+      ],
       feasibility: { densities: [{ feasible: faisable }] },
-      verdicts: [],
+      verdicts: [{ taskId: 't', neededMinutes: 100, placedMinutes: 100, status: 'placed' }],
       objectiveDoses: {},
     }) as unknown as import('./types').PlanningResult
-  const base = (over: Partial<Parameters<typeof deciderStop>[0]> = {}) => ({
-    learning: learning(),
-    confirmations: conf(),
-    nowMs: 0,
-    minute: 560,
-    reason: 'no-rush' as const,
-    planApres: () => ({ plan: plan(true), input: { today: TODAY, weeklyObjectiveServed: {} } }),
-    ...over,
-  })
-
-  it('il y a la place : arrêté, verdict, et des créneaux pour la promesse', () => {
-    const r = deciderStop(base())!
-    expect(r.etape).toBe('arrete')
-    if (r.etape !== 'arrete') return
-    expect(r.verdict).toBe('postponed')
-    expect(r.minutes).toBe(40)
-    expect(r.options[0]).toEqual({ date: TODAY, startMinute: 600 })
-    expect(r.learning.sessionEvents[0]!.stop).toMatchObject({ level: 2, verdict: 'postponed' })
-  })
+  const apres = (f = true) => () => ({ plan: plan(f), input: { today: TODAY, weeklyObjectiveServed: {} } })
 
   it('pas de place : rien ne s’arrête, pause de 15 min, puis on finit', () => {
-    const r = deciderStop(base({ planApres: () => ({ plan: plan(false), input: { today: TODAY, weeklyObjectiveServed: {} } }) }))!
+    const r = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(false) })!
     expect(r.etape).toBe('pas-de-place')
     if (r.etape !== 'pas-de-place') return
     expect(r.confirmations.pause!.kind).toBe('no-room')
-    expect(r.confirmations.stoppedBlockIds).toEqual([])
     expect(r.learning.sessionEvents[0]).toMatchObject({ forced: true, heldMinutes: null })
   })
 
-  it('niveau 3 : une raison qui ne colle pas amène la contre-offre ; refusée, c’est un abandon', () => {
-    let l = learning()
-    l = ajusterConfiance(l, 'echecGrave')
-    const r = deciderStop(base({ learning: l, reason: 'boring' }))!
-    expect(r.etape).toBe('contre-offre')
-    const refus = deciderStop(base({ learning: l, reason: 'boring', contreOffreRefusee: true }))!
-    expect(refus.etape === 'arrete' && refus.verdict).toBe('abandoned')
+  it('la place : la réaction, puis l’attente bloquée, puis l’arrêt et le rattrapage à choisir', () => {
+    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'too-hard', planApres: apres() })!
+    expect(prep.etape).toBe('reaction')
+    if (prep.etape !== 'reaction') return
+    expect(prep.attenteMinutes).toBe(5)
+    const c = demanderStop(conf(), { nowMs: 0, minute: 560, reason: 'too-hard', attenteMinutes: prep.attenteMinutes, placement: prep.reaction.placement })!
+    expect(c.stopPending).toMatchObject({ untilMinute: 565, untilMs: 300_000, morceau: 25, preference: 'profonde' })
+    // Rien n'est arrêté pendant l'attente.
+    expect(c.stoppedBlockIds).toEqual([])
+    expect(stopEchu(c, 299_999)).toBeNull()
+    expect(stopEchu(c, 300_000)).not.toBeNull()
+    const fin = executerStop({ learning: learning(), confirmations: c, nowMs: 300_000, label: 'Rapport', planApres: apres() })
+    const e = fin.learning.sessionEvents[0]!
+    expect(e).toMatchObject({ heldMinutes: 25, stoppedEarly: true, stop: { reason: 'too-hard', verdict: 'postponed' } })
+    const choix = fin.confirmations.promiseChoice!
+    expect(choix.minutes).toBe(35)
+    // Fenêtre profonde : demain, pas aujourd'hui (fenêtre normale).
+    expect(choix.options[0]).toEqual({ date: '2026-09-22', startMinute: 480 })
+    const p = choisirRattrapage(fin.learning, fin.confirmations, choix.options[0]!, 1)!
+    expect(p.confirmations.promiseChoice).toBeNull()
+    expect(p.learning.promises!.map((x) => [x.startMinute, x.minutes])).toEqual([[480, 25], [510, 10]])
+  })
+
+  it('« Je continue » annule l’attente, et le garde au journal', () => {
+    const c = demanderStop(conf(), { nowMs: 0, minute: 560, reason: 'boring', attenteMinutes: 5, placement: { preference: 'tot' } })!
+    const r = continuer(learning(), c)
+    expect(r.confirmations.stopPending).toBeNull()
+    expect(r.learning.sessionEvents[0]!.stopsWaived).toBe(1)
+  })
+
+  it('urgence : jusqu’à quand repousser, puis tout bloqué sauf 3 apps, et l’app regarde', () => {
+    const u = optionsUrgence({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, planApres: apres() })!
+    expect(u.minutes).toBe(40)
+    expect(u.options.length).toBeGreaterThan(0)
+    expect(optionsUrgence({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, planApres: apres(false) })!.options).toEqual([])
+    const r = reporterEnUrgence({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, option: { date: TODAY, startMinute: 660 }, minutes: 40, apps: ['a'], label: 'Rapport' })!
+    expect(r.learning.sessionEvents[0]!.stop).toMatchObject({ reason: 'real-event', verdict: 'urgent' })
+    expect(r.learning.promises![0]).toMatchObject({ startMinute: 660, minutes: 40 })
+    expect(r.confirmations.urgence).toMatchObject({ untilMinute: 660, apps: ['a'] })
+    const vu = tentativePendantUrgence(r.learning, r.confirmations, 60_000)
+    expect(vu.trust!.failures).toBe(2)
+    expect(tentativePendantUrgence(vu, r.confirmations, 70_000).trust!.failures).toBe(2)
+    const fin = ticConfiance(vu, r.confirmations, TODAY, 660, 100 * 60_000)
+    expect(fin.confirmations.urgence).toBeNull()
+    expect(fin.learning.emergencyPauses![0]).toMatchObject({ end: 'auto', attempts: 1 })
   })
 })

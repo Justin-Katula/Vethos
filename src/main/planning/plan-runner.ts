@@ -16,6 +16,7 @@ import {
   activeBlockFor,
   activeConfirmedSession,
   applyConfirmation,
+  applyStop,
   applyLapsedCredit,
   closeSessionEvent,
   heldOfWindow,
@@ -33,8 +34,18 @@ import {
 import type { ConfirmationOverlay } from './confirmation-overlay'
 import {
   creerPromesse,
-  deciderStop,
-  DELAI_STOP_SECONDES,
+  ATTENTE_STOP_MINUTES,
+  choisirRattrapage,
+  continuer,
+  demanderStop,
+  executerStop,
+  optionsUrgence,
+  preparerStop,
+  reporterEnUrgence,
+  stopEchu,
+  tentativePendantUrgence,
+  urgenceActive,
+  type PlanApres,
   fermerPause,
   finUrgence,
   niveauConfiance,
@@ -49,7 +60,7 @@ import {
   souffleDisponible,
   stopPermis,
   ticConfiance,
-  urgenceCommeAbandon,
+  urgenceTropFrequente,
   URGENCE_APPS_MAX,
   type OptionRattrapage,
   type StopResult,
@@ -119,8 +130,13 @@ export type PlanRunner = {
   stop: () => void
   tickNow: () => Promise<void>
   confirmBlock: (blockId: string) => Promise<ConfirmResult>
-  /** « Stop » pendant une séance : crédite jusqu'ici, lève le blocage, garde la raison. */
-  stopBlock: (args: StopArgs) => Promise<StopResult>
+  /**
+   * « Stop » : la raison donnée, l'app regarde la place et montre sa réaction
+   * (rien n'est arrêté). Sans raison : la fin d'une prolongation.
+   */
+  stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number }) => Promise<StopResult>
+  /** « Oui, j'arrête » : l'attente commence, bloquée ; le tic arrête ensuite. */
+  confirmStop: (args: StopArgs) => Promise<ConfirmResult>
   /** Une tentative d'ouvrir une app ou un site bloqué pendant la séance. */
   recordBlockedAttempt: () => Promise<void>
   /** Prolongation : l'offre du moment (comptée dès qu'elle est lue), ou null. */
@@ -132,11 +148,15 @@ export type PlanRunner = {
   /** Le jour libre pris, ou la journée gardée normale. */
   decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
   trust: () => Promise<TrustView>
-  /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
+  /** « Je continue » : l'attente s'annule. */
   waiveStop: () => Promise<void>
-  /** Le rattrapage choisi : une promesse. */
-  promise: (option: OptionRattrapage, minutes: number, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }) => Promise<void>
-  /** « Something real came up » : 15 min, jusqu'à 3 apps débloquées. */
+  /** Le rattrapage choisi parmi ceux proposés : une promesse. */
+  choosePromise: (option: OptionRattrapage) => Promise<ConfirmResult>
+  /** L'urgence : jusqu'à quand on peut repousser. */
+  urgentOptions: () => Promise<{ options: OptionRattrapage[]; minutes: number } | null>
+  /** L'urgence prise : repoussé à `option`, tout bloqué sauf `apps` (3 au plus). */
+  urgent: (option: OptionRattrapage, minutes: number, apps: string[]) => Promise<ConfirmResult>
+  /** Urgence sans place pour repousser (ou dans une promesse) : 15 min, 3 apps. */
   emergency: (apps: string[]) => Promise<ConfirmResult>
   /** « J'ai besoin de 15 min » : avant la promesse (`blockId`) ou pendant. */
   breather: (blockId?: string) => Promise<ConfirmResult>
@@ -147,12 +167,10 @@ export type PlanRunner = {
 export type { StopResult, TrustView }
 
 export type StopArgs = {
-  reason: StopReason | null
+  reason: StopReason
   text?: string
-  /** Temps mis à répondre, en ms : la raison a été proposée `answerMs` avant maintenant. */
+  /** Temps mis à répondre, en ms. */
   answerMs?: number
-  /** La contre-offre (niveaux 3-4) a été refusée explicitement. */
-  counterOfferRefused?: boolean
 }
 
 export const DEFAULT_PLAN_TICK_MS = 5_000
@@ -373,8 +391,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
 
   async function tick(): Promise<void> {
     const now = deps.now()
-    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks, wakeMinute, plan, today } =
-      await loadTodayState(now)
+    const state = await loadTodayState(now)
+    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks, wakeMinute, plan, today } = state
 
     const confirmedIds = new Set(Object.keys(confirmations.confirmedAt))
 
@@ -567,6 +585,26 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       log.info('[planning] tâches terminées automatiquement', { taskIds: finished })
     }
 
+    // L'attente d'un Stop est finie : la séance s'arrête, le blocage se lève,
+    // et le rattrapage reste à choisir.
+    const due = stopEchu(workingConfirmations, now.getTime())
+    if (due) {
+      const o = workingConfirmations.observedPending
+      const r = executerStop({
+        learning: workingLearning,
+        confirmations: workingConfirmations,
+        nowMs: now.getTime(),
+        label: todayBlocks.find((b) => b.id === due.blockId)?.label ?? '',
+        deadline: o?.kind === 'task' ? (tasks.find((t) => t.id === o.refId)?.deadline ?? null) : null,
+        textReason: due.text ? lireTexteArret(due.text) : null,
+        planApres: planApresFor(state, now),
+      })
+      workingLearning = r.learning
+      workingConfirmations = r.confirmations
+      changed = true
+      await pauseBlocking(null)
+    }
+
     // Stop, promesses et confiance : pauses échues (le blocage revient),
     // promesses tenues ou rompues.
     const pauseBefore = workingConfirmations.pause ?? null
@@ -716,7 +754,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     const now = deps.now()
     attempts = [...attempts.filter((t) => now.getTime() - t < 10 * 60_000), now.getTime()]
     const { learning, confirmations, nowMinute, todayBlocks } = await loadTodayState(now)
-    const next = recordBlockedAttempt(learning, confirmations, now.getTime())
+    const next = tentativePendantUrgence(recordBlockedAttempt(learning, confirmations, now.getTime()), confirmations, now.getTime())
     // Urgence : ouvrir une app NON choisie arrête la pause tout de suite.
     if (confirmations.pause?.kind === 'emergency') {
       const r = finUrgence(next, confirmations, { nowMinute, nowMs: now.getTime(), end: 'attempt' })
@@ -765,65 +803,117 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     deps.onBlockConfirmed?.()
   }
 
-  async function stopBlock(args: StopArgs): Promise<StopResult> {
+  /** Le plan recalculé comme si l'arrêt (et ses promesses) étaient acceptés. */
+  function planApresFor(state: Awaited<ReturnType<typeof loadTodayState>>, now: Date): PlanApres {
+    return (l, c) => {
+      const next: PlanningInput = {
+        ...state.input,
+        sessionEvents: l.sessionEvents,
+        activeSession: activeConfirmedSession(c, state.today, state.nowMinute),
+        promises: promessesAPoser(l),
+      }
+      return { plan: computePlan(next, now), input: next }
+    }
+  }
+
+  const sleptHoursOf = (state: Awaited<ReturnType<typeof loadTodayState>>) =>
+    state.sleepMinute !== null && state.wakeMinute !== null ? ((state.wakeMinute - state.sleepMinute + 1440) % 1440) / 60 : null
+
+  /**
+   * La raison est donnée : l'app regarde s'il y a la place de repousser, puis
+   * montre la réaction propre à la raison. Rien n'est arrêté ici — sauf une
+   * détresse lue dans le texte : on arrête tout de suite, sans attente, et on
+   * oriente vers une aide humaine.
+   */
+  async function stopReason(args: StopArgs): Promise<StopResult> {
     const now = deps.now()
     const state = await loadTodayState(now)
-    const { learning, confirmations, input } = state
+    const { learning, confirmations } = state
     const o = confirmations.observedPending
     if (!o) return { ok: false, reason: 'No session running.' }
-    // L'arrêt date de la fin du délai : le temps passé à choisir une raison
-    // n'est pas du travail.
-    const pressedAt = new Date(now.getTime() - Math.min(args.answerMs ?? 0, 30 * 60_000))
-    const sleep = state.sleepMinute
-    const wake = state.wakeMinute
-    const r = deciderStop({
+    const minute = state.nowMinute
+    const attemptsBefore = attempts.filter((t) => now.getTime() - t < 10 * 60_000).length
+
+    if (args.text && detecteDetresse(args.text)) {
+      const r = applyStop({ learning, confirmations, nowMs: now.getTime(), minute, reason: args.reason, text: args.text, attemptsBefore })
+      if (!r) return { ok: false, reason: 'No session running.' }
+      await Promise.all([
+        deps.storage.write('learning', { ...r.learning, lastSignalAt: { ...r.learning.lastSignalAt, [SUJET_DETRESSE]: now.toISOString() } }),
+        deps.storage.write('session_confirmations', r.confirmations),
+      ])
+      await pauseBlocking(null)
+      deps.onPlanningDataChanged?.()
+      return { ok: true, step: 'help', message: MESSAGE_AIDE }
+    }
+
+    const task = o.kind === 'task' ? state.tasks.find((t) => t.id === o.refId) : undefined
+    const prep = preparerStop({
       learning,
       confirmations,
       nowMs: now.getTime(),
-      minute: minuteOfDay(pressedAt),
+      minute,
+      reason: args.reason,
+      attemptsBefore,
+      sleptHours: sleptHoursOf(state),
+      coucher: state.sleepMinute,
+      tache: task ? { id: task.id, deadline: task.deadline } : null,
+      planApres: planApresFor(state, now),
+    })
+    if (!prep) return { ok: false, reason: 'No Stop in this session.' }
+    if (prep.etape === 'pas-de-place') {
+      await Promise.all([deps.storage.write('learning', prep.learning), deps.storage.write('session_confirmations', prep.confirmations)])
+      // Une pause : le blocage revient dans 15 min.
+      await pauseBlocking(null)
+      deps.onPlanningDataChanged?.()
+      return { ok: true, step: 'no-room', message: prep.message }
+    }
+    return { ok: true, step: 'reaction', lines: prep.reaction.lignes, tenMinutes: prep.reaction.dixMinutes, waitMinutes: prep.attenteMinutes }
+  }
+
+  /**
+   * « Oui, j'arrête » : l'attente commence. Le blocage tient jusqu'à la fin
+   * de l'attente, puis la séance s'arrête d'elle-même (le tic l'exécute).
+   */
+  async function confirmStop(args: StopArgs): Promise<ConfirmResult> {
+    const now = deps.now()
+    const state = await loadTodayState(now)
+    const { learning, confirmations } = state
+    const o = confirmations.observedPending
+    if (!o) return { ok: false, reason: 'No session running.' }
+    const attemptsBefore = attempts.filter((t) => now.getTime() - t < 10 * 60_000).length
+    const task = o.kind === 'task' ? state.tasks.find((t) => t.id === o.refId) : undefined
+    const prep = preparerStop({
+      learning,
+      confirmations,
+      nowMs: now.getTime(),
+      minute: state.nowMinute,
+      reason: args.reason,
+      attemptsBefore,
+      sleptHours: sleptHoursOf(state),
+      coucher: state.sleepMinute,
+      tache: task ? { id: task.id, deadline: task.deadline } : null,
+      planApres: planApresFor(state, now),
+    })
+    if (!prep || prep.etape !== 'reaction') return { ok: false, reason: 'No Stop in this session.' }
+    const next = demanderStop(confirmations, {
+      nowMs: now.getTime(),
+      minute: state.nowMinute,
       reason: args.reason,
       ...(args.text !== undefined ? { text: args.text } : {}),
       ...(args.answerMs !== undefined ? { answerMs: args.answerMs } : {}),
-      attemptsBefore: attempts.filter((t) => now.getTime() - t < 10 * 60_000).length,
-      textReason: args.text ? lireTexteArret(args.text) : null,
-      ...(args.counterOfferRefused !== undefined ? { contreOffreRefusee: args.counterOfferRefused } : {}),
-      sleptHours: sleep !== null && wake !== null ? ((wake - sleep + 1440) % 1440) / 60 : null,
-      coucher: sleep,
-      deadline: o.kind === 'task' ? (state.tasks.find((t) => t.id === o.refId)?.deadline ?? null) : null,
-      planApres: (l, c) => {
-        const next: PlanningInput = {
-          ...input,
-          sessionEvents: l.sessionEvents,
-          activeSession: activeConfirmedSession(c, state.today, state.nowMinute),
-        }
-        return { plan: computePlan(next, now), input: next }
-      },
+      attemptsBefore,
+      attenteMinutes: prep.attenteMinutes,
+      placement: prep.reaction.placement,
     })
-    if (!r) return { ok: false, reason: 'No Stop in this session.' }
-    if (r.etape === 'contre-offre') return { ok: true, step: 'counter-offer', message: r.message }
-
-    let nextLearning = r.learning
-    const detresse = r.etape === 'arrete' && !!args.text && detecteDetresse(args.text)
-    if (detresse) {
-      nextLearning = { ...nextLearning, lastSignalAt: { ...nextLearning.lastSignalAt, [SUJET_DETRESSE]: now.toISOString() } }
+    if (!next) return { ok: false, reason: 'The block ends before the wait.' }
+    await deps.storage.write('session_confirmations', next)
+    const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
+    if (rules.block) {
+      await deps.storage.write('blocking_rules', { ...rules, block: { ...rules.block, endsAt: next.stopPending!.untilMs } })
+      deps.onBlockConfirmed?.()
     }
-    await Promise.all([
-      deps.storage.write('learning', nextLearning),
-      deps.storage.write('session_confirmations', r.confirmations),
-    ])
-    // Pas de place : une pause, le blocage revient dans 15 min. Arrêté : il se lève.
-    await pauseBlocking(null)
-    log.info('[planning] Stop', { step: r.etape, reason: args.reason })
     deps.onPlanningDataChanged?.()
-    if (r.etape === 'pas-de-place') return { ok: true, step: 'no-room', message: r.message }
-    return {
-      ok: true,
-      step: 'stopped',
-      ...(detresse ? { help: MESSAGE_AIDE } : {}),
-      options: detresse ? [] : r.options,
-      minutes: r.minutes,
-      source: { kind: o.kind, refId: o.refId, blockId: o.blockId },
-    }
+    return { ok: true }
   }
 
   async function trustView(): Promise<TrustView> {
@@ -838,54 +928,99 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       return p?.nom_affiche ?? id
     }
     const pause = confirmations.pause ?? null
+    const u = urgenceActive(confirmations, now.getTime())
     return {
       level,
-      delaySeconds: DELAI_STOP_SECONDES[level],
+      waitMinutes: ATTENTE_STOP_MINUTES[level],
       stopAllowed: !!activeSession && stopPermis(learning, confirmations),
       pause: pause ? { kind: pause.kind, endMinute: pause.endMinute } : null,
       awaitingReturn: !!confirmations.awaitingReturn,
-      emergencyAsAbandon: urgenceCommeAbandon(learning, today),
+      stopPending: confirmations.stopPending ? { untilMs: confirmations.stopPending.untilMs } : null,
+      promiseChoice: confirmations.promiseChoice ?? null,
+      urgence: u ? { untilMinute: u.untilMinute } : null,
+      urgentTooOften: urgenceTropFrequente(learning, today),
       breatherNow: !!activeSession && souffleDisponible(learning, activeSession.blockId) && !pause,
       sessionApps: ids.map((id) => ({ id, name: nameOf(id) })),
     }
   }
 
+  /** « Je continue » : l'attente s'annule, le blocage retrouve la fin du bloc. */
   async function waiveStop(): Promise<void> {
-    const { learning, confirmations } = await loadTodayState(deps.now())
-    const o = confirmations.observedPending
-    if (!o) return
-    await deps.storage.write('learning', renoncerAuStop(learning, confirmations.date, o.blockId))
-  }
-
-  async function makePromise(
-    option: OptionRattrapage,
-    minutes: number,
-    source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string },
-  ): Promise<void> {
-    if (source.kind === 'ancre') return
     const now = deps.now()
-    const { learning, input } = await loadTodayState(now)
-    const label =
-      source.kind === 'task'
-        ? (input.tasks.find((t) => t.id === source.refId)?.title ?? '')
-        : (input.objectives.find((x) => x.id === source.refId)?.name ?? '')
-    await deps.storage.write(
-      'learning',
-      creerPromesse(learning, {
-        id: `${source.blockId}-${now.getTime().toString(36)}`,
-        kind: source.kind,
-        refId: source.refId,
-        label,
-        fromBlockId: source.blockId,
-        date: option.date,
-        startMinute: option.startMinute,
-        minutes: Math.max(1, Math.min(600, Math.round(minutes))),
-        createdAt: now.toISOString(),
-      }),
-    )
-    deps.onPlanningDataChanged?.()
+    const { learning, confirmations, todayBlocks } = await loadTodayState(now)
+    const r = continuer(learning, confirmations)
+    await Promise.all([deps.storage.write('learning', r.learning), deps.storage.write('session_confirmations', r.confirmations)])
+    if (confirmations.stopPending) await restoreBlocking(r.confirmations, todayBlocks, now)
   }
 
+  async function choosePromise(option: OptionRattrapage): Promise<ConfirmResult> {
+    const now = deps.now()
+    const { learning, confirmations } = await loadTodayState(now)
+    const r = choisirRattrapage(learning, confirmations, option, now.getTime())
+    if (!r) return { ok: false, reason: 'This slot is no longer offered.' }
+    await Promise.all([deps.storage.write('learning', r.learning), deps.storage.write('session_confirmations', r.confirmations)])
+    deps.onPlanningDataChanged?.()
+    return { ok: true }
+  }
+
+  /** L'urgence : jusqu'à quand on peut repousser (heures tenables seulement). */
+  async function urgentOptions(): Promise<{ options: OptionRattrapage[]; minutes: number } | null> {
+    const now = deps.now()
+    const state = await loadTodayState(now)
+    const o = state.confirmations.observedPending
+    return optionsUrgence({
+      learning: state.learning,
+      confirmations: state.confirmations,
+      nowMs: now.getTime(),
+      minute: state.nowMinute,
+      deadline: o?.kind === 'task' ? (state.tasks.find((t) => t.id === o.refId)?.deadline ?? null) : null,
+      planApres: planApresFor(state, now),
+    })
+  }
+
+  /**
+   * L'urgence prise : la séance s'arrête maintenant, la promesse est posée, et
+   * d'ici là tout reste bloqué sauf les apps choisies.
+   */
+  async function urgent(option: OptionRattrapage, minutes: number, apps: string[]): Promise<ConfirmResult> {
+    if (apps.length > URGENCE_APPS_MAX) return { ok: false, reason: '3 apps at most.' }
+    const now = deps.now()
+    const { learning, confirmations, nowMinute, sleepMinute, todayBlocks } = await loadTodayState(now)
+    const o = confirmations.observedPending
+    const r = reporterEnUrgence({
+      learning,
+      confirmations,
+      nowMs: now.getTime(),
+      minute: nowMinute,
+      option,
+      minutes,
+      apps,
+      label: todayBlocks.find((b) => b.id === o?.blockId)?.label ?? '',
+      coucher: sleepMinute,
+    })
+    if (!r) return { ok: false, reason: 'No session running.' }
+    const rules = (await deps.storage.read('blocking_rules')) ?? EMPTY_BLOCKING_RULES
+    const all = todayBlocks.find((b) => b.id === o?.blockId)?.appsToBlock ?? rules.block?.appIds ?? []
+    await Promise.all([
+      deps.storage.write('learning', r.learning),
+      deps.storage.write('session_confirmations', r.confirmations),
+      deps.storage.write('blocking_rules', {
+        ...rules,
+        block: {
+          blockId: `urgence-${o!.blockId}`,
+          startedAt: now.getTime(),
+          endsAt: r.confirmations.urgence!.untilMs,
+          appIds: all.filter((id) => !apps.includes(id)),
+          blockedSites: rules.block?.blockedSites ?? [],
+        },
+      }),
+    ])
+    deps.onBlockConfirmed?.()
+    deps.onPlanningDataChanged?.()
+    return { ok: true }
+  }
+
+  /** Pas de place pour repousser une urgence : 15 min, puis on finit. */
   async function emergency(apps: string[]): Promise<ConfirmResult> {
     if (apps.length > URGENCE_APPS_MAX) return { ok: false, reason: '3 apps at most.' }
     const now = deps.now()
@@ -902,6 +1037,22 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     await pauseBlocking((rules.block?.appIds ?? []).filter((id) => !apps.includes(id)))
     deps.onPlanningDataChanged?.()
     return { ok: true }
+  }
+
+  /**
+   * « Stop » : avec une raison, la préparation (place, réaction) ; sans raison,
+   * la fin d'une prolongation — le bloc prévu est fait, rien à rattraper.
+   */
+  async function stopBlock(args: { reason: StopReason | null; text?: string; answerMs?: number }): Promise<StopResult> {
+    if (args.reason !== null) return stopReason({ ...args, reason: args.reason })
+    const now = deps.now()
+    const { learning, confirmations, nowMinute } = await loadTodayState(now)
+    const r = applyStop({ learning, confirmations, nowMs: now.getTime(), minute: nowMinute, reason: null })
+    if (!r) return { ok: false, reason: 'No session running.' }
+    await Promise.all([deps.storage.write('learning', r.learning), deps.storage.write('session_confirmations', r.confirmations)])
+    await pauseBlocking(null)
+    deps.onPlanningDataChanged?.()
+    return { ok: true, step: 'ended' }
   }
 
   async function breather(blockId?: string): Promise<ConfirmResult> {
@@ -951,7 +1102,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     },
     tickNow,
     confirmBlock: (blockId: string) => serialize(() => confirmBlock(blockId)),
-    stopBlock: (args: StopArgs) => serialize(() => stopBlock(args)),
+    stopBlock: (args) => serialize(() => stopBlock(args)),
+    confirmStop: (args: StopArgs) => serialize(() => confirmStop(args)),
     recordBlockedAttempt: () => serialize(recordAttempt),
     extensionOffer: () => serialize(extensionOffer),
     acceptExtension: () => serialize(acceptExtension),
@@ -959,7 +1111,9 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     decideFreeDay: (date: string, decision: 'taken' | 'kept') => serialize(() => decideFreeDay(date, decision)),
     trust: () => serialize(trustView),
     waiveStop: () => serialize(waiveStop),
-    promise: (option, minutes, source) => serialize(() => makePromise(option, minutes, source)),
+    choosePromise: (option) => serialize(() => choosePromise(option)),
+    urgentOptions: () => serialize(urgentOptions),
+    urgent: (option, minutes, apps) => serialize(() => urgent(option, minutes, apps)),
     emergency: (apps: string[]) => serialize(() => emergency(apps)),
     breather: (blockId?: string) => serialize(() => breather(blockId)),
     resume: () => serialize(resume),

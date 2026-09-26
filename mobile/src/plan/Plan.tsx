@@ -17,22 +17,30 @@ import { useNomTheme } from '@/theme/Theme'
 import { accepterProlongation, dansLaProlongation, marquerOffre, proposerProlongation } from '@shared/planning/prolongation'
 import { jourLibrePropose } from '@shared/planning/jours-libres'
 import {
-  creerPromesse,
-  deciderStop,
-  DELAI_STOP_SECONDES,
-  finUrgence,
+  ATTENTE_STOP_MINUTES,
+  choisirRattrapage,
+  continuer,
+  demanderStop,
+  executerStop,
   fermerPause,
+  finUrgence,
   niveauConfiance,
+  optionsUrgence,
   ouvrirUrgence,
+  preparerStop,
   prendreSouffle,
   promesseDuBloc,
-  renoncerAuStop,
+  reporterEnUrgence,
   retourDuSouffle,
   souffleAvant,
   souffleDisponible,
+  stopEchu,
   stopPermis,
-  urgenceCommeAbandon,
+  tentativesPendantUrgence,
+  urgenceActive,
+  urgenceTropFrequente,
   type OptionRattrapage,
+  type PlanApres,
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { calculerPlan, cleDate, entreeEtPlan } from './moteur'
@@ -118,6 +126,8 @@ function useSourcePlan() {
   // effet, une seule fois par changement réel — `change` est calculé par la
   // pendule elle-même, jamais deviné ici.
   const dernierTic = useRef<string>('')
+  // Le recalcul « comme si l'arrêt était accepté », défini plus bas avec le reste du Stop.
+  const planApresRef = useRef<PlanApres | null>(null)
   useEffect(() => {
     if (!tic) return
     const empreinte = `${calcul.aujourdHui}|${calcul.minute}`
@@ -132,7 +142,7 @@ function useSourcePlan() {
       const vues = pontEcran().lireTentatives().filter((t) => t >= confirmeA && t <= Date.now())
       appris = setBlockedAttempts(appris, tic.confirmations, vues.length, vues.length ? Math.max(...vues) : undefined)
     }
-    // Urgence : ouvrir une app NON choisie arrête la pause tout de suite.
+    // Urgence courte (15 min) : ouvrir une app NON choisie arrête la pause tout de suite.
     let confs = tic.confirmations
     const pause = confs.pause
     if (pause?.kind === 'emergency' && pontEcran().lireTentatives().some((t) => t >= pause.startMs)) {
@@ -140,6 +150,27 @@ function useSourcePlan() {
       appris = r.learning
       confs = r.confirmations
       void useBlocage.getState().reprendre(pause.blockId, calcul.minute)
+    }
+    // Urgence reportée : l'app regarde. Chaque tentative d'une app non choisie est comptée.
+    const u = urgenceActive(confs, Date.now())
+    if (u) appris = tentativesPendantUrgence(appris, confs, pontEcran().lireTentatives().filter((t) => t >= u.startMs).length, Date.now())
+    // L'attente d'un Stop est finie : la séance s'arrête, le bouclier est déjà
+    // levé par iOS, et le rattrapage reste à choisir.
+    const du = stopEchu(confs, Date.now())
+    if (du && planApresRef.current) {
+      const o = confs.observedPending
+      const r = executerStop({
+        learning: appris,
+        confirmations: confs,
+        nowMs: Date.now(),
+        label: blocsDuJour.find((b) => b.id === du.blockId)?.label ?? '',
+        deadline: o?.kind === 'task' ? (taches.find((t) => t.id === o.refId)?.echeance ?? null) : null,
+        textReason: du.text ? lireTexteArret(du.text) : null,
+        planApres: planApresRef.current,
+      })
+      appris = r.learning
+      confs = r.confirmations
+      void useBlocage.getState().remplacerPlage(du.blockId, null)
     }
     // E.3/E.4 : l'utilisation réelle du jour, pour la fatigue accumulée.
     appris = recordDailyUtilization(appris, calcul.aujourdHui, calcul.resultat.todayFullCapacityMinutes)
@@ -232,24 +263,41 @@ function useSourcePlan() {
     })
     return { plan: resultat, input: entree }
   }
+  planApresRef.current = planApres
   const coucher = minutesDe(reglages.coucher)
   const lever = minutesDe(reglages.lever)
   const limite = coucher !== null ? coucher - 30 : null
   const blocage = () => useBlocage.getState()
   const confirmationsDuJour = confirmations.date === calcul.aujourdHui ? confirmations : null
+  const maintenantMinute = () => {
+    const d = new Date()
+    return { d, minute: d.getHours() * 60 + d.getMinutes() }
+  }
+  const tentativesRecentes = (confirmeA: number | undefined) =>
+    pontEcran()
+      .lireTentatives()
+      .filter((t) => Date.now() - t < 10 * 60_000 && (confirmeA === undefined || t >= confirmeA)).length
+  const tacheEnCours = (o: { kind: string; refId: string } | null | undefined) =>
+    o?.kind === 'task' ? taches.find((t) => t.id === o.refId) : undefined
 
   const confiance = {
     niveau,
-    /** Le délai avant que le Stop ne s'ouvre, en secondes. */
-    delaiStop: DELAI_STOP_SECONDES[niveau],
+    /** L'attente entre « Oui, j'arrête » et le déblocage, en minutes. */
+    attenteMinutes: ATTENTE_STOP_MINUTES[niveau],
     /** Pas de Stop dans un rattrapage, ni après un « pas de place ». */
     stopPermis: !!actif && !!confirmationsDuJour && stopPermis(apprentissage, confirmationsDuJour),
     /** La pause en cours, ou null. */
     pause: confirmationsDuJour?.pause ?? null,
     /** Le souffle est fini : l'overlay attend « Je reprends ». */
     retourAttendu: confirmationsDuJour?.awaitingReturn ?? null,
-    /** Au-delà d'un arrêt sur trois en urgence, l'urgence compte comme un abandon. */
-    urgenceAbandon: urgenceCommeAbandon(apprentissage, calcul.aujourdHui),
+    /** L'attente d'un Stop confirmé : la séance s'arrête à `untilMs`. */
+    stopEnAttente: confirmationsDuJour?.stopPending ?? null,
+    /** Le rattrapage à choisir : il n'y a pas d'autre sortie. */
+    choixRattrapage: confirmationsDuJour?.promiseChoice ?? null,
+    /** L'urgence en cours : tout écarté sauf les apps choisies, jusqu'à l'heure de reprise. */
+    urgence: confirmationsDuJour ? urgenceActive(confirmationsDuJour, Date.now()) : null,
+    /** Au-delà d'un arrêt sur trois en urgence, l'urgence passe par l'attente. */
+    urgenceTropFrequente: urgenceTropFrequente(apprentissage, calcul.aujourdHui),
     /** « J'ai besoin de 15 min » pendant la promesse en cours. */
     souffleEnCours: !!actif && souffleDisponible(apprentissage, actif.blockId) && !confirmationsDuJour?.pause,
     /** « J'ai besoin de 15 min » AVANT une promesse qui attend son départ. */
@@ -257,102 +305,163 @@ function useSourcePlan() {
     /** Le titre du bloc dont on attend le retour. */
     titreRetour: confirmationsDuJour?.awaitingReturn ? (blocsDuJour.find((b) => b.id === confirmationsDuJour.awaitingReturn!.blockId)?.label ?? '') : '',
 
-    /** Le Stop, décidé par le moteur. `minuteStop` : la fin du délai. */
-    decider: async (raison: StopReason | null, opts: { texte?: string; reponseMs?: number; contreOffreRefusee?: boolean; minuteStop: Date }) => {
+    /**
+     * La raison est donnée : la place, puis la réaction propre à la raison.
+     * Rien n'est arrêté — sauf une détresse lue dans le texte : on arrête
+     * tout de suite, sans attente, et on oriente vers une aide humaine.
+     */
+    preparer: async (raison: StopReason, texte?: string) => {
       const frais = useSeances.getState()
       const o = frais.confirmations.observedPending
       if (!o) return { etape: 'rien' as const }
+      const { d, minute } = maintenantMinute()
       const confirmeA = frais.confirmations.confirmedAt[o.blockId]
-      const minute = opts.minuteStop.getHours() * 60 + opts.minuteStop.getMinutes()
-      const r = deciderStop({
+      if (texte && detecteDetresse(texte)) {
+        const r = arreter({ maintenant: d, etat: { apprentissage: frais.apprentissage, confirmations: frais.confirmations }, raison, texte })
+        if (!r) return { etape: 'rien' as const }
+        await poser({
+          apprentissage: { ...r.apprentissage, lastSignalAt: { ...r.apprentissage.lastSignalAt, [SUJET_DETRESSE]: d.toISOString() } },
+          confirmations: r.confirmations,
+        })
+        await blocage().remplacerPlage(o.blockId, null)
+        return { etape: 'message' as const, message: MESSAGE_AIDE }
+      }
+      const tache = tacheEnCours(o)
+      const r = preparerStop({
         learning: frais.apprentissage,
         confirmations: frais.confirmations,
-        nowMs: Date.now(),
+        nowMs: d.getTime(),
         minute,
         reason: raison,
-        ...(opts.texte ? { text: opts.texte } : {}),
-        ...(opts.reponseMs !== undefined ? { answerMs: opts.reponseMs } : {}),
-        attemptsBefore: pontEcran()
-          .lireTentatives()
-          .filter((t) => Date.now() - t < 10 * 60_000 && (confirmeA === undefined || t >= confirmeA)).length,
-        textReason: opts.texte ? lireTexteArret(opts.texte) : null,
-        ...(opts.contreOffreRefusee !== undefined ? { contreOffreRefusee: opts.contreOffreRefusee } : {}),
+        attemptsBefore: tentativesRecentes(confirmeA),
         sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
         coucher,
-        deadline: o.kind === 'task' ? (taches.find((t) => t.id === o.refId)?.echeance ?? null) : null,
+        tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
         planApres,
       })
       if (!r) return { etape: 'rien' as const }
-      if (r.etape === 'contre-offre') return r
-      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
       if (r.etape === 'pas-de-place') {
+        await poser({ apprentissage: r.learning, confirmations: r.confirmations })
         await blocage().pauser(o.blockId, r.confirmations.pause!.endMinute)
-        return { etape: 'pas-de-place' as const, message: r.message }
+        return { etape: 'message' as const, message: r.message }
       }
-      await blocage().appliquerPlan(blocage().plagesActives.filter((p) => p.blocId !== o.blockId))
-      // Une détresse lue dans le texte : on sort du mode discipline 24 h, et
-      // aucune promesse n'est demandée.
-      if (opts.texte && detecteDetresse(opts.texte)) {
-        const e = useSeances.getState()
-        await e.poser({
-          apprentissage: { ...e.apprentissage, lastSignalAt: { ...e.apprentissage.lastSignalAt, [SUJET_DETRESSE]: new Date().toISOString() } },
-          confirmations: e.confirmations,
-        })
-        return { etape: 'aide' as const, message: MESSAGE_AIDE }
-      }
-      return {
-        etape: 'arrete' as const,
-        options: r.options,
-        minutes: r.minutes,
-        source: { kind: o.kind, refId: o.refId, blockId: o.blockId },
-      }
+      return { etape: 'reaction' as const, lignes: r.reaction.lignes, dixMinutes: r.reaction.dixMinutes, attenteMinutes: r.attenteMinutes }
     },
 
-    /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
-    renoncer: async () => {
-      const frais = useSeances.getState()
-      const o = frais.confirmations.observedPending
-      if (!o) return
-      await poser({ apprentissage: renoncerAuStop(frais.apprentissage, frais.confirmations.date, o.blockId), confirmations: frais.confirmations })
-    },
-
-    /** Le rattrapage choisi : une promesse. */
-    promettre: async (option: OptionRattrapage, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }, minutes: number) => {
-      if (source.kind === 'ancre') return
-      const frais = useSeances.getState()
-      const label =
-        source.kind === 'task'
-          ? (taches.find((t) => t.id === source.refId)?.titre ?? '')
-          : (objectifs.find((x) => x.id === source.refId)?.nom ?? '')
-      await poser({
-        apprentissage: creerPromesse(frais.apprentissage, {
-          id: `${source.blockId}-${Date.now().toString(36)}`,
-          kind: source.kind,
-          refId: source.refId,
-          label,
-          fromBlockId: source.blockId,
-          date: option.date,
-          startMinute: option.startMinute,
-          minutes,
-          createdAt: new Date().toISOString(),
-        }),
-        confirmations: frais.confirmations,
-      })
-    },
-
-    /** « Something real came up » : pause de 15 min, jusqu'à 3 apps débloquées. */
-    urgence: async (nbApps: number) => {
+    /**
+     * « Oui, j'arrête » : l'attente commence. Le bouclier tient jusqu'au bout
+     * de l'attente — iOS le lève lui-même, même app fermée — puis la séance
+     * s'arrête au tic suivant.
+     */
+    confirmerStop: async (raison: StopReason, texte?: string, reponseMs?: number) => {
       const frais = useSeances.getState()
       const o = frais.confirmations.observedPending
       if (!o) return false
-      const maintenant = new Date()
-      const r = ouvrirUrgence(frais.apprentissage, frais.confirmations, {
-        nowMinute: maintenant.getHours() * 60 + maintenant.getMinutes(),
-        nowMs: maintenant.getTime(),
+      const { d, minute } = maintenantMinute()
+      const tache = tacheEnCours(o)
+      const prep = preparerStop({
+        learning: frais.apprentissage,
+        confirmations: frais.confirmations,
+        nowMs: d.getTime(),
+        minute,
+        reason: raison,
+        attemptsBefore: tentativesRecentes(frais.confirmations.confirmedAt[o.blockId]),
+        sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
+        coucher,
+        tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
+        planApres,
+      })
+      if (!prep || prep.etape !== 'reaction') return false
+      const c = demanderStop(frais.confirmations, {
+        nowMs: d.getTime(),
+        minute,
+        reason: raison,
+        ...(texte ? { text: texte } : {}),
+        ...(reponseMs !== undefined ? { answerMs: reponseMs } : {}),
+        attemptsBefore: tentativesRecentes(frais.confirmations.confirmedAt[o.blockId]),
+        attenteMinutes: prep.attenteMinutes,
+        placement: prep.reaction.placement,
+      })
+      if (!c) return false
+      await poser({ apprentissage: frais.apprentissage, confirmations: c })
+      const plage = blocage().plagesActives.find((p) => p.blocId === o.blockId)
+      if (plage) await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: Math.max(plage.debutMinute + 1, c.stopPending!.untilMinute) })
+      return true
+    },
+
+    /** « Je continue » : l'attente s'annule, le bouclier retrouve la fin du bloc. */
+    continuer: async () => {
+      const frais = useSeances.getState()
+      const r = continuer(frais.apprentissage, frais.confirmations)
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      const o = r.confirmations.observedPending
+      const plage = o ? blocage().plagesActives.find((p) => p.blocId === o.blockId) : undefined
+      if (o && plage && frais.confirmations.stopPending) await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: o.endMinute })
+    },
+
+    /** Le rattrapage choisi parmi ceux proposés : la promesse. */
+    choisirRattrapage: async (option: OptionRattrapage) => {
+      const frais = useSeances.getState()
+      const r = choisirRattrapage(frais.apprentissage, frais.confirmations, option, Date.now())
+      if (r) await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+    },
+
+    /** L'urgence : jusqu'à quand on peut repousser (heures tenables seulement). */
+    optionsUrgence: () => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      const { d, minute } = maintenantMinute()
+      return optionsUrgence({
+        learning: frais.apprentissage,
+        confirmations: frais.confirmations,
+        nowMs: d.getTime(),
+        minute,
+        deadline: tacheEnCours(o)?.echeance ?? null,
+        planApres,
+      })
+    },
+
+    /** L'urgence prise : repoussé à `option`, tout écarté sauf `nbApps` apps (3 au plus). */
+    reporterEnUrgence: async (option: OptionRattrapage, minutes: number, nbApps: number) => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return false
+      const { d, minute } = maintenantMinute()
+      const r = reporterEnUrgence({
+        learning: frais.apprentissage,
+        confirmations: frais.confirmations,
+        nowMs: d.getTime(),
+        minute,
+        option,
+        minutes,
         apps: [],
         appCount: nbApps,
-        limiteMinute: limite,
+        label: blocsDuJour.find((b) => b.id === o.blockId)?.label ?? '',
+        coucher,
       })
+      if (!r) return false
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
+      const selectionId = blocage().selection?.identifiant
+      await blocage().remplacerPlage(o.blockId, null)
+      if (selectionId && r.confirmations.urgence!.untilMinute > minute) {
+        await blocage().remplacerPlage(`urgence-${o.blockId}`, {
+          blocId: `urgence-${o.blockId}`,
+          debutMinute: minute,
+          finMinute: r.confirmations.urgence!.untilMinute,
+          selectionId,
+          ...(nbApps > 0 ? { exceptionId: IDENTIFIANT_URGENCE } : {}),
+        })
+      }
+      return true
+    },
+
+    /** Pas la place de repousser une urgence (ou dans une promesse) : 15 min, puis on finit. */
+    urgenceCourte: async (nbApps: number) => {
+      const frais = useSeances.getState()
+      const o = frais.confirmations.observedPending
+      if (!o) return false
+      const { d, minute } = maintenantMinute()
+      const r = ouvrirUrgence(frais.apprentissage, frais.confirmations, { nowMinute: minute, nowMs: d.getTime(), apps: [], appCount: nbApps, limiteMinute: limite })
       if (!r) return false
       await poser({ apprentissage: r.learning, confirmations: r.confirmations })
       await blocage().pauser(o.blockId, r.confirmations.pause!.endMinute, nbApps > 0 ? IDENTIFIANT_URGENCE : null)
@@ -362,15 +471,14 @@ function useSourcePlan() {
     /** « J'ai besoin de 15 min », une fois par promesse : avant, la séance glisse ; pendant, une pause. */
     souffle: async (blockId?: string) => {
       const frais = useSeances.getState()
-      const maintenant = new Date()
-      const minute = maintenant.getHours() * 60 + maintenant.getMinutes()
+      const { d, minute } = maintenantMinute()
       if (blockId) {
         const p = promesseDuBloc(frais.apprentissage, blockId)
         const l = p ? souffleAvant(frais.apprentissage, p.id) : null
         if (l) await poser({ apprentissage: l, confirmations: frais.confirmations })
         return
       }
-      const r = prendreSouffle(frais.apprentissage, frais.confirmations, minute, maintenant.getTime(), limite)
+      const r = prendreSouffle(frais.apprentissage, frais.confirmations, minute, d.getTime(), limite)
       if (!r) return
       await poser({ apprentissage: r.learning, confirmations: r.confirmations })
       await blocage().pauser(r.confirmations.pause!.blockId, r.confirmations.pause!.endMinute)
@@ -379,12 +487,11 @@ function useSourcePlan() {
     /** « Je reprends » : la pause se termine, le bouclier revient. */
     reprendre: async () => {
       const frais = useSeances.getState()
-      const maintenant = new Date()
-      const minute = maintenant.getHours() * 60 + maintenant.getMinutes()
+      const { d, minute } = maintenantMinute()
       const c = frais.confirmations
       let suite: { learning: typeof apprentissage; confirmations: typeof confirmations }
       if (c.awaitingReturn) suite = retourDuSouffle(frais.apprentissage, c, minute, limite)
-      else if (c.pause?.kind === 'emergency') suite = finUrgence(frais.apprentissage, c, { nowMinute: minute, nowMs: maintenant.getTime(), end: 'voluntary' })
+      else if (c.pause?.kind === 'emergency') suite = finUrgence(frais.apprentissage, c, { nowMinute: minute, nowMs: d.getTime(), end: 'voluntary' })
       else if (c.pause) suite = { learning: frais.apprentissage, confirmations: fermerPause(c, minute) }
       else return
       await poser({ apprentissage: suite.learning, confirmations: suite.confirmations })
@@ -514,7 +621,9 @@ function useSourcePlan() {
         // qu'on ait a dire a quelqu'un qui vient d'ouvrir une application
         // ecartee. « Chemistry — until 15:30 » parle du plan ; « Blocked »
         // parlerait de lui.
-        if (plage) await blocage.ouvrirSeance(plage, { theme, titreBloc: bloc.label })
+        // « Distracted » : le rattrapage se fait en mode profond, tout écarté sauf la liste gardée.
+        const profond = promesseDuBloc(apprentissage, bloc.id)?.deep === true
+        if (plage) await blocage.ouvrirSeance(profond ? { ...plage, profond: true } : plage, { theme, titreBloc: bloc.label })
       }
 
       return { ok: true as const, retardMinutes: suivant.retardMinutes }

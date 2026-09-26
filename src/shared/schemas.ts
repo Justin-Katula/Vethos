@@ -411,6 +411,8 @@ export const PromiseSchema = z.object({
   minutes: z.number().int().min(1).max(600),
   createdAt: z.string().datetime(),
   status: z.enum(['pending', 'kept', 'broken']).default('pending'),
+  /** « Distracted » : la séance se fera en mode profond (tout bloqué sauf la liste gardée). */
+  deep: z.boolean().optional(),
   /** Heure de début réelle (confirmation). */
   startedMinute: z.number().int().min(0).max(1440).optional(),
   /** « J'ai besoin de 15 min » : une fois, avant ou pendant. */
@@ -472,8 +474,8 @@ export const SessionEventSchema = z.object({
       attemptsBefore: z.number().int().min(0).default(0),
       /** Niveau de confiance au moment du Stop (1 à 4). */
       level: z.number().int().min(1).max(4).optional(),
-      /** Ce que le moteur a tranché. */
-      verdict: z.enum(['postponed', 'abandoned', 'no-room']).optional(),
+      /** Ce que le moteur a tranché. Il n'existe pas d'abandon : le travail reste dû. */
+      verdict: z.enum(['postponed', 'no-room', 'urgent']).optional(),
     })
     .optional(),
   /** « Je continue » pendant le délai du Stop : autant de Stop renoncés. */
@@ -611,6 +613,50 @@ export const SessionConfirmationsStateSchema = z.object({
       startMinute: z.number().int().min(0).max(1440),
       endMinute: z.number().int().min(0).max(1440),
       startMs: z.number().int(),
+      apps: z.array(z.string()).max(3).default([]),
+    })
+    .nullable()
+    .optional(),
+  /**
+   * « Oui, j'arrête » : la séance reste bloquée jusqu'à `untilMs`, puis
+   * s'arrête d'elle-même — même si l'app est fermée. « Je continue » l'annule.
+   */
+  stopPending: z
+    .object({
+      blockId: z.string().min(1),
+      untilMs: z.number().int(),
+      untilMinute: z.number().int().min(0).max(1440),
+      reason: z.enum(STOP_REASONS),
+      text: z.string().max(500).optional(),
+      answerMs: z.number().int().min(0).optional(),
+      attemptsBefore: z.number().int().min(0).default(0),
+      morceau: z.number().int().min(5).max(90).optional(),
+      preference: z.enum(['tot', 'profonde', 'repose']).default('tot'),
+      deep: z.boolean().optional(),
+    })
+    .nullable()
+    .optional(),
+  /** L'arrêt est fait : le rattrapage reste à choisir. Il n'y a pas d'autre sortie. */
+  promiseChoice: z
+    .object({
+      options: z.array(z.object({ date: z.string().regex(DATE_REGEX), startMinute: z.number().int().min(0).max(1439) })).max(8),
+      minutes: z.number().int().min(1).max(600),
+      source: z.object({ kind: z.enum(['task', 'objective']), refId: z.string().min(1), blockId: z.string().min(1), label: z.string().max(200).default('') }),
+      morceau: z.number().int().min(5).max(90).optional(),
+      deep: z.boolean().optional(),
+    })
+    .nullable()
+    .optional(),
+  /**
+   * L'urgence : la séance est reportée à l'heure choisie ; d'ici là tout reste
+   * bloqué sauf les apps choisies (3 au plus), et chaque tentative est vue.
+   */
+  urgence: z
+    .object({
+      sourceBlockId: z.string().min(1),
+      startMs: z.number().int(),
+      untilMs: z.number().int(),
+      untilMinute: z.number().int().min(0).max(1440),
       apps: z.array(z.string()).max(3).default([]),
     })
     .nullable()

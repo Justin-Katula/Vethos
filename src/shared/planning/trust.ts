@@ -2,7 +2,7 @@ import type { EmergencyPause, LearningState, SessionConfirmationsState, SessionE
 import type { PlanningInput, PlanningResult } from './types'
 import { GAMMA } from './bayes'
 import { RAISONS, raisonConcorde } from './arrets'
-import { addDays, startOfWeek } from './dates'
+import { addDays, daysBetween, startOfWeek } from './dates'
 import { mergeIntervals } from './capacity'
 import { TOLERANCE_DEPART_MINUTES } from './habitudes'
 import { applyStop } from './clock'
@@ -31,11 +31,11 @@ export function niveauConfiance(t: LearningState['trust'] | undefined): Niveau {
 }
 
 /**
- * Le délai avant que le Stop ne s'ouvre, en secondes. Un délai avec un bouton
- * pour renoncer a réduit de 57 % les ouvertures ciblées (one sec) ; le message
- * de réflexion, lui, ne servait à rien — donc pas de texte pendant le délai.
+ * L'attente entre « Oui, j'arrête » et le déblocage, en minutes : 5, et plus
+ * quand la confiance baisse. La séance reste bloquée pendant ce temps, et
+ * « Je continue » reste à portée. L'urgence, elle, n'attend pas.
  */
-export const DELAI_STOP_SECONDES: Record<Niveau, number> = { 1: 0, 2: 60, 3: 120, 4: 300 }
+export const ATTENTE_STOP_MINUTES: Record<Niveau, number> = { 1: 5, 2: 5, 3: 10, 4: 15 }
 
 /** Rattrapage au niveau 4 : dans les 24 h. */
 export const RATTRAPAGE_MAX_HEURES_NIVEAU_4 = 24
@@ -50,9 +50,14 @@ export function ajusterConfiance(learning: LearningState, effet: EffetConfiance)
   return { ...learning, trust: { successes: s, failures: f } }
 }
 
-// ─── Le Stop : raison, contre-offre, verdict ─────────────────────────────
+// ─── Le Stop : la raison, et ce qu'elle fait faire à l'app ───────────────
+//
+// Il n'existe pas d'abandon. En créant une tâche, la personne a passé un pacte
+// avec l'app : « fais-moi faire ça du début à la fin ». Un Stop déplace le
+// travail, il ne le retire jamais. Le moteur ne tranche qu'une chose : y a-t-il
+// la place de le repousser ? Sinon, on finit maintenant.
 
-export type Verdict = 'postponed' | 'abandoned' | 'no-room'
+export type Verdict = 'postponed' | 'no-room' | 'urgent'
 
 /** Ce qu'on compare à la raison dite : des faits de la séance, rien d'autre. */
 export type FaitsDuStop = {
@@ -67,6 +72,10 @@ export type FaitsDuStop = {
 }
 
 const heure = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`
+const duree = (m: number) => {
+  const v = Math.max(0, Math.round(m))
+  return v < 60 ? `${v} min` : `${Math.floor(v / 60)} h${v % 60 ? ` ${String(v % 60).padStart(2, '0')}` : ''}`
+}
 
 /** Ce que le comportement ressemble plutôt, quand la raison ne colle pas. */
 function plutot(f: FaitsDuStop): string {
@@ -76,15 +85,11 @@ function plutot(f: FaitsDuStop): string {
   return 'a slump'
 }
 
-/** Les minutes de plus que propose la contre-offre. */
-export const CONTRE_OFFRE_MINUTES = 10
-
 /**
- * La contre-offre (niveaux 3 et 4), seulement quand la raison ne colle pas au
- * comportement : la raison, puis les chiffres, puis 10 minutes de plus. À
- * refuser explicitement. Jamais une accusation — une comparaison.
+ * La raison comparée aux faits, seulement quand elle ne colle pas. Jamais une
+ * accusation : une comparaison.
  */
-export function contreOffre(raison: StopReason, f: FaitsDuStop): string | null {
+export function comparaison(raison: StopReason, f: FaitsDuStop): string | null {
   if (raison === 'real-event' || raisonConcorde(f, raison)) return null
   const faits = [`It’s ${heure(f.nowMinute)}`]
   if (f.sleptHours != null) faits.push(`you slept ${Math.round(f.sleptHours)} h`)
@@ -92,28 +97,82 @@ export function contreOffre(raison: StopReason, f: FaitsDuStop): string | null {
     faits.push(`you tried to open a blocked app ${f.attemptsBefore} time${f.attemptsBefore > 1 ? 's' : ''} in 10 min`)
   else faits.push(`you held ${f.heldMinutes} of ${f.plannedMinutes} min`)
   const liste = faits.length > 2 ? `${faits.slice(0, -1).join(', ')}, and ${faits.at(-1)}` : faits.join(', and ')
-  return `You say ${RAISONS[raison].libelle.toLowerCase()}. ${liste}. That looks more like ${plutot(f)}. ${CONTRE_OFFRE_MINUTES} more minutes.`
+  return `You say ${RAISONS[raison].libelle.toLowerCase()}. ${liste}. That looks more like ${plutot(f)}.`
+}
+
+/** Les minutes de plus que « Boring » propose d'abord. */
+export const DIX_MINUTES = 10
+
+/** Les blocs courts du rattrapage (« trop dur », « ennuyeux »). */
+export const BLOC_COURT = 25
+
+export type Preference = 'tot' | 'profonde' | 'repose'
+export type Placement = { morceau?: number; preference: Preference; deep?: boolean }
+
+/** Ce que la raison fait faire à l'app : ce qu'elle montre, et où va le rattrapage. */
+export type Reaction = {
+  /** Des faits, jamais un sermon. */
+  lignes: string[]
+  /** « Boring » : 10 minutes de plus, proposées d'abord. */
+  dixMinutes: boolean
+  placement: Placement
+}
+
+/** L'échéance d'une tâche, en chiffres : pour « No rush ». */
+export type Echeance = { jours: number; resteMinutes: number; libreMinutes: number }
+
+export function echeanceDe(plan: PlanningResult, today: string, task: { id: string; deadline: string }): Echeance {
+  const v = plan.verdicts.find((x) => x.taskId === task.id)
+  return {
+    jours: Math.max(0, daysBetween(today, task.deadline)),
+    resteMinutes: v?.neededMinutes ?? 0,
+    libreMinutes: plan.capacities.filter((c) => c.date <= task.deadline).reduce((t, c) => t + c.effectiveCapacityMinutes, 0),
+  }
 }
 
 /**
- * C'est le moteur qui tranche, jamais l'IA.
- * - pas de place : le recalcul ne garde pas la semaine faisable ;
- * - report : il y a la place, et la raison colle (ou niveau 1) ;
- * - abandon : il y a la place, mais la raison ne colle pas, ou la
- *   contre-offre a été refusée. Le travail reste dû dans les deux cas.
+ * Chaque raison a sa réaction (la cause selon Steel, 2007) :
+ * - « Too hard » (confiance en soi) : le rattrapage en blocs de 25 min, dans
+ *   la meilleure fenêtre de concentration ;
+ * - « Boring » (aversion) : 10 min de plus d'abord ; sinon des blocs courts,
+ *   le plus tôt possible ;
+ * - « No rush » (échéance lointaine) : les vrais chiffres ; le rattrapage au
+ *   plus tôt, jamais glissé vers l'échéance ;
+ * - « Distracted » (impulsivité) : les tentatives montrées ; le rattrapage en
+ *   mode profond ;
+ * - « Tired » (fatigue) : si les faits collent, le rattrapage quand on est
+ *   reposé (un matin, pas ce soir) ; sinon, la comparaison, et on traite
+ *   comme une distraction.
+ * Aux niveaux 3-4, une raison qui ne colle pas montre aussi la comparaison.
  */
-export function verdictStop(a: {
-  niveau: Niveau
-  place: boolean
-  raison: StopReason | null
-  faits: FaitsDuStop
-  contreOffreRefusee?: boolean
-}): Verdict {
-  if (!a.place) return 'no-room'
-  if (a.niveau === 1) return 'postponed'
-  if (a.contreOffreRefusee) return 'abandoned'
-  if (a.raison === null) return 'abandoned'
-  return raisonConcorde(a.faits, a.raison) ? 'postponed' : 'abandoned'
+export function reactionRaison(raison: StopReason, f: FaitsDuStop, ctx: { niveau: Niveau; echeance?: Echeance | null }): Reaction {
+  const compare = comparaison(raison, f)
+  const avecComparaison = (r: Reaction): Reaction =>
+    ctx.niveau >= 3 && compare && !r.lignes.includes(compare) ? { ...r, lignes: [...r.lignes, compare] } : r
+  switch (raison) {
+    case 'too-hard':
+      return avecComparaison({ lignes: [], dixMinutes: false, placement: { morceau: BLOC_COURT, preference: 'profonde' } })
+    case 'boring':
+      return avecComparaison({ lignes: [], dixMinutes: true, placement: { morceau: BLOC_COURT, preference: 'tot' } })
+    case 'no-rush': {
+      const e = ctx.echeance
+      const lignes = e
+        ? [`Due in ${e.jours} day${e.jours === 1 ? '' : 's'}. ${duree(e.resteMinutes)} left, ${duree(e.libreMinutes)} free until then.`]
+        : []
+      return avecComparaison({ lignes, dixMinutes: false, placement: { preference: 'tot' } })
+    }
+    case 'distracted': {
+      const n = f.attemptsBefore
+      const lignes = n > 0 ? [`${n} blocked-app attempt${n > 1 ? 's' : ''} in the last 10 min.`] : []
+      return avecComparaison({ lignes, dixMinutes: false, placement: { preference: 'tot', deep: true } })
+    }
+    case 'tired':
+      return compare
+        ? { lignes: [compare], dixMinutes: false, placement: { preference: 'tot', deep: true } }
+        : { lignes: [], dixMinutes: false, placement: { preference: 'repose' } }
+    case 'real-event':
+      return { lignes: [], dixMinutes: false, placement: { preference: 'tot' } }
+  }
 }
 
 /**
@@ -148,16 +207,17 @@ export function placePourReporter(a: {
 /** Pas de place : « Pause de 15 min, puis tu finis. » */
 export const MESSAGE_PAS_DE_PLACE = 'No room to postpone. 15-minute break, then you finish.'
 
-// ─── L'urgence, et quand elle compte comme un abandon ────────────────────
+// ─── L'urgence, et quand elle n'en est plus une ──────────────────────────
 
 /**
  * Au-delà d'un arrêt sur trois en urgence (30 derniers jours, au moins 3
- * arrêts), l'urgence n'est plus une pause : elle compte comme un abandon.
+ * arrêts), l'urgence n'en est plus une : elle passe par l'attente comme les
+ * autres raisons.
  */
-export function urgenceCommeAbandon(learning: Pick<LearningState, 'sessionEvents' | 'emergencyPauses'>, today: string): boolean {
+export function urgenceTropFrequente(learning: Pick<LearningState, 'sessionEvents' | 'emergencyPauses'>, today: string): boolean {
   const depuis = addDays(today, -30)
   const urgences = (learning.emergencyPauses ?? []).filter((p) => p.date >= depuis).length
-  const stops = (learning.sessionEvents ?? []).filter((e) => e.date >= depuis && e.stop && e.stoppedEarly).length
+  const stops = (learning.sessionEvents ?? []).filter((e) => e.date >= depuis && e.stop && e.stoppedEarly && e.stop.verdict !== 'urgent').length
   const total = urgences + stops
   return total >= 3 && urgences / total > 1 / 3
 }
@@ -168,11 +228,54 @@ export type OptionRattrapage = { date: string; startMinute: number }
 
 const arrondi5 = (m: number) => Math.ceil(m / 5) * 5
 
+/** La place que prend un rattrapage : en blocs courts, 5 min entre chaque. */
+export function empreinteRattrapage(minutes: number, morceau?: number): number {
+  if (!morceau || minutes <= morceau) return minutes
+  const n = Math.ceil(minutes / morceau)
+  return minutes + (n - 1) * 5
+}
+
+/** Les débuts possibles, un jour donné, d'un rattrapage de `span` minutes (pas de 30 min). */
+function debutsLibres(
+  plan: PlanningResult,
+  date: string,
+  span: number,
+  kind: 'task' | 'objective',
+  refId: string,
+  plancher: number,
+  plafond: number,
+  filtre: (s: PlanningResult['capacities'][number]['slots'][number]) => boolean = () => true,
+): number[] {
+  const c = plan.capacities.find((x) => x.date === date)
+  if (!c || c.freeDay) return []
+  const pris = mergeIntervals(
+    plan.blocks
+      .filter((b) => b.date === date && !(b.kind === kind && b.refId === refId))
+      .map((b) => ({ start: b.startMinute, end: b.endMinute })),
+  )
+  const out: number[] = []
+  for (const s of c.slots.filter(filtre)) {
+    let debut = Math.max(arrondi5(s.startMinute), plancher)
+    while (debut + span <= s.endMinute && debut <= plafond) {
+      const choc = pris.find((p) => p.start < debut + span && debut < p.end)
+      if (choc) {
+        debut = arrondi5(choc.end)
+        continue
+      }
+      out.push(debut)
+      debut += 30
+    }
+  }
+  return out
+}
+
 /**
  * Les créneaux où tenir la promesse : les trous du plan recalculé (les blocs
  * de la même source n'occupent rien — la promesse les remplace), un par jour,
  * trois au plus. Au niveau 4, dans les 24 h. Une tâche, avant son échéance ;
- * un objectif, dans la semaine.
+ * un objectif, dans la semaine. La préférence vient de la raison : au plus
+ * tôt, dans une fenêtre profonde (« trop dur »), ou un matin reposé
+ * (« fatigué »). Rien ne correspond à la préférence : au plus tôt.
  */
 export function optionsRattrapage(a: {
   plan: PlanningResult
@@ -183,36 +286,30 @@ export function optionsRattrapage(a: {
   refId: string
   niveau: Niveau
   deadline?: string | null
+  morceau?: number
+  preference?: Preference
 }): OptionRattrapage[] {
   const demain = addDays(a.today, 1)
   const limite =
     a.niveau === 4 ? demain : a.kind === 'task' && a.deadline ? a.deadline : addDays(startOfWeek(a.today), 6)
-  const options: OptionRattrapage[] = []
-  for (const c of a.plan.capacities) {
-    if (options.length >= 3) break
-    if (c.date > limite || c.freeDay) continue
-    const occupe = a.plan.blocks
-      .filter((b) => b.date === c.date && !(b.kind === a.kind && b.refId === a.refId))
-      .map((b) => ({ start: b.startMinute, end: b.endMinute }))
-    const pris = mergeIntervals(occupe)
-    const plancher = c.date === a.today ? arrondi5(a.nowMinute + 15) : 0
-    const plafond = a.niveau === 4 && c.date === demain ? a.nowMinute : 1440
-    let trouve: number | null = null
-    for (const s of c.slots) {
-      let debut = Math.max(arrondi5(s.startMinute), plancher)
-      const fin = Math.min(s.endMinute, plafond + a.minutes)
-      for (const p of pris) {
-        if (p.end <= debut || p.start >= debut + a.minutes) continue
-        debut = arrondi5(p.end)
-      }
-      if (debut + a.minutes <= fin && debut <= plafond) {
-        trouve = debut
-        break
-      }
+  const span = empreinteRattrapage(a.minutes, a.morceau)
+  const chercher = (pref: Preference): OptionRattrapage[] => {
+    const options: OptionRattrapage[] = []
+    for (const c of a.plan.capacities) {
+      if (options.length >= 3) break
+      if (c.date > limite) continue
+      if (pref === 'repose' && c.date === a.today) continue
+      const plancher = c.date === a.today ? arrondi5(a.nowMinute + 15) : 0
+      const plafond = a.niveau === 4 && c.date === demain ? a.nowMinute : pref === 'repose' ? 12 * 60 : 1440
+      const filtre =
+        pref === 'profonde' ? (s: { cognitiveWindow: string }) => s.cognitiveWindow === 'PROFONDE' : () => true
+      const d = debutsLibres(a.plan, c.date, span, a.kind, a.refId, plancher, plafond, filtre)[0]
+      if (d !== undefined) options.push({ date: c.date, startMinute: d })
     }
-    if (trouve !== null) options.push({ date: c.date, startMinute: trouve })
+    return options
   }
-  return options
+  const voulu = chercher(a.preference ?? 'tot')
+  return voulu.length > 0 || (a.preference ?? 'tot') === 'tot' ? voulu : chercher('tot')
 }
 
 export function creerPromesse(
@@ -221,6 +318,25 @@ export function creerPromesse(
 ): LearningState {
   const promesse: SessionPromise = { ...p, label: (p.label ?? '').slice(0, 200), status: 'pending' }
   return { ...learning, promises: [...(learning.promises ?? []), promesse].slice(-300) }
+}
+
+/** Un rattrapage en blocs courts : une promesse par bloc, 5 min entre chaque. */
+export function creerPromesses(
+  learning: LearningState,
+  p: Omit<SessionPromise, 'status' | 'label'> & { label?: string },
+  morceau?: number,
+): LearningState {
+  if (!morceau || p.minutes <= morceau) return creerPromesse(learning, p)
+  let l = learning
+  let reste = p.minutes
+  let debut = p.startMinute
+  for (let k = 0; reste > 0; k++) {
+    const m = Math.min(morceau, reste)
+    l = creerPromesse(l, { ...p, id: `${p.id}-${k + 1}`, startMinute: Math.min(1439, debut), minutes: m })
+    reste -= m
+    debut += m + 5
+  }
+  return l
 }
 
 export const idBlocPromesse = (id: string) => `promesse-${id}`
@@ -567,51 +683,47 @@ export function noterVerdict(learning: LearningState, date: string, blockId: str
 }
 
 // ─── Le Stop, de bout en bout ────────────────────────────────────────────
+//
+// 1. La raison d'abord (un tap, texte optionnel).
+// 2. Le moteur regarde s'il y a la place de repousser. Sinon : on finit.
+// 3. La réaction propre à la raison, puis « Tu es sûr ? ».
+// 4. Oui : la séance reste bloquée pendant l'attente (5 min et plus), puis
+//    s'arrête d'elle-même, même app fermée. « Je continue » reste possible.
+// 5. Le rattrapage se choisit : c'est une promesse, et il n'y a pas d'autre
+//    sortie.
+// L'urgence saute l'attente : l'app dit jusqu'à quand on peut repousser, et
+// d'ici là tout reste bloqué sauf 3 apps, et elle regarde.
 
-export type EtapeStop =
-  /** Niveaux 3-4 : la contre-offre, à refuser explicitement (rien n'est arrêté). */
-  | { etape: 'contre-offre'; message: string }
-  /** Pas de place : pause de 15 min, puis on finit (rien n'est arrêté). */
+export type PlanApres = (
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+) => { plan: PlanningResult; input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'> }
+
+export type PreparationStop =
   | { etape: 'pas-de-place'; learning: LearningState; confirmations: SessionConfirmationsState; message: string }
-  /** Arrêté : le verdict, et les créneaux où promettre le reste. */
-  | {
-      etape: 'arrete'
-      learning: LearningState
-      confirmations: SessionConfirmationsState
-      verdict: Verdict | null
-      options: OptionRattrapage[]
-      /** Minutes à rattraper ; 0 = rien à promettre. */
-      minutes: number
-    }
+  | { etape: 'reaction'; reaction: Reaction; faits: FaitsDuStop; attenteMinutes: number }
 
 /**
- * Tout ce que « Stop » décide, dans l'ordre de la spec. `planApres` recalcule
- * la semaine comme si l'arrêt était accepté (même logique que E.5) : c'est le
- * seul juge de la place.
+ * Après la raison : y a-t-il la place de repousser ? Non : pause de 15 min,
+ * puis on finit (rien n'est arrêté). Oui : la réaction propre à la raison.
+ * Rien n'est encore écrit dans ce second cas.
  */
-export function deciderStop(a: {
+export function preparerStop(a: {
   learning: LearningState
   confirmations: SessionConfirmationsState
   nowMs: number
-  /** La minute où le Stop a vraiment eu lieu (après le délai). */
   minute: number
-  reason: StopReason | null
-  text?: string
-  answerMs?: number
+  reason: StopReason
   attemptsBefore?: number
-  textReason?: StopReason | null
-  contreOffreRefusee?: boolean
   sleptHours?: number | null
   /** Coucher du jour, pour la marge de 30 min de la reprise forcée. */
   coucher?: number | null
-  deadline?: string | null
-  planApres: (learning: LearningState, confirmations: SessionConfirmationsState) => {
-    plan: PlanningResult
-    input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'>
-  }
-}): EtapeStop | null {
+  /** La tâche en cours, pour les chiffres de « No rush ». */
+  tache?: { id: string; deadline: string } | null
+  planApres: PlanApres
+}): PreparationStop | null {
   const o = a.confirmations.observedPending
-  if (!o || !stopPermis(a.learning, a.confirmations)) return null
+  if (!o || !stopPermis(a.learning, a.confirmations) || a.confirmations.stopPending) return null
   const niveau = niveauConfiance(a.learning.trust)
   const essai = applyStop({
     learning: a.learning,
@@ -619,31 +731,26 @@ export function deciderStop(a: {
     nowMs: a.nowMs,
     minute: a.minute,
     reason: a.reason,
-    ...(a.text !== undefined ? { text: a.text } : {}),
-    ...(a.answerMs !== undefined ? { answerMs: a.answerMs } : {}),
     attemptsBefore: a.attemptsBefore ?? 0,
-    textReason: a.textReason ?? null,
   })
   if (!essai) return null
   const date = a.confirmations.date
   const e = (essai.learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === date)
-  // Dans une prolongation, ou sur une ancre : la fin, sans verdict ni promesse.
-  if (o.kind === 'ancre' || !e?.stoppedEarly) {
-    return { etape: 'arrete', learning: essai.learning, confirmations: essai.confirmations, verdict: null, options: [], minutes: 0 }
-  }
-
-  const { plan, input } = a.planApres(essai.learning, essai.confirmations)
-  const place = placePourReporter({ plan, input, kind: o.kind, refId: o.refId })
   const faits: FaitsDuStop = {
     heldMinutes: essai.heldMinutes,
-    plannedMinutes: e.plannedMinutes,
+    plannedMinutes: e?.plannedMinutes ?? essai.heldMinutes,
     attemptsBefore: a.attemptsBefore ?? 0,
     kind: o.kind,
     nowMinute: a.minute,
     ...(a.sleptHours !== undefined ? { sleptHours: a.sleptHours } : {}),
   }
+  const attenteMinutes = ATTENTE_STOP_MINUTES[niveau]
+  if (o.kind === 'ancre' || !e?.stoppedEarly) {
+    return { etape: 'reaction', reaction: reactionRaison(a.reason, faits, { niveau }), faits, attenteMinutes }
+  }
 
-  if (!place) {
+  const { plan, input } = a.planApres(essai.learning, essai.confirmations)
+  if (!placePourReporter({ plan, input, kind: o.kind, refId: o.refId })) {
     const limite = a.coucher != null ? a.coucher - 30 : null
     const pause = ouvrirPause(a.confirmations, { kind: 'no-room', nowMinute: a.minute, nowMs: a.nowMs, limiteMinute: limite })
     if (pause) {
@@ -659,24 +766,322 @@ export function deciderStop(a: {
       return { etape: 'pas-de-place', learning: l, confirmations: pause, message: MESSAGE_PAS_DE_PLACE }
     }
   }
-
-  if (niveau >= 3 && a.contreOffreRefusee === undefined && a.reason !== null) {
-    const message = contreOffre(a.reason, faits)
-    if (message) return { etape: 'contre-offre', message }
-  }
-
-  const verdict = verdictStop({ niveau, place: true, raison: a.reason, faits, ...(a.contreOffreRefusee ? { contreOffreRefusee: true } : {}) })
-  const learning = noterVerdict(essai.learning, date, o.blockId, niveau, verdict)
-  const minutes = Math.max(0, e.plannedMinutes - essai.heldMinutes)
-  const options =
-    minutes >= 5 && (o.kind === 'task' || o.kind === 'objective')
-      ? optionsRattrapage({ plan, today: date, nowMinute: a.minute, minutes, kind: o.kind, refId: o.refId, niveau, deadline: a.deadline ?? null })
-      : []
-  return { etape: 'arrete', learning, confirmations: essai.confirmations, verdict, options, minutes }
+  const echeance = a.tache && o.kind === 'task' ? echeanceDe(plan, a.confirmations.date, a.tache) : null
+  return { etape: 'reaction', reaction: reactionRaison(a.reason, faits, { niveau, echeance }), faits, attenteMinutes }
 }
 
-/** La contre-offre acceptée : 10 minutes de plus, et un Stop renoncé au journal. */
-export const accepterContreOffre = renoncerAuStop
+/**
+ * « Oui, j'arrête » : l'attente commence. La séance reste bloquée jusqu'au
+ * bout de l'attente (jamais au-delà de la fin du bloc), puis s'arrête d'elle-
+ * même. Le placement du rattrapage voyage avec elle.
+ */
+export function demanderStop(
+  confirmations: SessionConfirmationsState,
+  a: {
+    nowMs: number
+    minute: number
+    reason: StopReason
+    text?: string
+    answerMs?: number
+    attemptsBefore?: number
+    attenteMinutes: number
+    placement: Placement
+  },
+): SessionConfirmationsState | null {
+  const o = confirmations.observedPending
+  if (!o || !(o.blockId in confirmations.confirmedAt) || confirmations.pause) return null
+  if ((confirmations.stoppedBlockIds ?? []).includes(o.blockId)) return null
+  const untilMinute = Math.min(a.minute + a.attenteMinutes, o.endMinute - 1)
+  if (untilMinute <= a.minute) return null
+  const text = a.text?.trim()
+  return {
+    ...confirmations,
+    stopPending: {
+      blockId: o.blockId,
+      untilMs: a.nowMs + (untilMinute - a.minute) * 60_000,
+      untilMinute,
+      reason: a.reason,
+      ...(text ? { text: text.slice(0, 500) } : {}),
+      ...(a.answerMs !== undefined ? { answerMs: Math.max(0, Math.round(a.answerMs)) } : {}),
+      attemptsBefore: a.attemptsBefore ?? 0,
+      ...(a.placement.morceau ? { morceau: a.placement.morceau } : {}),
+      preference: a.placement.preference,
+      ...(a.placement.deep ? { deep: true } : {}),
+    },
+  }
+}
+
+/** « Je continue » : l'attente s'annule, un Stop renoncé au journal. */
+export function continuer(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+): { learning: LearningState; confirmations: SessionConfirmationsState } {
+  const o = confirmations.observedPending
+  return {
+    learning: o ? renoncerAuStop(learning, confirmations.date, o.blockId) : learning,
+    confirmations: { ...confirmations, stopPending: null },
+  }
+}
+
+/** L'attente est-elle finie ? */
+export const stopEchu = (c: SessionConfirmationsState, nowMs: number) =>
+  c.stopPending && nowMs >= c.stopPending.untilMs ? c.stopPending : null
+
+/**
+ * L'attente est finie : la séance s'arrête à la fin de l'attente (elle a été
+ * tenue jusque-là), et le rattrapage reste à choisir — placé comme la raison
+ * le demande. `textReason` : la catégorie lue dans le texte, par l'appelant.
+ */
+export function executerStop(a: {
+  learning: LearningState
+  confirmations: SessionConfirmationsState
+  nowMs: number
+  label: string
+  deadline?: string | null
+  textReason?: StopReason | null
+  planApres: PlanApres
+}): { learning: LearningState; confirmations: SessionConfirmationsState } {
+  const p = a.confirmations.stopPending
+  const o = a.confirmations.observedPending
+  const vide = { learning: a.learning, confirmations: { ...a.confirmations, stopPending: null } }
+  if (!p || !o || o.blockId !== p.blockId) return vide
+  const r = applyStop({
+    learning: a.learning,
+    confirmations: { ...a.confirmations, stopPending: null },
+    nowMs: a.nowMs,
+    minute: p.untilMinute,
+    reason: p.reason,
+    ...(p.text !== undefined ? { text: p.text } : {}),
+    ...(p.answerMs !== undefined ? { answerMs: p.answerMs } : {}),
+    attemptsBefore: p.attemptsBefore,
+    textReason: a.textReason ?? null,
+  })
+  if (!r) return vide
+  const date = a.confirmations.date
+  const niveau = niveauConfiance(a.learning.trust)
+  const learning = noterVerdict(r.learning, date, o.blockId, niveau, 'postponed')
+  const e = (learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === date)
+  const minutes = Math.max(0, (e?.plannedMinutes ?? 0) - r.heldMinutes)
+  if (o.kind === 'ancre' || minutes < 5 || !e?.stoppedEarly) return { learning, confirmations: r.confirmations }
+  const { plan } = a.planApres(learning, r.confirmations)
+  const options = optionsRattrapage({
+    plan,
+    today: date,
+    nowMinute: p.untilMinute,
+    minutes,
+    kind: o.kind,
+    refId: o.refId,
+    niveau,
+    deadline: a.deadline ?? null,
+    ...(p.morceau ? { morceau: p.morceau } : {}),
+    preference: p.preference,
+  })
+  if (!options.length) return { learning, confirmations: r.confirmations }
+  return {
+    learning,
+    confirmations: {
+      ...r.confirmations,
+      promiseChoice: {
+        options,
+        minutes,
+        source: { kind: o.kind, refId: o.refId, blockId: o.blockId, label: a.label.slice(0, 200) },
+        ...(p.morceau ? { morceau: p.morceau } : {}),
+        ...(p.deep ? { deep: true } : {}),
+      },
+    },
+  }
+}
+
+/** Le rattrapage choisi parmi ceux proposés : la promesse. */
+export function choisirRattrapage(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+  option: OptionRattrapage,
+  nowMs: number,
+): { learning: LearningState; confirmations: SessionConfirmationsState } | null {
+  const c = confirmations.promiseChoice
+  if (!c || !c.options.some((x) => x.date === option.date && x.startMinute === option.startMinute)) return null
+  return {
+    learning: creerPromesses(
+      learning,
+      {
+        id: `${c.source.blockId}-${nowMs.toString(36)}`,
+        kind: c.source.kind,
+        refId: c.source.refId,
+        label: c.source.label,
+        fromBlockId: c.source.blockId,
+        date: option.date,
+        startMinute: option.startMinute,
+        minutes: c.minutes,
+        createdAt: new Date(nowMs).toISOString(),
+        ...(c.deep ? { deep: true } : {}),
+      },
+      c.morceau,
+    ),
+    confirmations: { ...confirmations, promiseChoice: null },
+  }
+}
+
+// ─── L'urgence ───────────────────────────────────────────────────────────
+
+/**
+ * « Something real came up » : jusqu'à quand peut-on repousser ? Chaque
+ * heure possible est essayée dans le moteur, promesse posée : seules celles
+ * qui gardent la semaine faisable restent. Quatre au plus, la dernière
+ * comprise. Aucune : il n'y a pas la place de repousser.
+ */
+export function optionsUrgence(a: {
+  learning: LearningState
+  confirmations: SessionConfirmationsState
+  nowMs: number
+  minute: number
+  deadline?: string | null
+  planApres: PlanApres
+}): { options: OptionRattrapage[]; minutes: number } | null {
+  const o = a.confirmations.observedPending
+  if (!o || !stopPermis(a.learning, a.confirmations)) return null
+  const essai = applyStop({ learning: a.learning, confirmations: a.confirmations, nowMs: a.nowMs, minute: a.minute, reason: 'real-event' })
+  if (!essai) return null
+  const date = a.confirmations.date
+  const e = (essai.learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === date)
+  const minutes = Math.max(0, (e?.plannedMinutes ?? 0) - essai.heldMinutes)
+  if (o.kind === 'ancre' || minutes < 5) return { options: [], minutes: 0 }
+  const niveau = niveauConfiance(a.learning.trust)
+  const { plan } = a.planApres(essai.learning, essai.confirmations)
+  const limite = niveau === 4 ? addDays(date, 1) : o.kind === 'task' && a.deadline ? a.deadline : addDays(startOfWeek(date), 6)
+  const candidats: OptionRattrapage[] = []
+  for (const c of plan.capacities) {
+    if (c.date > limite || candidats.length >= 16) break
+    const plancher = c.date === date ? arrondi5(a.minute + 15) : 0
+    const debuts = debutsLibres(plan, c.date, minutes, o.kind, o.refId, plancher, 1440)
+    // Aujourd'hui, heure par heure ; les jours suivants, le premier créneau.
+    let dernier = -Infinity
+    for (const d of debuts) {
+      if (candidats.length >= 16) break
+      if (d - dernier < 60) continue
+      candidats.push({ date: c.date, startMinute: d })
+      dernier = d
+      if (c.date !== date) break
+    }
+  }
+  const tenables = candidats.filter((c) => {
+    const l = creerPromesse(essai.learning, {
+      id: 'essai',
+      kind: o.kind as 'task' | 'objective',
+      refId: o.refId,
+      fromBlockId: o.blockId,
+      date: c.date,
+      startMinute: c.startMinute,
+      minutes,
+      createdAt: new Date(a.nowMs).toISOString(),
+    })
+    const r = a.planApres(l, essai.confirmations)
+    return placePourReporter({ plan: r.plan, input: r.input, kind: o.kind, refId: o.refId })
+  })
+  const n = tenables.length
+  const options = n <= 4 ? tenables : [0, Math.round(n / 3), Math.round((2 * n) / 3), n - 1].map((i) => tenables[i]!)
+  return { options, minutes }
+}
+
+/**
+ * L'urgence est prise : la séance s'arrête maintenant (sans attente), la
+ * promesse est posée à l'heure choisie, et d'ici là — au plus jusqu'au
+ * coucher — tout reste bloqué sauf les apps choisies.
+ */
+export function reporterEnUrgence(a: {
+  learning: LearningState
+  confirmations: SessionConfirmationsState
+  nowMs: number
+  minute: number
+  option: OptionRattrapage
+  minutes: number
+  apps: string[]
+  appCount?: number
+  label: string
+  coucher?: number | null
+  text?: string
+}): { learning: LearningState; confirmations: SessionConfirmationsState } | null {
+  const o = a.confirmations.observedPending
+  const count = a.appCount ?? a.apps.length
+  if (!o || count > URGENCE_APPS_MAX || !stopPermis(a.learning, a.confirmations)) return null
+  if (o.kind === 'ancre') return null
+  const r = applyStop({
+    learning: a.learning,
+    confirmations: a.confirmations,
+    nowMs: a.nowMs,
+    minute: a.minute,
+    reason: 'real-event',
+    ...(a.text ? { text: a.text } : {}),
+  })
+  if (!r) return null
+  const date = a.confirmations.date
+  let learning = noterVerdict(r.learning, date, o.blockId, niveauConfiance(a.learning.trust), 'urgent')
+  learning = creerPromesse(learning, {
+    id: `${o.blockId}-${a.nowMs.toString(36)}`,
+    kind: o.kind,
+    refId: o.refId,
+    label: a.label,
+    fromBlockId: o.blockId,
+    date: a.option.date,
+    startMinute: a.option.startMinute,
+    minutes: Math.max(1, Math.min(600, a.minutes)),
+    createdAt: new Date(a.nowMs).toISOString(),
+  })
+  const coucher = a.coucher != null ? a.coucher - 30 : 1440
+  const untilMinute = Math.max(a.minute + 1, a.option.date === date ? Math.min(a.option.startMinute, coucher) : coucher)
+  const untilMs = a.nowMs + (untilMinute - a.minute) * 60_000
+  const trace: EmergencyPause = {
+    date,
+    blockId: o.blockId,
+    startMs: a.nowMs,
+    endMs: untilMs,
+    apps: a.apps.slice(0, URGENCE_APPS_MAX),
+    appCount: count,
+    attempts: 0,
+  }
+  learning = { ...learning, emergencyPauses: [...(learning.emergencyPauses ?? []), trace].slice(-300) }
+  return {
+    learning,
+    confirmations: {
+      ...r.confirmations,
+      urgence: { sourceBlockId: o.blockId, startMs: a.nowMs, untilMs, untilMinute, apps: a.apps.slice(0, URGENCE_APPS_MAX) },
+    },
+  }
+}
+
+export const urgenceActive = (c: SessionConfirmationsState, nowMs: number) =>
+  c.urgence && nowMs < c.urgence.untilMs ? c.urgence : null
+
+/**
+ * Pendant l'urgence, l'app regarde : chaque tentative d'ouvrir une app non
+ * choisie est comptée ; la première est un échec grave.
+ */
+export function tentativePendantUrgence(learning: LearningState, confirmations: SessionConfirmationsState, nowMs: number): LearningState {
+  const u = urgenceActive(confirmations, nowMs)
+  if (!u) return learning
+  const pauses = [...(learning.emergencyPauses ?? [])]
+  const i = pauses.map((x, k) => (x.blockId === u.sourceBlockId && x.startMs === u.startMs ? k : -1)).reduce((m, k) => Math.max(m, k), -1)
+  if (i < 0) return learning
+  const avant = pauses[i]!.attempts
+  pauses[i] = { ...pauses[i]!, attempts: avant + 1 }
+  const l = { ...learning, emergencyPauses: pauses }
+  return avant === 0 ? ajusterConfiance(l, 'echecGrave') : l
+}
+
+/** Fin de la fenêtre d'urgence : elle se referme toute seule. */
+function finFenetreUrgence(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+  nowMs: number,
+): { learning: LearningState; confirmations: SessionConfirmationsState } {
+  const u = confirmations.urgence
+  if (!u || nowMs < u.untilMs) return { learning, confirmations }
+  const pauses = (learning.emergencyPauses ?? []).map((x) =>
+    x.blockId === u.sourceBlockId && x.startMs === u.startMs ? { ...x, end: 'auto' as const, endMs: u.untilMs } : x,
+  )
+  return { learning: { ...learning, emergencyPauses: pauses }, confirmations: { ...confirmations, urgence: null } }
+}
+
 
 /**
  * Le tic de la confiance, après celui de la pendule : les pauses échues se
@@ -690,36 +1095,59 @@ export function ticConfiance(
   nowMs: number,
 ): { learning: LearningState; confirmations: SessionConfirmationsState; change: boolean } {
   const p = ticPauses(learning, confirmations, nowMinute, nowMs)
-  const l = suivrePromesses(p.learning, p.confirmations, today, nowMinute)
-  return { learning: l, confirmations: p.confirmations, change: p.change || l !== p.learning }
+  const u = finFenetreUrgence(p.learning, p.confirmations, nowMs)
+  const l = suivrePromesses(u.learning, u.confirmations, today, nowMinute)
+  return { learning: l, confirmations: u.confirmations, change: p.change || u.confirmations !== p.confirmations || l !== p.learning }
 }
 
 // ─── Ce que l'interface reçoit ───────────────────────────────────────────
 
-/** Ce que « Stop » a décidé (spec « Stop, promesses et confiance »). */
-export type StopResult =
-  | { ok: false; reason: string }
-  | { ok: true; step: 'counter-offer'; message: string }
-  | { ok: true; step: 'no-room'; message: string }
-  | {
-      ok: true
-      step: 'stopped'
-      help?: string
-      options: OptionRattrapage[]
-      minutes: number
-      source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }
-    }
-
-/** L'état du Stop et des pauses, pour l'interface. */
+/** L'état du Stop, des pauses et de l'urgence, pour l'interface (bureau). */
 export type TrustView = {
   level: Niveau
-  delaySeconds: number
+  waitMinutes: number
   stopAllowed: boolean
   pause: { kind: 'emergency' | 'breather' | 'no-room'; endMinute: number } | null
   awaitingReturn: boolean
-  emergencyAsAbandon: boolean
+  /** L'attente d'un Stop confirmé : la séance s'arrête à `untilMs`. */
+  stopPending: { untilMs: number } | null
+  /** Le rattrapage à choisir, s'il y en a un. */
+  promiseChoice: NonNullable<SessionConfirmationsState['promiseChoice']> | null
+  /** La fenêtre d'urgence en cours. */
+  urgence: { untilMinute: number } | null
+  urgentTooOften: boolean
   /** « J'ai besoin de 15 min » : pendant la promesse en cours. */
   breatherNow: boolean
-  /** Les apps que la séance bloque, pour en débloquer 3 pendant une urgence. */
+  /** Les apps que la séance bloque, pour en garder 3 pendant une urgence. */
   sessionApps: Array<{ id: string; name: string }>
+}
+
+/** Ce que la raison a donné (bureau). */
+export type StopResult =
+  | { ok: false; reason: string }
+  | { ok: true; step: 'no-room'; message: string }
+  | { ok: true; step: 'reaction'; lines: string[]; tenMinutes: boolean; waitMinutes: number }
+  | { ok: true; step: 'help'; message: string }
+  | { ok: true; step: 'ended' }
+
+/**
+ * Les tentatives vues pendant l'urgence, relues d'un compteur (le bouclier
+ * d'iOS les range lui-même) : le total est posé tel quel, et la première est
+ * un échec grave.
+ */
+export function tentativesPendantUrgence(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+  vues: number,
+  nowMs: number,
+): LearningState {
+  const u = urgenceActive(confirmations, nowMs)
+  if (!u || vues <= 0) return learning
+  const pauses = [...(learning.emergencyPauses ?? [])]
+  const i = pauses.map((x, k) => (x.blockId === u.sourceBlockId && x.startMs === u.startMs ? k : -1)).reduce((m, k) => Math.max(m, k), -1)
+  if (i < 0 || pauses[i]!.attempts >= vues) return learning
+  const avant = pauses[i]!.attempts
+  pauses[i] = { ...pauses[i]!, attempts: vues }
+  const l = { ...learning, emergencyPauses: pauses }
+  return avant === 0 ? ajusterConfiance(l, 'echecGrave') : l
 }

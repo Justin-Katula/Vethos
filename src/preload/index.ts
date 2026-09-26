@@ -196,15 +196,25 @@ const api = {
     confirmBlock: (blockId: string): Promise<ConfirmBlockResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_CONFIRM_BLOCK, blockId),
     /** « Stop » : arrête la séance en cours, avec une raison en un tap (spec 2026-09-25). */
-    stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number; counterOfferRefused?: boolean }): Promise<StopResult> =>
+    stopBlock: (args: { reason: StopReason | null; text?: string; answerMs?: number }): Promise<StopResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLANNING_STOP_BLOCK, args),
     /** Stop, promesses et confiance : niveau, délai, pause en cours. */
     trust: (): Promise<TrustView | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'get' }),
     /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
     waiveStop: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'waive' }),
     /** Le rattrapage choisi : une promesse. */
-    promise: (option: OptionRattrapage, minutes: number, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }): Promise<null> =>
-      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'promise', option, minutes, source }),
+    /** « Oui, j'arrête » : l'attente commence, la séance reste bloquée. */
+    confirmStop: (args: { reason: StopReason; text?: string; answerMs?: number }): Promise<ConfirmBlockResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'confirmStop', ...args }),
+    /** Le rattrapage choisi parmi ceux proposés. */
+    choosePromise: (option: OptionRattrapage): Promise<ConfirmBlockResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'choosePromise', option }),
+    /** L'urgence : jusqu'à quand on peut repousser. */
+    urgentOptions: (): Promise<{ options: OptionRattrapage[]; minutes: number } | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'urgentOptions' }),
+    /** L'urgence prise : repoussé, tout bloqué sauf 3 apps. */
+    urgent: (option: OptionRattrapage, minutes: number, apps: string[]): Promise<ConfirmBlockResult | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'urgent', option, minutes, apps }),
     /** « Something real came up » : 15 min, jusqu'à 3 apps débloquées. */
     emergency: (apps: string[]): Promise<ConfirmBlockResult | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'emergency', apps }),
     /** « J'ai besoin de 15 min ». */

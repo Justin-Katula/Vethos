@@ -17,6 +17,9 @@ import type { ActionsBouclier, ConfigurationBouclier } from './bouclier'
 /** Ce qu'une surveillance doit faire en se réveillant, à l'une ou l'autre borne. */
 export type ActionNative =
   | { type: 'blockSelection'; familyActivitySelectionId: string }
+  | { type: 'unblockSelection'; familyActivitySelectionId: string }
+  | { type: 'addSelectionToWhitelist'; familyActivitySelection: { activitySelectionId: string } }
+  | { type: 'removeSelectionFromWhitelist'; familyActivitySelection: { activitySelectionId: string } }
   | { type: 'enableBlockAllMode' }
   | { type: 'disableBlockAllMode' }
   | { type: 'setWebContentFilterPolicy'; policy: PolitiqueWeb }
@@ -193,7 +196,9 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
 
     async programmer(plages, options = {}) {
       const maintenant = options.maintenant ?? minuteCourante()
-      const profond = options.mode === 'profond'
+      const profondPartout = options.mode === 'profond'
+      const profondDe = (p: Plage) => profondPartout || p.profond === true
+      const profond = profondPartout || plages.some((p) => p.profond === true)
       const politique = options.filtrerLeWeb === true ? FILTRE_WEB : null
 
       // On repart toujours de zéro : réconcilier des surveillances existantes
@@ -236,13 +241,20 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         // les surveillances se programmaient correctement et aucun bouclier ne
         // se levait jamais — une application de blocage qui ne bloque pas, et
         // qui n'a pas une erreur à montrer pour l'expliquer.
+        const ici = profondDe(plage)
+        const sauf = plage.exceptionId
         natif.configureActions({
           activityName: activite,
           callbackName: 'intervalDidStart',
           actions: [
-            profond
+            // Urgence : les apps choisies passent, tout le reste reste écarté.
+            ...(ici && sauf
+              ? [{ type: 'addSelectionToWhitelist' as const, familyActivitySelection: { activitySelectionId: sauf } }]
+              : []),
+            ici
               ? { type: 'enableBlockAllMode' }
               : { type: 'blockSelection', familyActivitySelectionId: plage.selectionId },
+            ...(!ici && sauf ? [{ type: 'unblockSelection' as const, familyActivitySelectionId: sauf }] : []),
             ...(politique ? [{ type: 'setWebContentFilterPolicy' as const, policy: politique }] : []),
           ],
         })
@@ -255,7 +267,10 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
             // première action, une séance profonde ne se terminait jamais —
             // et comme Vethos peut être derrière son propre bouclier, il
             // n'était plus possible de la lever depuis l'application.
-            ...(profond ? [{ type: 'disableBlockAllMode' as const }] : []),
+            ...(ici ? [{ type: 'disableBlockAllMode' as const }] : []),
+            ...(ici && sauf
+              ? [{ type: 'removeSelectionFromWhitelist' as const, familyActivitySelection: { activitySelectionId: sauf } }]
+              : []),
             ...(politique ? [{ type: 'clearWebContentFilterPolicy' as const }] : []),
             { type: 'resetBlocks' },
           ],
@@ -280,8 +295,14 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       const enCours = plages.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
       if (enCours) {
         const parQui = `vethos:seance:${enCours.blocId}`
-        if (profond) natif.enableBlockAllMode(parQui)
+        if (enCours.exceptionId) {
+          natif.clearWhitelistAndUpdateBlock(parQui)
+          if (options.gardeeId) natif.addSelectionToWhitelistAndUpdateBlock({ activitySelectionId: options.gardeeId }, parQui)
+          if (profondDe(enCours)) natif.addSelectionToWhitelistAndUpdateBlock({ activitySelectionId: enCours.exceptionId }, parQui)
+        }
+        if (profondDe(enCours)) natif.enableBlockAllMode(parQui)
         else natif.blockSelection({ activitySelectionId: enCours.selectionId }, parQui)
+        if (!profondDe(enCours) && enCours.exceptionId) natif.unblockSelection({ activitySelectionId: enCours.exceptionId }, parQui)
         if (politique) natif.setWebContentFilterPolicy(politique, parQui)
       } else {
         // Aucune séance en cours : rien ne doit rester levé d'une précédente.

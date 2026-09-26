@@ -121,6 +121,10 @@ export const PlageSchema = z
     debutMinute: z.number().int().min(0).max(24 * 60),
     finMinute: z.number().int().min(0).max(24 * 60),
     selectionId: z.string().min(1),
+    /** Cette séance-ci en mode profond (« Distracted » : tout sauf la liste gardée). */
+    profond: z.boolean().optional(),
+    /** Urgence : ces apps-là passent, tout le reste reste écarté. */
+    exceptionId: z.string().min(1).optional(),
   })
   .refine((p) => p.finMinute > p.debutMinute, {
     message: 'Une plage se termine après son début.',
@@ -167,7 +171,10 @@ export function fusionnerPlages(plages: readonly Plage[]): Plage[] {
 
   for (const plage of triees) {
     const derniere = sortie[sortie.length - 1]
-    const memeSelection = derniere?.selectionId === plage.selectionId
+    const memeSelection =
+      derniere?.selectionId === plage.selectionId &&
+      !!derniere?.profond === !!plage.profond &&
+      derniere?.exceptionId === plage.exceptionId
     const seTouchent = derniere !== undefined && plage.debutMinute <= derniere.finMinute
 
     if (derniere && memeSelection && seTouchent) {

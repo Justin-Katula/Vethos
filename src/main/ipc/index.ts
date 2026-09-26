@@ -45,7 +45,10 @@ export type SessionExtras = {
   decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
   trust: () => Promise<TrustView>
   waiveStop: () => Promise<void>
-  promise: (option: OptionRattrapage, minutes: number, source: { kind: 'task' | 'objective' | 'ancre'; refId: string; blockId: string }) => Promise<void>
+  confirmStop: (args: { reason: StopReason; text?: string; answerMs?: number }) => Promise<ConfirmBlockResult>
+  choosePromise: (option: OptionRattrapage) => Promise<ConfirmBlockResult>
+  urgentOptions: () => Promise<{ options: OptionRattrapage[]; minutes: number } | null>
+  urgent: (option: OptionRattrapage, minutes: number, apps: string[]) => Promise<ConfirmBlockResult>
   emergency: (apps: string[]) => Promise<ConfirmBlockResult>
   breather: (blockId?: string) => Promise<ConfirmBlockResult>
   resume: () => Promise<void>
@@ -55,10 +58,18 @@ const TrustArgsSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('get') }),
   z.object({ action: z.literal('waive') }),
   z.object({
-    action: z.literal('promise'),
+    action: z.literal('confirmStop'),
+    reason: z.enum(STOP_REASONS),
+    text: z.string().max(500).optional(),
+    answerMs: z.number().int().min(0).max(3_600_000).optional(),
+  }),
+  z.object({ action: z.literal('choosePromise'), option: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), startMinute: z.number().int().min(0).max(1439) }) }),
+  z.object({ action: z.literal('urgentOptions') }),
+  z.object({
+    action: z.literal('urgent'),
     option: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), startMinute: z.number().int().min(0).max(1439) }),
     minutes: z.number().int().min(1).max(600),
-    source: z.object({ kind: z.enum(['task', 'objective', 'ancre']), refId: z.string().min(1), blockId: z.string().min(1) }),
+    apps: z.array(z.string().min(1)).max(3),
   }),
   z.object({ action: z.literal('emergency'), apps: z.array(z.string().min(1)).max(3) }),
   z.object({ action: z.literal('breather'), blockId: z.string().min(1).optional() }),
@@ -188,9 +199,14 @@ export async function registerAllIpcHandlers(
       case 'waive':
         await extras.waiveStop()
         return null
-      case 'promise':
-        await extras.promise(a.option, a.minutes, a.source)
-        return null
+      case 'confirmStop':
+        return extras.confirmStop({ reason: a.reason, ...(a.text !== undefined ? { text: a.text } : {}), ...(a.answerMs !== undefined ? { answerMs: a.answerMs } : {}) })
+      case 'choosePromise':
+        return extras.choosePromise(a.option)
+      case 'urgentOptions':
+        return extras.urgentOptions()
+      case 'urgent':
+        return extras.urgent(a.option, a.minutes, a.apps)
       case 'emergency':
         return extras.emergency(a.apps)
       case 'breather':

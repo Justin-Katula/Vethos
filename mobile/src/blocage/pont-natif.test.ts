@@ -75,6 +75,9 @@ function moduleEspion(disponible = true) {
       appels.push('filtreWeb:off')
     }),
     isWebContentFilterPolicyActive: vi.fn(() => false),
+    unblockSelection: vi.fn((sel: { activitySelectionId?: string }) => {
+      appels.push(`debloquer:${sel.activitySelectionId}`)
+    }),
   } as unknown as ModuleEcran & { [k: string]: ReturnType<typeof vi.fn> }
 
   return { natif, appels }
@@ -85,6 +88,8 @@ const plage = (p: Partial<Plage> = {}): Plage => ({
   debutMinute: p.debutMinute ?? 9 * 60,
   finMinute: p.finMinute ?? 10 * 60,
   selectionId: p.selectionId ?? 'vethos.ecarte',
+  ...(p.profond ? { profond: true } : {}),
+  ...(p.exceptionId ? { exceptionId: p.exceptionId } : {}),
 })
 
 describe('le module absent', () => {
@@ -397,5 +402,26 @@ describe('l’autorisation', () => {
     )
 
     await expect(creerPontDepuis(natif).demanderAutorisation()).resolves.toBe('refusee')
+  })
+})
+
+describe('l’urgence et le mode profond d’une seule séance', () => {
+  it('urgence : tout reste écarté sauf les apps choisies, tout de suite et à la borne', async () => {
+    const { natif, appels } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage({ exceptionId: 'vethos.urgence' })], { maintenant: 9 * 60 + 5 })
+    expect(appels).toContain('configureActions:intervalDidStart:blockSelection+unblockSelection')
+    expect(appels.slice(-2)).toEqual(['blockSelection:vethos.ecarte', 'debloquer:vethos.urgence'])
+  })
+
+  it('« Distracted » : cette séance-là en mode profond, sans toucher les autres', async () => {
+    const { natif, appels } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage({ profond: true }), plage({ blocId: 'b2', debutMinute: 11 * 60, finMinute: 12 * 60 })], {
+      maintenant: 9 * 60 + 5,
+      gardeeId: 'vethos.garde',
+    })
+    expect(appels).toContain('garder:vethos.garde')
+    expect(appels).toContain('configureActions:intervalDidStart:enableBlockAllMode')
+    expect(appels).toContain('configureActions:intervalDidStart:blockSelection')
+    expect(appels.at(-1)).toBe('enableBlockAllMode')
   })
 })
