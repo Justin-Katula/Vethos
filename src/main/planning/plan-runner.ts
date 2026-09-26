@@ -19,6 +19,7 @@ import {
   applyLapsedCredit,
   applyStop,
   closeSessionEvent,
+  recordDailyUtilization,
   recordBlockedAttempt,
   journalContextFor,
   overlayDueFor,
@@ -330,7 +331,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
 
   async function tick(): Promise<void> {
     const now = deps.now()
-    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks, wakeMinute } =
+    const { nowMinute, activeSession, learning, confirmations, todayBlocks, tasks, wakeMinute, plan, today } =
       await loadTodayState(now)
 
     const confirmedIds = new Set(Object.keys(confirmations.confirmedAt))
@@ -522,6 +523,14 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       await deps.storage.write('tasks', { tasks: nextTasks })
       changed = true
       log.info('[planning] tâches terminées automatiquement', { taskIds: finished })
+    }
+
+    // E.3/E.4 : l'utilisation RÉELLE du jour, enfin enregistrée — sans elle,
+    // la fatigue accumulée et la respiration de la semaine ne voyaient rien.
+    const measured = recordDailyUtilization(workingLearning, today, plan.todayFullCapacityMinutes)
+    if (measured !== workingLearning) {
+      workingLearning = measured
+      changed = true
     }
 
     if (changed) {

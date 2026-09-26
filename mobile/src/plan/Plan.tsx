@@ -5,7 +5,7 @@ import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
-import { journalContextFor, overlayDueFor, setBlockedAttempts } from '@shared/planning/clock'
+import { journalContextFor, overlayDueFor, recordDailyUtilization, setBlockedAttempts } from '@shared/planning/clock'
 import { lireTexteArret } from '@shared/coach/coach'
 import { dueRemovals } from '@shared/contract'
 import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
@@ -113,9 +113,11 @@ function useSourcePlan() {
       const vues = pontEcran().lireTentatives().filter((t) => t >= confirmeA && t <= Date.now())
       appris = setBlockedAttempts(appris, tic.confirmations, vues.length, vues.length ? Math.max(...vues) : undefined)
     }
+    // E.3/E.4 : l'utilisation réelle du jour, pour la fatigue accumulée.
+    appris = recordDailyUtilization(appris, calcul.aujourdHui, calcul.resultat.todayFullCapacityMinutes)
     if (tic.change || appris !== tic.apprentissage) void poser({ apprentissage: appris, confirmations: tic.confirmations })
     if (tic.terminees.length > 0) void terminerTaches(tic.terminees)
-  }, [tic, calcul.aujourdHui, calcul.minute, poser, terminerTaches])
+  }, [tic, calcul.aujourdHui, calcul.minute, calcul.resultat, poser, terminerTaches])
 
   // Retrait progressif : le bloc en attente n'appelle l'overlay que si sa
   // phase le demande (phase 3 : 10 min après, jamais un jour-test ; phase 4 :

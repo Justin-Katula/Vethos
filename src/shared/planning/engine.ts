@@ -38,7 +38,7 @@ import {
 } from './feasibility'
 import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
 import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe, trancheDe, type Tranche } from './bayes'
-import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue } from './habitudes'
+import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue, TOLERANCE_DEPART_MINUTES } from './habitudes'
 import { ajustementPour, diagnostiquer, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
 import {
@@ -933,6 +933,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     },
     breathing,
     objectiveDoses,
+    // E.3/E.4 : la capacité de la journée ENTIÈRE d'aujourd'hui, pas celle qui
+    // reste — la base de l'utilisation réelle que les horloges enregistrent.
+    todayFullCapacityMinutes: dates.includes(input.today)
+      ? buildDayFor(input.today, saturated, true).effectiveCapacityMinutes
+      : 0,
   }
 }
 
@@ -1196,7 +1201,7 @@ function buildLearningContext(
     arr.push(e)
     byCategory.set(e.category, arr)
   }
-  const startOk = (e: SessionEvent) => e.started && (e.delayMinutes ?? 0) <= 5
+  const startOk = (e: SessionEvent) => e.started && (e.delayMinutes ?? 0) <= TOLERANCE_DEPART_MINUTES
   // pTient est CONDITIONNEL au démarrage : un bloc jamais démarré n'est pas
   // un bloc « pas tenu » — sinon il compterait deux fois comme un échec.
   const heldOk = (e: SessionEvent) => (e.heldMinutes ?? 0) >= 0.8 * e.plannedMinutes

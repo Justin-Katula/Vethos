@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { LearningStateSchema } from '@shared/schemas'
+import { computePlan } from '@shared/planning/engine'
+import { sleepScheduleEntries } from '@shared/sleep'
 import {
+  recordDailyUtilization,
   applyConfirmation,
   applyLapsedCredit,
   applyStop,
@@ -838,5 +842,39 @@ describe('« Stop » — cas limites', () => {
     expect(pending).toBeNull()
     // Et un second « Stop » ne réécrit pas la raison.
     expect(applyStop({ learning: s.learning, confirmations: s.confirmations, nowMs: MS, minute: 625, reason: 'tired' })).toBeNull()
+  })
+})
+
+describe('Utilisation réelle des jours (E.3 / E.4)', () => {
+  const ev = (date: string, held: number) => ({
+    blockId: `b-${date}-${held}`, date, kind: 'task' as const, refId: 't', category: 'général',
+    plannedStartMinute: 600, plannedMinutes: held, started: true, delayMinutes: 0, spontaneous: false,
+    heldMinutes: held, stoppedEarly: false, blockedAttempts: 0, load48hMinutes: 0, createdAt: '2026-09-20T10:00:00.000Z',
+  })
+
+  it('les minutes tenues du jour, en % de la capacité de la journée entière', () => {
+    const l = LearningStateSchema.parse({ sessionEvents: [ev('2026-09-26', 90), ev('2026-09-26', 60), ev('2026-09-25', 300)] })
+    const r = recordDailyUtilization(l, '2026-09-26', 300)
+    expect(r.dailyUtilization['2026-09-26']).toBe(50)
+    // Rien de neuf : le même objet, aucune écriture.
+    expect(recordDailyUtilization(r, '2026-09-26', 300)).toBe(r)
+  })
+
+  it('ne garde que 60 jours', () => {
+    const l = LearningStateSchema.parse({ dailyUtilization: { '2026-06-01': 90 }, sessionEvents: [ev('2026-09-26', 30)] })
+    expect(Object.keys(recordDailyUtilization(l, '2026-09-26', 300).dailyUtilization)).toEqual(['2026-09-26'])
+  })
+
+  it('deux jours mesurés au-dessus de 85 % : le moteur allège le jour suivant (E.4)', () => {
+    const base = {
+      today: '2026-09-26', rangeEnd: '2026-09-27', tasks: [], objectives: [], ancres: [],
+      schedule: sleepScheduleEntries('23:00', '07:00'), observations: [], anchorMissCounts: {},
+      weeklyObjectiveServed: {}, objectiveLastServed: {}, lastSignalAt: {}, tasksCreatedPerWeek: {}, consecutiveDelays: {},
+    }
+    const repose = computePlan({ ...base, dailyUtilization: {} }, new Date(2026, 8, 26, 6, 0))
+    const fatigue = computePlan({ ...base, dailyUtilization: { '2026-09-24': 95, '2026-09-25': 92 } }, new Date(2026, 8, 26, 6, 0))
+    const cap = (p: typeof repose) => p.capacities.find((c) => c.date === '2026-09-26')!
+    expect(cap(fatigue).fatiguePenaltyMinutes).toBeGreaterThan(0)
+    expect(cap(fatigue).effectiveCapacityMinutes).toBeLessThan(cap(repose).effectiveCapacityMinutes)
   })
 })

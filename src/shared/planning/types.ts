@@ -283,6 +283,8 @@ export type PlanningResult = {
    * un déficit.
    */
   objectiveDoses: Record<string, { dose: number; cible: number }>
+  /** Capacité effective de la journée entière d'aujourd'hui (base de `dailyUtilization`). */
+  todayFullCapacityMinutes: number
   /** E.3 : bilan de la respiration hebdomadaire et jours réduits d'office. */
   breathing: {
     targetMinutes: number

@@ -1,4 +1,5 @@
 import { mergeIntervals, type Interval } from '@shared/planning/capacity'
+import { addDays } from '@shared/planning/dates'
 import { plannedTotalFor } from '@shared/planning/engine'
 import { estJourTest, phaseHabitude } from '@shared/planning/habitudes'
 import type { PlacedBlock, TaskItem } from '@shared/planning/types'
@@ -754,3 +755,32 @@ export function setBlockedAttempts(
   }))
 }
 
+
+// ─── Utilisation réelle des jours (E.3 / E.4) ─────────────────────────────
+
+/** Jours d'utilisation gardés : E.4 regarde les jours d'avant, E.3 la semaine. */
+const UTILISATION_JOURS = 60
+
+/**
+ * Enregistre l'utilisation RÉELLE d'aujourd'hui : les minutes tenues dans les
+ * séances du jour (journal), en % de la capacité effective de la journée
+ * entière. Mesurée, jamais déclarée (G.1). C'est elle qui nourrit la fatigue
+ * accumulée (E.4 : 2 jours > 85 % → le suivant est allégé) et la respiration
+ * de la semaine (E.3). Rend `learning` tel quel si rien ne change.
+ */
+export function recordDailyUtilization(
+  learning: LearningState,
+  today: string,
+  fullCapacityMinutes: number,
+): LearningState {
+  if (fullCapacityMinutes <= 0) return learning
+  const worked = (learning.sessionEvents ?? [])
+    .filter((e) => e.date === today && e.started)
+    .reduce((t, e) => t + (e.heldMinutes ?? 0), 0)
+  const percent = Math.min(500, Math.round((worked / fullCapacityMinutes) * 100))
+  const current = learning.dailyUtilization ?? {}
+  if (current[today] === percent) return learning
+  const limite = addDays(today, -UTILISATION_JOURS)
+  const kept = Object.fromEntries(Object.entries(current).filter(([d]) => d > limite))
+  return { ...learning, dailyUtilization: { ...kept, [today]: percent } }
+}

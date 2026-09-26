@@ -1,3 +1,4 @@
+import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Play, ShieldBan } from 'lucide-react'
@@ -56,7 +57,9 @@ export default function SessionStartOverlay(): JSX.Element {
   }, [])
 
   const nowMinute = now.getHours() * 60 + now.getMinutes()
+  // Quelques minutes, c'est être à l'heure : le retard ne s'affiche qu'au-delà.
   const delayMinutes = Math.max(0, nowMinute - startMinute)
+  const late = delayMinutes > TOLERANCE_DEPART_MINUTES
 
   async function confirmer(): Promise<void> {
     if (blockId === '') return
@@ -90,10 +93,10 @@ export default function SessionStartOverlay(): JSX.Element {
       <p
         className={cn(
           'mt-4 text-[13.5px] tabular-nums',
-          delayMinutes > 0 ? 'text-warn' : 'text-accent',
+          late ? 'text-warn' : 'text-accent',
         )}
       >
-        {delayMinutes > 0 ? (
+        {late ? (
           <>
             <span className="num text-[17px]">{delayMinutes}</span> min late
           </>

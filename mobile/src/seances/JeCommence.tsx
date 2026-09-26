@@ -1,3 +1,4 @@
+import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
 import { useState } from 'react'
 import { Modal, Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -121,11 +122,11 @@ export function JeCommence() {
             marginTop: PAS[4],
             fontFamily: GEIST.normal,
             fontSize: 13.5,
-            color: retard > 0 ? j.alerte : j.accentEncre,
+            color: retard > TOLERANCE_DEPART_MINUTES ? j.alerte : j.accentEncre,
             fontVariant: ['tabular-nums'],
           }}
         >
-          {retard > 0 ? `${retard} min late` : 'It’s time'}
+          {retard > TOLERANCE_DEPART_MINUTES ? `${retard} min late` : 'It’s time'}
         </Text>
 
         <Pressable

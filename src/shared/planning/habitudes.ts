@@ -26,6 +26,13 @@ const mediane = (xs: number[]) => {
 
 // ─── Les quatre mesures de discipline ─────────────────────────────────────
 
+/**
+ * « À l'heure », pour un humain : démarré dans les 5 minutes après l'heure
+ * prévue. Un retard de 2 min n'est jamais un raté ; la mesure de l'habitude
+ * regarde la MÉDIANE des retards, pas chaque départ.
+ */
+export const TOLERANCE_DEPART_MINUTES = 5
+
 export type Discipline = {
   /** P(démarrer dans les 5 min), loi Beta avec oubli. */
   fiabiliteDepart: number
@@ -46,7 +53,7 @@ export function discipline(events: SessionEvent[], refId: string): Discipline {
   // Les quatre mesures oublient le vieux : la fiabilité par sa loi Beta, les
   // trois autres sur la mémoire effective (les 33 derniers événements).
   const ev = tous.slice(-MEMOIRE)
-  const departs = tous.map((e) => e.started && (e.delayMinutes ?? 0) <= 5)
+  const departs = tous.map((e) => e.started && (e.delayMinutes ?? 0) <= TOLERANCE_DEPART_MINUTES)
   const tenues = ev.filter((e) => e.started && e.heldMinutes !== null)
   const survie: Survie[] = tenues.map((e) => ({ minutes: e.heldMinutes!, arret: e.stoppedEarly }))
   const heures = tenues.reduce((t, e) => t + e.heldMinutes!, 0) / 60
@@ -71,7 +78,7 @@ export const PHASES = {
   demarragesAncrage: 10,
   /** 2 → 3 : au moins 20 démarrages ET retard médian ≤ 5 min. */
   demarragesAutonomie: 20,
-  retardMedianMax: 5,
+  retardMedianMax: TOLERANCE_DEPART_MINUTES,
   /** 3 → 4 : autonomie ≥ 0,8 sur 14 jours glissants. */
   autonomieMin: 0.8,
   fenetreJours: 14,
