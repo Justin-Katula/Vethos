@@ -146,8 +146,8 @@ export function phaseHabitude(events: SessionEvent[], refId: string): Phase {
       phase === 2 &&
       total >= PHASES.demarragesAutonomie &&
       demarres > 0 &&
-      // Médiane des retards ≤ 5 min ⟺ au moins la moitié des départs à ≤ 5 min.
-      retardsCourts * 2 >= demarres
+      // Médiane des retards ≤ 5 min : plus de la moitié des départs à ≤ 5 min (strict, pour un nombre pair aussi).
+      retardsCourts * 2 > demarres
     ) {
       entrer(3, i)
     } else if (phase === 3) {
