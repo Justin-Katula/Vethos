@@ -440,9 +440,21 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       .filter((start) => wakeMinute === null || start > wakeMinute + 60)
       // Le créneau coupé à « maintenant » ne suit aucun événement.
       .filter((start) => !(date === input.today && start === nowMinute))
-    const scorer = (refId: string, session: number, hardGap: number, softGap = true, category?: string) => {
+    const scorer = (
+      refId: string,
+      session: number,
+      hardGap: number,
+      softGap = true,
+      category?: string,
+      family?: { ids: ReadonlySet<string>; notBefore?: number },
+    ) => {
       const key = `${refId}|${dayType}|${session}`
-      const sameRefToday = placedToday.filter((b) => b.refId === refId)
+      // Les parties d'une même tâche s'écartent entre elles comme les blocs
+      // d'une seule tâche : c'est le même travail.
+      const sameRefToday = placedToday.filter((b) => b.refId === refId || family?.ids.has(b.refId))
+      const stopped = stoppedUntil.get(refId)
+      const notBefore =
+        family?.notBefore === undefined ? stopped : Math.max(stopped ?? 0, family.notBefore)
       const learnedQuality = learn && category ? learn.quality(category, date, dow, dayIsCrisis) : undefined
       const triggerStarts = learn && learn.phase(refId) >= 2 ? dayTriggerStarts : undefined
       return (start: number, minutes: number) =>
@@ -460,7 +472,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           inertiaHard: !dayIsCrisis,
           eveningPenalty: learn?.eveningPenalty(refId),
           comfort: learn?.comfort(refId),
-          notBefore: stoppedUntil.get(refId),
+          notBefore,
           loadBefore,
         })
     }
@@ -695,6 +707,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     }
 
     // D.1.5 TÂCHES — cascade D.6, découpage encouragé, plafond 40 %.
+    // La cible du jour se calcule pour la tâche ENTIÈRE, parties comprises :
+    // jugée partie par partie, chacune se croyait à l'aise (4 h sur 10 jours)
+    // et la pression n'apparaissait qu'au dernier jour, qui recevait tout.
+    const familyLeft = new Map<string, { left: number; capOverride: boolean; ids: ReadonlySet<string> }>()
     for (const task of ordered) {
       if (budget < TASK_CONSTANTS.minBlockMinutes) break
       const need = remainingNeed.get(task.id) ?? 0
@@ -712,18 +728,36 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       // parallèle que le découpage doit empêcher.
       if (waitsForEarlierSibling(task, ordered, remainingNeed)) continue
 
-      const remainingDayCapacities = capacities
-        .filter((c) => c.date >= date && c.date <= task.deadline)
-        .map((c) => c.effectiveCapacityMinutes)
+      const familyKey = task.parentTaskId ?? task.id
+      let family = familyLeft.get(familyKey)
+      if (!family) {
+        const members = task.parentTaskId === null ? [task] : ordered.filter((t) => t.parentTaskId === task.parentTaskId)
+        const deadline = members.reduce((d, t) => (t.deadline > d ? t.deadline : d), task.deadline)
+        const remainingDayCapacities = capacities
+          .filter((c) => c.date >= date && c.date <= deadline)
+          .map((c) => c.effectiveCapacityMinutes)
+        const { target, capOverride } = computeTaskDayTarget({
+          remainingNeed: members.reduce((s, t) => s + (remainingNeed.get(t.id) ?? 0), 0),
+          dayCapacity: cap.effectiveCapacityMinutes,
+          remainingDayCapacities,
+          isCrisis: members.some((t) => t.marginMinutes < 0),
+        })
+        family = { left: target, capOverride, ids: new Set(members.map((t) => t.id)) }
+        familyLeft.set(familyKey, family)
+      }
+      // B.5.1 dans la journée aussi : une partie commence après la fin de
+      // celles qui la précèdent, jamais plus tôt sur l'horloge.
+      const earlierIds = new Set(
+        ordered
+          .filter((t) => task.parentTaskId !== null && t.parentTaskId === task.parentTaskId && (t.partOrder ?? 0) < (task.partOrder ?? 0))
+          .map((t) => t.id),
+      )
+      const earlierEnd = placedToday.filter((b) => earlierIds.has(b.refId)).reduce<number | undefined>((m, b) => Math.max(m ?? 0, b.endMinute), undefined)
+      const familyScore = { ids: family.ids, notBefore: earlierEnd }
+      const capOverride = family.capOverride
 
-      const { target, capOverride } = computeTaskDayTarget({
-        remainingNeed: need,
-        dayCapacity: cap.effectiveCapacityMinutes,
-        remainingDayCapacities,
-        isCrisis: task.marginMinutes < 0,
-      })
-
-      let dayTarget = Math.min(target, need)
+      // Une miette sous 25 min ne se place jamais seule : le bloc la prend.
+      let dayTarget = absorbCrumb(Math.min(family.left, need), need)
       while (
         dayTarget >= TASK_CONSTANTS.minBlockMinutes &&
         budget >= TASK_CONSTANTS.minBlockMinutes
@@ -735,6 +769,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
 
         let footprint = Math.min(footprintFor(work), budget)
         if (footprint > allocator.largestFree()) footprint = allocator.largestFree()
+        // Raccourci par la place du jour, le bloc ne doit pas laisser derrière
+        // lui une miette qu'aucun bloc ne pourra plus jamais prendre.
+        const crumb = (remainingNeed.get(task.id) ?? 0) - (footprint - computeBreakMinutes(footprint))
+        if (crumb > 0 && crumb < TASK_CONSTANTS.minBlockMinutes) footprint -= TASK_CONSTANTS.minBlockMinutes - crumb
         if (footprint - computeBreakMinutes(footprint) < TASK_CONSTANTS.minBlockMinutes) break
 
         // D.5 : le budget profond du jour est déjà partagé avec les objectifs.
@@ -742,7 +780,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const taskSession = placedToday.filter((b) => b.refId === task.id).length
         const slot = allocator.take(footprint, {
           avoid: deepWindowMinutes + work > DEEP_BUDGET_MINUTES ? 'PROFONDE' : undefined,
-          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0, task.category),
+          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0, task.category, familyScore),
           ...(learn
             ? {
                 lengthAt: (start: number) =>
@@ -783,6 +821,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         remember(task.id, slot.startMinute, slot.endMinute, workMinutes)
         budget -= size
         dayTarget -= workMinutes
+        family.left -= workMinutes
         remainingNeed.set(task.id, Math.max(0, (remainingNeed.get(task.id) ?? 0) - workMinutes))
         placedByTask.set(task.id, (placedByTask.get(task.id) ?? 0) + workMinutes)
       }

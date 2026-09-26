@@ -1863,3 +1863,37 @@ describe('Revue 3 — longueur par tranche, et un gros journal', () => {
     expect(performance.now() - t0).toBeLessThan(1000)
   })
 })
+
+describe('D.5 — une tâche découpée ne s’empile pas sur son dernier jour', () => {
+  it('la cible du jour se juge sur la tâche entière : 5 × 240 min en 7 jours, réparties, dans l’ordre des parties', () => {
+    const GROUP = uuid(40)
+    const tasks = [
+      task({ id: GROUP, title: 'Devoir', remainingMinutes: 0, deadline: RANGE_END }),
+      ...Array.from({ length: 5 }, (_, i) =>
+        task({
+          id: uuid(41 + i),
+          title: `Devoir — Part ${i + 1}`,
+          parentTaskId: GROUP,
+          partOrder: i + 1,
+          estimatedMinutes: 240,
+          remainingMinutes: 240,
+          deadline: RANGE_END,
+        }),
+      ),
+    ]
+    const plan = computePlan(input({ schedule: sleepScheduleEntries('23:30', '07:30'), tasks }), NOW)
+    const parJour = new Map<string, number>()
+    for (const b of plan.blocks) if (b.kind === 'task') parJour.set(b.date, (parJour.get(b.date) ?? 0) + b.workMinutes)
+    const total = [...parJour.values()].reduce((s, m) => s + m, 0)
+    expect(total).toBe(5 * 240)
+    const moyenne = total / 7
+    for (const m of parJour.values()) expect(m).toBeLessThanOrEqual(moyenne * 1.5)
+    expect(parJour.get(RANGE_END) ?? 0).toBeLessThanOrEqual(moyenne * 1.5)
+    // Dans une journée, une partie ne commence jamais avant la fin de la précédente.
+    const rang = new Map(tasks.map((t) => [t.id, t.partOrder ?? 0]))
+    for (const date of parJour.keys()) {
+      const jour = plan.blocks.filter((b) => b.kind === 'task' && b.date === date).sort((x, y) => x.startMinute - y.startMinute)
+      for (let k = 1; k < jour.length; k++) expect(rang.get(jour[k]!.refId)!).toBeGreaterThanOrEqual(rang.get(jour[k - 1]!.refId)!)
+    }
+  })
+})
