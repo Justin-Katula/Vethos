@@ -166,3 +166,15 @@ describe('Client — jeton renouvelé', () => {
     expect(jeton).toBe('neuf')
   })
 })
+
+describe('Garde-fous — deux listes', () => {
+  it('une réponse ordinaire du modèle n’est pas prise pour une détresse', () => {
+    expect(filtrerReponse('Cette envie va disparaître si tu commences.')?.texte).toBe('Cette envie va disparaître si tu commences.')
+    expect(filtrerReponse('Let’s end it here, block done.')?.texte).toBe('Let’s end it here, block done.')
+  })
+  it('ce que l’utilisateur écrit : la liste large, à la première personne', () => {
+    expect(detecteDetresse('je veux disparaître')).toBe(true)
+    expect(detecteDetresse('I want to end it all')).toBe(true)
+    expect(detecteDetresse('I want to end it, the block I mean')).toBe(false)
+  })
+})

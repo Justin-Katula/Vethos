@@ -17,15 +17,29 @@ const mots = (alternatives: string) => new RegExp(`(?<!\\p{L})(?:${alternatives}
  */
 const DETRESSE = [
   mots(
-    "suicid\\p{L}*|kill (?:my|him|her)self|end (?:it all|my life)|want to die|wanna die|don'?t want to (?:live|be here)|no reason to live|self[- ]?harm|cut(?:ting)? myself|hurt myself|better off dead|better off without me|can'?t go on|hopeless|worthless|end it|kms|unalive(?: myself)?|disappear forever",
+    "suicid\\p{L}*|kill (?:my|him|her)self|end (?:it all|my life)|want to die|wanna die|don'?t want to (?:live|be here)|no reason to live|self[- ]?harm|cut(?:ting)? myself|hurt myself|better off dead|better off without me|can'?t go on|hopeless|worthless|i want to end it all|\\bkms\\b|unalive myself|i want to disappear",
   ),
   mots(
-    'me suicider|me tuer|en finir|envie de mourir|veux mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien|je sers a rien|plus la force|mourir|disparaître|disparaitre pour toujours|plus envie de rien',
+    'me suicider|me tuer|en finir|envie de mourir|veux mourir|plus envie de vivre|me faire du mal|me mutiler|sans espoir|je ne vaux rien|je sers à rien|je sers a rien|plus la force|je veux disparaître|je veux disparaitre|plus envie de rien',
   ),
 ]
 
+/** Ce que l'UTILISATEUR écrit : la liste large — montrer l'aide coûte peu. */
 export function detecteDetresse(texte: string): boolean {
   return DETRESSE.some((r) => r.test(texte))
+}
+
+/**
+ * Ce que le MODÈLE écrit : seulement des phrases à la première personne, sans
+ * ambiguïté — sinon « cette envie va disparaître » ou « let's end it here,
+ * block done » remplaceraient un conseil ordinaire par le message de crise.
+ */
+const DETRESSE_REPONSE = [
+  mots("i want to die|i(?:'m| am) going to kill myself|i want to end my life|i don'?t want to live"),
+  mots('je veux mourir|je vais me tuer|je veux me suicider|je veux en finir avec la vie'),
+]
+export function detecteDetresseReponse(texte: string): boolean {
+  return DETRESSE_REPONSE.some((r) => r.test(texte))
 }
 
 /** Ce que le Coach dit quand il sort du mode discipline. Jamais un reproche, jamais un bloc. */
@@ -74,7 +88,7 @@ export function filtrerReponse(brut: string): Verdict | null {
     .filter(Boolean)
   const t = lignes.join('\n')
   if (!t) return null
-  if (detecteDetresse(t)) return { texte: MESSAGE_AIDE, remplace: true }
+  if (detecteDetresseReponse(t)) return { texte: MESSAGE_AIDE, remplace: true }
   if ([...INTERDITS, ...FLATTERIE, ...CONCESSIONS].some((r) => r.test(t))) return null
 
   const plan = lignes.find((l) => /^PLAN:/i.test(l))

@@ -1810,3 +1810,56 @@ describe('Déclencheur-événement nommé (plan si-alors)', () => {
     expect(mercredi[0]!.startMinute).toBeLessThanOrEqual(840)
   })
 })
+
+describe('Revue 3 — longueur par tranche, et un gros journal', () => {
+  const OBJ = objective({ weeklyTargetMinutes: 1200 })
+  const ev = (i: number, over: Partial<SessionEvent>): SessionEvent => ({
+    blockId: `r${i}`,
+    date: addDays(TODAY, -((i % 40) + 1)),
+    kind: 'objective',
+    refId: OBJ.id,
+    category: `objectif:${OBJ.id}`,
+    plannedStartMinute: 9 * 60,
+    plannedMinutes: 90,
+    started: true,
+    delayMinutes: 0,
+    spontaneous: false,
+    heldMinutes: 90,
+    stoppedEarly: false,
+    blockedAttempts: 0,
+    load48hMinutes: 0,
+    createdAt: '2026-08-01T09:00:00.000Z',
+    ...over,
+  })
+
+  it('la longueur apprise suit la tranche horaire du départ : longue le matin, courte le soir', () => {
+    const events = [
+      ...Array.from({ length: 8 }, (_, i) => ev(i, { plannedStartMinute: 9 * 60, heldMinutes: 90 })),
+      ...Array.from({ length: 8 }, (_, i) =>
+        ev(100 + i, { plannedStartMinute: 19 * 60, heldMinutes: 30 + (i % 3), stoppedEarly: true, stop: { reason: 'tired', attemptsBefore: 0 } }),
+      ),
+    ]
+    const plan = computePlan(input({ schedule: sleepScheduleEntries('23:00', '07:00'), objectives: [OBJ], sessionEvents: events }), NOW)
+    const blocs = plan.blocks.filter((b) => b.kind === 'objective' && b.date === '2026-08-12')
+    for (const b of blocs) {
+      if (b.startMinute >= 18 * 60) expect(b.workMinutes).toBeLessThanOrEqual(35)
+    }
+    expect(blocs.some((b) => b.startMinute < 12 * 60 && b.workMinutes >= 60)).toBe(true)
+  })
+
+  it('3000 événements : un calcul reste sous la seconde', () => {
+    const events = Array.from({ length: 3000 }, (_, i) =>
+      ev(i, {
+        blockId: `g${i}`,
+        refId: i % 3 ? OBJ.id : 'autre',
+        plannedStartMinute: (8 + (i % 12)) * 60,
+        heldMinutes: i % 5 ? 90 : 20,
+        stoppedEarly: i % 5 === 0,
+        ...(i % 5 === 0 ? { stop: { reason: 'boring' as const, attemptsBefore: i % 2 } } : {}),
+      }),
+    )
+    const t0 = performance.now()
+    computePlan(input({ schedule: sleepScheduleEntries('23:00', '07:00'), objectives: [OBJ], sessionEvents: events }), NOW)
+    expect(performance.now() - t0).toBeLessThan(1000)
+  })
+})

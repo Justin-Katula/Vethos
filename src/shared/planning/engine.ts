@@ -37,9 +37,9 @@ import {
   type DayCapacityPoint,
 } from './feasibility'
 import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
-import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe } from './bayes'
+import { BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe, trancheDe, type Tranche } from './bayes'
 import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue } from './habitudes'
-import { ajustementPour, pauseAnticipee } from './arrets'
+import { ajustementPour, diagnostiquer, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
 import {
   computeObjectiveQuota,
@@ -167,7 +167,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // `crisisDates` ne contient que des jours dont la crise est PROUVÉE (densité
   // > 1, C.2). C'est la seule clé qui ouvre les deux réductions permises : la
   // version minimale d'une ancre (D.3) et la zone de réveil rognée (A.2).
-  const buildDayFor = (date: string, crisisDates: Set<string>): DayCapacity => {
+  const buildDayFor = (date: string, crisisDates: Set<string>, fullDay = false): DayCapacity => {
     const dow = dayOfWeek(date)
     // Une occurrence unique (date renseignée) ne compte que ce jour-là ; une
     // entrée récurrente (le défaut historique) compte chaque semaine.
@@ -197,7 +197,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     // dans `observedPending` (mémoire explicite, `@shared/planning/clock.ts`), plus dans
     // une deuxième vue du plan — donc les deux consommateurs peuvent enfin
     // partager la même.
-    const notBeforeMinute = date === input.today ? nowMinute : undefined
+    const notBeforeMinute = date === input.today && !fullDay ? nowMinute : undefined
 
     const restFloor = computeRestFloor(
       buildDayCapacity({
@@ -376,7 +376,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // Sa capacité pleine est celle du même jour la semaine prochaine (l'horaire
   // est hebdomadaire) — jamais celle qui reste.
   const capaciteJourEntier = learn
-    ? capacities.map((c) => (c.date === input.today ? { ...buildDayFor(addDays(c.date, 7), saturated), date: c.date } : c))
+    ? capacities.map((c) => (c.date === input.today ? buildDayFor(c.date, saturated, true) : c))
     : capacities
 
   for (let di = 0; di < dates.length; di++) {
@@ -459,6 +459,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           // La première heure après le réveil : interdite, sauf crise prouvée.
           inertiaHard: !dayIsCrisis,
           eveningPenalty: learn?.eveningPenalty(refId),
+          comfort: learn?.comfort(refId),
           notBefore: stoppedUntil.get(refId),
           loadBefore,
         })
@@ -642,12 +643,18 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay
       ) {
         const objCategory = `objectif:${objective.id}`
-        const work = Math.min(left, learn ? learn.blockMax(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
+        // Le plafond : la plus longue des tranches ; la longueur de CHAQUE départ
+        // est ensuite celle de sa tranche (lengthAt).
+        const work = Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
         const slot = allocator.take(Math.min(footprint, budget), {
           avoid: deepExhausted ? 'PROFONDE' : undefined,
           score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective, true, objCategory),
+          // La longueur apprise suit la tranche horaire du départ choisi.
+          ...(learn
+            ? { lengthAt: (start: number) => footprintFor(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start)))) }
+            : {}),
         })
         if (!slot) break
         session++
@@ -722,7 +729,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         budget >= TASK_CONSTANTS.minBlockMinutes
       ) {
         const work = absorbCrumb(
-          Math.min(dayTarget, learn ? learn.blockMax(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
+          Math.min(dayTarget, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
           remainingNeed.get(task.id) ?? 0,
         )
 
@@ -736,6 +743,12 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const slot = allocator.take(footprint, {
           avoid: deepWindowMinutes + work > DEEP_BUDGET_MINUTES ? 'PROFONDE' : undefined,
           score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0, task.category),
+          ...(learn
+            ? {
+                lengthAt: (start: number) =>
+                  Math.min(footprint, footprintFor(absorbCrumb(Math.min(dayTarget, learn.blockMax(task.id, task.category, trancheDe(start))), remainingNeed.get(task.id) ?? 0))),
+              }
+            : {}),
         })
         if (!slot) break
 
@@ -1128,12 +1141,19 @@ function buildLearningContext(
   // un bloc « pas tenu » — sinon il compterait deux fois comme un échec.
   const heldOk = (e: SessionEvent) => (e.heldMinutes ?? 0) >= 0.8 * e.plannedMinutes
 
-  const dayTypeOf = (date: string) =>
-    scheduleEntriesForDate(schedule, date, dayOfWeek(date)).some(
-      (x) => x.categoryType === 'school' || x.categoryType === 'work',
-    )
-      ? 'busy'
-      : 'free'
+  const typesJour = new Map<string, string>()
+  const dayTypeOf = (date: string) => {
+    let t = typesJour.get(date)
+    if (!t) {
+      t = scheduleEntriesForDate(schedule, date, dayOfWeek(date)).some(
+        (x) => x.categoryType === 'school' || x.categoryType === 'work',
+      )
+        ? 'busy'
+        : 'free'
+      typesJour.set(date, t)
+    }
+    return t
+  }
 
   // Constance : la médiane des vrais départs, par engagement, type de jour et
   // rang de la séance dans la journée.
@@ -1165,13 +1185,31 @@ function buildLearningContext(
     return phaseCache.get(refId)!
   }
 
-  const blockMax = (refId: string, category: string) => {
-    const k = `${refId}|${category}`
+  // Le diagnostic d'arrêt est coûteux : une fois par calcul, puis mis en cache.
+  const diagnostic = diagnostiquer(events)
+  const ajustCache = new Map<string, ReturnType<typeof ajustementPour>>()
+  const ajust = (refId: string) => {
+    if (!ajustCache.has(refId)) ajustCache.set(refId, ajustementPour(events, refId, diagnostic))
+    return ajustCache.get(refId)!
+  }
+  const niveauCache = new Map<string, number>()
+  // Le niveau se lit en semaines CALENDAIRES (depuis le lundi), comme la dose :
+  // la longueur des blocs ne bouge pas en pleine semaine.
+  const niveau = (refId: string) => {
+    if (!niveauCache.has(refId)) niveauCache.set(refId, niveauDifficulte(events, refId, startOfWeek(today)))
+    return niveauCache.get(refId)!
+  }
+
+  const blockMax = (refId: string, category: string, tranche?: Tranche) => {
+    const k = `${refId}|${category}|${tranche ?? ''}`
     if (!blockMaxCache.has(k)) {
-      const base = dureeCible(survieDe(events, category))
-      // Le niveau de difficulté, construit semaine après semaine (~85 % tenu).
-      const d = niveauDifficulte(events, refId, today)
-      const adj = ajustementPour(events, refId)
+      const survie = survieDe(events, category, tranche)
+      const base = dureeCible(survie)
+      // Une seule croissance à la fois : quand Kaplan-Meier monte déjà depuis
+      // le plus long bloc tenu (+10 %), le niveau ne peut que retenir, pas pousser.
+      const croitDeja = survie.length >= 5 && !survie.some((o) => o.arret)
+      const d = croitDeja ? Math.min(1, niveau(refId)) : niveau(refId)
+      const adj = ajust(refId)
       const len = Math.max(BLOC_MIN, Math.min(BLOC_MAX, Math.round(base * d)))
       blockMaxCache.set(k, adj.blocMax ? Math.min(len, adj.blocMax) : len)
     }
@@ -1210,6 +1248,42 @@ function buildLearningContext(
     return offCache.get(refId)!
   }
 
+  // Les lois par (catégorie, heure, jour de semaine) ne dépendent pas de la
+  // date : calculées une fois. Seul le tirage dépend de la date (graine).
+  const qualiteCache = new Map<string, number>()
+  const loisCache = new Map<string, { pS: { a: number; b: number }; pT: { a: number; b: number } }>()
+  const lois = (cat: SessionEvent[], category: string, hour: number, dow: number) => {
+    const cle = `${category}|${hour}|${dow}`
+    const connu = loisCache.get(cle)
+    if (connu) return connu
+    const atHour = cat.filter((e) => Math.floor(e.plannedStartMinute / 60) === hour)
+    const atDow = atHour.filter((e) => dayOfWeek(e.date) === dow)
+    const started = (xs: SessionEvent[]) => xs.filter((e) => e.started)
+    const v = {
+      pS: inheritedPosterior([cat.map(startOk), atHour.map(startOk), atDow.map(startOk)], undefined, 4, gamma),
+      pT: inheritedPosterior([started(cat).map(heldOk), started(atHour).map(heldOk), started(atDow).map(heldOk)], undefined, 4, gamma),
+    }
+    loisCache.set(cle, v)
+    return v
+  }
+  const qualiteBrute = (cat: SessionEvent[], hour: number, dow: number, date: string, category: string, crisis: boolean) => {
+    const { pS, pT } = lois(cat, category, hour, dow)
+    let a: number
+    let b: number
+    if (crisis) {
+      a = betaMean(pS)
+      b = betaMean(pT)
+    } else {
+      const r = rng(seedFrom(`${category}|${date}|${hour}`))
+      // Après une rupture probable, on explore davantage quelques jours :
+      // des lois aplaties, donc des tirages plus larges.
+      const aplatir = (p: { a: number; b: number }) => (rupture ? { a: p.a * 0.5 + 0.5, b: p.b * 0.5 + 0.5 } : p)
+      a = sampleBeta(aplatir(pS), r)
+      b = sampleBeta(aplatir(pT), r)
+    }
+    return a * (V_START + b * V_TIENT) - V_NEUTRE
+  }
+
   return {
     habitual,
     /**
@@ -1223,32 +1297,16 @@ function buildLearningContext(
     quality(category: string, date: string, dow: number, crisis: boolean) {
       const cat = byCategory.get(category) ?? []
       if (!hasEnoughData(cat.length)) return undefined
+      // Une valeur par heure : le score est demandé à chaque quart d'heure, et
+      // les lois ne changent qu'avec l'heure.
       return (start: number) => {
         const hour = Math.floor(start / 60)
-        const atHour = cat.filter((e) => Math.floor(e.plannedStartMinute / 60) === hour)
-        const atDow = atHour.filter((e) => dayOfWeek(e.date) === dow)
-        const started = (xs: SessionEvent[]) => xs.filter((e) => e.started)
-        const pS = inheritedPosterior([cat.map(startOk), atHour.map(startOk), atDow.map(startOk)], undefined, 4, gamma)
-        const pT = inheritedPosterior(
-          [started(cat).map(heldOk), started(atHour).map(heldOk), started(atDow).map(heldOk)],
-          undefined,
-          4,
-          gamma,
-        )
-        let a: number
-        let b: number
-        if (crisis) {
-          a = betaMean(pS)
-          b = betaMean(pT)
-        } else {
-          const r = rng(seedFrom(`${category}|${date}|${hour}`))
-          // Après une rupture probable, on explore davantage quelques jours :
-          // des lois aplaties, donc des tirages plus larges.
-          const aplatir = (p: { a: number; b: number }) => (rupture ? { a: p.a * 0.5 + 0.5, b: p.b * 0.5 + 0.5 } : p)
-          a = sampleBeta(aplatir(pS), r)
-          b = sampleBeta(aplatir(pT), r)
-        }
-        return a * (V_START + b * V_TIENT) - V_NEUTRE
+        const cle = `${category}|${date}|${hour}|${crisis ? 1 : 0}`
+        const connu = qualiteCache.get(cle)
+        if (connu !== undefined) return connu
+        const v = qualiteBrute(cat, hour, dow, date, category, crisis)
+        qualiteCache.set(cle, v)
+        return v
       }
     },
     /**
@@ -1257,9 +1315,18 @@ function buildLearningContext(
      * bornée 25-90 ; raccourcie si le diagnostic d'arrêt montre de l'évitement.
      */
     blockMax,
+    /** La plus longue des trois tranches horaires. */
+    blockMaxToutesTranches(refId: string, category: string) {
+      return Math.max(...(['matin', 'apres-midi', 'soir'] as const).map((t) => blockMax(refId, category, t)))
+    },
     /** Fatigue diagnostiquée : l'exigeant quitte le soir. */
     eveningPenalty(refId: string) {
-      return ajustementPour(events, refId).soirPenalite
+      return ajust(refId).soirPenalite
+    },
+    /** « Plus dur » : un niveau au-dessus de 1 relâche l'attrait du créneau confortable. */
+    comfort(refId: string) {
+      const n = niveau(refId)
+      return n > 1 ? Math.max(0.5, 2 - n) : 1
     },
     /** Pause anticipée, si elle tombe dans le bloc. */
     pause(refId: string, size: number) {

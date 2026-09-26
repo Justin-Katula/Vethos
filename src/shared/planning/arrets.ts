@@ -142,11 +142,13 @@ export function fiabiliteRaison(events: SessionEvent[], raison: StopReason): num
   }
   // Une réponse mécanique (moins d'une seconde, ou la même raison que les
   // deux arrêts d'avant) ne compte que pour moitié : on pondère, on ne punit pas.
-  const tous = arretsDe(events)
+  // « Les deux arrêts d'avant » : par date et heure, jamais par l'ordre du tableau.
+  const tous = [...arretsDe(events)].sort((x, y) => x.date.localeCompare(y.date) || x.plannedStartMinute - y.plannedStartMinute)
+  const rang = new Map(tous.map((e, i) => [e, i] as const))
   let succes = 0
   let poids = 0
   for (const e of a) {
-    const i = tous.indexOf(e)
+    const i = rang.get(e) ?? 0
     const avant = tous.slice(Math.max(0, i - 2), i)
     const mecanique = (e.stop?.answerMs ?? 5000) < 1000 || (avant.length === 2 && avant.every((x) => x.stop?.reason === raison))
     const w = mecanique ? 0.5 : 1
@@ -162,10 +164,13 @@ export function fiabiliteRaison(events: SessionEvent[], raison: StopReason): num
  */
 export function raisonsAnormales(events: SessionEvent[], today: string): StopReason[] {
   const a = arretsDe(events)
-  const recents = a.filter((e) => e.date > addDays(today, -14) && e.date <= today)
-  if (recents.length < MIN_OBSERVATIONS || a.length < 2 * MIN_OBSERVATIONS) return []
+  const dans = (e: SessionEvent) => e.date > addDays(today, -14) && e.date <= today
+  const recents = a.filter(dans)
+  // La normale se mesure HORS de la quinzaine : sinon elle se tire vers elle.
+  const avant = a.filter((e) => !dans(e))
+  if (recents.length < MIN_OBSERVATIONS || avant.length < MIN_OBSERVATIONS) return []
   return STOP_REASONS.filter((r) => {
-    const normale = a.filter((e) => e.stop?.reason === r).length / a.length
+    const normale = avant.filter((e) => e.stop?.reason === r).length / avant.length
     const quinzaine = recents.filter((e) => e.stop?.reason === r).length / recents.length
     return quinzaine > 0.2 && quinzaine > 1.5 * normale
   })
@@ -184,7 +189,10 @@ function autresTiennent(tous: SessionEvent[], e: SessionEvent): number | null {
       x.date === e.date &&
       x.started &&
       x.heldMinutes !== null &&
-      Math.abs(x.plannedStartMinute - e.plannedStartMinute) <= 180,
+      x.stop?.reason !== 'real-event' &&
+      // Le même état, c'est AVANT l'arrêt : ce qui vient après ne le décrit pas.
+      x.plannedStartMinute <= e.plannedStartMinute &&
+      e.plannedStartMinute - x.plannedStartMinute <= 180,
   )
   if (!pareil.length) return null
   return pareil.filter((x) => !x.stoppedEarly).length / pareil.length
@@ -223,8 +231,12 @@ export type Ajustement = {
  * tâche » vaudrait toujours 1). L'évitement ne raccourcit que l'engagement
  * où les arrêts se concentrent vraiment.
  */
-export function ajustementPour(events: SessionEvent[], refId: string): Ajustement {
-  const d = diagnostiquer(events)
+export function ajustementPour(
+  events: SessionEvent[],
+  refId: string,
+  dejaCalcule?: ReturnType<typeof diagnostiquer>,
+): Ajustement {
+  const d = dejaCalcule ?? diagnostiquer(events)
   if (d === 'pas assez de données') return {}
   const top = (Object.keys(d) as Cause[]).reduce((m, k) => (d[k] > d[m] ? k : m))
   if (d[top] < 0.4) return {}

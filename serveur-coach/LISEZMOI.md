@@ -7,6 +7,8 @@ La clé DeepSeek vit **ici, et nulle part ailleurs** : ni dans l'app iPhone, ni 
 - **Le portefeuille** : 40 demandes par installation et par jour, 2000 en tout par jour, 5 nouveaux jetons par adresse et par heure (IPv6 regroupé par /64), 20 échecs d'authentification par adresse et par heure, jetons qui expirent après 30 jours (réglables). Un plafond mal écrit empêche le serveur de démarrer.
 - **La conversation** : un tour « Coach » renvoyé par l'app n'est accepté que s'il porte la signature du serveur ; les faits sont une liste fermée par job.
 
+Compromis assumé : derrière un opérateur mobile, beaucoup d'utilisateurs partagent une même adresse IPv4 publique ; le plafond par adresse (120/jour par défaut) peut alors gêner des utilisateurs légitimes à grande échelle. Relevez-le avec la croissance, ou passez à l'attestation d'appareil.
+
 Pour aller plus loin contre l'abus (fabrication de jetons en masse) : exiger une attestation d'appareil Apple (App Attest) avant `/v1/install`.
 - **Les règles du Coach** : le prompt système est construit sur le serveur. Une demande qui essaie d'en envoyer un est refusée.
 - **La détresse** : détectée avant tout appel au modèle ; la réponse oriente vers une aide humaine.

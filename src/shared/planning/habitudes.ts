@@ -94,44 +94,67 @@ export function autonomie(events: SessionEvent[], refId: string, today: string):
  */
 export function phaseHabitude(events: SessionEvent[], refId: string): Phase {
   const ev = eventsDe(events, refId)
-  let phase: Phase = 1
+  let phase = 1 as Phase
   // Tout se compte DEPUIS l'entrée dans la phase courante : après un recul,
   // la phase se regagne sur des preuves neuves, pas sur l'historique d'avant.
+  // Fenêtres glissantes (7 et 14 jours) tenues par des pointeurs : un seul
+  // passage sur le journal, même avec des milliers d'événements.
   let depuis = 0
   let demarresAvant = 0 // démarrages accumulés avant la phase courante (1 → 2 → 3 cumule)
+  let demarres = 0 // depuis l'entrée dans la phase
+  let retardsCourts = 0 // démarrages depuis l'entrée avec un retard ≤ 5 min
+  let g7 = 0 // début de la fenêtre de recul (7 jours)
+  let rates7 = 0
+  let g14 = 0 // début de la fenêtre d'autonomie (14 jours)
+  let spont14 = 0
+  const entrer = (p: Phase, i: number) => {
+    phase = p
+    depuis = i + 1
+    demarres = 0
+    retardsCourts = 0
+    g7 = g14 = depuis
+    rates7 = spont14 = 0
+  }
   for (let i = 0; i < ev.length; i++) {
     const e = ev[i]!
-    const vus = ev.slice(depuis, i + 1)
-    const semaine = vus.filter((x) => x.date > addDays(e.date, -PHASES.fenetreRecul))
-    if (semaine.filter((x) => !x.started).length >= PHASES.ratesRecul && phase > 1) {
-      phase = (phase - 1) as Phase
-      depuis = i + 1
+    if (e.started) {
+      demarres++
+      if ((e.delayMinutes ?? 0) <= PHASES.retardMedianMax) retardsCourts++
+      if (e.spontaneous) spont14++
+    } else rates7++
+    const limite7 = addDays(e.date, -PHASES.fenetreRecul)
+    while (g7 <= i && ev[g7]!.date <= limite7) {
+      if (!ev[g7]!.started) rates7--
+      g7++
+    }
+    const limite14 = addDays(e.date, -PHASES.fenetreJours)
+    while (g14 <= i && ev[g14]!.date <= limite14) {
+      if (ev[g14]!.started && ev[g14]!.spontaneous) spont14--
+      g14++
+    }
+
+    if (rates7 >= PHASES.ratesRecul && phase > 1) {
+      entrer((phase - 1) as Phase, i)
       demarresAvant = 0
       continue
     }
-    const demarres = vus.filter((x) => x.started)
-    const total = demarresAvant + demarres.length
+    const total = demarresAvant + demarres
     if (phase === 1 && total >= PHASES.demarragesAncrage) {
-      phase = 2
       demarresAvant = total
-      depuis = i + 1
+      entrer(2, i)
     } else if (
       phase === 2 &&
       total >= PHASES.demarragesAutonomie &&
-      demarres.length > 0 &&
-      mediane(demarres.map((x) => x.delayMinutes ?? 0)) <= PHASES.retardMedianMax
+      demarres > 0 &&
+      // Médiane des retards ≤ 5 min ⟺ au moins la moitié des départs à ≤ 5 min.
+      retardsCourts * 2 >= demarres
     ) {
-      phase = 3
-      depuis = i + 1
+      entrer(3, i)
     } else if (phase === 3) {
-      // Un raté (jamais démarré) compte comme un démarrage NON spontané : sans
-      // ça, les ratés ne baisseraient jamais l'autonomie.
-      const fen = vus.filter((x) => x.date > addDays(e.date, -PHASES.fenetreJours))
-      const auto = fen.length ? fen.filter((x) => x.started && x.spontaneous).length / fen.length : 0
-      if (fen.length >= MIN_OBSERVATIONS && auto >= PHASES.autonomieMin) {
-        phase = 4
-        depuis = i + 1
-      }
+      // Un raté compte comme un démarrage NON spontané : sans ça, les ratés ne
+      // baisseraient jamais l'autonomie.
+      const fen = i - g14 + 1
+      if (fen >= MIN_OBSERVATIONS && spont14 / fen >= PHASES.autonomieMin) entrer(4, i)
     }
   }
   return phase

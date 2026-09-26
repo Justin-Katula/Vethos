@@ -12,6 +12,8 @@ import { coach } from '@/coach/client'
  * que l'utilisateur a signé. Hors bloc, ou sans contrat, rien n'est refusé.
  * Rend `true` quand l'action peut avoir lieu.
  */
+let dejaReformule = ''
+
 export function useGardeContrat(): () => boolean {
   const contrat = useDonnees((d) => d.reglages.contrat)
   const { seanceActive, minute, maintenant } = usePlan()
@@ -26,7 +28,11 @@ export function useGardeContrat(): () => boolean {
     // Les mots du contrat, tout de suite ; puis, si le Coach existe, le même
     // refus dit par lui (job « refus ») — jamais une concession.
     toast(refusalLine(c.mode, c.signedAt, reste))
-    if (coach().disponible) {
+    // Le Coach ne reformule qu'UNE fois par bloc : un appel payant par tap,
+    // c'est la journée du Coach brûlée en une séance.
+    const cle = seanceActive?.blockId ?? ''
+    if (coach().disponible && cle && dejaReformule !== cle) {
+      dejaReformule = cle
       void coach()
         .demander({
           job: 'refus',

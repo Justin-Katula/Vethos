@@ -71,6 +71,12 @@ export function creerClientCoach(args: {
         j = await jeton(true)
         if (!j) return null
         r = await appeler('/v1/coach', d, j)
+        // Les tours signés pour l'ancien jeton ne valent plus : on repart du
+        // dernier message de l'utilisateur.
+        if (r.status === 400 && (d.messages ?? []).length > 1) {
+          const dernier = d.messages![d.messages!.length - 1]!
+          r = await appeler('/v1/coach', { ...d, messages: [{ role: 'user', content: dernier.content }] }, j)
+        }
       }
       if (!r.ok) return null
       const corps = (await r.json()) as { texte?: unknown; sig?: unknown }

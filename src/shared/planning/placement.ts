@@ -281,6 +281,8 @@ export type ScoreContext = {
   inertiaHard?: boolean
   /** Fatigue diagnostiquée : pénalité sur les départs après 18 h. */
   eveningPenalty?: number
+  /** Poids du confort (attrait du pic) : 1 par défaut, moins quand le niveau de difficulté monte. */
+  comfort?: number
   /** Un engagement arrêté par « Stop » ne revient pas avant cette minute (l'arrêt + 60). */
   notBefore?: number
   /** Minutes de charge cognitive déjà faites avant `start` (école, travail, blocs). */
@@ -304,7 +306,8 @@ export function scoreSlot(start: number, minutes: number, c: ScoreContext): numb
   let s = c.learnedQuality ? c.learnedQuality(start) : SCORE_DEFAULTS.quality[c.windowAt(Math.floor(start / 60))]
   if (c.midSleepMinute !== null) {
     const peak = (c.midSleepMinute + SCORE_DEFAULTS.peakHoursAfterMidSleep * 60) % 1440
-    s -= SCORE_DEFAULTS.synchronyPerHour * circularHours(start + minutes / 2, peak)
+    // « Plus dur » : un créneau moins confortable — l'attrait du pic se relâche.
+    s -= SCORE_DEFAULTS.synchronyPerHour * (c.comfort ?? 1) * circularHours(start + minutes / 2, peak)
   }
   if (c.habitualStart !== null) s -= SCORE_DEFAULTS.constancyPerHour * circularHours(start, c.habitualStart)
   if (c.wakeMinute !== null) {
@@ -370,6 +373,11 @@ export type TakeOptions = {
    * la qualité et l'écart font partie du score.
    */
   score?: (start: number, minutes: number) => number
+  /**
+   * Longueur apprise selon l'heure de départ (tranche horaire) : essayée pour
+   * chaque départ, bornée par `minutes`. La longueur suit le créneau choisi.
+   */
+  lengthAt?: (start: number) => number
 }
 
 export class DayAllocator {
@@ -418,7 +426,7 @@ export class DayAllocator {
   take(minutes: number, options: TakeOptions = {}): Allocation | null {
     if (minutes <= 0) return null
 
-    if (options.score) return this.takeByScore(minutes, options.score, options.avoid)
+    if (options.score) return this.takeByScore(minutes, options.score, options.avoid, options.lengthAt)
 
     const target = this.spreadTarget(minutes, options.spreadFrom)
     const starts = this.candidateStarts(minutes, target)
@@ -453,30 +461,34 @@ export class DayAllocator {
   }
 
   private takeByScore(
-    minutes: number,
+    maxMinutes: number,
     score: (start: number, minutes: number) => number,
     avoid?: CognitiveWindow,
+    lengthAt?: (start: number) => number,
   ): Allocation | null {
-    let best: { start: number; avoided: boolean; value: number } | null = null
+    let best: { start: number; minutes: number; avoided: boolean; value: number } | null = null
+    const shortest = lengthAt ? Math.min(maxMinutes, ...[0, 12 * 60, 18 * 60].map((m) => lengthAt(m))) : maxMinutes
     for (const i of this.free) {
-      const latest = i.end - minutes
+      const latest = i.end - shortest
       if (latest < i.start) continue
       const starts = [i.start]
       for (let q = Math.ceil(i.start / 15) * 15; q <= latest; q += 15) if (q > i.start) starts.push(q)
       for (const start of starts) {
+        const minutes = lengthAt ? Math.min(maxMinutes, lengthAt(start)) : maxMinutes
+        if (start + minutes > i.end) continue
         const value = score(start, minutes)
         if (value === -Infinity) continue
         const avoided = avoid ? this.overlapsWindow(start, minutes, avoid) : false
         const better =
           !best ||
           (avoided !== best.avoided ? !avoided : value > best.value || (value === best.value && start < best.start))
-        if (better) best = { start, avoided, value }
+        if (better) best = { start, minutes, avoided, value }
       }
     }
     if (!best) return null
     const allocation: Allocation = {
       startMinute: best.start,
-      endMinute: best.start + minutes,
+      endMinute: best.start + best.minutes,
       cognitiveWindow: this.windowAt(Math.floor(best.start / 60)),
     }
     this.reserve(allocation.startMinute, allocation.endMinute)

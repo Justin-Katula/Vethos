@@ -294,6 +294,10 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
 
     lireTentatives() {
       // Rangées par l'extension ShieldConfiguration à chaque bouclier montré.
+      // LIMITE iOS : ce rappel sert à DESSINER le bouclier, iOS peut le mettre
+      // en cache ou le rappeler — le compte est une approximation (souvent
+      // sous-estimé), jamais une mesure exacte. Le diagnostic ne s'en sert que
+      // comme un signal parmi d'autres.
       const brut = natif.userDefaultsGet?.<unknown>('vethos_tentatives')
       return Array.isArray(brut) ? brut.filter((t): t is number => typeof t === 'number') : []
     },
