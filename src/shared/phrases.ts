@@ -81,6 +81,6 @@ export function blockNote(block: {
   if (block.preview) return 'preview — locked by the previous part'
   if (block.capOverride) return 'over the daily cap'
   if (block.reducedToMinimum) return 'reduced to its minimum'
-  if (block.breakMinutes > 0) return `includes a ${durationLabel(block.breakMinutes)} break`
+  if (block.breakMinutes > 0) return `then a ${durationLabel(block.breakMinutes)} break`
   return undefined
 }

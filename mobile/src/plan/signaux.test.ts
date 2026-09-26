@@ -167,7 +167,7 @@ describe('la note du bloc', () => {
   })
 
   it('annonce la pause incluse dans l’empreinte', () => {
-    expect(noteDuBloc(bloc({ breakMinutes: 10 }))).toBe('includes a 10 min break')
+    expect(noteDuBloc(bloc({ breakMinutes: 10 }))).toBe('then a 10 min break')
   })
 
   it('fait primer le plafond dépassé sur la pause', () => {

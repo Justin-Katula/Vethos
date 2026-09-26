@@ -344,7 +344,7 @@ export default function HomePage() {
                   } else if (b.reducedToMinimum) {
                     noteText = 'reduced to its minimum'
                   } else if (b.breakMinutes > 0) {
-                    noteText = `includes a ${b.breakMinutes} min break`
+                    noteText = `then a ${b.breakMinutes} min break`
                   }
 
                   let valueText = duration(b.workMinutes)

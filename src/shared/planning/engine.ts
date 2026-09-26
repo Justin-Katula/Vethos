@@ -56,6 +56,8 @@ import {
 } from './placement'
 import {
   computeBreakMinutes,
+  settleBreaks,
+  workOfFootprint,
   computeFatigue,
   computeRestFloor,
   computeWeeklyBreathing,
@@ -672,7 +674,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         session++
 
         const size = slot.endMinute - slot.startMinute
-        const brk = computeBreakMinutes(size)
+        const brk = size - workOfFootprint(size)
         const workMinutes = size - brk
 
         blocks.push({
@@ -771,9 +773,9 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         if (footprint > allocator.largestFree()) footprint = allocator.largestFree()
         // Raccourci par la place du jour, le bloc ne doit pas laisser derrière
         // lui une miette qu'aucun bloc ne pourra plus jamais prendre.
-        const crumb = (remainingNeed.get(task.id) ?? 0) - (footprint - computeBreakMinutes(footprint))
+        const crumb = (remainingNeed.get(task.id) ?? 0) - workOfFootprint(footprint)
         if (crumb > 0 && crumb < TASK_CONSTANTS.minBlockMinutes) footprint -= TASK_CONSTANTS.minBlockMinutes - crumb
-        if (footprint - computeBreakMinutes(footprint) < TASK_CONSTANTS.minBlockMinutes) break
+        if (workOfFootprint(footprint) < TASK_CONSTANTS.minBlockMinutes) break
 
         // D.5 : le budget profond du jour est déjà partagé avec les objectifs.
         // Épuisé, il ne bloque rien : le bloc part en fenêtre NORMALE/BASSE.
@@ -791,7 +793,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         if (!slot) break
 
         const size = slot.endMinute - slot.startMinute
-        const brk = computeBreakMinutes(size)
+        const brk = size - workOfFootprint(size)
         const workMinutes = size - brk
 
         blocks.push({
@@ -826,6 +828,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         placedByTask.set(task.id, (placedByTask.get(task.id) ?? 0) + workMinutes)
       }
     }
+
+    // E.1 : la pause vient APRÈS le travail, et seulement si quelque chose
+    // commence dans les 30 min qui suivent. Sinon le bloc finit avec le travail.
+    settleBreaks(blocks, date, dayEntries)
   }
 
   // ─── C.3.1. Un verdict par tâche, jamais un verdict binaire global ──────

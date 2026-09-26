@@ -6,22 +6,62 @@ import type { PlacedBlock } from './types'
 // une fois le travail placé.
 
 /**
- * E.1 : micro-repos INCLUS dans l'empreinte du bloc, jamais ajouté après.
- * Un bloc de 90 min occupe 90 min de la journée, dont 20 de pause.
+ * E.1 : la pause qui SUIT un bloc — 20 min après 90 min de travail, 10 après
+ * 50, 5 après 25. Elle n'existe que si quelque chose commence dans les 30 min
+ * qui suivent le travail (`settleBreaks`) ; sinon le temps libre en tient lieu.
  */
-export function computeBreakMinutes(blockMinutes: number): number {
-  if (blockMinutes >= 90) return 20
-  if (blockMinutes >= 50) return 10
-  if (blockMinutes >= 25) return 5
+export function computeBreakMinutes(workMinutes: number): number {
+  if (workMinutes >= 90) return 20
+  if (workMinutes >= 50) return 10
+  if (workMinutes >= 25) return 5
   return 0
 }
 
 /**
- * E.1 : la pause FERME le bloc — on travaille, puis on souffle avant de passer
- * à autre chose. C'est la seule position cohérente avec « comprise dedans, pas
- * ajoutée après » : le bloc garde une seule empreinte, et la minute exacte où
- * le travail s'arrête est un fait, pas une interprétation de l'affichage.
- * Sans pause, la minute rendue est la fin du bloc : il n'y a rien à montrer.
+ * Le travail que contient une empreinte réservée : le plus grand travail dont
+ * la pause tient encore dedans. Le reste de l'empreinte est la pause.
+ */
+export function workOfFootprint(footprint: number): number {
+  for (const brk of [20, 10, 5]) {
+    const w = footprint - brk
+    if (computeBreakMinutes(w) === brk) return w
+  }
+  // Entre deux paliers (ex. 105) : on descend au palier inférieur.
+  if (footprint >= 60) return Math.min(footprint - 10, 89)
+  if (footprint >= 30) return Math.min(footprint - 5, 49)
+  return Math.min(footprint, 24)
+}
+
+/**
+ * Le placement réserve la pause derrière chaque bloc, pour que rien ne vienne
+ * s'y coller. Une fois la journée posée, on la garde seulement si l'engagement
+ * suivant (bloc, ancre, obligation) commence moins de 30 min après la fin du
+ * travail ; sinon elle disparaît et le bloc s'arrête avec le travail.
+ */
+export function settleBreaks(
+  blocks: PlacedBlock[],
+  date: string,
+  entries: Array<{ startMinute: number; categoryType: string }>,
+): void {
+  const day = blocks.filter((b) => b.date === date)
+  const starts = [
+    ...entries.filter((e) => e.categoryType !== 'sleep').map((e) => e.startMinute),
+    ...day.map((b) => b.startMinute),
+  ]
+  for (const b of day) {
+    if (b.kind === 'ancre' || b.confirmed === true || b.breakMinutes <= 0) continue
+    const workEnd = b.startMinute + b.workMinutes
+    const next = starts.filter((m) => m >= workEnd && m !== b.startMinute).reduce((m, x) => Math.min(m, x), Infinity)
+    if (next - workEnd < BREAK_HIDDEN_IF_FREE_MINUTES) continue
+    b.breakMinutes = 0
+    b.endMinute = workEnd
+    b.durationMinutes = b.workMinutes
+  }
+}
+
+/**
+ * E.1 : la pause suit le travail — on travaille, puis on souffle avant de
+ * passer à autre chose. Sans pause, la minute rendue est la fin du bloc.
  */
 export function breakStartMinute(block: Pick<PlacedBlock, 'endMinute' | 'breakMinutes'>): number {
   return block.endMinute - block.breakMinutes
@@ -31,12 +71,9 @@ export function breakStartMinute(block: Pick<PlacedBlock, 'endMinute' | 'breakMi
 export const BREAK_HIDDEN_IF_FREE_MINUTES = 30
 
 /**
- * E.1 : la pause reste TOUJOURS dans l'empreinte du bloc — ça ne change
- * jamais, elle n'est jamais ajoutée après. Mais elle ne mérite d'être MONTRÉE
- * que si elle se heurte vraiment à quelque chose : un autre engagement qui
- * commence dans les 30 minutes qui suivent. Si ce qui suit est libre au moins
- * 30 minutes, ce temps libre joue déjà le rôle de la pause — la hachurer en
- * plus rognerait visuellement sur du temps qui n'appartient à rien d'autre.
+ * E.1 : une pause ne se montre que si elle se heurte à quelque chose — un
+ * engagement qui commence dans les 30 min. `settleBreaks` retire déjà les
+ * autres du plan ; ce test reste pour les blocs venus d'ailleurs.
  */
 export function isBreakVisible(
   block: Pick<PlacedBlock, 'endMinute' | 'breakMinutes'>,

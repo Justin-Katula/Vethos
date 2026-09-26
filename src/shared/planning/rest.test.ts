@@ -12,7 +12,10 @@ import {
   nextOccupiedMinute,
   explainBlock,
   shouldResetFatigue,
+  settleBreaks,
+  workOfFootprint,
 } from './rest'
+import type { PlacedBlock } from './types'
 
 describe('E.1 — micro-repos inclus dans le bloc', () => {
   it('25-50 min → 5 min, 50-90 → 10 min, 90+ → 20 min', () => {
@@ -237,5 +240,45 @@ describe('E.4 — fatigue accumulée', () => {
     expect(countConsecutiveHighDays([90, 70, 90])).toBe(1)
     expect(shouldResetFatigue(49)).toBe(true)
     expect(shouldResetFatigue(50)).toBe(false)
+  })
+})
+
+describe('E.1 — la pause suit le travail, seulement si quelque chose vient dans les 30 min', () => {
+  const bloc = (id: string, start: number, work: number): PlacedBlock =>
+    ({
+      id, date: '2026-09-26', startMinute: start, endMinute: start + work + computeBreakMinutes(work),
+      durationMinutes: work + computeBreakMinutes(work), breakMinutes: computeBreakMinutes(work), workMinutes: work,
+      kind: 'task', refId: id, label: id, color: '#000', cognitiveWindow: 'NORMALE',
+    }) as PlacedBlock
+
+  it('90 min de travail puis rien avant 30 min : pas de pause, le bloc finit avec le travail', () => {
+    const b = bloc('a', 9 * 60, 90)
+    settleBreaks([b, bloc('b', 11 * 60, 90)], '2026-09-26', [])
+    expect(b.workMinutes).toBe(90)
+    expect(b.breakMinutes).toBe(0)
+    expect(b.endMinute).toBe(10 * 60 + 30)
+  })
+
+  it('90 min de travail et un autre bloc 20 min après : 20 min de pause entre les deux', () => {
+    const b = bloc('a', 9 * 60, 90)
+    settleBreaks([b, bloc('b', 10 * 60 + 50, 60)], '2026-09-26', [])
+    expect(b.breakMinutes).toBe(20)
+    expect(b.endMinute).toBe(10 * 60 + 50)
+  })
+
+  it('une obligation qui commence dans les 30 min compte aussi ; le sommeil non', () => {
+    const b = bloc('a', 9 * 60, 90)
+    settleBreaks([b], '2026-09-26', [{ startMinute: 10 * 60 + 50, categoryType: 'school' }])
+    expect(b.breakMinutes).toBe(20)
+    const c = bloc('c', 21 * 60, 90)
+    settleBreaks([c], '2026-09-26', [{ startMinute: 22 * 60 + 40, categoryType: 'sleep' }])
+    expect(c.breakMinutes).toBe(0)
+  })
+
+  it('une empreinte réservée contient le plus grand travail dont la pause tient dedans', () => {
+    expect(workOfFootprint(110)).toBe(90)
+    expect(workOfFootprint(60)).toBe(50)
+    expect(workOfFootprint(30)).toBe(25)
+    expect(workOfFootprint(105)).toBe(89)
   })
 })
