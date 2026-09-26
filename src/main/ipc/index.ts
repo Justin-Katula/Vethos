@@ -46,6 +46,7 @@ export type SessionExtras = {
   trust: () => Promise<TrustView>
   waiveStop: () => Promise<void>
   tenMore: (args: { reason: StopReason; text?: string }) => Promise<void>
+  delayAnchor: (blockId: string) => Promise<ConfirmBlockResult>
   confirmStop: (args: { reason: StopReason; text?: string; answerMs?: number }) => Promise<ConfirmBlockResult>
   choosePromise: (option: OptionRattrapage) => Promise<ConfirmBlockResult>
   urgentOptions: () => Promise<{ options: OptionRattrapage[]; minutes: number } | null>
@@ -58,6 +59,7 @@ export type SessionExtras = {
 const TrustArgsSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('get') }),
   z.object({ action: z.literal('waive') }),
+  z.object({ action: z.literal('delayAnchor'), blockId: z.string().min(1).max(300) }),
   z.object({ action: z.literal('tenMore'), reason: z.enum(STOP_REASONS), text: z.string().max(500).optional() }),
   z.object({
     action: z.literal('confirmStop'),
@@ -201,6 +203,8 @@ export async function registerAllIpcHandlers(
       case 'waive':
         await extras.waiveStop()
         return null
+      case 'delayAnchor':
+        return extras.delayAnchor(a.blockId)
       case 'tenMore':
         await extras.tenMore({ reason: a.reason, ...(a.text !== undefined ? { text: a.text } : {}) })
         return null

@@ -6,7 +6,7 @@ import { computePlan, PLANNING_HORIZON_DAYS } from '@shared/planning/engine'
 import { addDays, dateKey } from '@shared/planning/dates'
 import { sleepScheduleEntries } from '@shared/sleep'
 import type { PlacedBlock, PlanningInput } from '@shared/planning/types'
-import type { BlockingRulesState, LearningState, StopReason } from '@shared/schemas'
+import type { BlockingRulesState, LearningState, SessionConfirmationsState, StopReason } from '@shared/schemas'
 import { blockSessionIsActiveAt } from '@main/blocking/schedule'
 import { accepterProlongation, marquerOffre, proposerProlongation } from '@shared/planning/prolongation'
 import { jourLibrePropose, joursLibresPris } from '@shared/planning/jours-libres'
@@ -23,6 +23,8 @@ import {
   recordDailyUtilization,
   recordBlockedAttempt,
   journalContextFor,
+  decalageAncre,
+  decalerAncre,
   overlayDueFor,
   applyWorkCredit,
   blockSessionFor,
@@ -32,6 +34,7 @@ import {
   tasksToAutoComplete,
 } from '@shared/planning/clock'
 import type { ConfirmationOverlay } from './confirmation-overlay'
+import { elementPliable, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
 import {
   ATTENTE_STOP_MINUTES,
   choisirRattrapage,
@@ -130,6 +133,8 @@ export type PlanRunner = {
   stop: () => void
   tickNow: () => Promise<void>
   confirmBlock: (blockId: string) => Promise<ConfirmResult>
+  /** Une ancre : « In 5 min », 15 min au plus après son heure. */
+  delayAnchor: (blockId: string) => Promise<ConfirmResult>
   /**
    * « Stop » : la raison donnée, l'app regarde la place et montre sa réaction
    * (rien n'est arrêté). Sans raison : la fin d'une prolongation.
@@ -226,6 +231,8 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       lastSignalAt: learning.lastSignalAt,
       tasksCreatedPerWeek: learning.tasksCreatedPerWeek,
       consecutiveDelays: learning.consecutiveDelays,
+      // Pliés aujourd'hui : leur reste épaissit les jours suivants.
+      folded: pliesDuJour(learning, confirmations),
       // Le journal des séances : rampe, durées apprises, Thompson (spec 2026-09-25).
       sessionEvents: learning.sessionEvents,
       confirmationSource: {
@@ -372,9 +379,10 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     deps.onPlanningDataChanged?.()
   }
 
-  function viewFor(block: PlacedBlock, learning?: LearningState) {
+  function viewFor(block: PlacedBlock, learning?: LearningState, confirmations?: SessionConfirmationsState) {
     return {
       ...(block.promiseId && learning && souffleDisponible(learning, block.id) ? { breather: true } : {}),
+      ...(block.kind === 'ancre' ? { anchorShift: confirmations ? decalageAncre(confirmations, block.id) : 0 } : {}),
       blockId: block.id,
       kind: block.kind,
       label: block.label,
@@ -588,18 +596,14 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     }
 
     // L'attente d'un Stop est finie : la séance s'arrête, le blocage se lève,
-    // et le rattrapage reste à choisir.
+    // et le reste se plie dans les séances à venir.
     const due = stopEchu(workingConfirmations, now.getTime())
     if (due) {
-      const o = workingConfirmations.observedPending
       const r = executerStop({
         learning: workingLearning,
         confirmations: workingConfirmations,
         nowMs: now.getTime(),
-        label: todayBlocks.find((b) => b.id === due.blockId)?.label ?? '',
-        deadline: o?.kind === 'task' ? (tasks.find((t) => t.id === o.refId)?.deadline ?? null) : null,
         textReason: due.text ? lireTexteArret(due.text) : null,
-        planApres: planApresFor(state, now),
       })
       workingLearning = r.learning
       workingConfirmations = r.confirmations
@@ -641,9 +645,15 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       pending &&
       !disciplineSuspendue(workingLearning.lastSignalAt, now) &&
       (pending.promiseId !== undefined ||
-        overlayDueFor({ learning: workingLearning, block: pending, nowMinute, today: workingConfirmations.date }))
+        overlayDueFor({
+          learning: workingLearning,
+          block: pending,
+          nowMinute,
+          today: workingConfirmations.date,
+          decalage: decalageAncre(workingConfirmations, pending.id),
+        }))
     )
-      deps.overlay.show(viewFor(pending, workingLearning))
+      deps.overlay.show(viewFor(pending, workingLearning, workingConfirmations))
     else deps.overlay.close()
 
     await collectExpiredBlockSession(now)
@@ -670,6 +680,18 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
         running = null
       })
     return running
+  }
+
+  /** « In 5 min » : l'ancre se décale (15 min au plus après son heure), l'overlay se ferme. */
+  async function delayAnchor(blockId: string): Promise<ConfirmResult> {
+    const now = deps.now()
+    const { nowMinute, confirmations, todayBlocks } = await loadTodayState(now)
+    const block = todayBlocks.find((b) => b.id === blockId)
+    const next = block ? decalerAncre(confirmations, block, nowMinute) : null
+    if (!next) return { ok: false, reason: 'It’s time.' }
+    await deps.storage.write('session_confirmations', next)
+    deps.overlay.close()
+    return { ok: true }
   }
 
   async function confirmBlock(blockId: string): Promise<ConfirmResult> {
@@ -813,10 +835,17 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
         sessionEvents: l.sessionEvents,
         activeSession: activeConfirmedSession(c, state.today, state.nowMinute),
         promises: promessesAPoser(l),
+        folded: pliesDuJour(l, c),
       }
       return { plan: computePlan(next, now), input: next }
     }
   }
+
+  /** Ce qui se plie, et les créations passées pour la probabilité. */
+  const pliageFor = (state: Awaited<ReturnType<typeof loadTodayState>>, o: { kind: 'task' | 'objective' | 'ancre'; refId: string }) => ({
+    element: elementPliable(o, { tasks: state.input.tasks, objectives: state.input.objectives, today: state.today }),
+    creations: historiqueCreations({ tasks: state.input.tasks, objectives: state.input.objectives, ancres: state.input.ancres }),
+  })
 
   const sleptHoursOf = (state: Awaited<ReturnType<typeof loadTodayState>>) =>
     state.sleepMinute !== null && state.wakeMinute !== null ? ((state.wakeMinute - state.sleepMinute + 1440) % 1440) / 60 : null
@@ -860,6 +889,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       coucher: state.sleepMinute,
       tache: task ? { id: task.id, deadline: task.deadline } : null,
       planApres: planApresFor(state, now),
+      pliage: pliageFor(state, o),
     })
     if (!prep) return { ok: false, reason: 'No Stop in this session.' }
     if (prep.etape === 'pas-de-place') {
@@ -895,6 +925,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       coucher: state.sleepMinute,
       tache: task ? { id: task.id, deadline: task.deadline } : null,
       planApres: planApresFor(state, now),
+      pliage: pliageFor(state, o),
     })
     if (!prep || prep.etape !== 'reaction') return { ok: false, reason: 'No Stop in this session.' }
     const next = demanderStop(confirmations, {
@@ -943,6 +974,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       urgentTooOften: urgenceTropFrequente(learning, today),
       breatherNow: !!activeSession && souffleDisponible(learning, activeSession.blockId) && !pause,
       sessionApps: ids.map((id) => ({ id, name: nameOf(id) })),
+      anchor: !!activeSession && confirmations.observedPending?.kind === 'ancre',
       tenMinutesUp: activeSession && stopPermis(learning, confirmations) ? dixMinutesEchues(confirmations, now.getTime()) : null,
     }
   }
@@ -1114,6 +1146,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     },
     tickNow,
     confirmBlock: (blockId: string) => serialize(() => confirmBlock(blockId)),
+    delayAnchor: (blockId: string) => serialize(() => delayAnchor(blockId)),
     stopBlock: (args) => serialize(() => stopBlock(args)),
     confirmStop: (args: StopArgs) => serialize(() => confirmStop(args)),
     recordBlockedAttempt: () => serialize(recordAttempt),

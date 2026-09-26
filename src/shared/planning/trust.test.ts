@@ -4,7 +4,6 @@ import {
   ajusterConfiance,
   confiance,
   ATTENTE_STOP_MINUTES,
-  choisirRattrapage,
   comparaison,
   accorderDixMinutes,
   continuer,
@@ -35,6 +34,7 @@ import {
   urgenceTropFrequente,
   type FaitsDuStop,
 } from './trust'
+import { pliesDuJour } from './pliement'
 import { applyStop, applyWorkCredit } from './clock'
 import { computePlan } from './engine'
 import { sleepScheduleEntries } from '@shared/sleep'
@@ -279,44 +279,63 @@ describe('Le Stop, de bout en bout', () => {
     ({
       blocks: [],
       capacities: [
-        { date: TODAY, slots: [{ startMinute: 600, endMinute: 900, durationMinutes: 300, cognitiveWindow: 'NORMALE' }] },
-        { date: '2026-09-22', slots: [{ startMinute: 480, endMinute: 1200, durationMinutes: 720, cognitiveWindow: 'PROFONDE' }] },
+        { date: TODAY, effectiveCapacityMinutes: 300, slots: [{ startMinute: 600, endMinute: 900, durationMinutes: 300, cognitiveWindow: 'NORMALE' }] },
+        { date: '2026-09-22', effectiveCapacityMinutes: 720, slots: [{ startMinute: 480, endMinute: 1200, durationMinutes: 720, cognitiveWindow: 'PROFONDE' }] },
       ],
       feasibility: { densities: [{ feasible: faisable }] },
       verdicts: [{ taskId: 't', neededMinutes: 100, placedMinutes: 100, status: 'placed' }],
       objectiveDoses: {},
     }) as unknown as import('./types').PlanningResult
   const apres = (f = true) => () => ({ plan: plan(f), input: { today: TODAY, weeklyObjectiveServed: {} } })
+  // « t » : 4 h de travail, due dimanche — 60 min pliables.
+  const pliage = { element: { kind: 'task' as const, refId: 't', total: 240, fin: '2026-09-27' }, creations: [] }
 
   it('pas de place : rien ne s’arrête, pause de 15 min, puis on finit', () => {
-    const r = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(false) })!
+    const r = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(false), pliage })!
     expect(r.etape).toBe('pas-de-place')
     if (r.etape !== 'pas-de-place') return
     expect(r.confirmations.pause!.kind).toBe('no-room')
     expect(r.learning.sessionEvents[0]).toMatchObject({ forced: true, heldMinutes: null })
   })
 
-  it('la place : la réaction, puis l’attente bloquée, puis l’arrêt et le rattrapage à choisir', () => {
-    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'too-hard', planApres: apres() })!
+  it('la place : la réaction, puis l’attente bloquée, puis l’arrêt — le reste se plie, sans heure à choisir', () => {
+    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'too-hard', planApres: apres(), pliage })!
     expect(prep.etape).toBe('reaction')
     if (prep.etape !== 'reaction') return
     expect(prep.attenteMinutes).toBe(5)
+    expect(prep.reaction.lignes[0]).toBe('40 min folds into the next days. 20 min left to fold.')
     const c = demanderStop(conf(), { nowMs: 0, minute: 560, reason: 'too-hard', attenteMinutes: prep.attenteMinutes, placement: prep.reaction.placement })!
-    expect(c.stopPending).toMatchObject({ untilMinute: 565, untilMs: 300_000, morceau: 25, preference: 'profonde' })
+    expect(c.stopPending).toMatchObject({ untilMinute: 565, untilMs: 300_000 })
     // Rien n'est arrêté pendant l'attente.
     expect(c.stoppedBlockIds).toEqual([])
     expect(stopEchu(c, 299_999)).toBeNull()
     expect(stopEchu(c, 300_000)).not.toBeNull()
-    const fin = executerStop({ learning: learning(), confirmations: c, nowMs: 300_000, label: 'Rapport', planApres: apres() })
+    const fin = executerStop({ learning: learning(), confirmations: c, nowMs: 300_000 })
     const e = fin.learning.sessionEvents[0]!
-    expect(e).toMatchObject({ heldMinutes: 25, stoppedEarly: true, stop: { reason: 'too-hard', verdict: 'postponed' } })
-    const choix = fin.confirmations.promiseChoice!
-    expect(choix.minutes).toBe(35)
-    // Fenêtre profonde : demain, pas aujourd'hui (fenêtre normale).
-    expect(choix.options[0]).toEqual({ date: '2026-09-22', startMinute: 480 })
-    const p = choisirRattrapage(fin.learning, fin.confirmations, choix.options[0]!, 1)!
-    expect(p.confirmations.promiseChoice).toBeNull()
-    expect(p.learning.promises!.map((x) => [x.startMinute, x.minutes])).toEqual([[480, 25], [510, 10]])
+    expect(e).toMatchObject({ heldMinutes: 25, stoppedEarly: true, stop: { reason: 'too-hard', verdict: 'folded', foldedMinutes: 35 } })
+    // Plié : aucune heure à choisir, le moteur le répartit dès demain.
+    expect(fin.confirmations.promiseChoice ?? null).toBeNull()
+    expect(pliesDuJour(fin.learning, fin.confirmations)).toEqual(['t'])
+  })
+
+  it('le pli refusé : trop long, en pause, ou pas la place une fois les nouvelles tâches probables comptées', () => {
+    const court = { ...pliage, element: { ...pliage.element, total: 120 } }
+    const r = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage: court })!
+    expect(r.etape === 'pas-de-place' && r.message).toBe('Folded as far as it goes. 15-minute break, then you finish.')
+    // Une semaine chargée de créations : le libre ne couvre plus ce qui viendra.
+    const creations = Array.from({ length: 30 }, (_, i) => ({ kind: 'task' as const, date: `2026-09-${String(i % 20 + 1).padStart(2, '0')}`, minutes: 600 }))
+    const plein = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage: { ...pliage, creations } })!
+    expect(plein.etape === 'pas-de-place' && plein.message).toBe('No room to fold. 15-minute break, then you finish.')
+  })
+
+  it('une ancre ne s’arrête pas', () => {
+    const a = LearningStateSchema.parse({
+      sessionEvents: [{ blockId: 'b', date: TODAY, kind: 'ancre', refId: 'x', plannedStartMinute: 540, plannedMinutes: 60, started: true, createdAt: '2026-09-21T09:00:00.000Z' }],
+    })
+    const c = conf()
+    const ca = { ...c, observedPending: { ...c.observedPending!, kind: 'ancre' as const } }
+    expect(stopPermis(a, ca)).toBe(false)
+    expect(preparerStop({ learning: a, confirmations: ca, nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage })).toBeNull()
   })
 
   it('« Je continue » annule l’attente, et le garde au journal', () => {
@@ -327,7 +346,7 @@ describe('Le Stop, de bout en bout', () => {
   })
 
   it('« 10 more minutes » : « Stop ? » revient 10 min plus tard, sans reproposer les 10 min', () => {
-    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres() })!
+    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage })!
     expect(prep.etape === 'reaction' && prep.reaction.dixMinutes).toBe(true)
     const d = accorderDixMinutes(learning(), conf(), { nowMs: 0, reason: 'boring', text: 'meh' })!
     expect(d.learning.sessionEvents[0]!.stopsWaived).toBe(1)
@@ -335,14 +354,14 @@ describe('Le Stop, de bout en bout', () => {
     expect(dixMinutesEchues(d.confirmations, 600_000)).toEqual({ reason: 'boring', text: 'meh' })
     // Une seule fois par bloc.
     expect(accorderDixMinutes(d.learning, d.confirmations, { nowMs: 600_000, reason: 'boring' })).toBeNull()
-    const encore = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres() })!
+    const encore = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres(), pliage })!
     expect(encore.etape === 'reaction' && encore.reaction.dixMinutes).toBe(false)
     // Continuer, ou dire oui : la question a sa réponse et ne revient plus.
     expect(dixMinutesEchues(continuer(d.learning, d.confirmations).confirmations, 700_000)).toBeNull()
     const oui = demanderStop(d.confirmations, { nowMs: 600_000, minute: 570, reason: 'boring', attenteMinutes: 5, placement: { preference: 'tot' } })!
     expect(oui.dixMinutes!.repondu).toBe(true)
     // Plus de place au bout des 10 min : pause de 15 min, et plus de relance.
-    const plein = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres(false) })!
+    const plein = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres(false), pliage })!
     expect(plein.etape).toBe('pas-de-place')
     if (plein.etape === 'pas-de-place') expect(dixMinutesEchues({ ...plein.confirmations, pause: null }, 2_000_000)).toBeNull()
   })

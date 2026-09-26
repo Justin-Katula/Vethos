@@ -1,4 +1,5 @@
 import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
+import { decalageRestant } from '@shared/planning/clock'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Play, ShieldBan } from 'lucide-react'
@@ -40,6 +41,8 @@ export default function SessionStartOverlay(): JSX.Element {
   const startMinute = Number(params.get('startMinute') ?? 0)
   const apps = (params.get('apps') ?? '').split(',').filter((a) => a.length > 0)
   const breather = params.get('breather') === '1'
+  // Une ancre se décale de 15 min au plus ; elle ne s'arrête pas.
+  const shift = params.get('shift')
 
   const [now, setNow] = useState(() => new Date())
   const [confirming, setConfirming] = useState(false)
@@ -61,6 +64,7 @@ export default function SessionStartOverlay(): JSX.Element {
   // Quelques minutes, c'est être à l'heure : le retard ne s'affiche qu'au-delà.
   const delayMinutes = Math.max(0, nowMinute - startMinute)
   const late = delayMinutes > TOLERANCE_DEPART_MINUTES
+  const later = kind === 'ancre' && shift !== null ? decalageRestant(startMinute, Number(shift), nowMinute) : 0
 
   async function confirmer(): Promise<void> {
     if (blockId === '') return
@@ -132,6 +136,16 @@ export default function SessionStartOverlay(): JSX.Element {
           className="pressable mt-4 px-4 py-2 text-[14px] text-white/60 hover:text-white"
         >
           I need 15 min
+        </button>
+      )}
+
+      {later > 0 && (
+        <button
+          type="button"
+          onClick={() => void nexus.planning.delayAnchor(blockId)}
+          className="pressable mt-4 px-4 py-2 text-[14px] text-white/60 hover:text-white"
+        >
+          {`In ${later} min`}
         </button>
       )}
 

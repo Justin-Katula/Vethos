@@ -346,6 +346,8 @@ export type PlanningInput = {
    * Les rattrapages promis, encore à tenir. Posés comme une ancre, à l'heure
    * choisie : une promesse ne se déplace pas.
    */
+  /** Pliés aujourd'hui : aucune nouvelle séance avant demain (pliement). */
+  folded?: string[]
   promises?: Array<{ id: string; kind: 'task' | 'objective'; refId: string; date: string; startMinute: number; minutes: number }>
   /**
    * Le journal des séances (spec 2026-09-25). Absent = aucun apprentissage :

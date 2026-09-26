@@ -604,7 +604,7 @@ describe('DÉFAUT DU 2026-08-23 — « ce bloc ne fait plus partie du plan » al
 describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
   it('arrête, lève le blocage, garde la raison — et l’overlay ne redemande pas dans la foulée', async () => {
     let nowRef = WAKE
-    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 })) as Storage & {
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300, deadline: '2026-08-23' })) as Storage & {
       __mem: Map<string, unknown>
     }
     const overlay = fakeOverlay()
@@ -632,7 +632,7 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     expect(rules.block).toBeNull()
     const learning = storage.__mem.get('learning') as LearningState
     const e = learning.sessionEvents.find((x) => x.blockId === blockId)!
-    expect(e).toMatchObject({ stoppedEarly: true, heldMinutes: 25, stop: { reason: 'tired', text: 'so tired', textReason: 'tired', verdict: 'postponed' } })
+    expect(e).toMatchObject({ stoppedEarly: true, heldMinutes: 25, stop: { reason: 'tired', text: 'so tired', textReason: 'tired', verdict: 'folded' } })
 
     const avant = overlay.shown.length
     for (const m of [26, 30, 60]) {
@@ -642,16 +642,14 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     expect(overlay.shown.length).toBe(avant)
     // Un second « Stop » sur une séance déjà arrêtée ne fait rien.
     expect((await runner.stopBlock({ reason: 'boring' })).ok).toBe(false)
-    // Un Stop repousse le travail, il ne l'efface jamais : le rattrapage reste à choisir.
-    const view = await runner.trust()
-    expect(view.promiseChoice!.options.length).toBeGreaterThan(0)
-    expect(await runner.choosePromise(view.promiseChoice!.options[0]!)).toEqual({ ok: true })
-    expect((storage.__mem.get('learning') as LearningState).promises!.length).toBeGreaterThan(0)
+    // Un Stop plie le travail, il ne l'efface jamais : aucune heure à choisir,
+    // le reste revient dans les séances des jours suivants.
+    expect((await runner.trust()).promiseChoice).toBeNull()
   })
 
   it('« 10 more minutes » : on continue, puis « Stop ? » revient 10 min plus tard, une seule fois', async () => {
     let nowRef = WAKE
-    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 }))
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 600, remainingMinutes: 600, deadline: '2026-08-23' }))
     const overlay = fakeOverlay()
     const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
     await runner.tickNow()

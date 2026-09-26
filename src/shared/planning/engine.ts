@@ -135,6 +135,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     input.tasks.map((t) => t.parentTaskId).filter((id): id is string => id !== null),
   )
   const activeTasks = input.tasks.filter((t) => t.status === 'active' && !groupIds.has(t.id))
+  const folded = new Set(input.folded ?? [])
 
   // ─── B. Ce qu'il reste à placer ─────────────────────────────────────────
   //
@@ -695,6 +696,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         activeDaysPerWeek: learn ? learn.activeDays(objective.id) : undefined,
       })
       if (learn && learn.isDayOff(objective.id, date, capaciteJourEntier)) quota = 0
+      // Plié aujourd'hui : le reste épaissit les jours suivants (report D.4).
+      if (date === input.today && folded.has(objective.id)) quota = 0
 
       // D.2 : part progressive cédée à la tâche en tension (85-100 % de
       // densité C.2). Débit AVANT celui de D.7 juste en dessous : deux causes
@@ -784,6 +787,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       if (need <= 0) continue
       // Rien n'est placé après la deadline : ce serait un plan qui ment.
       if (date > task.deadline) continue
+      // Plié aujourd'hui : le reste épaissit les jours suivants.
+      if (date === input.today && folded.has(task.id)) continue
 
       // B.5.1 : une partie ne reçoit AUCUNE minute tant qu'une sœur de rang
       // antérieur n'a pas reçu la totalité des siennes. Le test porte sur

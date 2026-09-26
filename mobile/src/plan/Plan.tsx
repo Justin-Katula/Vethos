@@ -5,7 +5,8 @@ import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
-import { journalContextFor, overlayDueFor, recordDailyUtilization, setBlockedAttempts } from '@shared/planning/clock'
+import { decalageAncre, decalerAncre, decalageRestant, journalContextFor, overlayDueFor, recordDailyUtilization, setBlockedAttempts } from '@shared/planning/clock'
+import { elementPliable, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
 import { lireTexteArret } from '@shared/coach/coach'
 import { dueRemovals } from '@shared/contract'
 import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
@@ -42,7 +43,6 @@ import {
   urgenceActive,
   urgenceTropFrequente,
   type OptionRattrapage,
-  type PlanApres,
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { calculerPlan, cleDate, entreeEtPlan } from './moteur'
@@ -78,6 +78,7 @@ function useSourcePlan() {
     const resultat = calculerPlan({
       taches, objectifs, ancres, obligations, reglages, maintenant,
       apprentissage, seanceActive: active,
+      plies: confirmations.date === aujourdHui ? pliesDuJour(apprentissage, confirmations) : [],
     })
     const jours = lireSemaine(resultat, obligations, reglages)
     return { resultat, jours, maintenant, aujourdHui, minute,
@@ -129,7 +130,6 @@ function useSourcePlan() {
   // pendule elle-même, jamais deviné ici.
   const dernierTic = useRef<string>('')
   // Le recalcul « comme si l'arrêt était accepté », défini plus bas avec le reste du Stop.
-  const planApresRef = useRef<PlanApres | null>(null)
   useEffect(() => {
     if (!tic) return
     const empreinte = `${calcul.aujourdHui}|${calcul.minute}`
@@ -157,18 +157,14 @@ function useSourcePlan() {
     const u = urgenceActive(confs, Date.now())
     if (u) appris = tentativesPendantUrgence(appris, confs, pontEcran().lireTentatives().filter((t) => t >= u.startMs).length, Date.now())
     // L'attente d'un Stop est finie : la séance s'arrête, le bouclier est déjà
-    // levé par iOS, et le rattrapage reste à choisir.
+    // levé par iOS, et le reste se plie dans les séances à venir.
     const du = stopEchu(confs, Date.now())
-    if (du && planApresRef.current) {
-      const o = confs.observedPending
+    if (du) {
       const r = executerStop({
         learning: appris,
         confirmations: confs,
         nowMs: Date.now(),
-        label: blocsDuJour.find((b) => b.id === du.blockId)?.label ?? '',
-        deadline: o?.kind === 'task' ? (taches.find((t) => t.id === o.refId)?.echeance ?? null) : null,
         textReason: du.text ? lireTexteArret(du.text) : null,
-        planApres: planApresRef.current,
       })
       appris = r.learning
       confs = r.confirmations
@@ -191,7 +187,13 @@ function useSourcePlan() {
     enAttenteBrut !== null &&
     // Une promesse appelle toujours l'overlay : c'est un engagement pris.
     (enAttenteBrut.promiseId !== undefined ||
-      overlayDueFor({ learning: apprentissage, block: enAttenteBrut, nowMinute: calcul.minute, today: calcul.aujourdHui }))
+      overlayDueFor({
+        learning: apprentissage,
+        block: enAttenteBrut,
+        nowMinute: calcul.minute,
+        today: calcul.aujourdHui,
+        decalage: decalageAncre(confirmations, enAttenteBrut.id),
+      }))
 
   // ── Prolongation : l'offre des 2 dernières minutes d'une séance ──────────
   const actif = calcul.seanceActive
@@ -262,10 +264,18 @@ function useSourcePlan() {
     const { entree, resultat } = entreeEtPlan({
       taches, objectifs, ancres, obligations, reglages, maintenant,
       apprentissage: l, seanceActive: seanceActive(c, cleDate(maintenant), m),
+      plies: pliesDuJour(l, c),
     })
     return { plan: resultat, input: entree }
   }
-  planApresRef.current = planApres
+  // Ce qui se plie, et les créations passées (la probabilité) — lus du moteur.
+  const pliage = (o: { kind: 'task' | 'objective' | 'ancre'; refId: string }) => {
+    const { entree } = entreeEtPlan({ taches, objectifs, ancres, obligations, reglages, maintenant: new Date(), apprentissage, jours: 1 })
+    return {
+      element: elementPliable(o, { tasks: entree.tasks, objectives: entree.objectives, today: entree.today }),
+      creations: historiqueCreations({ tasks: entree.tasks, objectives: entree.objectives, ancres: entree.ancres }),
+    }
+  }
   const coucher = minutesDe(reglages.coucher)
   const lever = minutesDe(reglages.lever)
   const limite = coucher !== null ? coucher - 30 : null
@@ -304,6 +314,20 @@ function useSourcePlan() {
     souffleEnCours: !!actif && souffleDisponible(apprentissage, actif.blockId) && !confirmationsDuJour?.pause,
     /** « J'ai besoin de 15 min » AVANT une promesse qui attend son départ. */
     souffleAvantPossible: (blockId: string) => souffleDisponible(apprentissage, blockId),
+    /** Une ancre est en cours : ni Stop, ni pause. */
+    ancre: !!actif && confirmationsDuJour?.observedPending?.kind === 'ancre',
+    /** Une ancre pas encore commencée : dans combien de minutes elle peut revenir (0 : plus du tout). */
+    ancreDecalable: (bloc: { id: string; kind: string; startMinute: number }) =>
+      bloc.kind === 'ancre' && confirmationsDuJour && !(bloc.id in confirmationsDuJour.confirmedAt)
+        ? decalageRestant(bloc.startMinute, decalageAncre(confirmationsDuJour, bloc.id), calcul.minute)
+        : 0,
+    /** « In 5 min » : l'ancre revient plus tard, 15 min au plus après son heure. */
+    decalerAncre: async (bloc: { id: string; kind: 'task' | 'objective' | 'ancre'; startMinute: number }) => {
+      const frais = useSeances.getState()
+      const d = new Date()
+      const c = decalerAncre(frais.confirmations, bloc, d.getHours() * 60 + d.getMinutes())
+      if (c) await poser({ apprentissage: frais.apprentissage, confirmations: c })
+    },
     /** « 10 more minutes » en cours : l'heure où « Stop ? » revient. */
     dixMinutesJusqua: confirmationsDuJour?.dixMinutes && !confirmationsDuJour.dixMinutes.repondu ? confirmationsDuJour.dixMinutes.untilMs : null,
     /** Les 10 minutes sont passées : la raison à redemander, ou null. */
@@ -349,6 +373,7 @@ function useSourcePlan() {
         coucher,
         tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
         planApres,
+        pliage: pliage(o),
       })
       if (!r) return { etape: 'rien' as const }
       if (r.etape === 'pas-de-place') {
@@ -381,6 +406,7 @@ function useSourcePlan() {
         coucher,
         tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
         planApres,
+        pliage: pliage(o),
       })
       if (!prep || prep.etape !== 'reaction') return false
       const c = demanderStop(frais.confirmations, {

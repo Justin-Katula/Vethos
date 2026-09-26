@@ -6,6 +6,7 @@ import { addDays, daysBetween, startOfWeek } from './dates'
 import { mergeIntervals } from './capacity'
 import { TOLERANCE_DEPART_MINUTES } from './habitudes'
 import { applyStop } from './clock'
+import { jugerPliage, MESSAGE_REFUS, type Creation, type ElementPliable } from './pliement'
 
 // ═══ STOP, PROMESSES ET CONFIANCE (spec moteur 2026-09-25) ═══════════════
 //
@@ -57,7 +58,7 @@ export function ajusterConfiance(learning: LearningState, effet: EffetConfiance)
 // travail, il ne le retire jamais. Le moteur ne tranche qu'une chose : y a-t-il
 // la place de le repousser ? Sinon, on finit maintenant.
 
-export type Verdict = 'postponed' | 'no-room' | 'urgent'
+export type Verdict = 'postponed' | 'folded' | 'no-room' | 'urgent'
 
 /** Ce qu'on compare à la raison dite : des faits de la séance, rien d'autre. */
 export type FaitsDuStop = {
@@ -648,7 +649,8 @@ export function ticPauses(
 /** Pas de Stop dans un rattrapage, ni dans une reprise forcée. */
 export function stopPermis(learning: Pick<LearningState, 'sessionEvents' | 'promises'>, confirmations: SessionConfirmationsState): boolean {
   const o = confirmations.observedPending
-  if (!o) return false
+  // Une ancre ne s'arrête jamais : elle se décale avant de commencer, c'est tout.
+  if (!o || o.kind === 'ancre') return false
   if (promesseDuBloc(learning, o.blockId)) return false
   const e = (learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === confirmations.date)
   return !e?.forced && !e?.promiseId
@@ -721,6 +723,8 @@ export function preparerStop(a: {
   /** La tâche en cours, pour les chiffres de « No rush ». */
   tache?: { id: string; deadline: string } | null
   planApres: PlanApres
+  /** Ce qui se plie, et les créations passées (la probabilité). */
+  pliage: { element: ElementPliable | null; creations: readonly Creation[] }
 }): PreparationStop | null {
   const o = a.confirmations.observedPending
   if (!o || !stopPermis(a.learning, a.confirmations) || a.confirmations.stopPending) return null
@@ -747,16 +751,30 @@ export function preparerStop(a: {
   const attenteMinutes = ATTENTE_STOP_MINUTES[niveau]
   // Les 10 minutes ne s'offrent qu'une fois par bloc.
   const dejaOffert = a.confirmations.dixMinutes?.blockId === o.blockId
-  const reagir = (ctx: { niveau: Niveau; echeance?: Echeance | null }): Reaction => {
+  const reagir = (ctx: { niveau: Niveau; echeance?: Echeance | null }, pli?: string): Reaction => {
     const r = reactionRaison(a.reason, faits, ctx)
-    return dejaOffert ? { ...r, dixMinutes: false } : r
+    const s = dejaOffert ? { ...r, dixMinutes: false } : r
+    return pli ? { ...s, lignes: [pli, ...s.lignes] } : s
   }
-  if (o.kind === 'ancre' || !e?.stoppedEarly) {
-    return { etape: 'reaction', reaction: reagir({ niveau }), faits, attenteMinutes }
-  }
+  if (o.kind === 'ancre') return null
+  if (!e?.stoppedEarly) return { etape: 'reaction', reaction: reagir({ niveau }), faits, attenteMinutes }
 
+  // Le pli : ce qui reste de la séance épaissit les séances à venir.
+  const pli = Math.max(0, (e.plannedMinutes ?? 0) - essai.heldMinutes)
   const { plan, input } = a.planApres(essai.learning, essai.confirmations)
-  if (!placePourReporter({ plan, input, kind: o.kind, refId: o.refId })) {
+  const juge = a.pliage.element
+    ? jugerPliage({
+        learning: a.learning,
+        element: a.pliage.element,
+        minutes: pli,
+        today: date,
+        bloc: { blockId: o.blockId, date },
+        planApres: plan,
+        creations: a.pliage.creations,
+      })
+    : null
+  const refus = !placePourReporter({ plan, input, kind: o.kind, refId: o.refId }) ? 'place' : juge && !juge.ok ? juge.refus : null
+  if (refus) {
     const limite = a.coucher != null ? a.coucher - 30 : null
     const pause = ouvrirPause(a.confirmations, { kind: 'no-room', nowMinute: a.minute, nowMs: a.nowMs, limiteMinute: limite })
     if (pause) {
@@ -769,11 +787,13 @@ export function preparerStop(a: {
             : x,
         ),
       }
-      return { etape: 'pas-de-place', learning: l, confirmations: { ...pause, dixMinutes: dixMinutesRepondu(pause) }, message: MESSAGE_PAS_DE_PLACE }
+      return { etape: 'pas-de-place', learning: l, confirmations: { ...pause, dixMinutes: dixMinutesRepondu(pause) }, message: MESSAGE_REFUS[refus] }
     }
   }
   const echeance = a.tache && o.kind === 'task' ? echeanceDe(plan, a.confirmations.date, a.tache) : null
-  return { etape: 'reaction', reaction: reagir({ niveau, echeance }), faits, attenteMinutes }
+  const reste = juge ? Math.max(0, juge.budget.longueur - juge.budget.utilise - pli) : null
+  const ligne = pli > 0 ? `${duree(pli)} folds into the next days.${reste !== null ? ` ${duree(reste)} left to fold.` : ''}` : undefined
+  return { etape: 'reaction', reaction: reagir({ niveau, echeance }, ligne), faits, attenteMinutes }
 }
 
 /**
@@ -888,10 +908,7 @@ export function executerStop(a: {
   learning: LearningState
   confirmations: SessionConfirmationsState
   nowMs: number
-  label: string
-  deadline?: string | null
   textReason?: StopReason | null
-  planApres: PlanApres
 }): { learning: LearningState; confirmations: SessionConfirmationsState } {
   const p = a.confirmations.stopPending
   const o = a.confirmations.observedPending
@@ -911,37 +928,16 @@ export function executerStop(a: {
   if (!r) return vide
   const date = a.confirmations.date
   const niveau = niveauConfiance(a.learning.trust)
-  const learning = noterVerdict(r.learning, date, o.blockId, niveau, 'postponed')
-  const e = (learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === date)
-  const minutes = Math.max(0, (e?.plannedMinutes ?? 0) - r.heldMinutes)
-  if (o.kind === 'ancre' || minutes < 5 || !e?.stoppedEarly) return { learning, confirmations: r.confirmations }
-  const { plan } = a.planApres(learning, r.confirmations)
-  const options = optionsRattrapage({
-    plan,
-    today: date,
-    nowMinute: p.untilMinute,
-    minutes,
-    kind: o.kind,
-    refId: o.refId,
-    niveau,
-    deadline: a.deadline ?? null,
-    ...(p.morceau ? { morceau: p.morceau } : {}),
-    preference: p.preference,
-  })
-  if (!options.length) return { learning, confirmations: r.confirmations }
-  return {
-    learning,
-    confirmations: {
-      ...r.confirmations,
-      promiseChoice: {
-        options,
-        minutes,
-        source: { kind: o.kind, refId: o.refId, blockId: o.blockId, label: a.label.slice(0, 200) },
-        ...(p.morceau ? { morceau: p.morceau } : {}),
-        ...(p.deep ? { deep: true } : {}),
-      },
-    },
+  const e = (r.learning.sessionEvents ?? []).find((x) => x.blockId === o.blockId && x.date === date)
+  const plie = Math.max(0, (e?.plannedMinutes ?? 0) - r.heldMinutes)
+  // Plié : le reste n'a pas d'heure, le moteur le répartit dès demain.
+  const learning = {
+    ...r.learning,
+    sessionEvents: (r.learning.sessionEvents ?? []).map((x) =>
+      x.blockId === o.blockId && x.date === date && x.stop ? { ...x, stop: { ...x.stop, level: niveau, verdict: 'folded' as const, foldedMinutes: plie } } : x,
+    ),
   }
+  return { learning, confirmations: r.confirmations }
 }
 
 /** Le rattrapage choisi parmi ceux proposés : la promesse. */
@@ -1174,6 +1170,8 @@ export type TrustView = {
   sessionApps: Array<{ id: string; name: string }>
   /** Les « 10 more minutes » sont passées : redemander « Stop ? ». */
   tenMinutesUp: { reason: StopReason; text?: string } | null
+  /** Une ancre est en cours : ni Stop, ni pause. */
+  anchor: boolean
 }
 
 /** Ce que la raison a donné (bureau). */

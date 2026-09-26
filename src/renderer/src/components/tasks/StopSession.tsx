@@ -168,7 +168,8 @@ export function StopSession({ label, inExtension = false, showButton = true }: {
         <button type="button" className="pressable inline-flex items-center gap-2 rounded bg-fg px-3 py-1.5 text-[12.5px] font-medium text-bg" onClick={keepGoing}>
           I’ll continue <span className="font-mono tabular-nums opacity-60">{`${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`}</span>
         </button>
-      ) : showButton ? (
+      ) : showButton && !trust?.anchor ? (
+        // Une ancre ne s'arrête pas : pas de bouton.
         <button type="button" className="pressable inline-flex items-center gap-2 rounded border border-line px-3 py-1.5 text-[12.5px] text-fg-2 hover:text-fg" onClick={open}>
           <Square size={12} strokeWidth={2.4} />
           {trust && !trust.stopAllowed && !inExtension ? 'Pause' : 'Stop'}

@@ -25,6 +25,8 @@ export type PendingBlockView = {
   appsToBlock: string[]
   /** Une promesse dont le souffle (« J'ai besoin de 15 min ») est encore libre. */
   breather?: boolean
+  /** Une ancre : son décalage actuel, en minutes (elle se décale de 15 min au plus). */
+  anchorShift?: number
 }
 
 export type ConfirmationOverlay = {
@@ -88,6 +90,7 @@ export function createConfirmationOverlay(): ConfirmationOverlay {
       startMinute: String(block.startMinute),
       apps: block.appsToBlock.join(','),
       ...(block.breather ? { breather: '1' } : {}),
+      ...(block.anchorShift !== undefined ? { shift: String(block.anchorShift) } : {}),
     })
     return {
       devHash: `#/session-start?${params.toString()}`,

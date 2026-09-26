@@ -474,8 +474,14 @@ export const SessionEventSchema = z.object({
       attemptsBefore: z.number().int().min(0).default(0),
       /** Niveau de confiance au moment du Stop (1 à 4). */
       level: z.number().int().min(1).max(4).optional(),
-      /** Ce que le moteur a tranché. Il n'existe pas d'abandon : le travail reste dû. */
-      verdict: z.enum(['postponed', 'no-room', 'urgent']).optional(),
+      /**
+       * Ce que le moteur a tranché. Il n'existe pas d'abandon : le travail
+       * reste dû. `folded` : plié dans les séances à venir ; `postponed` :
+       * l'ancien rattrapage à heure fixe (données d'avant le pliement).
+       */
+      verdict: z.enum(['postponed', 'folded', 'no-room', 'urgent']).optional(),
+      /** Les minutes pliées dans les séances à venir. */
+      foldedMinutes: z.number().int().min(0).max(1440).optional(),
     })
     .optional(),
   /** « Je continue » pendant le délai du Stop : autant de Stop renoncés. */
@@ -675,6 +681,8 @@ export const SessionConfirmationsStateSchema = z.object({
     })
     .nullable()
     .optional(),
+  /** Une ancre ne s'arrête pas : elle se décale, de 15 min au plus. Par bloc. */
+  ancreDecalage: z.record(z.string(), z.number().int().min(0).max(15)).optional(),
   /** Le souffle est fini mais la reprise n'est pas encore confirmée. */
   awaitingReturn: z.object({ blockId: z.string().min(1), sinceMinute: z.number().int().min(0).max(1440) }).nullable().optional(),
   /** Blocs à qui une prolongation a déjà été offerte aujourd'hui (1 par bloc). */

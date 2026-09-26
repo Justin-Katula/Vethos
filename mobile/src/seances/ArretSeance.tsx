@@ -174,7 +174,8 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
         </Text>
       </Pressable>
     )
-  } else if (montrerPilule) {
+  } else if (montrerPilule && !confiance.ancre) {
+    // Une ancre ne s'arrête pas : pas de bouton.
     bouton = (
       <Pressable accessibilityRole="button" onPress={ouvrir} style={({ pressed }) => pilule(pressed)}>
         <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{confiance.stopPermis || enProlongation ? 'Stop' : 'Pause'}</Text>

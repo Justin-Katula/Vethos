@@ -53,6 +53,8 @@ export function JeCommence() {
   const bloc = enAttente ?? { kind: 'task', startMinute: retour!.sinceMinute, label: confiance.titreRetour, id: '', promiseId: 'retour' }
   const retard = Math.max(0, minute - bloc.startMinute)
   const souffle = enAttente?.promiseId !== undefined && confiance.souffleAvantPossible(enAttente.id)
+  // Une ancre se décale de 15 min au plus ; elle ne s'arrête pas.
+  const plusTard = enAttente ? confiance.ancreDecalable(enAttente) : 0
 
   const valider = async () => {
     setErreur(null)
@@ -168,6 +170,16 @@ export function JeCommence() {
             style={({ pressed }) => ({ marginTop: PAS[4], minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
           >
             <Text style={{ fontFamily: GEIST.moyen, fontSize: 15, color: j.text2 }}>I need 15 min</Text>
+          </Pressable>
+        ) : null}
+
+        {plusTard > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void confiance.decalerAncre(enAttente!)}
+            style={({ pressed }) => ({ marginTop: PAS[4], minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text style={{ fontFamily: GEIST.moyen, fontSize: 15, color: j.text2 }}>{`In ${plusTard} min`}</Text>
           </Pressable>
         ) : null}
 

@@ -481,7 +481,9 @@ export function applyConfirmation(
   confirmationMinute: number,
   context: JournalContext = {},
 ): { learning: LearningState; confirmations: SessionConfirmationsState; delayMinutes: number } {
-  const delay = computeBlockDelayMinutes(block, confirmationMinute)
+  // Une ancre décalée (15 min au plus) se mesure depuis sa nouvelle heure.
+  const decalage = block.kind === 'ancre' ? (confirmations.ancreDecalage?.[block.id] ?? 0) : 0
+  const delay = Math.max(0, computeBlockDelayMinutes(block, confirmationMinute) - decalage)
   const today = confirmations.date
 
   const nextLearning: LearningState = {
@@ -731,7 +733,15 @@ export function overlayDue(args: { phase: number; nowMinute: number; blockStartM
  * elle a une fin — : elle garde toujours l'overlay (phase 1). Les objectifs
  * et les ancres passent par les 4 phases, mesurées dans le journal.
  */
-export function overlayDueFor(args: { learning: LearningState; block: Pick<PlacedBlock, 'kind' | 'refId' | 'startMinute'>; nowMinute: number; today: string }): boolean {
+export function overlayDueFor(args: {
+  learning: LearningState
+  block: Pick<PlacedBlock, 'kind' | 'refId' | 'startMinute'>
+  nowMinute: number
+  today: string
+  /** Une ancre décalée : l'overlay revient à sa nouvelle heure. */
+  decalage?: number
+}): boolean {
+  if (args.decalage && args.nowMinute < args.block.startMinute + args.decalage) return false
   const phase = args.block.kind === 'task' ? 1 : phaseHabitude(args.learning.sessionEvents ?? [], args.block.refId)
   return overlayDue({
     phase,
@@ -791,4 +801,37 @@ export function recordDailyUtilization(
   const limite = addDays(today, -UTILISATION_JOURS)
   const kept = Object.fromEntries(Object.entries(current).filter(([d]) => d > limite))
   return { ...learning, dailyUtilization: { ...kept, [today]: percent } }
+}
+
+// ─── L'ancre se décale, elle ne s'arrête pas ─────────────────────────────
+
+/** Une ancre se décale de 15 min au plus ; jamais repoussée, jamais arrêtée. */
+export const ANCRE_DECALAGE_MAX = 15
+
+/** Le décalage d'une ancre, en minutes depuis son heure. */
+export const decalageAncre = (c: Pick<SessionConfirmationsState, 'ancreDecalage'>, blockId: string) => c.ancreDecalage?.[blockId] ?? 0
+
+/**
+ * « In 5 min » : dans combien de minutes l'ancre peut revenir, au plus tard
+ * 15 min après son heure (0 : plus de décalage possible).
+ */
+export function decalageRestant(startMinute: number, decalage: number, nowMinute: number): number {
+  const cible = Math.min(ANCRE_DECALAGE_MAX, Math.max(decalage, nowMinute - startMinute) + 5)
+  return Math.max(0, startMinute + cible - nowMinute)
+}
+
+export function decalagePossible(c: SessionConfirmationsState, block: Pick<PlacedBlock, 'id' | 'kind' | 'startMinute'>, nowMinute: number): number {
+  if (block.kind !== 'ancre' || block.id in c.confirmedAt) return 0
+  return decalageRestant(block.startMinute, decalageAncre(c, block.id), nowMinute)
+}
+
+/** L'ancre revient dans 5 min (moins si la limite des 15 min est plus proche). */
+export function decalerAncre(
+  c: SessionConfirmationsState,
+  block: Pick<PlacedBlock, 'id' | 'kind' | 'startMinute'>,
+  nowMinute: number,
+): SessionConfirmationsState | null {
+  const dans = decalagePossible(c, block, nowMinute)
+  if (dans <= 0) return null
+  return { ...c, ancreDecalage: { ...c.ancreDecalage, [block.id]: nowMinute + dans - block.startMinute } }
 }

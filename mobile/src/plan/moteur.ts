@@ -49,6 +49,7 @@ export function entreeEtPlan({
   reglages,
   apprentissage,
   seanceActive = null,
+  plies = [],
   jours = 7,
   maintenant = new Date(),
 }: {
@@ -61,6 +62,8 @@ export function entreeEtPlan({
   apprentissage?: LearningState
   /** D.7 : la seance confirmee en cours. Elle se produit deja, donc on ne la replace pas. */
   seanceActive?: ActiveSession | null
+  /** Pliés aujourd'hui : leur reste épaissit les jours suivants. */
+  plies?: readonly string[]
   /** Horizon, en jours. Sept couvre la semaine que le moteur raisonne. */
   jours?: number
   maintenant?: Date
@@ -142,6 +145,7 @@ export function entreeEtPlan({
     // Jours libres pris : le moteur les vide (ancres minimales exceptées).
     ...(apprentissage ? { freeDays: joursLibresPris(apprentissage) } : {}),
     ...(apprentissage ? { promises: promessesAPoser(apprentissage) } : {}),
+    ...(plies.length ? { folded: [...plies] } : {}),
   }
 
   return { entree, resultat: computePlan(entree, maintenant) }
