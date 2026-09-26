@@ -104,11 +104,35 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
     fermer()
   }
 
+  // « 10 more minutes » relance « Stop ? » dans 10 min ; sinon on continue.
   const continuer = () => {
     vibrer('medium')
-    void confiance.continuer()
+    void (etape.e === 'reaction' && etape.dixMinutes ? confiance.dixMinutesDePlus(etape.raison, texte.trim() || undefined) : confiance.continuer())
     fermer()
   }
+
+  // Les 10 minutes passées, « Stop ? » revient — sans les reproposer.
+  const dixJusqua = confiance.dixMinutesJusqua
+  const relance = useRef(false)
+  const confianceRef = useRef(confiance)
+  confianceRef.current = confiance
+  useEffect(() => {
+    if (dixJusqua === null) return void (relance.current = false)
+    const t = setInterval(() => {
+      const confiance = confianceRef.current
+      const d = confiance.dixMinutesEchues()
+      if (!d || relance.current || etape.e !== 'ferme') return
+      relance.current = true
+      depuis.current = Date.now()
+      setTexte(d.text ?? '')
+      void confiance.preparer(d.reason, d.text).then((r) => {
+        vibrer('medium')
+        if (r.etape === 'reaction') setEtape({ e: 'reaction', raison: d.reason, lignes: r.lignes, dixMinutes: r.dixMinutes, attenteMinutes: r.attenteMinutes })
+        else if (r.etape === 'message') setEtape({ e: 'message', texte: r.message })
+      })
+    }, 2000)
+    return () => clearInterval(t)
+  }, [dixJusqua, etape.e])
 
   const ouvrir = () => {
     vibrer('light')
@@ -188,7 +212,8 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
         ) : null}
       </Feuille>
 
-      <Feuille ouverte={etape.e !== 'ferme'} fermer={fermer} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+      {/* Fermer la question « Stop ? », c'est continuer. */}
+      <Feuille ouverte={etape.e !== 'ferme'} fermer={etape.e === 'reaction' ? () => (void confiance.continuer(), fermer()) : fermer} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
         {etape.e === 'raison' ? (
           <>
             <Text accessibilityRole="header" style={titreFeuille}>{`Stop ${titre}?`}</Text>

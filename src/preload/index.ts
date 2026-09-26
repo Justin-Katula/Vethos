@@ -202,6 +202,9 @@ const api = {
     trust: (): Promise<TrustView | null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'get' }),
     /** « Je continue » pendant le délai, ou la contre-offre acceptée. */
     waiveStop: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'waive' }),
+    /** « 10 more minutes » : « Stop ? » revient dans 10 min. */
+    tenMore: (args: { reason: StopReason; text?: string }): Promise<null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLANNING_TRUST, { action: 'tenMore', ...args }),
     /** Le rattrapage choisi : une promesse. */
     /** « Oui, j'arrête » : l'attente commence, la séance reste bloquée. */
     confirmStop: (args: { reason: StopReason; text?: string; answerMs?: number }): Promise<ConfirmBlockResult | null> =>

@@ -35,8 +35,10 @@ import type { ConfirmationOverlay } from './confirmation-overlay'
 import {
   ATTENTE_STOP_MINUTES,
   choisirRattrapage,
+  accorderDixMinutes,
   continuer,
   demanderStop,
+  dixMinutesEchues,
   executerStop,
   optionsUrgence,
   preparerStop,
@@ -148,6 +150,8 @@ export type PlanRunner = {
   trust: () => Promise<TrustView>
   /** « Je continue » : l'attente s'annule. */
   waiveStop: () => Promise<void>
+  /** « 10 more minutes » : on continue, « Stop ? » revient dans 10 min. */
+  tenMore: (args: StopArgs) => Promise<void>
   /** Le rattrapage choisi parmi ceux proposés : une promesse. */
   choosePromise: (option: OptionRattrapage) => Promise<ConfirmResult>
   /** L'urgence : jusqu'à quand on peut repousser. */
@@ -939,6 +943,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       urgentTooOften: urgenceTropFrequente(learning, today),
       breatherNow: !!activeSession && souffleDisponible(learning, activeSession.blockId) && !pause,
       sessionApps: ids.map((id) => ({ id, name: nameOf(id) })),
+      tenMinutesUp: activeSession && stopPermis(learning, confirmations) ? dixMinutesEchues(confirmations, now.getTime()) : null,
     }
   }
 
@@ -947,6 +952,15 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     const now = deps.now()
     const { learning, confirmations, todayBlocks } = await loadTodayState(now)
     const r = continuer(learning, confirmations)
+    await Promise.all([deps.storage.write('learning', r.learning), deps.storage.write('session_confirmations', r.confirmations)])
+    if (confirmations.stopPending) await restoreBlocking(r.confirmations, todayBlocks, now)
+  }
+
+  async function tenMore(args: StopArgs): Promise<void> {
+    const now = deps.now()
+    const { learning, confirmations, todayBlocks } = await loadTodayState(now)
+    const r = accorderDixMinutes(learning, confirmations, { nowMs: now.getTime(), reason: args.reason, ...(args.text !== undefined ? { text: args.text } : {}) })
+    if (!r) return waiveStop()
     await Promise.all([deps.storage.write('learning', r.learning), deps.storage.write('session_confirmations', r.confirmations)])
     if (confirmations.stopPending) await restoreBlocking(r.confirmations, todayBlocks, now)
   }
@@ -1109,6 +1123,7 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
     decideFreeDay: (date: string, decision: 'taken' | 'kept') => serialize(() => decideFreeDay(date, decision)),
     trust: () => serialize(trustView),
     waiveStop: () => serialize(waiveStop),
+    tenMore: (args: StopArgs) => serialize(() => tenMore(args)),
     choosePromise: (option) => serialize(() => choosePromise(option)),
     urgentOptions: () => serialize(urgentOptions),
     urgent: (option, minutes, apps) => serialize(() => urgent(option, minutes, apps)),

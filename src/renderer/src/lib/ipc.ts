@@ -247,6 +247,7 @@ function createBrowserStub(): NexusApi {
       stopBlock: async () => ({ ok: true as const, step: 'ended' as const }),
       trust: async () => null,
       waiveStop: async () => null,
+      tenMore: async () => null,
       confirmStop: async () => ({ ok: true as const }),
       choosePromise: async () => ({ ok: true as const }),
       urgentOptions: async () => null,

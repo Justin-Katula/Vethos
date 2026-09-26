@@ -745,8 +745,14 @@ export function preparerStop(a: {
     ...(a.sleptHours !== undefined ? { sleptHours: a.sleptHours } : {}),
   }
   const attenteMinutes = ATTENTE_STOP_MINUTES[niveau]
+  // Les 10 minutes ne s'offrent qu'une fois par bloc.
+  const dejaOffert = a.confirmations.dixMinutes?.blockId === o.blockId
+  const reagir = (ctx: { niveau: Niveau; echeance?: Echeance | null }): Reaction => {
+    const r = reactionRaison(a.reason, faits, ctx)
+    return dejaOffert ? { ...r, dixMinutes: false } : r
+  }
   if (o.kind === 'ancre' || !e?.stoppedEarly) {
-    return { etape: 'reaction', reaction: reactionRaison(a.reason, faits, { niveau }), faits, attenteMinutes }
+    return { etape: 'reaction', reaction: reagir({ niveau }), faits, attenteMinutes }
   }
 
   const { plan, input } = a.planApres(essai.learning, essai.confirmations)
@@ -763,11 +769,11 @@ export function preparerStop(a: {
             : x,
         ),
       }
-      return { etape: 'pas-de-place', learning: l, confirmations: pause, message: MESSAGE_PAS_DE_PLACE }
+      return { etape: 'pas-de-place', learning: l, confirmations: { ...pause, dixMinutes: dixMinutesRepondu(pause) }, message: MESSAGE_PAS_DE_PLACE }
     }
   }
   const echeance = a.tache && o.kind === 'task' ? echeanceDe(plan, a.confirmations.date, a.tache) : null
-  return { etape: 'reaction', reaction: reactionRaison(a.reason, faits, { niveau, echeance }), faits, attenteMinutes }
+  return { etape: 'reaction', reaction: reagir({ niveau, echeance }), faits, attenteMinutes }
 }
 
 /**
@@ -796,6 +802,7 @@ export function demanderStop(
   const text = a.text?.trim()
   return {
     ...confirmations,
+    dixMinutes: dixMinutesRepondu(confirmations),
     stopPending: {
       blockId: o.blockId,
       untilMs: a.nowMs + (untilMinute - a.minute) * 60_000,
@@ -811,6 +818,10 @@ export function demanderStop(
   }
 }
 
+/** La relance des 10 minutes a eu sa réponse (continuer, ou arrêter). */
+const dixMinutesRepondu = (c: SessionConfirmationsState): SessionConfirmationsState['dixMinutes'] =>
+  c.dixMinutes && c.dixMinutes.blockId === c.observedPending?.blockId ? { ...c.dixMinutes, repondu: true } : (c.dixMinutes ?? null)
+
 /** « Je continue » : l'attente s'annule, un Stop renoncé au journal. */
 export function continuer(
   learning: LearningState,
@@ -819,8 +830,49 @@ export function continuer(
   const o = confirmations.observedPending
   return {
     learning: o ? renoncerAuStop(learning, confirmations.date, o.blockId) : learning,
-    confirmations: { ...confirmations, stopPending: null },
+    confirmations: { ...confirmations, stopPending: null, dixMinutes: dixMinutesRepondu(confirmations) },
   }
+}
+
+/**
+ * « 10 more minutes » (Boring) : on continue, et au bout des 10 minutes l'app
+ * redemande « Stop ? », sans reproposer les 10 minutes. Une fois par bloc.
+ */
+export function accorderDixMinutes(
+  learning: LearningState,
+  confirmations: SessionConfirmationsState,
+  a: { nowMs: number; reason: StopReason; text?: string },
+): { learning: LearningState; confirmations: SessionConfirmationsState } | null {
+  const o = confirmations.observedPending
+  if (!o || confirmations.dixMinutes?.blockId === o.blockId) return null
+  const text = a.text?.trim()
+  return {
+    learning: renoncerAuStop(learning, confirmations.date, o.blockId),
+    confirmations: {
+      ...confirmations,
+      stopPending: null,
+      dixMinutes: {
+        blockId: o.blockId,
+        untilMs: a.nowMs + DIX_MINUTES * 60_000,
+        reason: a.reason,
+        ...(text ? { text: text.slice(0, 500) } : {}),
+        repondu: false,
+      },
+    },
+  }
+}
+
+/**
+ * Les 10 minutes sont passées et la séance tourne encore : il faut
+ * redemander « Stop ? ». Rien si le bloc est fini, arrêté, en pause ou déjà
+ * dans l'attente d'un arrêt.
+ */
+export function dixMinutesEchues(c: SessionConfirmationsState, nowMs: number): { reason: StopReason; text?: string } | null {
+  const d = c.dixMinutes
+  const o = c.observedPending
+  if (!d || d.repondu || nowMs < d.untilMs || !o || o.blockId !== d.blockId) return null
+  if (c.stopPending || c.pause || (c.stoppedBlockIds ?? []).includes(o.blockId)) return null
+  return { reason: d.reason, ...(d.text ? { text: d.text } : {}) }
 }
 
 /** L'attente est-elle finie ? */
@@ -1120,6 +1172,8 @@ export type TrustView = {
   breatherNow: boolean
   /** Les apps que la séance bloque, pour en garder 3 pendant une urgence. */
   sessionApps: Array<{ id: string; name: string }>
+  /** Les « 10 more minutes » sont passées : redemander « Stop ? ». */
+  tenMinutesUp: { reason: StopReason; text?: string } | null
 }
 
 /** Ce que la raison a donné (bureau). */

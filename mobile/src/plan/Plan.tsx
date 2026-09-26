@@ -18,9 +18,11 @@ import { accepterProlongation, dansLaProlongation, marquerOffre, proposerProlong
 import { jourLibrePropose } from '@shared/planning/jours-libres'
 import {
   ATTENTE_STOP_MINUTES,
+  accorderDixMinutes,
   choisirRattrapage,
   continuer,
   demanderStop,
+  dixMinutesEchues,
   executerStop,
   fermerPause,
   finUrgence,
@@ -302,6 +304,15 @@ function useSourcePlan() {
     souffleEnCours: !!actif && souffleDisponible(apprentissage, actif.blockId) && !confirmationsDuJour?.pause,
     /** « J'ai besoin de 15 min » AVANT une promesse qui attend son départ. */
     souffleAvantPossible: (blockId: string) => souffleDisponible(apprentissage, blockId),
+    /** « 10 more minutes » en cours : l'heure où « Stop ? » revient. */
+    dixMinutesJusqua: confirmationsDuJour?.dixMinutes && !confirmationsDuJour.dixMinutes.repondu ? confirmationsDuJour.dixMinutes.untilMs : null,
+    /** Les 10 minutes sont passées : la raison à redemander, ou null. */
+    dixMinutesEchues: () => {
+      const c = useSeances.getState()
+      return actif && c.confirmations.date === calcul.aujourdHui && stopPermis(c.apprentissage, c.confirmations)
+        ? dixMinutesEchues(c.confirmations, Date.now())
+        : null
+    },
     /** Le titre du bloc dont on attend le retour. */
     titreRetour: confirmationsDuJour?.awaitingReturn ? (blocsDuJour.find((b) => b.id === confirmationsDuJour.awaitingReturn!.blockId)?.label ?? '') : '',
 
@@ -397,6 +408,14 @@ function useSourcePlan() {
       const o = r.confirmations.observedPending
       const plage = o ? blocage().plagesActives.find((p) => p.blocId === o.blockId) : undefined
       if (o && plage && frais.confirmations.stopPending) await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: o.endMinute })
+    },
+
+    /** « 10 more minutes » : on continue, « Stop ? » revient dans 10 min. */
+    dixMinutesDePlus: async (raison: StopReason, texte?: string) => {
+      const frais = useSeances.getState()
+      const r = accorderDixMinutes(frais.apprentissage, frais.confirmations, { nowMs: Date.now(), reason: raison, ...(texte ? { text: texte } : {}) })
+      if (!r) return confiance.continuer()
+      await poser({ apprentissage: r.learning, confirmations: r.confirmations })
     },
 
     /** Le rattrapage choisi parmi ceux proposés : la promesse. */

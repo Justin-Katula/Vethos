@@ -649,6 +649,29 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
     expect((storage.__mem.get('learning') as LearningState).promises!.length).toBeGreaterThan(0)
   })
 
+  it('« 10 more minutes » : on continue, puis « Stop ? » revient 10 min plus tard, une seule fois', async () => {
+    let nowRef = WAKE
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 }))
+    const overlay = fakeOverlay()
+    const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
+    await runner.tickNow()
+    await runner.confirmBlock(overlay.shown[0]!.blockId)
+    nowRef = new Date(WAKE.getTime() + 5 * 60_000)
+    await runner.tickNow()
+    expect(await runner.stopBlock({ reason: 'boring' })).toMatchObject({ step: 'reaction', tenMinutes: true })
+    await runner.tenMore({ reason: 'boring' })
+    nowRef = new Date(WAKE.getTime() + 14 * 60_000)
+    await runner.tickNow()
+    expect((await runner.trust()).tenMinutesUp).toBeNull()
+    nowRef = new Date(WAKE.getTime() + 15 * 60_000)
+    await runner.tickNow()
+    expect((await runner.trust()).tenMinutesUp).toEqual({ reason: 'boring' })
+    // La question revient, sans les 10 minutes cette fois.
+    expect(await runner.stopBlock({ reason: 'boring' })).toMatchObject({ step: 'reaction', tenMinutes: false })
+    await runner.waiveStop()
+    expect((await runner.trust()).tenMinutesUp).toBeNull()
+  })
+
   it('un texte de détresse : l’aide humaine, et plus d’overlay pendant 24 h', async () => {
     let nowRef = WAKE
     const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 300, remainingMinutes: 300 }))

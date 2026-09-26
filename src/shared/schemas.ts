@@ -636,6 +636,20 @@ export const SessionConfirmationsStateSchema = z.object({
     })
     .nullable()
     .optional(),
+  /**
+   * « 10 more minutes » (Boring) : au bout, l'app redemande « Stop ? » — une
+   * seule fois par bloc. `repondu` : la question a eu sa réponse.
+   */
+  dixMinutes: z
+    .object({
+      blockId: z.string().min(1),
+      untilMs: z.number().int(),
+      reason: z.enum(STOP_REASONS),
+      text: z.string().max(500).optional(),
+      repondu: z.boolean().default(false),
+    })
+    .nullable()
+    .optional(),
   /** L'arrêt est fait : le rattrapage reste à choisir. Il n'y a pas d'autre sortie. */
   promiseChoice: z
     .object({

@@ -45,6 +45,7 @@ export type SessionExtras = {
   decideFreeDay: (date: string, decision: 'taken' | 'kept') => Promise<void>
   trust: () => Promise<TrustView>
   waiveStop: () => Promise<void>
+  tenMore: (args: { reason: StopReason; text?: string }) => Promise<void>
   confirmStop: (args: { reason: StopReason; text?: string; answerMs?: number }) => Promise<ConfirmBlockResult>
   choosePromise: (option: OptionRattrapage) => Promise<ConfirmBlockResult>
   urgentOptions: () => Promise<{ options: OptionRattrapage[]; minutes: number } | null>
@@ -57,6 +58,7 @@ export type SessionExtras = {
 const TrustArgsSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('get') }),
   z.object({ action: z.literal('waive') }),
+  z.object({ action: z.literal('tenMore'), reason: z.enum(STOP_REASONS), text: z.string().max(500).optional() }),
   z.object({
     action: z.literal('confirmStop'),
     reason: z.enum(STOP_REASONS),
@@ -198,6 +200,9 @@ export async function registerAllIpcHandlers(
         return extras.trust()
       case 'waive':
         await extras.waiveStop()
+        return null
+      case 'tenMore':
+        await extras.tenMore({ reason: a.reason, ...(a.text !== undefined ? { text: a.text } : {}) })
         return null
       case 'confirmStop':
         return extras.confirmStop({ reason: a.reason, ...(a.text !== undefined ? { text: a.text } : {}), ...(a.answerMs !== undefined ? { answerMs: a.answerMs } : {}) })

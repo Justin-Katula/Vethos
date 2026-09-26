@@ -6,8 +6,10 @@ import {
   ATTENTE_STOP_MINUTES,
   choisirRattrapage,
   comparaison,
+  accorderDixMinutes,
   continuer,
   demanderStop,
+  dixMinutesEchues,
   executerStop,
   optionsUrgence,
   preparerStop,
@@ -322,6 +324,27 @@ describe('Le Stop, de bout en bout', () => {
     const r = continuer(learning(), c)
     expect(r.confirmations.stopPending).toBeNull()
     expect(r.learning.sessionEvents[0]!.stopsWaived).toBe(1)
+  })
+
+  it('« 10 more minutes » : « Stop ? » revient 10 min plus tard, sans reproposer les 10 min', () => {
+    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres() })!
+    expect(prep.etape === 'reaction' && prep.reaction.dixMinutes).toBe(true)
+    const d = accorderDixMinutes(learning(), conf(), { nowMs: 0, reason: 'boring', text: 'meh' })!
+    expect(d.learning.sessionEvents[0]!.stopsWaived).toBe(1)
+    expect(dixMinutesEchues(d.confirmations, 599_999)).toBeNull()
+    expect(dixMinutesEchues(d.confirmations, 600_000)).toEqual({ reason: 'boring', text: 'meh' })
+    // Une seule fois par bloc.
+    expect(accorderDixMinutes(d.learning, d.confirmations, { nowMs: 600_000, reason: 'boring' })).toBeNull()
+    const encore = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres() })!
+    expect(encore.etape === 'reaction' && encore.reaction.dixMinutes).toBe(false)
+    // Continuer, ou dire oui : la question a sa réponse et ne revient plus.
+    expect(dixMinutesEchues(continuer(d.learning, d.confirmations).confirmations, 700_000)).toBeNull()
+    const oui = demanderStop(d.confirmations, { nowMs: 600_000, minute: 570, reason: 'boring', attenteMinutes: 5, placement: { preference: 'tot' } })!
+    expect(oui.dixMinutes!.repondu).toBe(true)
+    // Plus de place au bout des 10 min : pause de 15 min, et plus de relance.
+    const plein = preparerStop({ learning: d.learning, confirmations: d.confirmations, nowMs: 600_000, minute: 570, reason: 'boring', planApres: apres(false) })!
+    expect(plein.etape).toBe('pas-de-place')
+    if (plein.etape === 'pas-de-place') expect(dixMinutesEchues({ ...plein.confirmations, pause: null }, 2_000_000)).toBeNull()
   })
 
   it('urgence : jusqu’à quand repousser, puis tout bloqué sauf 3 apps, et l’app regarde', () => {

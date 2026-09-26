@@ -100,10 +100,33 @@ export function StopSession({ label, inExtension = false, showButton = true }: {
     refresh()
   }
 
+  // « 10 more minutes » relance « Stop ? » dans 10 min ; sinon on continue.
   const keepGoing = () => {
-    void nexus.planning.waiveStop().then(refresh)
+    const ask = step.s === 'reaction' && step.tenMinutes ? { reason: step.reason, ...(text.trim() ? { text: text.trim() } : {}) } : null
+    void (ask ? nexus.planning.tenMore(ask) : nexus.planning.waiveStop()).then(refresh)
     close()
   }
+
+  // Les 10 minutes sont passées : « Stop ? » revient, sans les reproposer.
+  const tenUp = trust?.tenMinutesUp ?? null
+  // Une fois par relance : la vue peut rester en retard d'un rafraîchissement.
+  const asked = useRef(false)
+  useEffect(() => {
+    if (!tenUp) return void (asked.current = false)
+    if (step.s !== 'closed' || asked.current) return
+    asked.current = true
+    shownAt.current = performance.now()
+    setText(tenUp.text ?? '')
+    void nexus.planning
+      .stopBlock({ reason: tenUp.reason, ...(tenUp.text ? { text: tenUp.text } : {}) })
+      .then((r) => {
+        if (!r.ok) return
+        if (r.step === 'reaction') setStep({ s: 'reaction', reason: tenUp.reason, lines: r.lines, tenMinutes: r.tenMinutes, waitMinutes: r.waitMinutes })
+        else if (r.step === 'no-room' || r.step === 'help') setStep({ s: 'message', text: r.message })
+      })
+      .catch(() => undefined)
+      .finally(refresh)
+  }, [tenUp, step.s, refresh])
 
   const open = () => {
     shownAt.current = performance.now()
@@ -175,7 +198,7 @@ export function StopSession({ label, inExtension = false, showButton = true }: {
         </div>
       </Modal>
 
-      <Modal open={step.s !== 'closed'} title={title} onClose={close}>
+      <Modal open={step.s !== 'closed'} title={title} onClose={step.s === 'reaction' ? () => (void nexus.planning.waiveStop().then(refresh), close()) : close}>
         {step.s === 'reason' && (
           <>
             <div className="grid grid-cols-2 gap-2">
