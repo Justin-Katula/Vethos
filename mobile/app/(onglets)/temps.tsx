@@ -73,7 +73,7 @@ export default function MonTemps() {
   const { acc } = useLumiere()
   const toast = useToast()
   const garde = useGardeContrat()
-  const { jours, minute: N, maintenant } = usePlan()
+  const { jours, minute: N, maintenant, tenuesDu } = usePlan()
   const d = useDonnees()
   const confirmees = useSeances((e) => e.confirmations)
   const [vis, setVis] = useState(AUJ)
@@ -111,11 +111,14 @@ export default function MonTemps() {
   )
   const segmentsDe = (i: number): SegmentTemps[] => {
     if (i >= AUJ) return (jours.find((j) => j.date === DAYS[i]!.cle)?.segments ?? []).filter((s) => s.nature !== 'sleep')
-    // Le passé : seulement ce qui était fixe ce jour-là.
+    // Le passé : ce qui était fixe ce jour-là, et les séances vraiment faites.
     const dt = DAYS[i]!
-    return d.obligations
-      .filter((o) => o.categoryType !== 'sleep' && (o.date ? o.date === dt.cle : o.dayOfWeek === dt.date.getDay()))
-      .map((o) => ({ id: `${o.id}-${dt.cle}`, date: dt.cle, debut: o.startMinute, fin: o.endMinute, titre: o.label, nature: 'fixed' as const, travail: 0 }))
+    return [
+      ...d.obligations
+        .filter((o) => o.categoryType !== 'sleep' && (o.date ? o.date === dt.cle : o.dayOfWeek === dt.date.getDay()))
+        .map((o) => ({ id: `${o.id}-${dt.cle}`, date: dt.cle, debut: o.startMinute, fin: o.endMinute, titre: o.label, nature: 'fixed' as const, travail: 0 })),
+      ...tenuesDu(dt.cle),
+    ].sort((a, b) => a.debut - b.debut)
   }
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -250,11 +253,12 @@ export default function MonTemps() {
                         )
                       const vivant = i === AUJ && s.debut <= N && N < s.fin
                       const on = sel?.id === s.id
-                      // La pause se montre toujours, hachurée au bas du bloc : le
-                      // bloc va jusqu'au bout de son empreinte, travail puis pause.
-                      const finBloc = Math.min(BED, s.pause ? (s.finEmpreinte ?? s.fin) : s.fin)
+                      // La pause, hachurée au bas du bloc — seulement quand
+                      // quelque chose commence dans les 30 min (E.1).
+                      const avecPause = !!s.pause && !!s.pauseVisible
+                      const finBloc = Math.min(BED, avecPause ? (s.finEmpreinte ?? s.fin) : s.fin)
                       const hb = Math.max(14, Y(finBloc) - Y(a))
-                      const hp = s.pause ? Math.max(4, Math.round(hb * (s.pause / Math.max(1, finBloc - s.debut)))) : 0
+                      const hp = avecPause ? Math.max(4, Math.round(hb * (s.pause! / Math.max(1, finBloc - s.debut)))) : 0
                       const tb = `${fmt(s.debut)}–${fmt(finBloc)}`
                       return (
                         <BlocTemps
@@ -412,7 +416,7 @@ function FeuilleSeance({
   const iJour = DAYS.findIndex((x) => x.cle === s.date)
   const statut = (x: SegmentTemps, i: number): [string, string] => {
     const passe = i < AUJ || (i === AUJ && x.fin <= N)
-    if (passe) return x.bloc && confirmees[x.bloc.id] ? ['Done', A.t2] : ['Missed', A.rouge]
+    if (passe) return x.tenue || (x.bloc && confirmees[x.bloc.id]) ? ['Done', A.t2] : ['Missed', A.rouge]
     if (i === AUJ && x.debut <= N && N < x.fin) return ['Now', acc]
     return ['Upcoming', A.t3]
   }

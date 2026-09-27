@@ -1,3 +1,4 @@
+import type { SessionEvent } from '@shared/schemas'
 import type { PlacedBlock, PlanningResult } from '@shared/planning/types'
 import { breakStartMinute, isBreakVisible, nextOccupiedMinute } from '@shared/planning/rest'
 import type { Obligation, Reglages } from '@/donnees/magasin'
@@ -29,6 +30,8 @@ export type SegmentTemps = {
   ref?: string
   bloc?: PlacedBlock
   couleur?: string
+  /** Une séance vraiment faite, relue du journal : elle reste sur la carte. */
+  tenue?: boolean
 }
 export type JourTemps = {
   date: string
@@ -115,3 +118,41 @@ export function segmentActuel(segments: readonly SegmentTemps[], minute: number)
     ?? segments.find((s) => s.debut <= minute && minute < s.fin)
 }
 
+
+/**
+ * Les séances vraiment tenues un jour donné, relues du journal. Le plan ne
+ * garde que ce qui reste à faire : sans elles, une séance finie disparaissait
+ * de la carte comme si elle n'avait jamais existé. Début : l'heure du « Je
+ * commence » ; durée : les minutes tenues. La séance en cours n'y est pas (elle
+ * est encore dans le plan).
+ */
+export function seancesTenues(
+  events: readonly SessionEvent[],
+  date: string,
+  titreDe: (kind: SessionEvent['kind'], refId: string) => { titre: string; couleur?: string } | null,
+): SegmentTemps[] {
+  return events
+    .filter((e) => e.date === date && e.started && e.heldMinutes !== null && e.heldMinutes > 0)
+    .map((e) => {
+      const d = new Date(e.createdAt)
+      const memeJour = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` === date
+      const debut = memeJour ? d.getHours() * 60 + d.getMinutes() : e.plannedStartMinute + (e.delayMinutes ?? 0)
+      const fin = Math.min(1440, debut + (e.heldMinutes ?? 0))
+      const t = titreDe(e.kind, e.refId)
+      return {
+        id: `tenue-${e.blockId}-${e.date}`,
+        date,
+        debut,
+        fin,
+        finEmpreinte: fin,
+        titre: t?.titre ?? (e.kind === 'ancre' ? 'Anchor' : e.kind === 'objective' ? 'Goal' : 'Task'),
+        nature: e.kind,
+        travail: e.heldMinutes ?? 0,
+        pause: 0,
+        pauseVisible: false,
+        ref: e.refId,
+        tenue: true,
+        ...(t?.couleur ? { couleur: t.couleur } : {}),
+      }
+    })
+}

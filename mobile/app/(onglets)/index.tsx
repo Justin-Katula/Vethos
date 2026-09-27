@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Mask, Path, Rect } from 'react-native-svg'
 import { useDonnees } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
-import { dateLocale } from '@/plan/format'
+import { arrondiCinq, dateLocale } from '@/plan/format'
 import type { SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 import { ArretSeance, BanniereProlongation, CarteJourLibre, DemarrerSeance } from '@/seances/ArretSeance'
@@ -346,7 +346,8 @@ export default function Aujourdhui() {
             ).map(([k, l]) => {
               const on = focus === k
               const estC = k === 'com'
-              const v = Math.max(0, Math.round(d.vals[k]))
+              // Le multiple de 5 le plus proche : jamais « 4 h 21 ».
+              const v = arrondiCinq(d.vals[k])
               const vc = estC ? acc : k === 'left' ? A.t2 : A.t1
               return (
                 <Pressable

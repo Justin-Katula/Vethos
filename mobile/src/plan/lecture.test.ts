@@ -75,3 +75,18 @@ describe('lecture commune du cercle et de la semaine', () => {
     }
   })
 })
+
+describe('Les séances faites restent sur la carte', () => {
+  it('relues du journal : heure du « Je commence », minutes tenues ; la séance en cours et les ratées n’y sont pas', async () => {
+    const { seancesTenues } = await import('./lecture')
+    const debut = new Date(2026, 8, 26, 9, 32).toISOString()
+    const ev = (o: object) => ({ blockId: 'b', date: '2026-09-26', kind: 'task', refId: 't', plannedStartMinute: 570, plannedMinutes: 90, started: true, delayMinutes: 2, heldMinutes: 90, createdAt: debut, ...o }) as never
+    const r = seancesTenues(
+      [ev({}), ev({ blockId: 'c', heldMinutes: null }), ev({ blockId: 'd', started: false, heldMinutes: 0 })],
+      '2026-09-26',
+      () => ({ titre: 'Rapport' }),
+    )
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ debut: 572, fin: 662, titre: 'Rapport', nature: 'task', tenue: true })
+  })
+})

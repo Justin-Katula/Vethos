@@ -31,6 +31,10 @@ export type NatureApp = keyof typeof TYPEC
 export const natureDe = (kind: string): NatureApp | null =>
   kind === 'task' ? 'TASK' : kind === 'objective' ? 'GOAL' : kind === 'ancre' || kind === 'anchor' ? 'ANCHOR' : null
 
+/** La nuit : l'intensité ne descend pas plus bas, et la lueur reste à l'écran. */
+const LUEUR_NUIT_MIN = 0.9
+const LUEUR_Y_MIN = 0.08
+
 /** La lumière de l'heure, rafraîchie chaque minute. */
 export function useLumiere() {
   const [H, setH] = useState(heureDecimale())
@@ -39,7 +43,9 @@ export function useLumiere() {
     return () => clearInterval(t)
   }, [])
   const L = lumiere(H)
-  const lueur: Lueur = { x: L.lp[0], y: L.lp[1], i: L.li, lt: L.lt, tc: L.tc }
+  // La nuit, la lueur tombait à 0,42 et passait sous l'écran : sur un
+  // téléphone, du noir. Elle garde un plancher et reste au bas de l'écran.
+  const lueur: Lueur = { x: L.lp[0], y: Math.max(L.lp[1], LUEUR_Y_MIN), i: Math.max(L.li, LUEUR_NUIT_MIN), lt: L.lt, tc: L.tc }
   return { H, acc: accentApp(H), teinte: teinteApp(H), lueur }
 }
 

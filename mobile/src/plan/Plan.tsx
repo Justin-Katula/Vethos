@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AppState } from 'react-native'
 import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
@@ -46,7 +46,7 @@ import {
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { cleDate, entreeEtPlan } from './moteur'
-import { lireSemaine } from './lecture'
+import { lireSemaine, seancesTenues } from './lecture'
 
 function useSourcePlan() {
   const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches, supprimerObjectif, majReglages } = useDonnees()
@@ -65,6 +65,20 @@ function useSourcePlan() {
     return () => { clearInterval(intervalle); retour.remove() }
   }, [])
 
+  /** Le nom et la couleur d'une séance du journal, même pour une tâche finie. */
+  const titreDe = useCallback((kind: 'task' | 'objective' | 'ancre', refId: string) => {
+    if (kind === 'task') {
+      const t = taches.find((x) => x.id === refId)
+      return t ? { titre: t.titre, ...(t.couleur ? { couleur: t.couleur } : {}) } : null
+    }
+    if (kind === 'objective') {
+      const o = objectifs.find((x) => x.id === refId)
+      return o ? { titre: o.nom, couleur: o.couleur } : null
+    }
+    const a = ancres.find((x) => x.id === refId)
+    return a ? { titre: a.nom } : null
+  }, [taches, objectifs, ancres])
+
   const calcul = useMemo(() => {
     const maintenant = new Date(instant)
     const aujourdHui = cleDate(maintenant)
@@ -80,11 +94,15 @@ function useSourcePlan() {
       apprentissage, seanceActive: active,
       plies: confirmations.date === aujourdHui ? pliesDuJour(apprentissage, confirmations) : [],
     })
-    const jours = lireSemaine(resultat, obligations, reglages)
+    // Aujourd'hui, les séances déjà faites restent sur la carte, avant le plan.
+    const faites = seancesTenues(apprentissage.sessionEvents ?? [], aujourdHui, titreDe)
+    const jours = lireSemaine(resultat, obligations, reglages).map((j) =>
+      j.date === aujourdHui && faites.length ? { ...j, segments: [...j.segments, ...faites].sort((a, b) => a.debut - b.debut) } : j,
+    )
     return { resultat, entree, jours, maintenant, aujourdHui, minute,
       chargees: chargees && mesuresPretes, seanceActive: active }
   }, [taches, objectifs, ancres, obligations, reglages, instant, chargees,
-      apprentissage, confirmations, mesuresPretes])
+      apprentissage, confirmations, mesuresPretes, titreDe])
 
   // Les aperçus sont écartés UNE FOIS, ici : une partie encore verrouillée
   // (B.5.1) ne se confirme pas, ne bloque rien et ne crédite aucun travail.
@@ -548,6 +566,8 @@ function useSourcePlan() {
 
   return {
     ...calcul,
+    /** Les séances faites un jour passé, relues du journal. */
+    tenuesDu: (date: string) => seancesTenues(apprentissage.sessionEvents ?? [], date, titreDe),
     confiance,
     /** Prolongation proposée pour la séance en cours (minutes), ou null. */
     prolongation: prolongationMontree?.minutes ?? null,

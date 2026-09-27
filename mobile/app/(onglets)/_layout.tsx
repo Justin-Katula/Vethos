@@ -61,8 +61,7 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
   const marges = useSafeAreaInsets()
   const courant = state.routes[state.index]?.name
   const actif = courant === 'profil' ? 'index' : courant
-  // Comme la maquette : verre dépoli (noir à 45 %, flou), le contenu passe
-  // dessous sans se lire.
+  // Verre dépoli, mais noir : le contenu passe dessous sans se lire.
   return (
     <BlurView
       intensity={100}
@@ -73,7 +72,6 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
         right: 0,
         bottom: 0,
         height: 49 + Math.max(marges.bottom, 12),
-        backgroundColor: 'rgba(0,0,0,0.45)',
         borderTopWidth: 1,
         borderTopColor: 'rgba(242,242,242,0.08)',
         flexDirection: 'row',
@@ -81,6 +79,8 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
         overflow: 'hidden',
       }}
     >
+      {/* Le flou gris d'iOS et du web, ramené au noir de Vethos. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' }} />
       {ONGLETS.map((o) => {
         const on = actif === o.nom
         const c = on ? A.t1 : A.t3
