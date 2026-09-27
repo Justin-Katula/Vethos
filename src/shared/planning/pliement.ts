@@ -85,12 +85,18 @@ export function probabiliteCreation(creations: readonly Creation[], today: strin
 // Chaque tâche a une version idéale : le plan tel que le moteur l'a posé la
 // première fois, avant tout pli — ce qui devrait être fait, jour après jour.
 // Plier fait prendre du retard sur elle ; les séances épaissies le rattrapent.
-// Le pli est refusé dès que la tâche serait à plus de 15 % (du travail
-// entier) derrière sa version idéale. Plus une tâche est longue, plus ces
-// 15 % font de minutes. Un objectif a sa version idéale par semaine.
+// Le pli est refusé dès que la tâche serait à plus de 15 % derrière sa
+// version idéale — 15 % de ce que l'idéal prévoit sur les 7 prochains jours,
+// jamais de la tâche entière : une longue tâche ne donne pas plus de pouvoir
+// de repousser, seul le rythme de la semaine compte. La version idéale
+// s'allonge jour après jour, sans jamais réécrire un jour figé. Un objectif a
+// sa version idéale par semaine.
 
-/** Le retard maximal sur la version idéale, en part du travail entier. */
+/** Le retard maximal sur la version idéale, en part de ses 7 prochains jours. */
 export const RETARD_MAX = 0.15
+
+/** La fenêtre sur laquelle se mesurent les 15 %. */
+export const FENETRE_RETARD_JOURS = 7
 
 /** Le travail entier d'une tâche, corrigé. */
 export const travailTotal = (t: Pick<Task, 'estimatedMinutes' | 'correctionFactor' | 'extraMinutes'>) =>
@@ -150,22 +156,28 @@ export function figerIdeaux(
   ]
   for (const el of elements) {
     const k = cleIdeal(el, a.today)
-    if (ideals[k]) continue
+    const deja = ideals[k]
+    // Déjà figée : seuls les jours après son dernier jour s'ajoutent (une
+    // longue tâche dépasse l'horizon du premier plan). Jamais au-delà du
+    // travail entier.
+    const apres = deja ? (deja.points.at(-1)?.[0] ?? deja.since) : null
     const parJour = new Map<string, number>()
     for (const b of plan.blocks) {
       if (b.kind !== el.kind || b.refId !== el.refId || b.date < a.today || b.date > el.fin || b.preview) continue
+      if (apres !== null && b.date <= apres) continue
       parJour.set(b.date, (parJour.get(b.date) ?? 0) + b.workMinutes)
     }
     if (parJour.size === 0) continue
-    const base = faitDe(learning, el, a.today)
-    let cumul = base
-    const points: Array<[string, number]> = [...parJour.entries()]
+    const base = deja ? deja.base : faitDe(learning, el, a.today)
+    let cumul = deja ? (deja.points.at(-1)?.[1] ?? deja.base) : base
+    if (cumul >= el.total && deja) continue
+    const nouveaux: Array<[string, number]> = [...parJour.entries()]
       .sort(([x], [y]) => x.localeCompare(y))
       .map(([d, m]) => {
-        cumul += m
+        cumul = Math.min(Math.max(el.total, base), cumul + m)
         return [d, cumul]
       })
-    ideals[k] = { since: a.today, base, points }
+    ideals[k] = deja ? { ...deja, points: [...deja.points, ...nouveaux].slice(-400) } : { since: a.today, base, points: nouveaux }
     change = true
   }
   return change ? { ...learning, ideals } : learning
@@ -196,7 +208,7 @@ export function libreJusqua(plan: PlanningResult, today: string, fin: string): n
 export type RefusPliage = 'pause' | 'retard' | 'place'
 
 export type BudgetPliage = {
-  /** Le retard permis sur la version idéale : 15 % du travail entier. */
+  /** Le retard permis : 15 % de ce que l'idéal prévoit sur les 7 prochains jours. */
   retardMax: number
   /** Le retard sur la version idéale si ce pli est fait (fin de journée). */
   retard: number
@@ -232,8 +244,17 @@ export function jugerPliage(a: {
   const ideal = a.learning.ideals?.[cleIdeal(a.element, a.today)]
   // Le pli fait, plus rien de cet élément aujourd'hui : fait = déjà fait + tenu.
   const fait = faitDe(a.learning, a.element, a.today) + a.tenu
+  // Les 15 % se prennent sur la semaine qui vient de la version idéale — sans
+  // elle, sur ce que le plan prévoit ces 7 jours, séance arrêtée comprise.
+  const septieme = addDays(a.today, FENETRE_RETARD_JOURS - 1)
+  const fenetre = ideal
+    ? idealA(ideal, septieme) - idealA(ideal, addDays(a.today, -1))
+    : a.tenu +
+      a.planApres.blocks
+        .filter((b) => b.kind === a.element.kind && b.refId === a.element.refId && b.date >= a.today && b.date <= septieme)
+        .reduce((t, b) => t + b.workMinutes, 0)
   const budget: BudgetPliage = {
-    retardMax: Math.round(RETARD_MAX * a.element.total),
+    retardMax: Math.round(RETARD_MAX * fenetre),
     retard: ideal ? Math.max(0, idealA(ideal, a.today) - fait) : 0,
     libre: libreJusqua(a.planApres, a.today, jusqua),
     attendu: probabiliteCreation(a.creations, a.today, jours).minutesAttendues,

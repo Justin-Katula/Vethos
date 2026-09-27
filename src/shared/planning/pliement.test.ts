@@ -3,7 +3,7 @@ import { LearningStateSchema, SessionConfirmationsStateSchema, type SessionEvent
 import { sleepScheduleEntries } from '@shared/sleep'
 import { computePlan } from './engine'
 import { applyConfirmation, decalagePossible, decalerAncre, overlayDueFor } from './clock'
-import { faitDe, figerIdeaux, idealA, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
+import { faitDe, figerIdeaux, idealA, jugerPliage, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
 import type { PlacedBlock, PlanningInput } from './types'
 
 const TODAY = '2026-09-21'
@@ -60,8 +60,39 @@ describe('La version idéale', () => {
     expect(idealA(l1.ideals!['task:t']!, TODAY)).toBe(100)
     expect(idealA(l1.ideals!['task:t']!, '2026-09-20')).toBe(40)
     expect(faitDe(l1, { kind: 'task', refId: 't' }, TODAY)).toBe(40)
+    // Plus tard, les jours après son dernier jour s'ajoutent — jamais au-delà du travail entier.
+    const l2 = figerIdeaux(l1, { blocks: [bloc('2026-09-22', 999), bloc('2026-09-23', 30)] }, { tasks: [tache], objectives: [], today: '2026-09-22' })
+    expect(l2.ideals!['task:t']!.points).toEqual([[TODAY, 100], ['2026-09-22', 200]])
+    const long = { ...tache, estimatedMinutes: 400 } as typeof tache
+    const l3 = figerIdeaux(l1, { blocks: [bloc('2026-09-23', 90)] }, { tasks: [long], objectives: [], today: '2026-09-22' })
+    expect(l3.ideals!['task:t']!.points).toEqual([[TODAY, 100], ['2026-09-22', 200], ['2026-09-23', 290]])
     // La tâche finie ou supprimée : sa version idéale tombe.
     expect(figerIdeaux(l1, { blocks: [] }, { tasks: [], objectives: [], today: TODAY }).ideals).toEqual({})
+  })
+})
+
+describe('Une longue tâche ne donne pas plus de pouvoir de repousser', () => {
+  it('les 15 % se prennent sur les 7 prochains jours de l’idéal, pas sur la tâche entière', () => {
+    // Même rythme (60 min par jour), l'une de 7 h, l'autre de 40 h.
+    const ideal = (jours: number) => ({
+      since: TODAY,
+      base: 0,
+      points: Array.from({ length: jours }, (_, i) => [`2026-${i < 10 ? '09' : '10'}-${String(i < 10 ? 21 + i : i - 9).padStart(2, '0')}`, 60 * (i + 1)] as [string, number]),
+    })
+    const juger = (total: number, jours: number) =>
+      jugerPliage({
+        learning: { sessionEvents: [], ideals: { 'task:t': ideal(jours) } },
+        element: { kind: 'task', refId: 't', total, fin: '2026-12-31' },
+        tenu: 30,
+        today: TODAY,
+        bloc: { blockId: 'b', date: TODAY },
+        planApres: { blocks: [], capacities: [] } as unknown as import('./types').PlanningResult,
+        creations: [],
+      }).budget
+    const court = juger(420, 7)
+    const long = juger(2400, 40)
+    expect(court.retardMax).toBe(63)
+    expect(long.retardMax).toBe(court.retardMax)
   })
 })
 
