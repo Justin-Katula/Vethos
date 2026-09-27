@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router'
 import { BlurView } from 'expo-blur'
-import { Pressable, Text, View } from 'react-native'
+import { Platform, Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import { FondLumiere } from '@/ui/FondLumiere'
@@ -61,27 +61,22 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
   const marges = useSafeAreaInsets()
   const courant = state.routes[state.index]?.name
   const actif = courant === 'profil' ? 'index' : courant
-  // Verre dépoli, mais noir : le contenu passe dessous sans se lire.
-  return (
-    <BlurView
-      intensity={100}
-      tint="dark"
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: 49 + Math.max(marges.bottom, 12),
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(242,242,242,0.08)',
-        flexDirection: 'row',
-        paddingHorizontal: 6,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Le flou gris d'iOS et du web, ramené au noir de Vethos. */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' }} />
-      {ONGLETS.map((o) => {
+  // Verre noir, transparent et flou, comme la maquette : noir à 45 %, flou de
+  // 20 px. Sur le web, la recette exacte ; sur iPhone, le matériau le plus
+  // fin et sombre d'iOS (sans le voile gris du teint « dark »).
+  const style = {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 49 + Math.max(marges.bottom, 12),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(242,242,242,0.08)',
+    flexDirection: 'row' as const,
+    paddingHorizontal: 6,
+    overflow: 'hidden' as const,
+  }
+  const onglets = ONGLETS.map((o) => {
         const on = actif === o.nom
         const c = on ? A.t1 : A.t3
         return (
@@ -112,7 +107,13 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
             <Text style={{ color: c, fontFamily: GEIST.moyen, fontSize: 10 }}>{o.titre}</Text>
           </Pressable>
         )
-      })}
+  })
+  if (Platform.OS === 'web')
+    return <View style={[style, { backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as object]}>{onglets}</View>
+  return (
+    <BlurView intensity={80} tint="systemUltraThinMaterialDark" style={style}>
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+      {onglets}
     </BlurView>
   )
 }
