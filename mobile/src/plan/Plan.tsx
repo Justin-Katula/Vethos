@@ -6,7 +6,7 @@ import { useBlocage } from '@/blocage/etat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
 import { decalageAncre, decalerAncre, decalageRestant, journalContextFor, overlayDueFor, recordDailyUtilization, setBlockedAttempts } from '@shared/planning/clock'
-import { elementPliable, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
+import { elementPliable, figerIdeaux, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
 import { lireTexteArret } from '@shared/coach/coach'
 import { dueRemovals } from '@shared/contract'
 import { detecteDetresse, disciplineSuspendue, MESSAGE_AIDE, SUJET_DETRESSE } from '@shared/coach/garde-fous'
@@ -45,7 +45,7 @@ import {
   type OptionRattrapage,
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
-import { calculerPlan, cleDate, entreeEtPlan } from './moteur'
+import { cleDate, entreeEtPlan } from './moteur'
 import { lireSemaine } from './lecture'
 
 function useSourcePlan() {
@@ -75,13 +75,13 @@ function useSourcePlan() {
     // chaque recalcul la repousserait d'une minute vers l'avant, indéfiniment.
     const active = seanceActive(confirmations, aujourdHui, minute)
 
-    const resultat = calculerPlan({
+    const { entree, resultat } = entreeEtPlan({
       taches, objectifs, ancres, obligations, reglages, maintenant,
       apprentissage, seanceActive: active,
       plies: confirmations.date === aujourdHui ? pliesDuJour(apprentissage, confirmations) : [],
     })
     const jours = lireSemaine(resultat, obligations, reglages)
-    return { resultat, jours, maintenant, aujourdHui, minute,
+    return { resultat, entree, jours, maintenant, aujourdHui, minute,
       chargees: chargees && mesuresPretes, seanceActive: active }
   }, [taches, objectifs, ancres, obligations, reglages, instant, chargees,
       apprentissage, confirmations, mesuresPretes])
@@ -137,7 +137,8 @@ function useSourcePlan() {
     dernierTic.current = empreinte
     // Les tentatives d'ouvrir une app écartée, relues depuis l'extension du
     // bouclier : leur nombre depuis le « Je commence » de la séance en cours.
-    let appris = tic.apprentissage
+    // La version idéale de chaque tâche : figée la première fois que le plan la pose.
+    let appris = figerIdeaux(tic.apprentissage, calcul.resultat, { tasks: calcul.entree.tasks, objectives: calcul.entree.objectives, today: calcul.aujourdHui })
     const o = tic.confirmations.observedPending
     const confirmeA = o ? tic.confirmations.confirmedAt[o.blockId] : undefined
     if (confirmeA !== undefined) {
@@ -174,7 +175,7 @@ function useSourcePlan() {
     appris = recordDailyUtilization(appris, calcul.aujourdHui, calcul.resultat.todayFullCapacityMinutes)
     if (tic.change || appris !== tic.apprentissage || confs !== tic.confirmations) void poser({ apprentissage: appris, confirmations: confs })
     if (tic.terminees.length > 0) void terminerTaches(tic.terminees)
-  }, [tic, calcul.aujourdHui, calcul.minute, calcul.resultat, poser, terminerTaches])
+  }, [tic, calcul.aujourdHui, calcul.minute, calcul.resultat, calcul.entree, poser, terminerTaches])
 
   // Retrait progressif : le bloc en attente n'appelle l'overlay que si sa
   // phase le demande (phase 3 : 10 min après, jamais un jour-test ; phase 4 :

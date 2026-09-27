@@ -183,14 +183,18 @@ export function reactionRaison(raison: StopReason, f: FaitsDuStop, ctx: { niveau
  */
 export function placePourReporter(a: {
   plan: PlanningResult
-  input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'>
+  input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'> & Partial<Pick<PlanningInput, 'rangeEnd' | 'tasks'>>
   kind: SessionEvent['kind']
   refId: string
 }): boolean {
   if (!a.plan.feasibility.densities.every((d) => d.feasible)) return false
   if (a.kind === 'task') {
     const v = a.plan.verdicts.find((x) => x.taskId === a.refId)
-    return v === undefined || v.status === 'placed'
+    if (v === undefined || v.status === 'placed') return true
+    // Échéance au-delà des jours calculés : le reste se place plus tard ; la
+    // densité (jusqu'à l'échéance) a déjà dit si ça tient.
+    const t = a.input.tasks?.find((x) => x.id === a.refId)
+    return !!t && !!a.input.rangeEnd && t.deadline > a.input.rangeEnd && v.status === 'partial'
   }
   if (a.kind === 'objective') {
     const dose = a.plan.objectiveDoses[a.refId]?.dose
@@ -699,7 +703,7 @@ export function noterVerdict(learning: LearningState, date: string, blockId: str
 export type PlanApres = (
   learning: LearningState,
   confirmations: SessionConfirmationsState,
-) => { plan: PlanningResult; input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'> }
+) => { plan: PlanningResult; input: Pick<PlanningInput, 'today' | 'weeklyObjectiveServed'> & Partial<Pick<PlanningInput, 'rangeEnd' | 'tasks'>> }
 
 export type PreparationStop =
   | { etape: 'pas-de-place'; learning: LearningState; confirmations: SessionConfirmationsState; message: string }
@@ -766,7 +770,7 @@ export function preparerStop(a: {
     ? jugerPliage({
         learning: a.learning,
         element: a.pliage.element,
-        minutes: pli,
+        tenu: essai.heldMinutes,
         today: date,
         bloc: { blockId: o.blockId, date },
         planApres: plan,
@@ -791,7 +795,8 @@ export function preparerStop(a: {
     }
   }
   const echeance = a.tache && o.kind === 'task' ? echeanceDe(plan, a.confirmations.date, a.tache) : null
-  const reste = juge ? Math.max(0, juge.budget.longueur - juge.budget.utilise - pli) : null
+  // Ce qui peut encore se plier avant d'être 15 % derrière la version idéale.
+  const reste = juge ? Math.max(0, juge.budget.retardMax - juge.budget.retard) : null
   const ligne = pli > 0 ? `${duree(pli)} folds into the next days.${reste !== null ? ` ${duree(reste)} left to fold.` : ''}` : undefined
   return { etape: 'reaction', reaction: reagir({ niveau, echeance }, ligne), faits, attenteMinutes }
 }

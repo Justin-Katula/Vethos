@@ -34,7 +34,7 @@ import {
   tasksToAutoComplete,
 } from '@shared/planning/clock'
 import type { ConfirmationOverlay } from './confirmation-overlay'
-import { elementPliable, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
+import { elementPliable, figerIdeaux, historiqueCreations, pliesDuJour } from '@shared/planning/pliement'
 import {
   ATTENTE_STOP_MINUTES,
   choisirRattrapage,
@@ -441,9 +441,10 @@ export function createPlanRunner(deps: PlanRunnerDeps): PlanRunner {
       nowMinute,
     })
 
-    let workingLearning = learning
+    // La version idéale de chaque tâche : figée la première fois que le plan la pose.
+    let workingLearning = figerIdeaux(learning, plan, { tasks: state.input.tasks, objectives: state.input.objectives, today })
     let workingConfirmations = confirmations
-    let changed = false
+    let changed = workingLearning !== learning
 
     if (closed !== null) {
       const confirmedAtMs = confirmations.confirmedAt[closed.blockId]

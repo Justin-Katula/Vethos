@@ -298,12 +298,16 @@ describe('Le Stop, de bout en bout', () => {
     expect(r.learning.sessionEvents[0]).toMatchObject({ forced: true, heldMinutes: null })
   })
 
+  // La version idéale de « t » : 50 min aujourd'hui, le reste demain (240 en tout).
+  const avecIdeal = (aujourdhui: number) => ({ ...learning(), ideals: { 'task:t': { since: TODAY, base: 0, points: [[TODAY, aujourdhui], ['2026-09-22', 240]] as Array<[string, number]> } } })
+
   it('la place : la réaction, puis l’attente bloquée, puis l’arrêt — le reste se plie, sans heure à choisir', () => {
-    const prep = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'too-hard', planApres: apres(), pliage })!
+    const prep = preparerStop({ learning: avecIdeal(50), confirmations: conf(), nowMs: 0, minute: 560, reason: 'too-hard', planApres: apres(), pliage })!
     expect(prep.etape).toBe('reaction')
     if (prep.etape !== 'reaction') return
     expect(prep.attenteMinutes).toBe(5)
-    expect(prep.reaction.lignes[0]).toBe('40 min folds into the next days. 20 min left to fold.')
+    // 20 min tenues sur 50 prévues : 30 min derrière l'idéal, 36 permises (15 % de 240).
+    expect(prep.reaction.lignes[0]).toBe('40 min folds into the next days. 6 min left to fold.')
     const c = demanderStop(conf(), { nowMs: 0, minute: 560, reason: 'too-hard', attenteMinutes: prep.attenteMinutes, placement: prep.reaction.placement })!
     expect(c.stopPending).toMatchObject({ untilMinute: 565, untilMs: 300_000 })
     // Rien n'est arrêté pendant l'attente.
@@ -318,12 +322,12 @@ describe('Le Stop, de bout en bout', () => {
     expect(pliesDuJour(fin.learning, fin.confirmations)).toEqual(['t'])
   })
 
-  it('le pli refusé : trop long, en pause, ou pas la place une fois les nouvelles tâches probables comptées', () => {
-    const court = { ...pliage, element: { ...pliage.element, total: 120 } }
-    const r = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage: court })!
-    expect(r.etape === 'pas-de-place' && r.message).toBe('Folded as far as it goes. 15-minute break, then you finish.')
+  it('le pli refusé : 15 % derrière la version idéale, ou pas la place une fois les nouvelles tâches probables comptées', () => {
+    // 20 min tenues sur 60 prévues : 40 min derrière l'idéal, plus que les 15 % (36 min).
+    const r = preparerStop({ learning: avecIdeal(60), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage })!
+    expect(r.etape === 'pas-de-place' && r.message).toBe('Already 15% behind. 15-minute break, then you finish.')
     // Une semaine chargée de créations : le libre ne couvre plus ce qui viendra.
-    const creations = Array.from({ length: 30 }, (_, i) => ({ kind: 'task' as const, date: `2026-09-${String(i % 20 + 1).padStart(2, '0')}`, minutes: 600 }))
+    const creations = Array.from({ length: 30 }, (_, i) => ({ kind: 'task' as const, date: `2026-09-${String(i % 20 + 1).padStart(2, '0')}`, minutes: 3000 }))
     const plein = preparerStop({ learning: learning(), confirmations: conf(), nowMs: 0, minute: 560, reason: 'boring', planApres: apres(), pliage: { ...pliage, creations } })!
     expect(plein.etape === 'pas-de-place' && plein.message).toBe('No room to fold. 15-minute break, then you finish.')
   })

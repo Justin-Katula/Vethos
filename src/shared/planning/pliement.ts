@@ -6,10 +6,10 @@ import { addDays, daysBetween, startOfWeek } from './dates'
 //
 // Un Stop ne déplace pas le travail : il le PLIE. La partie non faite ne
 // disparaît pas, elle épaissit les séances à venir de la même tâche (ou du
-// même objectif) — le moteur la répartit, jamais le jour même. Plus une tâche
-// est longue, plus elle se plie ; l'échéance, le temps libre et la
-// probabilité de nouvelles tâches disent jusqu'où. Plier trop souvent met le
-// pliement en pause. Une ancre ne se plie jamais.
+// même objectif) — le moteur la répartit, jamais le jour même. La version
+// idéale de la tâche, l'échéance, le temps libre et la probabilité de
+// nouvelles tâches disent jusqu'où. Plier trop souvent met le pliement en
+// pause. Une ancre ne se plie jamais.
 
 // ─── La probabilité ──────────────────────────────────────────────────────
 //
@@ -80,10 +80,17 @@ export function probabiliteCreation(creations: readonly Creation[], today: strin
   return { ...r, minutesAttendues: r.task.minutesAttendues + r.objective.minutesAttendues + r.ancre.minutesAttendues }
 }
 
-// ─── Jusqu'où plier ──────────────────────────────────────────────────────
+// ─── Jusqu'où plier : la version idéale ──────────────────────────────────
+//
+// Chaque tâche a une version idéale : le plan tel que le moteur l'a posé la
+// première fois, avant tout pli — ce qui devrait être fait, jour après jour.
+// Plier fait prendre du retard sur elle ; les séances épaissies le rattrapent.
+// Le pli est refusé dès que la tâche serait à plus de 15 % (du travail
+// entier) derrière sa version idéale. Plus une tâche est longue, plus ces
+// 15 % font de minutes. Un objectif a sa version idéale par semaine.
 
-/** La part d'une tâche (ou de la cible de la semaine) qui peut se plier. */
-export const PART_PLIABLE = 0.25
+/** Le retard maximal sur la version idéale, en part du travail entier. */
+export const RETARD_MAX = 0.15
 
 /** Le travail entier d'une tâche, corrigé. */
 export const travailTotal = (t: Pick<Task, 'estimatedMinutes' | 'correctionFactor' | 'extraMinutes'>) =>
@@ -107,27 +114,75 @@ export function elementPliable(
   return null
 }
 
-const estPlie = (e: SessionEvent) => e.stop?.verdict === 'folded'
+/** La clé de la version idéale : la tâche, ou l'objectif pour cette semaine. */
+export const cleIdeal = (el: Pick<ElementPliable, 'kind' | 'refId'>, today: string) =>
+  el.kind === 'objective' ? `objective:${el.refId}:${startOfWeek(today)}` : `task:${el.refId}`
 
-/** Les minutes déjà pliées : toute la tâche ; pour un objectif, cette semaine. */
-export function minutesPliees(learning: Pick<LearningState, 'sessionEvents'>, el: Pick<ElementPliable, 'kind' | 'refId'>, today: string): number {
+/** Le travail vraiment fait : les séances tenues (un objectif : cette semaine). */
+export function faitDe(learning: Pick<LearningState, 'sessionEvents'>, el: Pick<ElementPliable, 'kind' | 'refId'>, today: string): number {
   const depuis = el.kind === 'objective' ? startOfWeek(today) : ''
   return (learning.sessionEvents ?? [])
-    .filter((e) => e.refId === el.refId && estPlie(e) && e.date >= depuis)
-    .reduce((t, e) => t + (e.stop?.foldedMinutes ?? 0), 0)
+    .filter((e) => e.refId === el.refId && e.date >= depuis)
+    .reduce((t, e) => t + (e.heldMinutes ?? 0), 0)
 }
 
+type Ideal = NonNullable<LearningState['ideals']>[string]
+
 /**
- * La pause de pliement : parmi les 3 dernières séances commencées de cet
- * élément, 2 pliées ou plus — plier est suspendu. Elle se lève d'elle-même
- * quand les séances suivantes sont tenues jusqu'au bout.
+ * Fige la version idéale des tâches et objectifs que le plan place et qui
+ * n'en ont pas encore. Jamais refigée : c'est la référence, pas le plan du
+ * jour. Les versions des tâches disparues et des semaines passées tombent.
  */
+export function figerIdeaux(
+  learning: LearningState,
+  plan: Pick<PlanningResult, 'blocks'>,
+  a: { tasks: readonly Task[]; objectives: readonly Objective[]; today: string },
+): LearningState {
+  const avant = learning.ideals ?? {}
+  const semaine = startOfWeek(a.today)
+  const garder = (k: string) =>
+    k.startsWith('task:') ? a.tasks.some((t) => t.status === 'active' && k === `task:${t.id}`) : k.endsWith(`:${semaine}`)
+  const ideals: Record<string, Ideal> = Object.fromEntries(Object.entries(avant).filter(([k]) => garder(k)))
+  let change = Object.keys(ideals).length !== Object.keys(avant).length
+  const elements: ElementPliable[] = [
+    ...a.tasks.filter((t) => t.status === 'active').map((t) => ({ kind: 'task' as const, refId: t.id, total: travailTotal(t), fin: t.deadline })),
+    ...a.objectives.map((o) => ({ kind: 'objective' as const, refId: o.id, total: o.weeklyTargetMinutes, fin: addDays(semaine, 6) })),
+  ]
+  for (const el of elements) {
+    const k = cleIdeal(el, a.today)
+    if (ideals[k]) continue
+    const parJour = new Map<string, number>()
+    for (const b of plan.blocks) {
+      if (b.kind !== el.kind || b.refId !== el.refId || b.date < a.today || b.date > el.fin || b.preview) continue
+      parJour.set(b.date, (parJour.get(b.date) ?? 0) + b.workMinutes)
+    }
+    if (parJour.size === 0) continue
+    const base = faitDe(learning, el, a.today)
+    let cumul = base
+    const points: Array<[string, number]> = [...parJour.entries()]
+      .sort(([x], [y]) => x.localeCompare(y))
+      .map(([d, m]) => {
+        cumul += m
+        return [d, cumul]
+      })
+    ideals[k] = { since: a.today, base, points }
+    change = true
+  }
+  return change ? { ...learning, ideals } : learning
+}
+
+/** Ce que la version idéale dit d'avoir fait à la fin de `date`, en minutes. */
+export function idealA(ideal: Ideal, date: string): number {
+  return ideal.points.filter(([d]) => d <= date).at(-1)?.[1] ?? ideal.base
+}
+
+/** La pause de pliement : 2 des 3 dernières séances commencées de cet élément pliées. */
 export function pliageEnPause(learning: Pick<LearningState, 'sessionEvents'>, refId: string, sauf?: { blockId: string; date: string }): boolean {
   const dernieres = (learning.sessionEvents ?? [])
     .filter((e) => e.refId === refId && e.started && !(sauf && e.blockId === sauf.blockId && e.date === sauf.date))
     .sort((a, b) => (a.date === b.date ? a.plannedStartMinute - b.plannedStartMinute : a.date.localeCompare(b.date)))
     .slice(-3)
-  return dernieres.filter(estPlie).length >= 2
+  return dernieres.filter((e) => e.stop?.verdict === 'folded').length >= 2
 }
 
 /** Le temps libre qui reste d'aujourd'hui à `fin`, une fois tout placé. */
@@ -138,13 +193,13 @@ export function libreJusqua(plan: PlanningResult, today: string, fin: string): n
   return Math.max(0, capacite - pris)
 }
 
-export type RefusPliage = 'pause' | 'longueur' | 'place'
+export type RefusPliage = 'pause' | 'retard' | 'place'
 
 export type BudgetPliage = {
-  /** Ce que la longueur permet de plier en tout. */
-  longueur: number
-  /** Déjà plié. */
-  utilise: number
+  /** Le retard permis sur la version idéale : 15 % du travail entier. */
+  retardMax: number
+  /** Le retard sur la version idéale si ce pli est fait (fin de journée). */
+  retard: number
   /** Le libre avant l'échéance, une fois ce pli réparti. */
   libre: number
   /** Ce que les nouvelles créations prendront probablement d'ici là. */
@@ -152,30 +207,39 @@ export type BudgetPliage = {
 }
 
 /**
- * Ce pli de `minutes` passe-t-il ? Dans l'ordre : la pause de pliement, la
- * longueur (déjà plié + ce pli ≤ 25 % du total), puis la place — le temps
- * libre qui reste APRÈS avoir réparti ce pli doit encore couvrir ce que les
- * nouvelles tâches, objectifs et ancres prendront probablement d'ici
- * l'échéance. `planApres` : le plan recalculé comme si le pli était fait.
+ * Ce pli passe-t-il ? Dans l'ordre : la pause de pliement (2 des 3 dernières
+ * séances pliées), la version idéale (le retard, une fois ce pli fait et la
+ * journée finie, reste sous 15 % du travail entier), puis la place — le
+ * temps libre qui reste APRÈS avoir réparti ce pli doit encore couvrir ce que
+ * les nouvelles tâches, objectifs et ancres prendront probablement d'ici
+ * l'échéance. `tenu` : les minutes tenues de la séance qu'on arrête ;
+ * `planApres` : le plan recalculé comme si le pli était fait.
  */
 export function jugerPliage(a: {
-  learning: Pick<LearningState, 'sessionEvents'>
+  learning: Pick<LearningState, 'sessionEvents' | 'ideals'>
   element: ElementPliable
-  minutes: number
+  tenu: number
   today: string
   bloc: { blockId: string; date: string }
   planApres: PlanningResult
   creations: readonly Creation[]
 }): { ok: true; budget: BudgetPliage } | { ok: false; refus: RefusPliage; budget: BudgetPliage } {
-  const jours = Math.max(1, daysBetween(a.today, a.element.fin) + 1)
+  // Le libre et le probable se comparent sur la même période : jusqu'à
+  // l'échéance, mais pas au-delà des jours que le plan calcule.
+  const dernier = a.planApres.capacities.reduce((m, c) => (c.date > m ? c.date : m), a.today)
+  const jusqua = a.element.fin < dernier ? a.element.fin : dernier
+  const jours = Math.max(1, daysBetween(a.today, jusqua) + 1)
+  const ideal = a.learning.ideals?.[cleIdeal(a.element, a.today)]
+  // Le pli fait, plus rien de cet élément aujourd'hui : fait = déjà fait + tenu.
+  const fait = faitDe(a.learning, a.element, a.today) + a.tenu
   const budget: BudgetPliage = {
-    longueur: Math.round(PART_PLIABLE * a.element.total),
-    utilise: minutesPliees(a.learning, a.element, a.today),
-    libre: libreJusqua(a.planApres, a.today, a.element.fin),
+    retardMax: Math.round(RETARD_MAX * a.element.total),
+    retard: ideal ? Math.max(0, idealA(ideal, a.today) - fait) : 0,
+    libre: libreJusqua(a.planApres, a.today, jusqua),
     attendu: probabiliteCreation(a.creations, a.today, jours).minutesAttendues,
   }
   if (pliageEnPause(a.learning, a.element.refId, a.bloc)) return { ok: false, refus: 'pause', budget }
-  if (budget.utilise + a.minutes > budget.longueur) return { ok: false, refus: 'longueur', budget }
+  if (budget.retard > budget.retardMax) return { ok: false, refus: 'retard', budget }
   if (budget.libre < budget.attendu) return { ok: false, refus: 'place', budget }
   return { ok: true, budget }
 }
@@ -183,7 +247,7 @@ export function jugerPliage(a: {
 /** Ce que l'app dit quand le pli ne passe pas. */
 export const MESSAGE_REFUS: Record<RefusPliage, string> = {
   pause: 'Too many folds on this one. 15-minute break, then you finish.',
-  longueur: 'Folded as far as it goes. 15-minute break, then you finish.',
+  retard: 'Already 15% behind. 15-minute break, then you finish.',
   place: 'No room to fold. 15-minute break, then you finish.',
 }
 

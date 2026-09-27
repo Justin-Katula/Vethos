@@ -3,7 +3,7 @@ import { LearningStateSchema, SessionConfirmationsStateSchema, type SessionEvent
 import { sleepScheduleEntries } from '@shared/sleep'
 import { computePlan } from './engine'
 import { applyConfirmation, decalagePossible, decalerAncre, overlayDueFor } from './clock'
-import { minutesPliees, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
+import { faitDe, figerIdeaux, idealA, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
 import type { PlacedBlock, PlanningInput } from './types'
 
 const TODAY = '2026-09-21'
@@ -45,7 +45,23 @@ describe('La pause de pliement', () => {
     expect(pliageEnPause(l([true, true]), 't')).toBe(true)
     expect(pliageEnPause(l([true, false, true]), 't')).toBe(true)
     expect(pliageEnPause(l([true, true, false, false]), 't')).toBe(false)
-    expect(minutesPliees(l([true, true]), { kind: 'task', refId: 't' }, TODAY)).toBe(60)
+  })
+})
+
+describe('La version idéale', () => {
+  it('figée la première fois que le plan pose la tâche, jamais refigée ; le fait se lit dans les séances', () => {
+    const tache = { id: 't', status: 'active', estimatedMinutes: 200, correctionFactor: 1, extraMinutes: 0, deadline: '2026-09-27' } as unknown as import('@shared/schemas').Task
+    const bloc = (date: string, workMinutes: number) => ({ kind: 'task', refId: 't', date, workMinutes }) as PlacedBlock
+    const l0 = LearningStateSchema.parse({ sessionEvents: [{ ...ev(1, false), heldMinutes: 40 }] })
+    const l1 = figerIdeaux(l0, { blocks: [bloc(TODAY, 60), bloc('2026-09-22', 60), bloc('2026-09-22', 40)] }, { tasks: [tache], objectives: [], today: TODAY })
+    expect(l1.ideals!['task:t']).toEqual({ since: TODAY, base: 40, points: [[TODAY, 100], ['2026-09-22', 200]] })
+    // Un autre plan le lendemain (après un pli) ne la change pas.
+    expect(figerIdeaux(l1, { blocks: [bloc('2026-09-22', 160)] }, { tasks: [tache], objectives: [], today: '2026-09-22' })).toBe(l1)
+    expect(idealA(l1.ideals!['task:t']!, TODAY)).toBe(100)
+    expect(idealA(l1.ideals!['task:t']!, '2026-09-20')).toBe(40)
+    expect(faitDe(l1, { kind: 'task', refId: 't' }, TODAY)).toBe(40)
+    // La tâche finie ou supprimée : sa version idéale tombe.
+    expect(figerIdeaux(l1, { blocks: [] }, { tasks: [], objectives: [], today: TODAY }).ideals).toEqual({})
   })
 })
 

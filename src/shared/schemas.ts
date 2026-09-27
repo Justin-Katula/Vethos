@@ -392,6 +392,21 @@ export const LearningStateSchema = z.object({
   promises: z.array(z.lazy(() => PromiseSchema)).max(300).optional(),
   /** Chaque pause d'urgence : début, fin, apps débloquées, tentatives. */
   emergencyPauses: z.array(z.lazy(() => EmergencyPauseSchema)).max(300).optional(),
+  /**
+   * La version idéale de chaque tâche (et de chaque objectif, par semaine) :
+   * le plan figé la première fois qu'il la place, avant tout pli. `base` : le
+   * travail déjà fait à ce moment ; `points` : le cumul prévu jour par jour.
+   */
+  ideals: z
+    .record(
+      z.string(),
+      z.object({
+        since: z.string().regex(DATE_REGEX),
+        base: z.number().int().min(0),
+        points: z.array(z.tuple([z.string().regex(DATE_REGEX), z.number().int().min(0)])).max(400),
+      }),
+    )
+    .optional(),
 })
 export type LearningState = z.infer<typeof LearningStateSchema>
 
