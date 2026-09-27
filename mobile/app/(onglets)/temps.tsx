@@ -9,9 +9,10 @@
  * n'en inventera pas.
  */
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Defs, LinearGradient, Path, Stop, Rect } from 'react-native-svg'
+import Svg, { Defs, LinearGradient, Path, Pattern, Stop, Rect } from 'react-native-svg'
+import { THEMES } from '@/theme/jetons'
 import * as Haptics from 'expo-haptics'
 import { useDonnees, type Obligation } from '@/donnees/magasin'
 import { verifierSommeil } from '@/donnees/regle-sommeil'
@@ -37,6 +38,7 @@ import {
   MONO,
   Plus,
   TitrePage,
+  TRAIT,
   TYPEC,
   useLumiere,
   useToast,
@@ -248,31 +250,26 @@ export default function MonTemps() {
                         )
                       const vivant = i === AUJ && s.debut <= N && N < s.fin
                       const on = sel?.id === s.id
+                      // La pause se montre toujours, hachurée au bas du bloc : le
+                      // bloc va jusqu'au bout de son empreinte, travail puis pause.
+                      const finBloc = Math.min(BED, s.pause ? (s.finEmpreinte ?? s.fin) : s.fin)
+                      const hb = Math.max(14, Y(finBloc) - Y(a))
+                      const hp = s.pause ? Math.max(4, Math.round(hb * (s.pause / Math.max(1, finBloc - s.debut)))) : 0
+                      const tb = `${fmt(s.debut)}–${fmt(finBloc)}`
                       return (
-                        <Pressable
+                        <BlocTemps
                           key={s.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${s.titre}, ${t}`}
-                          onPress={() => (vibrer(), setSel(s))}
-                          style={{
-                            position: 'absolute',
-                            left: 3,
-                            right: 3,
-                            top: Y(a),
-                            height: h,
-                            borderRadius: 8,
-                            backgroundColor: TYPEC[n],
-                            borderWidth: vivant || on ? 1.5 : 0,
-                            borderColor: on ? A.t1 : acc,
-                            paddingVertical: 6,
-                            paddingHorizontal: 8,
-                            overflow: 'hidden',
-                            zIndex: on ? 15 : 5,
-                          }}
-                        >
-                          <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 12, lineHeight: 15 }}>{s.titre}</Text>
-                          {h >= 38 ? <Text numberOfLines={1} style={{ marginTop: 2, color: 'rgba(242,242,242,0.7)', fontFamily: MONO.normal, fontSize: 10, lineHeight: 13 }}>{t}</Text> : null}
-                        </Pressable>
+                          id={s.id}
+                          titre={s.titre}
+                          heures={tb}
+                          top={Y(a)}
+                          hauteur={hb}
+                          pause={hp}
+                          trait={TRAIT[n]}
+                          bord={on ? A.t1 : vivant ? acc : null}
+                          devant={on}
+                          surPression={() => (vibrer(), setSel(s))}
+                        />
                       )
                     })}
                     {voile ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: voile, backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 25 }} /> : null}
@@ -293,6 +290,95 @@ export default function MonTemps() {
       <FeuilleFixe ouverte={fixe} fermer={() => setFixe(false)} nouveau={() => (setFixe(false), garde() && setNouveau(true))} />
       <FeuilleNouveau ouverte={nouveau} fermer={() => setNouveau(false)} DAYS={DAYS} />
     </View>
+  )
+}
+
+// ——— Un bloc placé ———
+
+const SOMBRE = THEMES.sombre
+
+/**
+ * La forme d'origine des blocs : fond sombre, trait de couleur à gauche, fin
+ * contour ; la pause (E.1) fermée au bas du bloc par un voile hachuré.
+ */
+function BlocTemps({ id, titre, heures, top, hauteur, pause, trait, bord, devant, surPression }: {
+  id: string
+  titre: string
+  heures: string
+  top: number
+  hauteur: number
+  pause: number
+  trait: string
+  bord: string | null
+  devant: boolean
+  surPression: () => void
+}) {
+  const afficherTitre = hauteur >= 16
+  const afficherHeures = hauteur >= 34
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${titre}, ${heures}`}
+      onPress={surPression}
+      style={({ pressed }) => ({
+        position: 'absolute',
+        left: 3,
+        right: 3,
+        top,
+        height: hauteur,
+        borderRadius: 6,
+        overflow: 'hidden',
+        backgroundColor: SOMBRE.surface2,
+        borderWidth: bord ? 1.5 : 1,
+        borderColor: bord ?? SOMBRE.line,
+        borderLeftWidth: 3.5,
+        borderLeftColor: trait,
+        paddingHorizontal: afficherTitre ? 6 : 0,
+        paddingVertical: afficherTitre ? 3 : 0,
+        zIndex: devant ? 15 : 5,
+        opacity: pressed ? 0.72 : 1,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
+    >
+      {afficherTitre ? (
+        <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 10.5, letterSpacing: -0.2 }}>{titre}</Text>
+      ) : null}
+      {afficherHeures ? (
+        <Text numberOfLines={1} style={{ marginTop: 1, color: A.t3, fontFamily: MONO.normal, fontSize: 9, fontVariant: ['tabular-nums'] }}>{heures}</Text>
+      ) : null}
+      {pause > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: pause,
+              backgroundColor: SOMBRE.pauseVoile,
+              borderTopWidth: 1,
+              borderTopColor: SOMBRE.pauseBordure,
+              overflow: 'hidden',
+            },
+            Platform.select({
+              web: { backgroundImage: `repeating-linear-gradient(-45deg, ${SOMBRE.pauseHachure} 0 2px, transparent 2px 5px)` } as object,
+            }),
+          ]}
+        >
+          {Platform.OS !== 'web' ? (
+            <Svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+              <Defs>
+                <Pattern id={`hachure-${id}`} width="5" height="5" patternUnits="userSpaceOnUse">
+                  <Path d="M-1,1 l2,-2 M0,5 l5,-5 M4,6 l2,-2" stroke={SOMBRE.pauseHachure} strokeWidth="2" strokeLinecap="square" />
+                </Pattern>
+              </Defs>
+              <Rect width="100%" height="100%" fill={`url(#hachure-${id})`} />
+            </Svg>
+          ) : null}
+        </View>
+      ) : null}
+    </Pressable>
   )
 }
 

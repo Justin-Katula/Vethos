@@ -9,6 +9,7 @@ import Svg, { Path } from 'react-native-svg'
 import { accentApp, heureDecimale, lumiere, teinteApp } from './lumiere'
 import type { Lueur } from './FondLumiere'
 import { GEIST, MONO } from './primitives'
+import { arrondiCinq } from '@/plan/format'
 
 export const A = {
   t1: '#f2f2f2',
@@ -258,7 +259,8 @@ export function BoutonBlanc({ children, onPress, actif = true, hauteur = 52 }: {
 }
 
 export const hm = (m: number) => {
-  const v = Math.max(0, Math.round(m))
+  // Le multiple de 5 le plus proche : jamais « 1 h 23 » (sous 5 min, telle quelle).
+  const v = arrondiCinq(m)
   if (v < 60) return `${v} min`
   return `${Math.floor(v / 60)} h${v % 60 ? ` ${String(v % 60).padStart(2, '0')}` : ''}`
 }

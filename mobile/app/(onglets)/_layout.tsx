@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router'
+import { BlurView } from 'expo-blur'
 import { Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
@@ -60,19 +61,24 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
   const marges = useSafeAreaInsets()
   const courant = state.routes[state.index]?.name
   const actif = courant === 'profil' ? 'index' : courant
+  // Comme la maquette : verre dépoli (noir à 45 %, flou), le contenu passe
+  // dessous sans se lire.
   return (
-    <View
+    <BlurView
+      intensity={100}
+      tint="dark"
       style={{
         position: 'absolute',
         left: 0,
         right: 0,
         bottom: 0,
         height: 49 + Math.max(marges.bottom, 12),
-        backgroundColor: 'rgba(0,0,0,0.82)',
+        backgroundColor: 'rgba(0,0,0,0.45)',
         borderTopWidth: 1,
         borderTopColor: 'rgba(242,242,242,0.08)',
         flexDirection: 'row',
         paddingHorizontal: 6,
+        overflow: 'hidden',
       }}
     >
       {ONGLETS.map((o) => {
@@ -107,7 +113,7 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
           </Pressable>
         )
       })}
-    </View>
+    </BlurView>
   )
 }
 

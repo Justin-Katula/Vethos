@@ -85,6 +85,14 @@ const WIP_TARGET_WEEKS = 2
  */
 const DEEP_BUDGET_MINUTES = TASK_CONSTANTS.maxDeepBlocksPerDay * TASK_CONSTANTS.targetBlockMinutes
 
+/**
+ * Toute durée que le moteur pose tombe sur un multiple de 5 : jamais « 1 h 23 »
+ * à l'écran. Le travail restant, les longueurs apprises, les quotas et le
+ * début de la journée en cours s'y arrondissent ; le reste en découle.
+ */
+const cinq = (m: number) => Math.round(m / 5) * 5
+const cinqDessous = (m: number) => Math.floor(m / 5) * 5
+
 /** L'empreinte réelle d'un bloc : le travail plus sa pause (E.1). */
 function footprintFor(workMinutes: number): number {
   return workMinutes + computeBreakMinutes(workMinutes)
@@ -145,7 +153,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // comptabilité : c'est du temps réellement passé, pas une déclaration.
   const needByTask = new Map<string, number>()
   for (const task of activeTasks) {
-    needByTask.set(task.id, remainingWorkFor(task, input.durationSource))
+    needByTask.set(task.id, cinq(remainingWorkFor(task, input.durationSource)))
   }
 
   const ancresFor = (dow: number): AncreItem[] =>
@@ -714,7 +722,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         sacrificeLeft -= given
       }
 
-      let left = Math.min(quota, budget)
+      let left = cinq(Math.min(quota, budget))
       // Au plus 2 séances par objectif et par jour, à 3 h d'écart au moins.
       // Si le quota tient en un bloc, une seule. Ce qui ne trouve pas sa place
       // part dans le report de D.4 — jamais en blocs collés.
@@ -836,7 +844,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       const capOverride = family.capOverride
 
       // Une miette sous 25 min ne se place jamais seule : le bloc la prend.
-      let dayTarget = absorbCrumb(Math.min(family.left, need), need)
+      let dayTarget = cinq(absorbCrumb(Math.min(family.left, need), need))
       while (
         dayTarget >= TASK_CONSTANTS.minBlockMinutes &&
         budget >= TASK_CONSTANTS.minBlockMinutes
@@ -846,8 +854,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           remainingNeed.get(task.id) ?? 0,
         )
 
-        let footprint = Math.min(footprintFor(work), budget)
-        if (footprint > allocator.largestFree()) footprint = allocator.largestFree()
+        let footprint = cinqDessous(Math.min(footprintFor(work), budget))
+        if (footprint > allocator.largestFree()) footprint = cinqDessous(allocator.largestFree())
         // Raccourci par la place du jour, le bloc ne doit pas laisser derrière
         // lui une miette qu'aucun bloc ne pourra plus jamais prendre.
         const crumb = (remainingNeed.get(task.id) ?? 0) - workOfFootprint(footprint)
@@ -1337,7 +1345,7 @@ function buildLearningContext(
       const croitDeja = survie.length >= 5 && !survie.some((o) => o.arret)
       const d = croitDeja ? Math.min(1, niveau(refId)) : niveau(refId)
       const adj = ajust(refId)
-      const len = Math.max(BLOC_MIN, Math.min(BLOC_MAX, Math.round(base * d)))
+      const len = Math.max(BLOC_MIN, Math.min(BLOC_MAX, cinq(base * d)))
       blockMaxCache.set(k, adj.blocMax ? Math.min(len, adj.blocMax) : len)
     }
     return blockMaxCache.get(k)!

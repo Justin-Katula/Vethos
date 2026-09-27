@@ -978,7 +978,7 @@ describe('D.2 — préemption', () => {
     // (25 min, A.2/D.5) une fois la part volée retranchée. Au-delà d'un bloc,
     // la limite de 2 séances à 3 h d'écart plafonnerait déjà la journée, et le
     // test ne prouverait plus rien sur la PROGRESSIVITÉ du vol.
-    const gros = () => objective({ weeklyTargetMinutes: 560 })
+    const gros = () => objective({ weeklyTargetMinutes: 620 })
 
     const base = computePlan(input({ objectives: [gros()] }), NOW)
     const baseObjective = objectiveMinutesOn(base, TODAY)

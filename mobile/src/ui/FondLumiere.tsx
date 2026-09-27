@@ -12,6 +12,8 @@ import type { RVB } from './lumiere'
 
 /** L'intensité est cuite dans le dégradé à ce niveau, puis réglée par l'opacité. */
 const PLAFOND = 1.4
+/** Sur un téléphone, la lueur se voyait à peine : +10 % de lumière. */
+const LUMINOSITE = 1.1
 const DUREE = 1400
 const DOUX = Easing.bezier(0.23, 1, 0.32, 1)
 
@@ -39,7 +41,7 @@ const Couche = memo(function Couche({ lt, tc, cote, id }: { lt: number; tc: RVB;
   const stops = Array.from({ length: n + 1 }, (_, k) => {
     const t = k / n
     const d2 = (t * R) ** 2
-    const v = PLAFOND * (0.125 * Math.exp(-d2 * lt) + 0.14 * Math.exp(-d2 * lt * 9))
+    const v = LUMINOSITE * PLAFOND * (0.125 * Math.exp(-d2 * lt) + 0.14 * Math.exp(-d2 * lt * 9))
     return { t, o: Math.min(1, v) }
   })
   return (

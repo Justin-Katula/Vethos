@@ -175,12 +175,15 @@ export default function Aujourdhui() {
   const badge = `TODAY · ${maintenant.getDate()} ${MOIS[maintenant.getMonth()]}`
 
   // Les découpes du masque : l'aiguille passe SOUS les textes du centre.
-  const K = 400 / 340
+  const K = 400 / cote
+  // À cette hauteur, le cercle est plus étroit qu'à son centre. Garder une
+  // marge de chaque côté, même sur les petits écrans et avec un titre long.
+  const largeurStatut = cote * 0.7
   const boite = (cx: number, cy: number, w: number, h: number) => ({ x: cx - w / 2, y: cy - h / 2, w, h })
   const coupes = [
     boite(200, 200 - 56 * K + 8 * K, (badge.length * 7.6 + 22) * K, 16 * K),
     boite(200, 200 - 56 * K + 57 * K, (5 * 36 + 10) * K, 56 * K),
-    boite(200, 200 + 56 * K - 10 * K, (statut.length * 7.4 + 14) * K, 20 * K),
+    boite(200, 200 + 56 * K - 10 * K, (largeurStatut + 16) * K, 44 * K),
   ]
 
   const onCarrousel = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -309,7 +312,7 @@ export default function Aujourdhui() {
                 <Text style={{ color: A.t3, fontFamily: GEIST.demi, fontSize: 11, letterSpacing: 1.4 }}>{badge}</Text>
               </View>
               <Text style={{ marginTop: 6, color: A.t1, fontFamily: GEIST.demi, fontSize: 64, lineHeight: 70, letterSpacing: -2.5, fontVariant: ['tabular-nums'] }}>{fmt(N)}</Text>
-              <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 15 }}>{statut}</Text>
+              <Text numberOfLines={2} ellipsizeMode="tail" style={{ width: largeurStatut, color: A.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 20, textAlign: 'center' }}>{statut}</Text>
             </View>
           </Pressable>
 

@@ -27,8 +27,14 @@ export function enHeure(minute: number): string {
   return `${String(Math.floor(valeur / 60) % 24).padStart(2, '0')}:${String(valeur % 60).padStart(2, '0')}`
 }
 
-export function duree(minutes: number): string {
+/** Une durée tombe sur le multiple de 5 le plus proche : jamais « 1 h 23 ». Sous 5 min, telle quelle. */
+export const arrondiCinq = (minutes: number) => {
   const m = Math.max(0, Math.round(minutes))
+  return m < 5 ? m : Math.round(m / 5) * 5
+}
+
+export function duree(minutes: number): string {
+  const m = arrondiCinq(minutes)
   const h = Math.floor(m / 60)
   return h === 0 ? `${m} min` : m % 60 === 0 ? `${h} h` : `${h} h ${String(m % 60).padStart(2, '0')}`
 }
