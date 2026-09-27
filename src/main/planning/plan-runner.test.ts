@@ -604,7 +604,7 @@ describe('DÉFAUT DU 2026-08-23 — « ce bloc ne fait plus partie du plan » al
 describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
   it('arrête, lève le blocage, garde la raison — et l’overlay ne redemande pas dans la foulée', async () => {
     let nowRef = WAKE
-    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 600, remainingMinutes: 600, deadline: '2026-08-30' })) as Storage & {
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 1200, remainingMinutes: 1200, deadline: '2026-09-02' })) as Storage & {
       __mem: Map<string, unknown>
     }
     const overlay = fakeOverlay()
@@ -649,7 +649,7 @@ describe('« Stop » pendant une séance (spec moteur 2026-09-25)', () => {
 
   it('« 10 more minutes » : on continue, puis « Stop ? » revient 10 min plus tard, une seule fois', async () => {
     let nowRef = WAKE
-    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 600, remainingMinutes: 600, deadline: '2026-08-30' }))
+    const storage = fakeStorage(oneTaskSeed({ estimatedMinutes: 1200, remainingMinutes: 1200, deadline: '2026-09-02' }))
     const overlay = fakeOverlay()
     const runner = createPlanRunner({ storage, overlay, now: () => nowRef })
     await runner.tickNow()

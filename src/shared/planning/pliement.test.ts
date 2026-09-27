@@ -3,7 +3,7 @@ import { LearningStateSchema, SessionConfirmationsStateSchema, type SessionEvent
 import { sleepScheduleEntries } from '@shared/sleep'
 import { computePlan } from './engine'
 import { applyConfirmation, decalagePossible, decalerAncre, overlayDueFor } from './clock'
-import { faitDe, figerIdeaux, idealA, jugerPliage, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
+import { droitDePlier, faitDe, figerIdeaux, idealA, jugerPliage, pliageEnPause, probabiliteCreation, type Creation } from './pliement'
 import type { PlacedBlock, PlanningInput } from './types'
 
 const TODAY = '2026-09-21'
@@ -50,7 +50,7 @@ describe('La pause de pliement', () => {
 
 describe('La version idéale', () => {
   it('figée la première fois que le plan pose la tâche, jamais refigée ; le fait se lit dans les séances', () => {
-    const tache = { id: 't', status: 'active', estimatedMinutes: 200, correctionFactor: 1, extraMinutes: 0, deadline: '2026-09-27' } as unknown as import('@shared/schemas').Task
+    const tache = { id: 't', status: 'active', estimatedMinutes: 200, correctionFactor: 1, extraMinutes: 0, deadline: '2026-09-27', createdAt: '2026-09-01T10:00:00.000Z' } as unknown as import('@shared/schemas').Task
     const bloc = (date: string, workMinutes: number) => ({ kind: 'task', refId: 't', date, workMinutes }) as PlacedBlock
     const l0 = LearningStateSchema.parse({ sessionEvents: [{ ...ev(1, false), heldMinutes: 40 }] })
     const l1 = figerIdeaux(l0, { blocks: [bloc(TODAY, 60), bloc('2026-09-22', 60), bloc('2026-09-22', 40)] }, { tasks: [tache], objectives: [], today: TODAY })
@@ -71,28 +71,39 @@ describe('La version idéale', () => {
   })
 })
 
-describe('Une longue tâche ne donne pas plus de pouvoir de repousser', () => {
-  it('les 15 % se prennent sur les 7 prochains jours de l’idéal, pas sur la tâche entière', () => {
-    // Même rythme (60 min par jour), l'une de 7 h, l'autre de 40 h.
-    const ideal = (jours: number) => ({
-      since: TODAY,
-      base: 0,
-      points: Array.from({ length: jours }, (_, i) => [`2026-${i < 10 ? '09' : '10'}-${String(i < 10 ? 21 + i : i - 9).padStart(2, '0')}`, 60 * (i + 1)] as [string, number]),
-    })
-    const juger = (total: number, jours: number) =>
+describe('La longueur et le temps', () => {
+  it('le droit de plier se gagne jour après jour et fond à l’approche de l’échéance', () => {
+    // 20 h, créée le 1er, due le 20 : 3 h pliables en tout.
+    const el = { total: 1200, debut: '2026-09-01', fin: '2026-09-20' }
+    expect(droitDePlier(el, '2026-09-01').droit).toBe(9)
+    expect(droitDePlier(el, '2026-09-10').droit).toBe(90)
+    expect(droitDePlier(el, '2026-09-18').droit).toBe(27)
+    // Plus long, plus de droit — mais jamais d'un coup.
+    expect(droitDePlier({ ...el, total: 2400 }, '2026-09-10').droit).toBe(180)
+    expect(droitDePlier({ ...el, total: 2400 }, '2026-09-01').droit).toBe(18)
+  })
+
+  it('ce qui est déjà plié se retire du droit', () => {
+    const plie = LearningStateSchema.parse({ sessionEvents: [ev(1, true), ev(2, true)] })
+    const juger = (learning: typeof plie) =>
       jugerPliage({
-        learning: { sessionEvents: [], ideals: { 'task:t': ideal(jours) } },
-        element: { kind: 'task', refId: 't', total, fin: '2026-12-31' },
+        learning,
+        element: { kind: 'task', refId: 't', total: 1200, debut: '2026-09-01', fin: '2026-09-20' },
+        minutes: 30,
         tenu: 30,
-        today: TODAY,
-        bloc: { blockId: 'b', date: TODAY },
-        planApres: { blocks: [], capacities: [] } as unknown as import('./types').PlanningResult,
+        today: '2026-09-10',
+        bloc: { blockId: 'x', date: '2026-09-10' },
+        planApres: { blocks: [], capacities: [{ date: '2026-09-10', effectiveCapacityMinutes: 5000 }] } as unknown as import('./types').PlanningResult,
         creations: [],
-      }).budget
-    const court = juger(420, 7)
-    const long = juger(2400, 40)
-    expect(court.retardMax).toBe(63)
-    expect(long.retardMax).toBe(court.retardMax)
+      })
+    // Deux plis de 30 : 60 + 30 ≤ 90 — mais 2 des 3 dernières séances sont pliées.
+    expect(juger(plie)).toMatchObject({ ok: false, refus: 'pause' })
+    const troisPlis = LearningStateSchema.parse({ sessionEvents: [ev(1, true), ev(2, false), ev(3, false), ev(4, true), ev(5, false), ev(6, false)] })
+    expect(juger(troisPlis).ok).toBe(true)
+    expect(juger(LearningStateSchema.parse({ sessionEvents: [ev(1, true), ev(2, false), ev(3, false), ev(4, true), ev(5, false), ev(6, false), ev(7, true), ev(8, false), ev(9, false)] }))).toMatchObject({
+      ok: false,
+      refus: 'droit',
+    })
   })
 })
 

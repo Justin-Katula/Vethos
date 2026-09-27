@@ -770,6 +770,7 @@ export function preparerStop(a: {
     ? jugerPliage({
         learning: a.learning,
         element: a.pliage.element,
+        minutes: pli,
         tenu: essai.heldMinutes,
         today: date,
         bloc: { blockId: o.blockId, date },
@@ -795,8 +796,8 @@ export function preparerStop(a: {
     }
   }
   const echeance = a.tache && o.kind === 'task' ? echeanceDe(plan, a.confirmations.date, a.tache) : null
-  // Ce qui peut encore se plier avant d'être 15 % derrière la version idéale.
-  const reste = juge ? Math.max(0, juge.budget.retardMax - juge.budget.retard) : null
+  // Ce qui peut encore se plier : ni 15 % derrière l'idéal, ni au-delà du droit gagné.
+  const reste = juge ? Math.max(0, Math.min(juge.budget.retardMax - juge.budget.retard, juge.budget.droit - juge.budget.plie - pli)) : null
   const ligne = pli > 0 ? `${duree(pli)} folds into the next days.${reste !== null ? ` ${duree(reste)} left to fold.` : ''}` : undefined
   return { etape: 'reaction', reaction: reagir({ niveau, echeance }, ligne), faits, attenteMinutes }
 }
