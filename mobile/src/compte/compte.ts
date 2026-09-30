@@ -105,9 +105,12 @@ export async function supprimerCompte(): Promise<Resultat> {
   return { ok: true }
 }
 
-/** La session en cours, tenue à jour (connexion, déconnexion, rafraîchissement). */
-export function useSession(): Session | null {
-  const [session, setSession] = useState<Session | null>(null)
+/**
+ * La session en cours, tenue à jour (connexion, déconnexion, rafraîchissement).
+ * `undefined` tant qu'elle n'est pas encore relue du téléphone.
+ */
+export function useSession(): Session | null | undefined {
+  const [session, setSession] = useState<Session | null | undefined>(supabase() ? undefined : null)
   useEffect(() => {
     const sb = supabase()
     if (!sb) return

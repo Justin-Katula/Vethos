@@ -18,6 +18,7 @@ import { useDonnees } from '@/donnees/magasin'
 import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
 import { Introduction } from '@/accueil/Introduction'
+import { PorteCompte } from '@/compte/PorteCompte'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 
 // On garde l'écran de lancement jusqu'à ce que les polices soient là. Sans cela
@@ -67,6 +68,8 @@ function Coque() {
       <JeCommence />
       {/* Au-dessus encore : au premier lancement, il n'y a rien derriere. */}
       <Introduction />
+      {/* Puis la porte : sans compte, l'app ne s'ouvre pas. */}
+      <PorteCompte />
     </View>
   )
 }

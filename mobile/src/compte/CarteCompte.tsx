@@ -61,27 +61,57 @@ function confirmer(titre: string, message: string, action: string): Promise<bool
   )
 }
 
+/** Ce que cet appareil peut proposer, et la connexion qui s'en sert. */
+export function useConnexion() {
+  const toast = useToast()
+  const [dispo, setDispo] = useState<{ apple: boolean; google: boolean } | null>(null)
+  const [occupe, setOccupe] = useState(false)
+  const [echec, setEchec] = useState(false)
+  useEffect(() => {
+    void fournisseurs().then(setDispo)
+  }, [])
+  const lancer = async (f: () => Promise<Resultat>) => {
+    if (occupe) return
+    setOccupe(true)
+    setEchec(false)
+    const r = await f()
+    setOccupe(false)
+    if (!r.ok && r.raison === 'erreur') {
+      setEchec(true)
+      toast('Couldn’t sign in.')
+    }
+  }
+  return { dispo, lancer, echec }
+}
+
+/** « Continue with Apple », « Continue with Google » : seulement ce qui est vraiment configuré. */
+export function BoutonsConnexion({ dispo, lancer }: Pick<ReturnType<typeof useConnexion>, 'dispo' | 'lancer'>) {
+  if (!dispo) return null
+  return (
+    <View style={{ gap: 10 }}>
+      {dispo.apple ? (
+        <Bouton fond={A.t1} encre="#000" onPress={() => void lancer(connecterApple)}>
+          <LogoApple couleur="#000" />
+          <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 16 }}>Continue with Apple</Text>
+        </Bouton>
+      ) : null}
+      {dispo.google ? (
+        <Bouton fond="transparent" encre={A.t1} bord={A.s} onPress={() => void lancer(connecterGoogle)}>
+          <LogoGoogle />
+          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16 }}>Continue with Google</Text>
+        </Bouton>
+      ) : null}
+    </View>
+  )
+}
+
 /**
- * Le compte, dans Profil. Sans compte : les fournisseurs vraiment configurés,
- * rien d'autre. Avec : l'adresse, se déconnecter, supprimer le compte.
+ * Le compte, dans Profil : l'adresse, se déconnecter, supprimer le compte.
+ * Sans compte, l'app est derrière la porte (`PorteCompte`) : rien à montrer ici.
  */
 export function CarteCompte() {
   const session = useSession()
   const toast = useToast()
-  const [dispo, setDispo] = useState<{ apple: boolean; google: boolean } | null>(null)
-  const [occupe, setOccupe] = useState(false)
-  useEffect(() => {
-    void fournisseurs().then(setDispo)
-  }, [])
-
-  const lancer = async (f: () => Promise<Resultat>) => {
-    if (occupe) return
-    setOccupe(true)
-    const r = await f()
-    setOccupe(false)
-    if (!r.ok && r.raison === 'erreur') toast('Couldn’t sign in.')
-  }
-
   if (session) {
     const u = session.user
     const nom = u.email ?? (u.user_metadata?.full_name as string | undefined) ?? 'Signed in'
@@ -112,22 +142,5 @@ export function CarteCompte() {
     )
   }
 
-  if (!dispo || (!dispo.apple && !dispo.google)) return null
-  return (
-    <Carte style={{ marginTop: 12, paddingVertical: 18, paddingHorizontal: 16, gap: 10 }}>
-      <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4, marginBottom: 4 }}>Account</Text>
-      {dispo.apple ? (
-        <Bouton fond={A.t1} encre="#000" onPress={() => void lancer(connecterApple)}>
-          <LogoApple couleur="#000" />
-          <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 16 }}>Continue with Apple</Text>
-        </Bouton>
-      ) : null}
-      {dispo.google ? (
-        <Bouton fond="transparent" encre={A.t1} bord={A.s} onPress={() => void lancer(connecterGoogle)}>
-          <LogoGoogle />
-          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16 }}>Continue with Google</Text>
-        </Bouton>
-      ) : null}
-    </Carte>
-  )
+  return null
 }
