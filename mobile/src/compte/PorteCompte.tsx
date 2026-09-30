@@ -5,10 +5,15 @@ import { useDonnees } from '@/donnees/magasin'
 import { A, GEIST, SORTIE } from '@/ui/app-briques'
 import { useSession } from './compte'
 import { BoutonsConnexion, useConnexion } from './CarteCompte'
+import { useAbonnement } from '@/abonnement/achats'
+import { EcranAbonnement } from '@/abonnement/EcranAbonnement'
 
 /**
  * La porte : après l'introduction, pas de compte, pas d'app. Elle se referme
  * à la déconnexion et à la suppression du compte.
+ *
+ * Derrière la connexion, le mur : sans abonnement ni essai, l'app reste
+ * fermée aussi (voir `EcranAbonnement`).
  *
  * Tant qu'aucun fournisseur n'est configuré (ni Apple, ni Google), la porte
  * n'existe pas : une porte sans clé enfermerait l'utilisateur dehors.
@@ -23,11 +28,21 @@ export function PorteCompte() {
   const configuree = !!connexion.dispo && (connexion.dispo.apple || connexion.dispo.google)
   const fermee = introFaite && configuree && session === null
 
+  const abonnement = useAbonnement((e) => e.etat)
+  const initialiser = useAbonnement((e) => e.initialiser)
+  const utilisateur = session?.user.id
+  useEffect(() => {
+    if (utilisateur) void initialiser(utilisateur)
+  }, [utilisateur, initialiser])
+
   useEffect(() => {
     if (fermee) Animated.timing(apparition, { toValue: 1, duration: 420, easing: SORTIE, useNativeDriver: true }).start()
     else apparition.setValue(0)
   }, [fermee, apparition])
 
+  if (introFaite && session && abonnement === 'inactif') return <EcranAbonnement />
+  // Pendant qu'on demande au Store : du noir, pas un aperçu de l'app.
+  if (introFaite && session && abonnement === 'chargement') return <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 100 }]} />
   if (!fermee) return null
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: apparition, zIndex: 100 }]}>

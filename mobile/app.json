@@ -107,6 +107,13 @@
         "apple": false,
         "googleWeb": "",
         "googleIos": ""
+      },
+      "revenuecat": {
+        "ios": "",
+        "android": ""
+      },
+      "liens": {
+        "confidentialite": ""
       }
     },
     "owner": "justin-katula",
