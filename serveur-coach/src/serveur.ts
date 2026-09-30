@@ -82,7 +82,7 @@ createServer(async (req, res) => {
     const corps = await lire(req).catch(() => null)
     if (corps === null) return repondre(400, { erreur: 'corps illisible' })
     if (req.url === '/v1/install') {
-      const r = coeur.installer(ipDe(req))
+      const r = await coeur.installer(ipDe(req))
       return repondre(r.status, r.corps)
     }
     if (req.url === '/v1/coach') {

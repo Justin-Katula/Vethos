@@ -27,6 +27,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
+    "coach:supabase": "esbuild serveur-coach/src/coeur.ts --bundle --platform=neutral --format=esm --external:node:* --main-fields=module,main --tsconfig=tsconfig.node.json --outfile=supabase/functions/coach/coeur.js",
     "coach:build": "esbuild serveur-coach/src/serveur.ts --bundle --platform=node --target=node20 --format=cjs --tsconfig=tsconfig.node.json --outfile=serveur-coach/dist/serveur.js"
   },
   "devDependencies": {

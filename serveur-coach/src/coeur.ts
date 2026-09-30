@@ -13,6 +13,7 @@
 //    sont une liste fermée par job ; un tour « assistant » n'est accepté que
 //    s'il porte la signature du serveur qui l'a produit.
 
+import { Buffer } from 'node:buffer'
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { DemandeCoachSchema, messagesPourModele } from '@shared/coach/prompt'
 import { detecteDetresse, filtrerReponse, MESSAGE_AIDE } from '@shared/coach/garde-fous'
@@ -31,6 +32,51 @@ export type Config = {
 }
 
 export type Reponse = { status: number; corps: Record<string, unknown> }
+
+/** Une fenêtre de comptage : l'heure ou le jour (UTC) en cours. */
+export type Fenetre = 'heure' | 'jour'
+export type Prise = { cle: string; fenetre: Fenetre; plafond: number }
+
+/**
+ * Où vivent les compteurs des plafonds. En mémoire pour un serveur qui reste
+ * allumé ; dans Postgres pour une fonction Supabase, qui repart de zéro à
+ * chaque appel. `prendre` est atomique : il ajoute 1 à CHAQUE compteur, ou à
+ * aucun si l'un d'eux a déjà atteint son plafond.
+ */
+export interface Compteurs {
+  prendre(prises: readonly Prise[]): Promise<boolean>
+  lire(cle: string, fenetre: Fenetre): Promise<number>
+}
+
+/** L'identifiant de la fenêtre en cours : un compteur d'hier ne compte plus aujourd'hui. */
+export const periode = (fenetre: Fenetre, t: Date) =>
+  fenetre === 'heure' ? `h${Math.floor(t.getTime() / 3_600_000)}` : `j${t.toISOString().slice(0, 10)}`
+
+export function compteursEnMemoire(maintenant: () => Date = () => new Date()): Compteurs {
+  const n = new Map<string, number>()
+  let courant = ''
+  const cleDe = (cle: string, f: Fenetre) => `${periode(f, maintenant())}|${cle}`
+  // Chaque nouvelle heure, les fenêtres passées s'effacent : aucune mémoire qui grossit sans fin.
+  const purger = () => {
+    const h = periode('heure', maintenant())
+    if (h === courant) return
+    courant = h
+    const j = periode('jour', maintenant())
+    for (const k of n.keys()) if (!k.startsWith(`${h}|`) && !k.startsWith(`${j}|`)) n.delete(k)
+  }
+  return {
+    async prendre(prises) {
+      purger()
+      if (prises.some((p) => (n.get(cleDe(p.cle, p.fenetre)) ?? 0) >= p.plafond)) return false
+      for (const p of prises) n.set(cleDe(p.cle, p.fenetre), (n.get(cleDe(p.cle, p.fenetre)) ?? 0) + 1)
+      return true
+    },
+    async lire(cle, f) {
+      purger()
+      return n.get(cleDe(cle, f)) ?? 0
+    },
+  }
+}
 
 const b64 = (b: Buffer) => b.toString('base64url')
 
@@ -58,23 +104,17 @@ export function validerConfig(c: Config): string | null {
   return null
 }
 
-export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; maintenant?: () => Date } = {}) {
+export function creerCoeur(
+  cfg: Config,
+  deps: { fetchImpl?: typeof fetch; maintenant?: () => Date; compteurs?: Compteurs } = {},
+) {
   const erreur = validerConfig(cfg)
   if (erreur) throw new Error(erreur)
   const f = deps.fetchImpl ?? fetch
   const now = deps.maintenant ?? (() => new Date())
   const joursJeton = cfg.joursJeton ?? 30
-
-  let jour = ''
-  const parInstallation = new Map<string, number>()
-  // Par adresse et par jour : une seule adresse ne peut pas vider le plafond
-  // global pour tout le monde en fabriquant des jetons.
-  const parAdresseJour = new Map<string, number>()
-  let global = 0
-  // Par heure : jetons délivrés et échecs d'authentification, par adresse.
-  let heureCourante = -1
-  const jetonsParAdresse = new Map<string, number>()
-  const echecsParAdresse = new Map<string, number>()
+  const compteurs = deps.compteurs ?? compteursEnMemoire(now)
+  const MAX_ECHECS = 20
 
   const hmac = (texte: string) => b64(createHmac('sha256', cfg.secret).update(texte).digest())
   const egal = (a: string, b: string) => {
@@ -89,50 +129,29 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
     if (!egal(hmac(`jeton:${id}.${exp}`), sig)) return null
     return Number(exp) > now().getTime() ? id : null
   }
-  /** Chaque heure, les compteurs par adresse repartent de zéro : aucune mémoire qui grossit sans fin. */
-  const tournerHeure = () => {
-    const h = Math.floor(now().getTime() / 3_600_000)
-    if (h !== heureCourante) {
-      heureCourante = h
-      jetonsParAdresse.clear()
-      echecsParAdresse.clear()
-    }
-  }
-  const tournerJour = () => {
-    const j = now().toISOString().slice(0, 10)
-    if (jour !== j) {
-      jour = j
-      parInstallation.clear()
-      parAdresseJour.clear()
-      global = 0
-    }
-  }
-
   return {
     /** Signature d'un tour produit par le serveur : l'app la renvoie telle quelle. */
     /** Un tour est lié à l'installation qui l'a reçu : il ne se rejoue pas ailleurs. */
     signerTour: (installation: string, contenu: string) => hmac(`tour:${installation}:${contenu}`),
 
     /** Un jeton d'installation anonyme. Aucune donnée personnelle, aucun compte. */
-    installer(ip: string): Reponse {
-      tournerHeure()
+    async installer(ip: string): Promise<Reponse> {
       const cle = cleAdresse(ip)
-      const n = jetonsParAdresse.get(cle) ?? 0
-      if (n >= cfg.installationsParIpParHeure) return { status: 429, corps: { erreur: 'trop de demandes' } }
-      jetonsParAdresse.set(cle, n + 1)
+      if (!(await compteurs.prendre([{ cle: `jetons:${cle}`, fenetre: 'heure', plafond: cfg.installationsParIpParHeure }])))
+        return { status: 429, corps: { erreur: 'trop de demandes' } }
       const id = randomUUID().replace(/-/g, '')
       const exp = String(now().getTime() + joursJeton * 86_400_000)
       return { status: 200, corps: { token: `${id}.${exp}.${hmac(`jeton:${id}.${exp}`)}` } }
     },
 
     async coach(autorisation: string | undefined, brut: unknown, ip = 'inconnue'): Promise<Reponse> {
-      tournerHeure()
       const cle = cleAdresse(ip)
-      if ((echecsParAdresse.get(cle) ?? 0) >= 20) return { status: 429, corps: { erreur: 'trop d’échecs' } }
+      if ((await compteurs.lire(`echecs:${cle}`, 'heure')) >= MAX_ECHECS)
+        return { status: 429, corps: { erreur: 'trop d’échecs' } }
       const jeton = autorisation?.startsWith('Bearer ') ? autorisation.slice(7) : ''
       const id = verifier(jeton)
       if (!id) {
-        echecsParAdresse.set(cle, (echecsParAdresse.get(cle) ?? 0) + 1)
+        await compteurs.prendre([{ cle: `echecs:${cle}`, fenetre: 'heure', plafond: MAX_ECHECS }])
         return { status: 401, corps: { erreur: 'jeton invalide' } }
       }
 
@@ -148,18 +167,14 @@ export function creerCoeur(cfg: Config, deps: { fetchImpl?: typeof fetch; mainte
       if (d.data.messages.some((m) => m.role === 'user' && detecteDetresse(m.content)))
         return { status: 200, corps: { texte: MESSAGE_AIDE, sig: hmac(`tour:${id}:${MESSAGE_AIDE}`) } }
 
-      tournerJour()
-      const utilise = parInstallation.get(id) ?? 0
-      const parAdresse = parAdresseJour.get(cle) ?? 0
-      if (
-        utilise >= cfg.parInstallationParJour ||
-        parAdresse >= cfg.parAdresseParJour ||
-        global >= cfg.globalParJour
-      )
-        return { status: 429, corps: { erreur: 'plafond atteint' } }
-      parInstallation.set(id, utilise + 1)
-      parAdresseJour.set(cle, parAdresse + 1)
-      global++
+      // Par installation, par adresse (une seule adresse ne vide pas le plafond
+      // global en fabriquant des jetons) et pour tout le monde : les trois ou rien.
+      const pris = await compteurs.prendre([
+        { cle: `installation:${id}`, fenetre: 'jour', plafond: cfg.parInstallationParJour },
+        { cle: `adresse:${cle}`, fenetre: 'jour', plafond: cfg.parAdresseParJour },
+        { cle: 'global', fenetre: 'jour', plafond: cfg.globalParJour },
+      ])
+      if (!pris) return { status: 429, corps: { erreur: 'plafond atteint' } }
 
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), 15_000)
