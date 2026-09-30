@@ -38,15 +38,16 @@
 
       <p>
         Vethos helps you plan your time and keep distracting apps aside while you work. This policy explains what the
-        Vethos app collects, why, and who processes it. The short version: <strong>your plans, tasks and schedule stay on
-        your device</strong>. We collect what we need to run your account, your subscription and the Coach, and nothing
-        for advertising.
+        Vethos app collects, why, and who processes it. The short version: we keep what you create in Vethos so you can find it on any
+        device you sign in to, we collect what we need to run your subscription and the Coach, and nothing for
+        advertising.
       </p>
 
-      <h2>What stays on your device</h2>
+      <h2>Your plans and history</h2>
       <p>
-        Your tasks, goals, anchors, schedule, sleep times, session history and settings are stored on your device only.
-        They are not sent to us.
+        Your tasks, goals, anchors, schedule, sleep times, session history and settings are stored on your device, and a
+        copy is backed up to your account so you get them back when you sign in on another device. Only your account can
+        read this backup. It is deleted when you delete your account.
       </p>
       <p>
         <strong>Blocking uses Apple's Screen Time.</strong> When you choose apps to set aside, iOS gives Vethos opaque
@@ -64,6 +65,11 @@
             <td>Account: your email address, your name if you share it, and the ID from Apple or Google</td>
             <td>To sign you in and keep your subscription tied to you</td>
             <td>Supabase (hosting and authentication)</td>
+          </tr>
+          <tr>
+            <td>Your Vethos data: tasks, goals, anchors, schedule, settings and session history</td>
+            <td>To back them up and restore them on your other devices</td>
+            <td>Supabase (hosting and database)</td>
           </tr>
           <tr>
             <td>Subscription: your purchases, renewals and trial status, linked to your account ID</td>
@@ -104,7 +110,7 @@
 
       <h2>How long we keep data</h2>
       <ul>
-        <li>Account data: until you delete your account.</li>
+        <li>Account data and your backed-up Vethos data: until you delete your account.</li>
         <li>Subscription records: as long as required for accounting and tax purposes, and by Apple and RevenueCat under their own policies.</li>
         <li>Coach requests: not stored by us after the reply is sent, apart from short-lived technical logs kept by our hosting provider.</li>
         <li>Abuse-limit counters: about one day.</li>
@@ -112,8 +118,8 @@
 
       <h2>Deleting your account</h2>
       <p>
-        In the app, go to <strong>Profile → Account → Delete account</strong>. Your account is erased from our servers
-        immediately. Data on your device is removed when you delete the app. Deleting your account does not cancel an
+        In the app, go to <strong>Profile → Account → Delete account</strong>. Your account and your backed-up data are erased
+        from our servers immediately, and removed from that device. Deleting your account does not cancel an
         App Store subscription: cancel it in your iPhone's Settings → Apple ID → Subscriptions.
       </p>
 
