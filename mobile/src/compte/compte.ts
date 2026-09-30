@@ -5,6 +5,7 @@ import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
+import { oublierLocalement } from './nuage'
 import { config, supabase } from './supabase'
 
 /**
@@ -136,6 +137,10 @@ export async function supprimerCompte(): Promise<Resultat> {
   } catch {
     return { ok: false, raison: 'erreur' }
   }
+  // Ses lignes en ligne sont parties avec le compte (cascade) ; son tiroir
+  // quitte aussi ce téléphone.
+  const id = data.session?.user.id
+  if (id) await oublierLocalement(id).catch(() => undefined)
   await sb.auth.signOut({ scope: 'local' })
   return { ok: true }
 }

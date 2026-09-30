@@ -9,6 +9,8 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }))
 
+vi.mock('./nuage', () => ({ noterEcriture: async () => undefined }))
+
 import { cleCompte, definirCompte, reclamer } from './espace'
 
 beforeEach(() => {

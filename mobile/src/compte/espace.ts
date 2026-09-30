@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { noterEcriture, type Magasin } from './nuage'
 
 /**
  * Un tiroir par compte. Les données de Vethos (engagements, réglages,
@@ -23,6 +24,15 @@ export const definirCompte = (id: string | null) => {
 
 /** La clé d'un magasin pour le compte connecté. */
 export const cleCompte = (base: string, id: string | null = compte) => (id ? `${base}:u:${id}` : base)
+
+/**
+ * Écrire dans le tiroir d'un compte : sur le téléphone, puis vers la
+ * sauvegarde en ligne. Le tiroir commun (sans compte) ne part nulle part.
+ */
+export async function ecrireTiroir(base: Magasin, proprietaire: string | null, brut: string): Promise<void> {
+  await AsyncStorage.setItem(cleCompte(base, proprietaire), brut)
+  if (proprietaire) await noterEcriture(proprietaire, base, brut)
+}
 
 /** Les magasins rangés par compte. */
 export const MAGASINS_PAR_COMPTE = ['vethos:donnees:v1', 'vethos:seances:v1'] as const

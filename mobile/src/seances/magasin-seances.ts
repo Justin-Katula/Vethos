@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
-import { cleCompte, compteCourant } from '@/compte/espace'
+import { cleCompte, compteCourant, ecrireTiroir } from '@/compte/espace'
 import {
   LearningStateSchema,
   SessionConfirmationsStateSchema,
@@ -72,8 +72,9 @@ export const useSeances = create<EtatMagasin>((set, get) => ({
     set(suivant)
     const e = get()
     try {
-      await AsyncStorage.setItem(
-        cleCompte(CLE, e.proprietaire),
+      await ecrireTiroir(
+        CLE,
+        e.proprietaire,
         JSON.stringify({ apprentissage: e.apprentissage, confirmations: e.confirmations }),
       )
     } catch {

@@ -21,6 +21,7 @@ import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
 import { definirCompte, reclamer } from '@/compte/espace'
+import { accorder } from '@/compte/nuage'
 import { useSeances } from '@/seances/magasin-seances'
 import { cleDate } from '@/plan/moteur'
 import { ChargementVethos } from '@/ui/MouvementVethos'
@@ -64,7 +65,12 @@ function Coque() {
       // Plus rien ne s'écrit tant que le bon tiroir n'est pas ouvert.
       useDonnees.setState({ chargees: false })
       useSeances.setState({ chargees: false })
-      if (compte) await reclamer(compte).catch(() => undefined)
+      if (compte) {
+        await reclamer(compte).catch(() => undefined)
+        // Le téléphone et la sauvegarde en ligne se mettent d'accord : sur un
+        // nouvel iPhone, c'est ici que le compte retrouve ses affaires.
+        await accorder(compte).catch(() => undefined)
+      }
       if (annule) return
       definirCompte(compte)
       await charger()

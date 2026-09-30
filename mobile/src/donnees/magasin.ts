@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { cleCompte, compteCourant } from '@/compte/espace'
+import { cleCompte, compteCourant, ecrireTiroir } from '@/compte/espace'
 import { create } from 'zustand'
 import { z } from 'zod'
 import { findAncreConflict } from '@shared/planning/placement'
@@ -230,7 +230,7 @@ type EtatDonnees = Contenu & {
  */
 async function ecrire(contenu: Contenu, proprietaire: string | null): Promise<void> {
   try {
-    await AsyncStorage.setItem(cleCompte(CLE, proprietaire), JSON.stringify(contenu))
+    await ecrireTiroir(CLE, proprietaire, JSON.stringify(contenu))
   } catch {
     // Un échec d'écriture ne doit pas faire tomber l'interface : l'utilisateur
     // garde ce qu'il vient de saisir à l'écran, et la prochaine écriture
@@ -505,7 +505,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       })
       // Le parcours ne disparaît qu'après une vraie sauvegarde. Un échec laisse
       // le brouillon intact et réessayable, sans créer de doublons.
-      await AsyncStorage.setItem(cleCompte(CLE, get().proprietaire), JSON.stringify(contenu))
+      await ecrireTiroir(CLE, get().proprietaire, JSON.stringify(contenu))
       set(contenu)
     },
   }
