@@ -56,7 +56,11 @@ async function parRedirection(provider: 'apple' | 'google'): Promise<Resultat> {
 async function parNavigateur(provider: 'apple' | 'google'): Promise<Resultat> {
   const sb = supabase()
   if (!sb) return { ok: false, raison: 'indisponible' }
-  const retour = Linking.createURL('auth')
+  // Expo Go : la feuille de connexion d'iOS rattrape le retour par son schéma
+  // (`exp`), quel que soit l'hôte. On vise l'hôte du Site URL (`localhost`),
+  // que Supabase accepte toujours — il ignore les `exp://` de la liste des
+  // redirections (vérifié le 2026-09-30). Hors Expo Go : le schéma de l'app.
+  const retour = dansExpoGo() ? 'exp://localhost/--/auth' : Linking.createURL('auth')
   const { data, error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: retour, skipBrowserRedirect: true } })
   if (error || !data.url) return { ok: false, raison: 'erreur' }
   const r = await WebBrowser.openAuthSessionAsync(data.url, retour)
