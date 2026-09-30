@@ -8,6 +8,7 @@ import { effectiveContract, requestModeChange, signContract, type Mode } from '@
 import { usePlan } from '@/plan/Plan'
 import { coach } from '@/coach/client'
 import { FeuilleCoach } from '@/coach/FeuilleCoach'
+import { CarteCompte } from '@/compte/CarteCompte'
 
 const MOIS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -114,6 +115,7 @@ export default function Profil() {
           </Carte>
         </Pressable>
       ) : null}
+      <CarteCompte />
       <FeuilleCoach ouverte={coachOuvert} fermer={() => setCoachOuvert(false)} />
     </ScrollView>
   )

@@ -12,6 +12,7 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.vethos.app",
+      "usesAppleSignIn": true,
       "supportsTablet": true,
       "deploymentTarget": "16.0",
       "infoPlist": {
@@ -29,6 +30,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-apple-authentication",
       [
         "react-native-device-activity",
         {
@@ -98,7 +100,14 @@
         },
         "projectId": "862f46d8-f1a7-404e-8ea9-cd20027d21fd"
       },
-      "coachUrl": "https://aflefvivzyarsqwuwazz.supabase.co/functions/v1/coach"
+      "coachUrl": "https://aflefvivzyarsqwuwazz.supabase.co/functions/v1/coach",
+      "supabase": {
+        "url": "https://aflefvivzyarsqwuwazz.supabase.co",
+        "cle": "sb_publishable_yWPi5fusuadTzx7P-ZqJiA_Y5WUxcg7",
+        "apple": false,
+        "googleWeb": "",
+        "googleIos": ""
+      }
     },
     "owner": "justin-katula",
     "icon": "./assets/icon.png"
