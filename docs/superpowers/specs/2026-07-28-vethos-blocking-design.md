@@ -333,7 +333,7 @@ Champ texte pour justifier le déblocage d'une application précise.
 supprimée avec le reste du blocage au commit `33c5d0c`. Ce qui subsiste
 aujourd'hui :
 
-- `DEEPSEEK_API_KEY` dans `.env` — seule clé d'API IA du dépôt ;
+- `DEEPSEEK_API_KEY` : plus dans `.env` (supprimé le 2026-09-30) — secrets Supabase pour le Coach, clé de l’utilisateur sur le bureau ;
 - le client `src/main/blocking/deepseek.ts`, récupérable à
   `git show d83994d:src/main/blocking/deepseek.ts` (203 lignes).
 

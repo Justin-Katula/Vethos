@@ -249,9 +249,9 @@ export function definirCleDeepSeek(cle: string | null | undefined): void {
 
 function getApiKey(): string | null {
   if (cachedApiKey !== undefined) return cachedApiKey
-  // La clé des réglages prime sur `.env`, qui ne sert qu'au développement :
-  // en production, aucun `.env` n'accompagne l'exécutable.
-  const key = cleUtilisateur ?? readEnvValue('DEEPSEEK_API_KEY')
+  // Seulement la clé des réglages. Plus aucune clé lue dans un `.env` : un
+  // fichier de clés sur le disque est une clé qu'on peut voler.
+  const key = cleUtilisateur
   cachedApiKey = key && key.length > 0 ? key : null
   if (!cachedApiKey) {
     log.info(

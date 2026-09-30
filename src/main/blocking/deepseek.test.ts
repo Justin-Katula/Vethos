@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { judgeJustification } from './deepseek'
+import { definirCleDeepSeek, judgeJustification } from './deepseek'
 
 // Mock du logger pour éviter le bruit + s'assurer qu'il ne lève pas.
 vi.mock('@main/logging/setup', () => ({
@@ -26,6 +26,8 @@ vi.stubGlobal('fetch', fetchMock)
 
 beforeEach(() => {
   fetchMock.mockReset()
+  // La clé vient des réglages de l'utilisateur, jamais d'un fichier.
+  definirCleDeepSeek('test-key-fake')
 })
 
 afterEach(() => {

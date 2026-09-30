@@ -663,7 +663,7 @@ git commit -m "feat(blocking): machine a etats par application, statut preexista
 - `git show d83994d:src/main/blocking/deepseek.ts` — 203 lignes
 - `git show d83994d:src/main/blocking/deepseek.test.ts` — 156 lignes, 8 cas
 
-La clé `DEEPSEEK_API_KEY` est toujours présente dans `.env`. C'est la seule clé d'API IA du dépôt.
+La clé `DEEPSEEK_API_KEY` ne vit plus dans `.env` (supprimé le 2026-09-30) : le Coach la garde dans les secrets Supabase, le bureau utilise la clé saisie par l’utilisateur. C'est la seule clé d'API IA du dépôt.
 
 **Files:**
 - Create: `src/main/blocking/deepseek.ts` (restauré depuis git)
