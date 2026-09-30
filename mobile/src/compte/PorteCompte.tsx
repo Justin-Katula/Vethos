@@ -1,17 +1,42 @@
 import { useEffect, useRef, useState } from 'react'
-import { Animated, Image, StyleSheet, Text, View } from 'react-native'
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
 import { A, GEIST, SORTIE } from '@/ui/app-briques'
-import { useSession } from './compte'
+import { connecterApple, connecterGoogle, useSession } from './compte'
 import { introVueSurAppareil, marquerIntroVue } from './espace'
-import { BoutonsConnexion, useConnexion } from './CarteCompte'
+import { LogoApple, LogoGoogle, useConnexion } from './CarteCompte'
 import { useAbonnement } from '@/abonnement/achats'
 import { EcranAbonnement } from '@/abonnement/EcranAbonnement'
 
+/** Un bouton en pilule, comme les écrans de connexion d'iOS. */
+function Pilule({ onPress, clair, children, label }: { onPress: () => void; clair?: boolean; children: React.ReactNode; label: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: clair ? A.t1 : 'rgba(242,242,242,0.09)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        opacity: pressed ? 0.85 : 1,
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+      })}
+    >
+      {children}
+    </Pressable>
+  )
+}
+
 /**
- * La porte : après l'introduction, pas de compte, pas d'app. Elle se referme
- * à la déconnexion et à la suppression du compte.
+ * La porte. Déconnecté, on arrive ici d'abord — jamais sur l'introduction.
+ * « Sign In » pour revenir sur son compte, « Sign Up » pour en créer un ;
+ * l'introduction ne se joue qu'après, pour un compte qui ne l'a pas faite.
  *
  * Derrière la connexion, le mur : sans abonnement ni essai, l'app reste
  * fermée aussi (voir `EcranAbonnement`).
@@ -26,21 +51,17 @@ export function PorteCompte() {
   const marges = useSafeAreaInsets()
   const apparition = useRef(new Animated.Value(0)).current
 
-  // Ce téléphone a déjà vu l'introduction : déconnecté, c'est la porte qui
-  // s'affiche, pas une nouvelle introduction (le tiroir commun est vide).
-  const [introVue, setIntroVue] = useState(false)
+  // Un téléphone qui a déjà servi ouvre sur « Sign In » ; un téléphone neuf, sur « Sign Up ».
+  const [inscription, setInscription] = useState<boolean | null>(null)
   useEffect(() => {
-    void introVueSurAppareil().then(setIntroVue)
+    void introVueSurAppareil().then((vue) => setInscription(!vue))
   }, [])
   useEffect(() => {
-    if (introFaite && !introVue) {
-      setIntroVue(true)
-      void marquerIntroVue()
-    }
-  }, [introFaite, introVue])
+    if (introFaite) void marquerIntroVue()
+  }, [introFaite])
 
   const configuree = !!connexion.dispo && (connexion.dispo.apple || connexion.dispo.google)
-  const fermee = (introFaite || introVue) && configuree && session === null
+  const fermee = configuree && session === null && inscription !== null
 
   const abonnement = useAbonnement((e) => e.etat)
   const initialiser = useAbonnement((e) => e.initialiser)
@@ -57,19 +78,54 @@ export function PorteCompte() {
   if (introFaite && session && abonnement === 'inactif') return <EcranAbonnement />
   // Pendant qu'on demande au Store : du noir, pas un aperçu de l'app.
   if (introFaite && session && abonnement === 'chargement') return <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 100 }]} />
-  if (!fermee) return null
+  if (!fermee || !connexion.dispo) return null
+  const { apple, google } = connexion.dispo
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: apparition, zIndex: 100 }]}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Image source={require('../../assets/vethos-logo.png')} accessibilityLabel="Vethos" style={{ width: 120, height: 120 }} resizeMode="contain" />
-      </View>
-      <View style={{ paddingHorizontal: 24, paddingBottom: marges.bottom + 24 }}>
-        <BoutonsConnexion dispo={connexion.dispo} lancer={connexion.lancer} />
+      <View style={{ flex: 1, width: '100%', maxWidth: 440, alignSelf: 'center', paddingHorizontal: 20, paddingTop: marges.top + 64, paddingBottom: marges.bottom + 24 }}>
+        <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 28, letterSpacing: -0.6, textAlign: 'center' }}>
+          {inscription ? 'Sign Up' : 'Sign In'}
+        </Text>
+        <Text style={{ marginTop: 8, color: A.t3, fontFamily: GEIST.normal, fontSize: 15, textAlign: 'center' }}>
+          {inscription ? 'Let’s get your time back.' : 'Sign in or create an account to continue.'}
+        </Text>
+
+        <View style={{ marginTop: 36, gap: 12 }}>
+          {apple ? (
+            <Pilule clair label="Continue with Apple" onPress={() => void connexion.lancer(connecterApple)}>
+              <LogoApple couleur="#000" />
+              <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 17 }}>Continue with Apple</Text>
+            </Pilule>
+          ) : null}
+          {apple && google ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+              <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: A.s }} />
+              <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 14 }}>or</Text>
+              <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: A.s }} />
+            </View>
+          ) : null}
+          {google ? (
+            <Pilule clair={!apple} label="Continue with Google" onPress={() => void connexion.lancer(connecterGoogle)}>
+              <LogoGoogle />
+              <Text style={{ color: apple ? A.t1 : '#000', fontFamily: GEIST.demi, fontSize: 17 }}>Continue with Google</Text>
+            </Pilule>
+          ) : null}
+        </View>
+
         {connexion.echec ? (
-          <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, textAlign: 'center', color: A.rouge, fontFamily: GEIST.moyen, fontSize: 14 }}>
+          <Text accessibilityLiveRegion="polite" style={{ marginTop: 14, textAlign: 'center', color: A.rouge, fontFamily: GEIST.moyen, fontSize: 14 }}>
             Couldn’t sign in.
           </Text>
         ) : null}
+
+        <Pressable accessibilityRole="button" onPress={() => setInscription(!inscription)} hitSlop={12} style={({ pressed }) => ({ marginTop: 28, alignSelf: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 15 }}>
+            {inscription ? 'Already have an account?' : 'Don’t have an account?'}
+          </Text>
+        </Pressable>
+
+        <View style={{ flex: 1 }} />
+        <Image source={require('../../assets/vethos-logo.png')} accessibilityLabel="Vethos" style={{ width: 40, height: 40, alignSelf: 'center', opacity: 0.9 }} resizeMode="contain" />
       </View>
     </Animated.View>
   )
