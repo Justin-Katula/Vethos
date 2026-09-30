@@ -36,6 +36,17 @@ docker run -p 8787:8787 -e DEEPSEEK_API_KEY=... -e COACH_SECRET=... vethos-coach
 ```
 N'importe quel hébergeur de conteneurs convient (Fly.io, Render, Railway…). Mettez-le derrière HTTPS.
 
+## Déployer sur Supabase (en service)
+Le projet « Vethos Coach » (`aflefvivzyarsqwuwazz`) fait tourner ce cœur dans une fonction :
+`https://aflefvivzyarsqwuwazz.supabase.co/functions/v1/coach`. Les plafonds vivent dans
+Postgres (`supabase/migrations/…_coach_compteurs.sql` : table fermée au public, RLS sans règle).
+Secrets du projet : `DEEPSEEK_API_KEY`, `COACH_SECRET`. Après tout changement du cœur :
+```bash
+npm run coach:supabase
+npx supabase functions deploy coach --project-ref aflefvivzyarsqwuwazz --no-verify-jwt --use-api
+```
+`--no-verify-jwt` est voulu : l'app s'authentifie avec le jeton d'installation signé par le Coach.
+
 ## Brancher les apps
 - **iPhone** : `extra.coachUrl` dans `mobile/app.json` (par ex. `https://coach.mondomaine.com`).
 - **Bureau** : variable `VETHOS_COACH_URL` au lancement, ou `coachUrl` dans les réglages.

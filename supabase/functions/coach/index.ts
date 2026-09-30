@@ -42,7 +42,7 @@ async function rpc(nom: string, args: unknown): Promise<unknown> {
     headers: { 'Content-Type': 'application/json', apikey: CLE_SERVICE, Authorization: `Bearer ${CLE_SERVICE}` },
     body: JSON.stringify(args),
   })
-  if (!r.ok) throw new Error(`rpc ${nom} : ${r.status}`)
+  if (!r.ok) throw new Error(`rpc ${nom} : ${r.status} ${(await r.text()).slice(0, 200)}`)
   return r.json()
 }
 
@@ -106,8 +106,10 @@ Deno.serve(async (req) => {
       return repondre(r.status, r.corps)
     }
     return repondre(404, { erreur: 'introuvable' })
-  } catch {
+  } catch (e) {
     // Jamais de détail d'erreur vers l'extérieur — ni la clé, ni une trace.
+    // Le journal de Supabase garde le message pour le diagnostic.
+    console.error('coach :', e instanceof Error ? e.message : 'erreur')
     return repondre(500, { erreur: 'erreur' })
   }
 })

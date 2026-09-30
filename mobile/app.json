@@ -98,7 +98,7 @@
         },
         "projectId": "862f46d8-f1a7-404e-8ea9-cd20027d21fd"
       },
-      "coachUrl": ""
+      "coachUrl": "https://aflefvivzyarsqwuwazz.supabase.co/functions/v1/coach"
     },
     "owner": "justin-katula",
     "icon": "./assets/icon.png"
