@@ -19,6 +19,10 @@ import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
+import { useSession } from '@/compte/compte'
+import { definirCompte, reclamer } from '@/compte/espace'
+import { useSeances } from '@/seances/magasin-seances'
+import { cleDate } from '@/plan/moteur'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 
 // On garde l'écran de lancement jusqu'à ce que les polices soient là. Sans cela
@@ -44,10 +48,32 @@ function Coque() {
   }, [relire])
 
   useEffect(() => {
-    // Les données d'abord : l'écran d'accueil les lit dès son premier rendu.
-    void charger()
     void initialiser()
-  }, [charger, initialiser])
+  }, [initialiser])
+
+  // Les données suivent le compte : un tiroir par compte (`@/compte/espace`).
+  // On attend de savoir qui est connecté, puis on ouvre SON tiroir. Changer de
+  // compte referme l'un et ouvre l'autre : jamais les affaires de l'un chez
+  // l'autre.
+  const session = useSession()
+  const compte = session === undefined ? undefined : (session?.user.id ?? null)
+  useEffect(() => {
+    if (compte === undefined) return
+    let annule = false
+    void (async () => {
+      // Plus rien ne s'écrit tant que le bon tiroir n'est pas ouvert.
+      useDonnees.setState({ chargees: false })
+      useSeances.setState({ chargees: false })
+      if (compte) await reclamer(compte).catch(() => undefined)
+      if (annule) return
+      definirCompte(compte)
+      await charger()
+      await useSeances.getState().charger(cleDate(new Date()))
+    })()
+    return () => {
+      annule = true
+    }
+  }, [compte, charger])
 
   if (!donneesPretes) {
     return <ChargementVethos pleinEcran />

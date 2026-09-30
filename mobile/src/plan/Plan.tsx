@@ -50,7 +50,7 @@ import { lireSemaine, seancesTenues } from './lecture'
 
 function useSourcePlan() {
   const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches, supprimerObjectif, majReglages } = useDonnees()
-  const { apprentissage, confirmations, chargees: mesuresPretes, charger, poser } = useSeances()
+  const { apprentissage, confirmations, chargees: mesuresPretes, poser } = useSeances()
   // Le bouclier s'affiche dans un AUTRE processus, qui n'a pas notre thème et
   // ne peut pas le demander : ses couleurs se figent au moment où on le pose.
   const theme = useNomTheme()
@@ -130,7 +130,8 @@ function useSourcePlan() {
      apprentissage, confirmations],
   )
 
-  useEffect(() => { void charger(cleDate(new Date())) }, [charger])
+  // Les séances se chargent avec le compte (voir `app/_layout.tsx`) : chaque
+  // compte a son tiroir, et le changer recharge le bon.
 
   // Contrat : un retrait d'objectif demandé il y a 48 h prend effet maintenant.
   useEffect(() => {

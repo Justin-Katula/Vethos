@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
+import { cleCompte, compteCourant } from '@/compte/espace'
 import {
   LearningStateSchema,
   SessionConfirmationsStateSchema,
@@ -30,6 +31,8 @@ const videPour = (date: string): SessionConfirmationsState =>
 
 type EtatMagasin = EtatSeances & {
   chargees: boolean
+  /** Le compte dont ces séances sont le tiroir (null : le tiroir commun). */
+  proprietaire: string | null
   charger: (aujourdHui: string) => Promise<void>
   /** Range un état déjà calculé par la pendule. Aucune règle ici. */
   poser: (suivant: EtatSeances) => Promise<void>
@@ -39,12 +42,14 @@ export const useSeances = create<EtatMagasin>((set, get) => ({
   apprentissage: VIDE_APPRENTISSAGE,
   confirmations: videPour('1970-01-01'),
   chargees: false,
+  proprietaire: null,
 
   async charger(aujourdHui) {
+    const proprietaire = compteCourant()
     try {
-      const brut = await AsyncStorage.getItem(CLE)
+      const brut = await AsyncStorage.getItem(cleCompte(CLE, proprietaire))
       if (!brut) {
-        set({ confirmations: videPour(aujourdHui), chargees: true })
+        set({ apprentissage: VIDE_APPRENTISSAGE, confirmations: videPour(aujourdHui), proprietaire, chargees: true })
         return
       }
       const lu = JSON.parse(brut) as Record<string, unknown>
@@ -55,10 +60,11 @@ export const useSeances = create<EtatMagasin>((set, get) => ({
       set({
         apprentissage: appris.success ? appris.data : VIDE_APPRENTISSAGE,
         confirmations: confs.success ? confs.data : videPour(aujourdHui),
+        proprietaire,
         chargees: true,
       })
     } catch {
-      set({ apprentissage: VIDE_APPRENTISSAGE, confirmations: videPour(aujourdHui), chargees: true })
+      set({ apprentissage: VIDE_APPRENTISSAGE, confirmations: videPour(aujourdHui), proprietaire, chargees: true })
     }
   },
 
@@ -67,7 +73,7 @@ export const useSeances = create<EtatMagasin>((set, get) => ({
     const e = get()
     try {
       await AsyncStorage.setItem(
-        CLE,
+        cleCompte(CLE, e.proprietaire),
         JSON.stringify({ apprentissage: e.apprentissage, confirmations: e.confirmations }),
       )
     } catch {

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { cleCompte, compteCourant } from '@/compte/espace'
 import { create } from 'zustand'
 import { z } from 'zod'
 import { findAncreConflict } from '@shared/planning/placement'
@@ -181,6 +182,8 @@ export function identifiant(): string {
 
 type EtatDonnees = Contenu & {
   chargees: boolean
+  /** Le compte dont ces données sont le tiroir (null : le tiroir commun). */
+  proprietaire: string | null
   charger: () => Promise<void>
 
   ajouterTache: (
@@ -220,9 +223,14 @@ type EtatDonnees = Contenu & {
   ) => Promise<void>
 }
 
-async function ecrire(contenu: Contenu): Promise<void> {
+/**
+ * Écrit dans le tiroir du compte À QUI appartiennent ces données, pas du
+ * compte connecté à cet instant : une écriture en vol pendant un changement
+ * de compte ne peut pas verser les affaires de l'un chez l'autre.
+ */
+async function ecrire(contenu: Contenu, proprietaire: string | null): Promise<void> {
   try {
-    await AsyncStorage.setItem(CLE, JSON.stringify(contenu))
+    await AsyncStorage.setItem(cleCompte(CLE, proprietaire), JSON.stringify(contenu))
   } catch {
     // Un échec d'écriture ne doit pas faire tomber l'interface : l'utilisateur
     // garde ce qu'il vient de saisir à l'écran, et la prochaine écriture
@@ -235,24 +243,31 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
   const enregistrer = async (partiel: Partial<Contenu>) => {
     set(partiel)
     const e = get()
-    await ecrire({
-      taches: e.taches,
-      objectifs: e.objectifs,
-      ancres: e.ancres,
-      obligations: e.obligations,
-      reglages: e.reglages,
-    })
+    await ecrire(
+      {
+        taches: e.taches,
+        objectifs: e.objectifs,
+        ancres: e.ancres,
+        obligations: e.obligations,
+        reglages: e.reglages,
+      },
+      e.proprietaire,
+    )
   }
 
   return {
     ...VIDE,
     chargees: false,
+    proprietaire: null,
 
     async charger() {
+      // Le tiroir du compte connecté. Un tiroir vide est un compte neuf : il
+      // repart de zéro, sans rien garder du compte précédent.
+      const proprietaire = compteCourant()
       try {
-        const brut = await AsyncStorage.getItem(CLE)
+        const brut = await AsyncStorage.getItem(cleCompte(CLE, proprietaire))
         if (!brut) {
-          set({ chargees: true })
+          set({ ...VIDE, proprietaire, chargees: true })
           return
         }
         // `safeParse` : un fichier d'une version précédente ne doit jamais
@@ -260,7 +275,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
         // planter — et l'utilisateur voit une application neuve, pas un écran noir.
         const lu = ContenuSchema.safeParse(JSON.parse(brut))
         if (!lu.success) {
-          set({ ...VIDE, chargees: true })
+          set({ ...VIDE, proprietaire, chargees: true })
           return
         }
 
@@ -290,20 +305,24 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
           objectifs,
           ancres,
           taches,
+          proprietaire,
           chargees: true,
         })
 
         if (modifie) {
-          void ecrire({
-            taches,
-            objectifs,
-            ancres,
-            obligations: lu.data.obligations,
-            reglages: lu.data.reglages,
-          })
+          void ecrire(
+            {
+              taches,
+              objectifs,
+              ancres,
+              obligations: lu.data.obligations,
+              reglages: lu.data.reglages,
+            },
+            proprietaire,
+          )
         }
       } catch {
-        set({ ...VIDE, chargees: true })
+        set({ ...VIDE, proprietaire, chargees: true })
       }
     },
 
@@ -486,7 +505,7 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
       })
       // Le parcours ne disparaît qu'après une vraie sauvegarde. Un échec laisse
       // le brouillon intact et réessayable, sans créer de doublons.
-      await AsyncStorage.setItem(CLE, JSON.stringify(contenu))
+      await AsyncStorage.setItem(cleCompte(CLE, get().proprietaire), JSON.stringify(contenu))
       set(contenu)
     },
   }

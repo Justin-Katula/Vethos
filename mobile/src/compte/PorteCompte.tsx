@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Animated, Image, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
 import { A, GEIST, SORTIE } from '@/ui/app-briques'
 import { useSession } from './compte'
+import { introVueSurAppareil, marquerIntroVue } from './espace'
 import { BoutonsConnexion, useConnexion } from './CarteCompte'
 import { useAbonnement } from '@/abonnement/achats'
 import { EcranAbonnement } from '@/abonnement/EcranAbonnement'
@@ -25,8 +26,21 @@ export function PorteCompte() {
   const marges = useSafeAreaInsets()
   const apparition = useRef(new Animated.Value(0)).current
 
+  // Ce téléphone a déjà vu l'introduction : déconnecté, c'est la porte qui
+  // s'affiche, pas une nouvelle introduction (le tiroir commun est vide).
+  const [introVue, setIntroVue] = useState(false)
+  useEffect(() => {
+    void introVueSurAppareil().then(setIntroVue)
+  }, [])
+  useEffect(() => {
+    if (introFaite && !introVue) {
+      setIntroVue(true)
+      void marquerIntroVue()
+    }
+  }, [introFaite, introVue])
+
   const configuree = !!connexion.dispo && (connexion.dispo.apple || connexion.dispo.google)
-  const fermee = introFaite && configuree && session === null
+  const fermee = (introFaite || introVue) && configuree && session === null
 
   const abonnement = useAbonnement((e) => e.etat)
   const initialiser = useAbonnement((e) => e.initialiser)

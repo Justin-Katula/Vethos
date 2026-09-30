@@ -77,13 +77,25 @@ const ipDe = (req: Request) => {
   return chaine[chaine.length - 1] ?? 'inconnue'
 }
 
+/**
+ * CORS : l'app web (et Expo sur le web) appelle depuis une autre origine. Aucun
+ * cookie ici — l'accès tient au jeton signé —, donc toute origine peut appeler.
+ */
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+}
+
 const repondre = (status: number, corps: unknown) =>
   new Response(JSON.stringify(corps), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS },
   })
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   try {
     const chemin = new URL(req.url).pathname
     if (req.method === 'GET' && chemin.endsWith('/health')) return repondre(coeur ? 200 : 503, { ok: !!coeur })
