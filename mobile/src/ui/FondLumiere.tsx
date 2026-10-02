@@ -12,8 +12,8 @@ import type { RVB } from './lumiere'
 
 /** L'intensité est cuite dans le dégradé à ce niveau, puis réglée par l'opacité. */
 const PLAFOND = 1.4
-/** Sur un téléphone, la lueur se voyait à peine : +10 % de lumière. */
-const LUMINOSITE = 1.1
+/** Sur un téléphone, la lueur se voyait à peine : +10 % de lumière, puis le double de ce niveau (1,1 × 2). */
+const LUMINOSITE = 2.2
 const DUREE = 1400
 const DOUX = Easing.bezier(0.23, 1, 0.32, 1)
 
