@@ -107,6 +107,14 @@ function accentRvb(h: number): RVB {
   return hex3(KF[0]![1])
 }
 export const accentIntro = (h: number) => hex(accentRvb(h))
+/** L'encre lisible sur un accent : noir sur un accent clair, blanc sur un sombre. */
+export function encreSur(fond: string): string {
+  const [r, g, b] = hex3(fond).map((c) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }) as RVB
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? '#000000' : '#ffffff'
+}
 /** Le même, éclairci pour du texte. */
 export const encreIntro = (h: number) => hex(accentRvb(h).map((v) => v + (255 - v) * 0.22) as RVB)
 

@@ -1,5 +1,6 @@
 import { THEMES, type Jetons, type NomTheme } from '@/theme/jetons'
 import { enHeure } from '@/plan/format'
+import { accentIntro, encreSur, heureDecimale } from '@/ui/lumiere'
 
 /**
  * Le bouclier : l'écran qu'on voit quand on ouvre une application écartée.
@@ -129,9 +130,15 @@ export function habillageBouclier(args: {
   finMinute: number
   /** Mode profond : tout est écarté sauf la liste gardée. Change la sortie. */
   profond?: boolean
+  /** L'heure (décimale) dont le bouclier prend la couleur ; maintenant par défaut. */
+  heure?: number
 }): { configuration: ConfigurationBouclier; actions: ActionsBouclier } {
   const j: Jetons = THEMES[args.theme]
   const sortie = sortieDuBouclier(args.profond ?? false)
+  // L'accent est la couleur de l'heure (`build/Vethos Block Overlay.dc.html`),
+  // cuite au moment où la séance s'ouvre : l'extension ne sait pas lire l'heure
+  // à notre façon.
+  const acc = accentIntro(args.heure ?? heureDecimale())
 
   return {
     configuration: {
@@ -144,10 +151,10 @@ export function habillageBouclier(args: {
       // séance, il n'enferme pas. Un cadenas promettrait une serrure que
       // personne ne possède — l'autorisation se retire depuis les Réglages.
       iconSystemName: 'hourglass',
-      iconTint: versCouleurIOS(j.accentEncre),
+      iconTint: versCouleurIOS(acc),
       primaryButtonLabel: 'Close',
-      primaryButtonLabelColor: versCouleurIOS(j.accentSur),
-      primaryButtonBackgroundColor: versCouleurIOS(j.accent),
+      primaryButtonLabelColor: versCouleurIOS(encreSur(acc)),
+      primaryButtonBackgroundColor: versCouleurIOS(acc),
       secondaryButtonLabel: sortie.libelle,
       secondaryButtonLabelColor: versCouleurIOS(j.text3),
     },
