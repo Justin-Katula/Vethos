@@ -20,7 +20,7 @@ import { JeCommence } from '@/seances/JeCommence'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
-import { definirCompte, reclamer } from '@/compte/espace'
+import { definirCompte, oublierTiroirCommun } from '@/compte/espace'
 import { accorder } from '@/compte/nuage'
 import { useSeances } from '@/seances/magasin-seances'
 import { cleDate } from '@/plan/moteur'
@@ -55,7 +55,7 @@ function Coque() {
   // Les données suivent le compte : un tiroir par compte (`@/compte/espace`).
   // On attend de savoir qui est connecté, puis on ouvre SON tiroir. Changer de
   // compte referme l'un et ouvre l'autre : jamais les affaires de l'un chez
-  // l'autre.
+  // l'autre. Déconnecté, il n'y a pas de tiroir du tout.
   const session = useSession()
   const compte = session === undefined ? undefined : (session?.user.id ?? null)
   useEffect(() => {
@@ -63,14 +63,14 @@ function Coque() {
     let annule = false
     void (async () => {
       // Plus rien ne s'écrit tant que le bon tiroir n'est pas ouvert.
-      useDonnees.setState({ chargees: false })
-      useSeances.setState({ chargees: false })
-      if (compte) {
-        await reclamer(compte).catch(() => undefined)
-        // Le téléphone et la sauvegarde en ligne se mettent d'accord : sur un
-        // nouvel iPhone, c'est ici que le compte retrouve ses affaires.
-        await accorder(compte).catch(() => undefined)
-      }
+      useDonnees.setState({ chargees: false, proprietaire: null })
+      useSeances.setState({ chargees: false, proprietaire: null })
+      definirCompte(null)
+      await oublierTiroirCommun().catch(() => undefined)
+      if (!compte) return
+      // Le téléphone et la sauvegarde en ligne se mettent d'accord : sur un
+      // nouvel iPhone, c'est ici que le compte retrouve ses affaires.
+      await accorder(compte).catch(() => undefined)
       if (annule) return
       definirCompte(compte)
       await charger()
@@ -80,6 +80,20 @@ function Coque() {
       annule = true
     }
   }, [compte, charger])
+
+  if (compte === undefined) return <ChargementVethos pleinEcran />
+
+  // Déconnecté : la porte, et RIEN derrière — ni introduction, ni « Je
+  // commence », ni onglets. Ces écrans sont des fenêtres iOS qui passent
+  // au-dessus de tout ; s'ils existaient ici, ils couvriraient la porte.
+  if (compte === null) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <StatusBar style="light" />
+        <PorteCompte />
+      </View>
+    )
+  }
 
   if (!donneesPretes) {
     return <ChargementVethos pleinEcran />
@@ -98,9 +112,9 @@ function Coque() {
       {/* D.8 : au-dessus de TOUT, quel que soit l'onglet ouvert. Une question
           qu'on peut eviter en changeant d'onglet n'est pas une friction. */}
       <JeCommence />
-      {/* Au-dessus encore : au premier lancement, il n'y a rien derriere. */}
+      {/* Au-dessus encore : un compte neuf n'a rien derrière. */}
       <Introduction />
-      {/* Puis la porte : sans compte, l'app ne s'ouvre pas. */}
+      {/* Puis le mur d'abonnement, une fois l'introduction faite. */}
       <PorteCompte />
     </View>
   )

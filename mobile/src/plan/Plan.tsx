@@ -567,6 +567,17 @@ function useSourcePlan() {
 
   return {
     ...calcul,
+    /**
+     * Une séance n'est pas finie : commencée, en pause, en souffle, en attente
+     * de Stop ou de rattrapage. Tant que c'est vrai, on ne quitte pas son compte.
+     */
+    seanceEnCours:
+      !!actif ||
+      !!confiance.pause ||
+      !!confiance.retourAttendu ||
+      !!confiance.stopEnAttente ||
+      !!confiance.choixRattrapage ||
+      !!confiance.urgence,
     /** Les séances faites un jour passé, relues du journal. */
     tenuesDu: (date: string) => seancesTenues(apprentissage.sessionEvents ?? [], date, titreDe),
     confiance,

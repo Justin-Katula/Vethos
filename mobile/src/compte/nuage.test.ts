@@ -26,4 +26,10 @@ describe('Sauvegarde en ligne : la version la plus récente gagne', () => {
   it('rien nulle part : rien ne bouge', () => {
     expect(arbitrer({ heure: null, present: false }, null)).toBe('garder')
   })
+
+  it('séances : la copie du téléphone n’est jamais écrasée par une plus récente venue d’ailleurs', () => {
+    expect(arbitrer({ heure: t('10:00'), present: true }, { heure: t('11:00') }, 'vethos:seances:v1')).toBe('envoyer')
+    expect(arbitrer({ heure: null, present: false }, { heure: t('11:00') }, 'vethos:seances:v1')).toBe('prendre')
+    expect(arbitrer({ heure: t('10:00'), present: true }, { heure: t('10:00') }, 'vethos:seances:v1')).toBe('garder')
+  })
 })

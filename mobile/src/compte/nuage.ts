@@ -17,10 +17,23 @@ export const MAGASINS: readonly Magasin[] = ['vethos:donnees:v1', 'vethos:seance
 const cleLocale = (m: Magasin, compte: string) => `${m}:u:${compte}`
 const cleHeure = (m: Magasin, compte: string) => `vethos:maj:${m}:u:${compte}`
 
-/** Ce que la comparaison décide, pour un magasin. Pur : testé sans réseau. */
-export function arbitrer(local: { heure: string | null; present: boolean }, distant: { heure: string } | null): 'garder' | 'prendre' | 'envoyer' {
+/**
+ * Ce que la comparaison décide, pour un magasin. Pur : testé sans réseau.
+ *
+ * Les séances font exception : elles sont la mesure de CE téléphone (la
+ * pendule y tourne, « Je commence » s'y appuie). Remplacer en bloc la copie
+ * locale par une version plus récente venue d'ailleurs effaçait une séance
+ * déjà commencée — et l'overlay la redemandait. Le nuage ne sert donc les
+ * séances qu'à un téléphone qui n'en a pas (nouvel iPhone).
+ */
+export function arbitrer(
+  local: { heure: string | null; present: boolean },
+  distant: { heure: string } | null,
+  m: Magasin = 'vethos:donnees:v1',
+): 'garder' | 'prendre' | 'envoyer' {
   if (!distant) return local.present ? 'envoyer' : 'garder'
   if (!local.present || !local.heure) return 'prendre'
+  if (m === 'vethos:seances:v1') return local.heure === distant.heure ? 'garder' : 'envoyer'
   const l = Date.parse(local.heure)
   const d = Date.parse(distant.heure)
   if (d > l) return 'prendre'
@@ -43,7 +56,7 @@ export async function accorder(compte: string, delaiMs = 5000): Promise<void> {
       const distant = (data ?? []).find((r) => r.magasin === m) as { contenu: unknown; maj: string } | undefined
       const brut = await AsyncStorage.getItem(cleLocale(m, compte))
       const heure = await AsyncStorage.getItem(cleHeure(m, compte))
-      const choix = arbitrer({ heure, present: !!brut }, distant ? { heure: distant.maj } : null)
+      const choix = arbitrer({ heure, present: !!brut }, distant ? { heure: distant.maj } : null, m)
       if (choix === 'prendre' && distant) {
         await AsyncStorage.setItem(cleLocale(m, compte), JSON.stringify(distant.contenu))
         await AsyncStorage.setItem(cleHeure(m, compte), distant.maj)

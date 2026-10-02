@@ -9,39 +9,40 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }))
 
-vi.mock('./nuage', () => ({ noterEcriture: async () => undefined }))
+const envois: string[] = []
+vi.mock('./nuage', () => ({ noterEcriture: async (compte: string) => void envois.push(compte) }))
 
-import { cleCompte, definirCompte, reclamer } from './espace'
+import { cleCompte, definirCompte, ecrireTiroir, oublierTiroirCommun } from './espace'
 
 beforeEach(() => {
   disque.clear()
+  envois.length = 0
   definirCompte(null)
 })
 
 describe('Un tiroir par compte', () => {
   it('deux comptes, deux clés', () => {
     expect(cleCompte('vethos:donnees:v1', 'a')).not.toBe(cleCompte('vethos:donnees:v1', 'b'))
-    expect(cleCompte('vethos:donnees:v1', null)).toBe('vethos:donnees:v1')
   })
 
-  it('le premier compte reprend ce que l’introduction a rangé, et le tiroir commun se vide', async () => {
+  it('une écriture va dans le tiroir de son propriétaire, et part en ligne', async () => {
+    await ecrireTiroir('vethos:donnees:v1', 'lea', '{"a":1}')
+    expect(disque.get('vethos:donnees:v1:u:lea')).toBe('{"a":1}')
+    expect(envois).toEqual(['lea'])
+  })
+
+  it('sans compte, rien ne s’écrit : le prochain compte n’hérite de rien', async () => {
+    await ecrireTiroir('vethos:donnees:v1', null, '{"intro":"Léa"}')
+    await ecrireTiroir('vethos:seances:v1', null, '{}')
+    expect(disque.size).toBe(0)
+    expect(envois).toEqual([])
+  })
+
+  it('l’ancien tiroir commun est effacé, les tiroirs des comptes restent', async () => {
     disque.set('vethos:donnees:v1', '{"intro":"Léa"}')
-    await reclamer('lea')
-    expect(disque.get('vethos:donnees:v1:u:lea')).toBe('{"intro":"Léa"}')
-    expect(disque.has('vethos:donnees:v1')).toBe(false)
-  })
-
-  it('un second compte ne récupère rien du premier', async () => {
-    disque.set('vethos:donnees:v1', '{"intro":"Léa"}')
-    await reclamer('lea')
-    await reclamer('tom')
-    expect(disque.has('vethos:donnees:v1:u:tom')).toBe(false)
-  })
-
-  it('un compte qui a déjà son tiroir ne se fait pas écraser par le tiroir commun', async () => {
-    disque.set('vethos:donnees:v1:u:lea', '{"a":"sien"}')
-    disque.set('vethos:donnees:v1', '{"a":"commun"}')
-    await reclamer('lea')
-    expect(disque.get('vethos:donnees:v1:u:lea')).toBe('{"a":"sien"}')
+    disque.set('vethos:seances:v1', '{}')
+    disque.set('vethos:donnees:v1:u:tom', '{"a":"sien"}')
+    await oublierTiroirCommun()
+    expect([...disque.keys()]).toEqual(['vethos:donnees:v1:u:tom'])
   })
 })

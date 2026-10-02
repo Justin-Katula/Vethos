@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Alert, Platform, Pressable, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { A, Carte, GEIST, useToast } from '@/ui/app-briques'
+import { usePlan } from '@/plan/Plan'
 import { connecterApple, connecterGoogle, deconnecter, fournisseurs, supprimerCompte, useSession, type Resultat } from './compte'
 
 /** Le « G » de Google, dans ses quatre couleurs (charte de Google). */
@@ -112,6 +113,13 @@ export function BoutonsConnexion({ dispo, lancer }: Pick<ReturnType<typeof useCo
 export function CarteCompte() {
   const session = useSession()
   const toast = useToast()
+  // Une séance pas finie (pause comprise) garde son compte : on ne s'échappe
+  // pas d'un engagement en se déconnectant.
+  const { seanceEnCours } = usePlan()
+  const bloque = () => {
+    if (seanceEnCours) toast('Finish your session first.')
+    return seanceEnCours
+  }
   if (session) {
     const u = session.user
     const nom = u.email ?? (u.user_metadata?.full_name as string | undefined) ?? 'Signed in'
@@ -124,17 +132,20 @@ export function CarteCompte() {
             {via ? `${nom} · ${via}` : nom}
           </Text>
         </View>
-        <Bouton fond="transparent" encre={A.t1} bord={A.s} onPress={() => void deconnecter()}>
-          Sign out
-        </Bouton>
+        <View style={{ opacity: seanceEnCours ? 0.4 : 1 }}>
+          <Bouton fond="transparent" encre={A.t1} bord={A.s} onPress={() => { if (!bloque()) void deconnecter() }}>
+            Sign out
+          </Bouton>
+        </View>
         <Pressable
           accessibilityRole="button"
           onPress={async () => {
+            if (bloque()) return
             if (!(await confirmer('Delete account?', 'Your account is erased for good. This can’t be undone.', 'Delete'))) return
             const r = await supprimerCompte()
             toast(r.ok ? 'Account deleted.' : 'Couldn’t delete the account.')
           }}
-          style={({ pressed }) => ({ alignSelf: 'center', paddingVertical: 6, opacity: pressed ? 0.6 : 1 })}
+          style={({ pressed }) => ({ alignSelf: 'center', paddingVertical: 6, opacity: seanceEnCours ? 0.4 : pressed ? 0.6 : 1 })}
         >
           <Text style={{ color: A.rouge, fontFamily: GEIST.moyen, fontSize: 14 }}>Delete account</Text>
         </Pressable>

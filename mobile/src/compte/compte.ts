@@ -42,10 +42,16 @@ export async function fournisseurs(): Promise<{ apple: boolean; google: boolean 
 }
 
 /** Sur le web : le fournisseur ouvre sa page, puis revient ici avec la session. */
+/**
+ * Google reconnecte en silence le dernier compte utilisé dans le navigateur :
+ * « changer de compte » rouvrait le même. On demande toujours lequel.
+ */
+const choixDuCompte = (provider: 'apple' | 'google') => (provider === 'google' ? { prompt: 'select_account' } : undefined)
+
 async function parRedirection(provider: 'apple' | 'google'): Promise<Resultat> {
   const sb = supabase()
   if (!sb) return { ok: false, raison: 'indisponible' }
-  const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: globalThis.location?.origin } })
+  const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: globalThis.location?.origin, queryParams: choixDuCompte(provider) } })
   return error ? { ok: false, raison: 'erreur' } : { ok: true }
 }
 
@@ -62,7 +68,7 @@ async function parNavigateur(provider: 'apple' | 'google'): Promise<Resultat> {
   // que Supabase accepte toujours — il ignore les `exp://` de la liste des
   // redirections (vérifié le 2026-09-30). Hors Expo Go : le schéma de l'app.
   const retour = dansExpoGo() ? 'exp://localhost/--/auth' : Linking.createURL('auth')
-  const { data, error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: retour, skipBrowserRedirect: true } })
+  const { data, error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: retour, skipBrowserRedirect: true, queryParams: choixDuCompte(provider) } })
   if (error || !data.url) return { ok: false, raison: 'erreur' }
   const r = await WebBrowser.openAuthSessionAsync(data.url, retour)
   if (r.type !== 'success') return { ok: false, raison: 'annule' }
@@ -118,6 +124,16 @@ export async function connecterGoogle(): Promise<Resultat> {
 
 export async function deconnecter(): Promise<void> {
   await supabase()?.auth.signOut()
+  // Le module Google natif garde lui aussi le dernier compte : on l'oublie,
+  // pour que la prochaine connexion propose le choix.
+  if (Platform.OS !== 'web' && !dansExpoGo()) {
+    try {
+      const { GoogleSignin } = await import('@react-native-google-signin/google-signin')
+      await GoogleSignin.signOut()
+    } catch {
+      // Pas de module natif, ou pas de compte Google : rien à oublier.
+    }
+  }
 }
 
 /**
