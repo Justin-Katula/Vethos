@@ -37,9 +37,10 @@ function arc(a0: number, a1: number, r: number) {
 const TICKS = Array.from({ length: 96 }, (_, i) => {
   const h = i % 4 === 0
   const six = i % 24 === 0
-  const [x1, y1] = pt(i * 15, six ? 178 : h ? 180 : 182)
-  const [x2, y2] = pt(i * 15, six ? 192 : h ? 188 : 185)
-  return { x1, y1, x2, y2, c: six ? A.t1 : h ? A.t3 : '#3a3a3a', w: six ? 1.5 : 1 }
+  const [x1, y1] = pt(i * 15, six ? 178 : h ? 180 : 181)
+  const [x2, y2] = pt(i * 15, six ? 192 : h ? 188 : 185.5)
+  // Sur la lueur, les anciens gris (#3a3a3a, t3) se perdaient : plus clairs et un peu plus épais.
+  return { x1, y1, x2, y2, c: six ? A.t1 : h ? A.t2 : '#8c8c8c', w: six ? 2 : h ? 1.6 : 1.3 }
 })
 const enMin = (h: string) => {
   const [a, b] = h.split(':').map(Number)

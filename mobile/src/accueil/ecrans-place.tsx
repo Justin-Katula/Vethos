@@ -532,9 +532,9 @@ const TICKS = Array.from({ length: 96 }, (_, i) => {
   const m = i * 15
   const h = i % 4 === 0
   const six = i % 24 === 0
-  const [x1, y1] = pt(m, six ? 178 : h ? 180 : 182)
-  const [x2, y2] = pt(m, six ? 192 : h ? 188 : 185)
-  return { x1, y1, x2, y2, c: six ? C.t1 : h ? C.t3 : '#3a3a3a', w: six ? 1.5 : 1 }
+  const [x1, y1] = pt(m, six ? 178 : h ? 180 : 181)
+  const [x2, y2] = pt(m, six ? 192 : h ? 188 : 185.5)
+  return { x1, y1, x2, y2, c: six ? C.t1 : h ? C.t2 : '#8c8c8c', w: six ? 2 : h ? 1.6 : 1.3 }
 })
 function Graduations() {
   return (
