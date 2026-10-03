@@ -92,6 +92,7 @@ const DEEP_BUDGET_MINUTES = TASK_CONSTANTS.maxDeepBlocksPerDay * TASK_CONSTANTS.
  */
 const cinq = (m: number) => Math.round(m / 5) * 5
 const cinqDessous = (m: number) => Math.floor(m / 5) * 5
+const cinqDessus = (m: number) => Math.ceil(m / 5) * 5
 
 /** L'empreinte réelle d'un bloc : le travail plus sa pause (E.1). */
 function footprintFor(workMinutes: number): number {
@@ -892,8 +893,18 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         if (footprint > allocator.largestFree()) footprint = cinqDessous(allocator.largestFree())
         // Raccourci par la place du jour, le bloc ne doit pas laisser derrière
         // lui une miette qu'aucun bloc ne pourra plus jamais prendre.
+        // D'abord l'allonger jusqu'à la prendre, si le budget et la place le
+        // permettent ; sinon le raccourcir pour lui laisser un vrai bloc.
+        // Défaut réel du 2026-10-02 : pendant une séance, le reste d'une partie
+        // tombe hors de la grille de 5 min (32 min). Le bloc de 30 laissait 2
+        // min, le raccourci le ramenait à 12 — sous le minimum, rien n'était
+        // posé, et le verrou B.5.1 retirait toutes les parties suivantes.
         const crumb = (remainingNeed.get(task.id) ?? 0) - workOfFootprint(footprint)
-        if (crumb > 0 && crumb < TASK_CONSTANTS.minBlockMinutes) footprint -= TASK_CONSTANTS.minBlockMinutes - crumb
+        if (crumb > 0 && crumb < TASK_CONSTANTS.minBlockMinutes) {
+          const entier = cinqDessus(footprintFor(remainingNeed.get(task.id) ?? 0))
+          if (entier <= budget && entier <= allocator.largestFree() && workOfFootprint(entier) >= (remainingNeed.get(task.id) ?? 0)) footprint = entier
+          else footprint -= TASK_CONSTANTS.minBlockMinutes - crumb
+        }
         if (workOfFootprint(footprint) < TASK_CONSTANTS.minBlockMinutes) break
 
         // D.5 : le budget profond du jour est déjà partagé avec les objectifs.

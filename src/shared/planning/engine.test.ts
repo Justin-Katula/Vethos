@@ -1178,6 +1178,36 @@ describe('B.5.1 — les parties se font DANS L’ORDRE, une à la fois', () => {
     expect(placedFor(2)).toBeGreaterThan(0)
   })
 
+  // Défaut réel du 2026-10-02 (iPhone, séance en cours) : une partie à qui il
+  // restait 32 min recevait un bloc de 30, la règle anti-miette le RACCOURCISSAIT
+  // à 12 (sous le minimum), rien n'était posé — et le verrou B.5.1 retirait
+  // TOUTES les parties suivantes : « 12 h 43 missing », une minute sur deux.
+  it('pendant une séance, le reste de la partie est placé quelle que soit la minute — et les parties suivantes aussi', () => {
+    const group = uuid(40)
+    const tasks = [1, 2].map((n) =>
+      task({
+        id: uuid(40 + n),
+        title: `Part ${n}`,
+        parentTaskId: group,
+        partOrder: n,
+        estimatedMinutes: n === 1 ? 90 : 240,
+        remainingMinutes: n === 1 ? 90 : 240,
+        deadline: '2026-08-17',
+      }),
+    )
+    // La séance de la partie 1 a commencé à 7 h 30 pour 90 min de travail.
+    const seance = { blockId: 'seance-p1', kind: 'task' as const, refId: uuid(41), startMinute: 450, endMinute: 540, workMinutes: 90 }
+    for (let k = 0; k <= 10; k++) {
+      // De 8 h 00 à 8 h 10 : ce que la séance doit encore produire passe de 60 à 50 min,
+      // et le reste à placer après elle de 30 à 40 — tous les chiffres des unités.
+      const plan = computePlan(input({ tasks, schedule: [], activeSession: seance }), new Date(2026, 7, 11, 8, k))
+      const placedFor = (n: number) =>
+        plan.verdicts.find((v) => v.taskId === uuid(40 + n))?.placedMinutes ?? 0
+      expect({ minute: k, partie1: 90 - placedFor(1) <= 4 }).toEqual({ minute: k, partie1: true })
+      expect({ minute: k, partie2: placedFor(2) > 0 }).toEqual({ minute: k, partie2: true })
+    }
+  })
+
   it('une tâche NON découpée n’est jamais mise en aperçu', () => {
     const plan = computePlan(input({ tasks: [task({ remainingMinutes: 120 })] }), NOW)
     expect(plan.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)
