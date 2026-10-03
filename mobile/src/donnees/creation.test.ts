@@ -52,12 +52,11 @@ describe('B.5 — la tâche trop grosse se découpe toute seule', () => {
     expect(sortie[0]!.parentId).toBeNull()
   })
 
-  it('découpe sur la durée CORRIGÉE, pas sur celle annoncée', () => {
-    // 200 min annoncées tiennent sous un plafond de 250. Corrigées à 280,
-    // elles ne tiennent plus. Découper sur l'annoncé laisserait passer une
-    // tâche que le moteur ne pourra pas poser.
-    const sortie = preparerTache(brouillon({ minutesEstimees: 200 }), options(250))
-    expect(sortie.length).toBeGreaterThan(1)
+  it('découpe sur la durée DEMANDÉE : 100 h demandées = 100 h planifiées', () => {
+    // Plus de facteur ×1,4 (2026-10-02) : 200 min tiennent sous un plafond de
+    // 250 et restent entières ; 300 min ne tiennent plus et se découpent.
+    expect(preparerTache(brouillon({ minutesEstimees: 200 }), options(250))).toHaveLength(1)
+    expect(preparerTache(brouillon({ minutesEstimees: 300 }), options(250)).length).toBeGreaterThan(1)
   })
 
   it('vide la tâche d’origine et passe tout le travail aux parties', () => {
@@ -74,7 +73,7 @@ describe('B.5 — la tâche trop grosse se découpe toute seule', () => {
   it('ne perd pas une minute au découpage', () => {
     const sortie = preparerTache(brouillon({ minutesEstimees: 600 }), options(200))
     const total = sortie.slice(1).reduce((s, p) => s + p.minutesRestantes, 0)
-    expect(total).toBe(840) // 600 × 1,4
+    expect(total).toBe(600) // exactement ce qui a été demandé
   })
 
   it('numérote les parties, et sans trou', () => {

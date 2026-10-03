@@ -41,13 +41,13 @@ describe('onboarding — le plan est une vraie simulation sans écriture', () =>
     expect(JSON.stringify(source)).toBe(avant)
   })
 
-  it('uses the task estimate correction and keeps its real deadline', () => {
+  it('plans exactly the time asked and keeps its real deadline', () => {
     const p = preparerIntroduction(
       source,
       { ...brouillon(), nom: 'Report', minutes: 90, echeance: '2026-09-24' },
       maintenant,
     )
-    expect(p.ajouts.taches[0]?.minutesRestantes).toBeGreaterThan(90)
+    expect(p.ajouts.taches[0]?.minutesRestantes).toBe(90)
     expect(p.ajouts.taches[0]?.echeance).toBe('2026-09-24')
     expect(p.blocs.length).toBeGreaterThan(0)
     expect(p.blocs.every((b) => b.date <= '2026-09-24')).toBe(true)
