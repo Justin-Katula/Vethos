@@ -4174,6 +4174,9 @@ var AuthAccountSchema = external_exports.object({
   email: external_exports.string().email().max(254),
   passwordHash: external_exports.string().min(1),
   passwordSalt: external_exports.string().min(1),
+  // Itérations PBKDF2 du hash. Absent : compte créé avant 600 000 (180 000),
+  // re-haché à la prochaine connexion réussie.
+  passwordIterations: external_exports.number().int().positive().optional(),
   createdAt: external_exports.string().datetime(),
   updatedAt: external_exports.string().datetime()
 });
@@ -4280,10 +4283,10 @@ var TaskSchema = external_exports.object({
   workKind: external_exports.enum(["routine", "novel"]).default("routine"),
   /** Estimation brute de l'utilisateur, en minutes. (B.1/B.3) */
   estimatedMinutes: external_exports.number().int().min(1).max(1e4).default(60),
-  /** Travail restant en minutes, corrigé par le facteur. Diminue au fil des sessions. (C.1) */
+  /** Travail restant en minutes : ce que l'utilisateur a demandé, sans majoration. Diminue au fil des sessions. (C.1) */
   remainingMinutes: external_exports.number().int().min(0).max(1e4).default(60),
-  /** Facteur appliqué à l'estimation (B.1/B.4). Défaut B.3 tant que <5 tâches complétées. */
-  correctionFactor: external_exports.number().min(0.5).max(3).default(1.4),
+  /** Facteur appliqué à l'estimation : 1 — l'application planifie exactement ce qui est demandé. Les tâches créées avant ce changement gardent leur ancien facteur. */
+  correctionFactor: external_exports.number().min(0.5).max(3).default(1),
   /** Regroupement visuel : id de la tâche d'origine quand elle a été découpée (B.5). */
   parentTaskId: external_exports.string().uuid().nullable().default(null),
   /**
@@ -4301,6 +4304,13 @@ var TaskSchema = external_exports.object({
    * (B.2 compare réel ÷ estimé — gonfler l'estimé annulerait le signal).
    */
   extraMinutes: external_exports.number().int().min(0).max(1e4).default(0),
+  /**
+   * Bonus LIBÉRÉ : du temps de travail en plus, devenu travail normal de la
+   * tâche (voir `bonus.ts`). Séparé du plancher À DESSEIN : le plancher — ce que
+   * l'utilisateur a demandé, rallonges comprises — est seul à compter pour la
+   * faisabilité, les déficits et les signaux. Absent = 0.
+   */
+  bonusMinutes: external_exports.number().int().min(0).max(1e4).optional(),
   /**
    * D.8 : applications bloquées PENDANT un bloc de cette tâche, déclarées à la
    * création. Ids de `declared_apps`, spécifiques à CE bloc — jamais une liste
@@ -4788,6 +4798,7 @@ function promptSysteme(mode) {
     "Tu n\u2019accordes rien. Toute demande passe par evaluer_demande() \u2014 c\u2019est-\xE0-dire le moteur, jamais toi :",
     "si l\u2019utilisateur demande du repos, un report ou moins de travail, r\xE9ponds qu\u2019il peut le demander dans l\u2019app, et que le moteur d\xE9cidera.",
     "Quand tu refuses, tu cites le contrat sign\xE9 par l\u2019utilisateur.",
+    "Si l\u2019utilisateur demande combien d\u2019heures il doit faire ou fera, tu r\xE9ponds avec les chiffres exacts du moteur : ce qu\u2019il a demand\xE9, ce qui est fait, ce qui est plac\xE9, ce qui manque. 100 h demand\xE9es, c\u2019est 100 h planifi\xE9es. Tu ne nies jamais le temps en plus que l\u2019app peut lib\xE9rer, et tu ne le pr\xE9sentes jamais comme un reproche.",
     "Interdits : humilier, culpabiliser, menacer, mentir, flatter, comparer aux autres.",
     "Apr\xE8s un \xE9chec : constat en une phrase, puis la prochaine action.",
     "Une question maximum par message. Style entretien motivationnel.",

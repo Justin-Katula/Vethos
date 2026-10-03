@@ -519,7 +519,7 @@ function AddTaskModal({
       workKind: draft.workKind,
       estimatedMinutes: draft.minutes,
       remainingMinutes: draft.minutes,
-      correctionFactor: draft.workKind === 'novel' ? 1.7 : 1.4,
+      correctionFactor: 1,
       status: 'active',
       appsToBlock: [],
     })

@@ -42,7 +42,7 @@ describe('lecture commune du cercle et de la semaine', () => {
     const tache = {
       id: 't1', titre: 'Réviser', intention: '', echeance: '2026-09-25', importance: 5,
       minutesEstimees: 600, minutesRestantes: 600, facteurCorrection: 1.4,
-      minutesSupplementaires: 0, parentId: null, rangPartie: null,
+      minutesSupplementaires: 0, minutesBonus: 0, bonusLibere: [], parentId: null, rangPartie: null,
       nature: 'routine' as const, terminee: false, creeeLe: '2026-09-20T10:00:00.000Z',
     }
     const plan = calculerPlan({ taches: [tache], objectifs: [], ancres: [], obligations: [examen], reglages, maintenant: new Date(2026, 8, 21, 8) })

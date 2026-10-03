@@ -47,9 +47,10 @@ import {
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { cleDate, entreeEtPlan } from './moteur'
 import { lireSemaine, seancesTenues } from './lecture'
+import { liberationsDuJour } from './bonus-tache'
 
 function useSourcePlan() {
-  const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches, supprimerObjectif, majReglages } = useDonnees()
+  const { taches, objectifs, ancres, obligations, reglages, chargees, terminerTaches, libererBonus, supprimerObjectif, majReglages } = useDonnees()
   const { apprentissage, confirmations, chargees: mesuresPretes, poser } = useSeances()
   // Le bouclier s'affiche dans un AUTRE processus, qui n'a pas notre thème et
   // ne peut pas le demander : ses couleurs se figent au moment où on le pose.
@@ -79,7 +80,9 @@ function useSourcePlan() {
     return a ? { titre: a.nom } : null
   }, [taches, objectifs, ancres])
 
-  const calcul = useMemo(() => {
+  const prets = chargees && mesuresPretes
+
+  const calculFrais = useMemo(() => {
     const maintenant = new Date(instant)
     const aujourdHui = cleDate(maintenant)
     const minute = maintenant.getHours() * 60 + maintenant.getMinutes()
@@ -104,6 +107,14 @@ function useSourcePlan() {
   }, [taches, objectifs, ancres, obligations, reglages, instant, chargees,
       apprentissage, confirmations, mesuresPretes, titreDe])
 
+  // Le dernier plan calculé sur des données LUES. Tant qu'un tiroir se recharge
+  // (changement de compte, rechargement à chaud), le plan d'avant reste affiché :
+  // un plan calculé sur un état vide ferait disparaître tous les blocs, puis les
+  // ferait revenir quelques instants plus tard.
+  const dernierBonCalcul = useRef<typeof calculFrais | null>(null)
+  if (prets) dernierBonCalcul.current = calculFrais
+  const calcul = !prets && dernierBonCalcul.current ? dernierBonCalcul.current : calculFrais
+
   // Les aperçus sont écartés UNE FOIS, ici : une partie encore verrouillée
   // (B.5.1) ne se confirme pas, ne bloque rien et ne crédite aucun travail.
   // En oublier un seul endroit rouvrirait la porte à une confirmation sur une
@@ -112,6 +123,21 @@ function useSourcePlan() {
     () => calcul.resultat.blocks.filter((b) => b.date === calcul.aujourdHui && b.preview !== true),
     [calcul.resultat, calcul.aujourdHui],
   )
+
+  // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
+  // la cause est écrite dans la console de Metro (données rechargées, tâches
+  // retirées, ou simple recalcul). Sans cela, « les blocs disparaissent puis
+  // reviennent » ne laisse aucune trace.
+  const traceBlocs = useRef<{ blocs: number; taches: number; prets: boolean } | null>(null)
+  useEffect(() => {
+    if (!__DEV__) return
+    const maintenant = { blocs: calcul.resultat.blocks.filter((b) => b.date === calcul.aujourdHui).length, taches: taches.length, prets }
+    const avant = traceBlocs.current
+    if (avant && (maintenant.blocs < avant.blocs || maintenant.taches < avant.taches || maintenant.prets !== avant.prets)) {
+      console.warn(`[plan] ${new Date().toLocaleTimeString()} blocs du jour ${avant.blocs}→${maintenant.blocs} · tâches ${avant.taches}→${maintenant.taches} · données prêtes ${avant.prets}→${maintenant.prets}`)
+    }
+    traceBlocs.current = maintenant
+  }, [calcul.resultat, calcul.aujourdHui, taches.length, prets])
 
   const tic = useMemo(
     () => (mesuresPretes && chargees
@@ -194,7 +220,19 @@ function useSourcePlan() {
     appris = recordDailyUtilization(appris, calcul.aujourdHui, calcul.resultat.todayFullCapacityMinutes)
     if (tic.change || appris !== tic.apprentissage || confs !== tic.confirmations) void poser({ apprentissage: appris, confirmations: confs })
     if (tic.terminees.length > 0) void terminerTaches(tic.terminees)
-  }, [tic, calcul.aujourdHui, calcul.minute, calcul.resultat, calcul.entree, poser, terminerTaches])
+    // Le bonus : quelques minutes de plus, libérées quand le plan a du jeu et que
+    // les blocs sont tenus. Il devient du travail normal ; il ne touche jamais au
+    // plancher demandé (voir `@shared/planning/bonus`).
+    const liberations = liberationsDuJour({
+      taches,
+      resultat: calcul.resultat,
+      events: appris.sessionEvents ?? [],
+      fait: appris.workedMinutesByRef,
+      today: calcul.aujourdHui,
+      retardAujourdhui: (appris.dailyDelayMinutes[calcul.aujourdHui] ?? 0) > 0,
+    })
+    if (liberations.length > 0) void libererBonus(liberations)
+  }, [tic, taches, calcul.aujourdHui, calcul.minute, calcul.resultat, calcul.entree, poser, terminerTaches, libererBonus])
 
   // Retrait progressif : le bloc en attente n'appelle l'overlay que si sa
   // phase le demande (phase 3 : 10 min après, jamais un jour-test ; phase 4 :

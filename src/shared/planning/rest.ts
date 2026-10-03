@@ -245,8 +245,6 @@ export type FatigueState = {
   crisisReduced: boolean
 }
 
-export const FATIGUE_CRISIS_FLOOR_PERCENT = 60
-
 /**
  * Compte les jours consécutifs au-dessus de 85 % d'utilisation, en remontant
  * depuis le plus récent. Un jour sous 50 % remet le compteur à zéro.
@@ -264,8 +262,13 @@ export function countConsecutiveHighDays(utilizationDescending: number[]): numbe
 /**
  * E.4 : 2 jours consécutifs >85 % → jour suivant réduit de 25 %.
  *       3 jours consécutifs → jour suivant plafonné à 40 % (réduction de 60 %).
- * Une crise prouvée peut rogner cette protection, jamais l'annuler : la
- * capacité ne descend jamais sous 60 % de la normale.
+ *
+ * Crise prouvée (la charge demandée ne tient pas) : la réduction est LEVÉE.
+ * Quand l'utilisateur demande 100 h, l'application lui fait travailler le plus
+ * de temps possible — retirer de la capacité à un jour déjà trop court
+ * garantirait de manquer l'échéance. Ce que cela coûte est chiffré
+ * (`crisisReduced`, et l'écart rendu dans `fatigueCrisisReliefMinutes`), jamais
+ * silencieux. Auparavant, la capacité ne descendait pas sous 60 % de la normale.
  */
 export function computeFatigue(args: {
   consecutiveHighDays: number
@@ -278,11 +281,8 @@ export function computeFatigue(args: {
 
   let crisisReduced = false
   if (reduction > 0 && args.isCrisis) {
-    const maxReduction = 100 - FATIGUE_CRISIS_FLOOR_PERCENT
-    if (reduction > maxReduction) {
-      reduction = maxReduction
-      crisisReduced = true
-    }
+    reduction = 0
+    crisisReduced = true
   }
 
   return {

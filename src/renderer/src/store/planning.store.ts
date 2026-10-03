@@ -204,9 +204,8 @@ export const usePlanningStore = create<PlanningStore>((set, get) => ({
 
   async addTask(input, options) {
     if (!contractAllows(get().sessionConfirmations, get().learning)) return
-    // B.1/B.4 : la durée retenue est l'estimation CORRIGÉE par ce que les
-    // tâches passées de cette catégorie ont réellement coûté. L'utilisateur
-    // donne son estimation ; l'application ne la prend jamais au mot.
+    // La durée retenue est EXACTEMENT celle que l'utilisateur a demandée :
+    // 100 h demandées, 100 h planifiées. `planningFactor` rend toujours 1.
     const factor = planningFactor({
       observations: get().learning.observations,
       category: input.category,

@@ -13,9 +13,6 @@ export const DEFAULT_FACTORS = { routine: 1.4, novel: 1.7 } as const
 /** B.1 — fenêtre des N dernières tâches complétées prises en compte. */
 export const FACTOR_WINDOW = 20
 
-/** B.4 — les tâches à deadline se planifient au 75e percentile, pas à la médiane. */
-export const PLANNING_PERCENTILE = 0.75
-
 export const MIN_FACTOR = 0.5
 export const MAX_FACTOR = 3
 
@@ -98,9 +95,15 @@ export function computeCorrectionFactor(args: {
 }
 
 /**
- * B.4 : percentile de planification.
- * Tâche à deadline → 75e percentile du facteur : on réserve plus que le cas
- * moyen. Objectif → médiane, il n'y a pas de deadline dure à protéger.
+ * Le facteur appliqué à la PLANIFICATION : toujours 1.
+ *
+ * Quand l'utilisateur demande 100 h, l'application lui fait travailler 100 h —
+ * elle ne les transforme pas en 140 ou 170. Le facteur de correction (B.1, B.3)
+ * continue de se MESURER (médiane de durée réelle ÷ durée estimée) et reste un
+ * fait disponible pour le Coach (B.6), mais il ne gonfle plus jamais le travail
+ * à placer. L'ancien percentile de planification (B.4) et les défauts ×1,4 et
+ * ×1,7 sont retirés : ils faisaient passer un projet de « faisable » à « en
+ * déficit » sans que l'utilisateur ait rien changé.
  */
 export function planningFactor(args: {
   observations: LearningObservation[]
@@ -109,13 +112,10 @@ export function planningFactor(args: {
   hasDeadline: boolean
 }): CorrectionFactor {
   const base = computeCorrectionFactor(args)
-  if (!args.hasDeadline || base.sampleSize < 5) return base
-
-  const ratios = ratiosOf(args.observations, args.category)
   return {
     ...base,
-    factor: clamp(percentile(ratios, PLANNING_PERCENTILE)),
-    reason: `${base.reason} 75e percentile appliqué (tâche à deadline).`,
+    factor: 1,
+    reason: `${base.reason} Not applied: the plan uses exactly the time asked.`,
   }
 }
 

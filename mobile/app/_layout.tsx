@@ -1,3 +1,4 @@
+import { tiroirDejaOuvert } from '@/compte/rechargement'
 import { useEffect } from 'react'
 import { AppState } from 'react-native'
 import { Stack } from 'expo-router'
@@ -61,6 +62,12 @@ function Coque() {
   useEffect(() => {
     if (compte === undefined) return
     let annule = false
+    // Le même compte est déjà ouvert et lu : rien à refaire. Cet effet se
+    // rejoue au moindre rechargement à chaud ou changement d'identité de
+    // `charger` ; remettre `chargees` à faux faisait alors disparaître tout le
+    // plan, puis le faisait revenir quelques instants plus tard. Un tiroir
+    // déjà lu pour CE compte reste affiché tel quel.
+    if (tiroirDejaOuvert(compte, useDonnees.getState(), useSeances.getState())) return
     void (async () => {
       // Plus rien ne s'écrit tant que le bon tiroir n'est pas ouvert.
       useDonnees.setState({ chargees: false, proprietaire: null })

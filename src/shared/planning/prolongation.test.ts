@@ -53,8 +53,14 @@ describe('Prolongation — quand proposer', () => {
     expect(proposerProlongation(base({ nowMinute: 9 * 60 + 50 }))).toBeNull()
   })
 
-  it('jamais sous 5 observations (règle G)', () => {
-    expect(proposerProlongation(base({ events: passe(4) }))).toBeNull()
+  it('sous 5 observations : pas de courbe à lire, donc une offre COURTE (30 min au plus), dès la première séance', () => {
+    expect(proposerProlongation(base({ events: passe(4) }))).toBe(30)
+    expect(proposerProlongation(base({ events: [] }))).toBe(30)
+  })
+
+  it('sans historique, une séance où l’on a tenté d’ouvrir une app bloquée n’en reçoit aucune', () => {
+    const agitee = ev({ blockedAttempts: 1, lastAttemptAt: Date.parse('2026-09-26T09:00:00Z') })
+    expect(proposerProlongation(base({ event: agitee, events: [] }))).toBeNull()
   })
 
   it('jamais après une tentative d’app bloquée dans les 15 min', () => {

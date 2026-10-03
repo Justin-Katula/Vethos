@@ -191,6 +191,7 @@ export function versTachesMoteur(taches: readonly Tache[]): TaskItem[] {
       parentTaskId: t.parentId,
       partOrder: t.rangPartie,
       extraMinutes: t.minutesSupplementaires,
+      bonusMinutes: t.minutesBonus,
       appsToBlock: [],
       status: 'active' as const,
       createdAt: t.creeeLe,

@@ -193,10 +193,9 @@ function TasksEditor({
       category: draft.category.trim() || 'general',
       workKind: draft.workKind,
       estimatedMinutes: draft.minutes,
-      // Le store applique le facteur de correction : l'estimation brute
-      // n'entre jamais telle quelle dans le plan.
+      // Le plan reçoit exactement ce que l'utilisateur demande.
       remainingMinutes: draft.minutes,
-      correctionFactor: draft.workKind === 'novel' ? 1.7 : 1.4,
+      correctionFactor: 1,
       status: 'active',
       appsToBlock: [],
     })

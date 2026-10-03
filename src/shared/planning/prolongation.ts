@@ -19,6 +19,13 @@ export const FENETRE_BANNIERE_MINUTES = 2
 export const CALME_MINUTES = 15
 /** Marge gardée avant le coucher. */
 export const MARGE_AVANT_SOMMEIL = 30
+/**
+ * Premier départ : sans courbe de survie (moins de 5 blocs observés), l'offre
+ * existe quand même, mais courte. Elle n'attend pas des jours d'historique — elle
+ * lit la séance en cours (calme, sans tentative d'app bloquée) et apprend à
+ * chaque offre. Au-delà de cette durée, il faut des données.
+ */
+export const DUREE_MAX_SANS_HISTORIQUE = 30
 /** Au-delà de 3 h d'affilée, la performance chute : jamais plus long. */
 export const TRAVAIL_CONTINU_MAX = 180
 
@@ -122,6 +129,10 @@ export function proposerProlongation(a: ProlongationArgs): number | null {
     if (a.travailDuJour + d > seuilFatigue) continue
     const p = survieA(obs, e.plannedMinutes + d)
     if (p !== null && p >= SEUIL_SURVIE_PROLONGATION) return d
+    // Pas assez de blocs observés pour lire une courbe : offre courte, séance sans
+    // aucune tentative d'app bloquée. `p === null` AVEC des données (durée trop
+    // loin au-delà du plus long bloc tenu) reste refusé : on monte par paliers.
+    if (p === null && obs.length < 5 && d <= DUREE_MAX_SANS_HISTORIQUE && e.blockedAttempts === 0) return d
   }
   return null
 }

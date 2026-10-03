@@ -72,6 +72,7 @@ export default function Aujourdhui() {
   // Le constat d'après un raté est noté quand il s'affiche : il ne revient
   // qu'après 72 h (usure des messages).
   const ligneMontree = useRef(false)
+  const dejaAffiche = useRef(false)
   useEffect(() => {
     if (!ligneMontree.current) return
     const dit = apprentissageSignaux['coach:rate']
@@ -126,7 +127,10 @@ export default function Aujourdhui() {
     }
   }, [jour, N, reglages.coucher, reglages.lever])
 
-  if (!jour || !chargees || !d) return <ChargementVethos pleinEcran />
+  // Le chargement ne couvre l'écran qu'AVANT le premier affichage complet : un
+  // rechargement des données ensuite ne doit pas faire disparaître l'écran.
+  if (jour && chargees && d) dejaAffiche.current = true
+  if (!jour || !d || (!chargees && !dejaAffiche.current)) return <ChargementVethos pleinEcran />
 
   const { WAKE, BED, blocs, visibles } = d
   // Ce qui se passe maintenant.

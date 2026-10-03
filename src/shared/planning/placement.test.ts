@@ -372,7 +372,6 @@ describe('D.5 — tailles de bloc', () => {
       remainingNeed: 200,
       dayCapacity: 500,
       remainingDayCapacities: [500, 500, 500],
-      isCrisis: false,
     })
     expect(r).toEqual({ target: 90, capOverride: false })
   })
@@ -384,30 +383,39 @@ describe('D.5 — tailles de bloc', () => {
       remainingNeed: 600,
       dayCapacity: 500,
       remainingDayCapacities: [500, 500, 500],
-      isCrisis: false,
     })
     expect(r).toEqual({ target: 200, capOverride: false })
   })
 
-  it('sans crise, le plafond de 40 % tient même si la part le dépasse', () => {
-    // Besoin 900 sur 2 jours de 500 : part = 450 > plafond 200.
+  it('la part dépasse le plafond de 40 % : le plafond SAUTE, sans attendre une « crise », et c’est signalé', () => {
+    // Besoin 900 sur 2 jours de 500 : part = 450 > plafond 200. L'utilisateur a
+    // demandé ce travail : l'application le place.
     const r = computeTaskDayTarget({
       remainingNeed: 900,
       dayCapacity: 500,
       remainingDayCapacities: [500, 500],
-      isCrisis: false,
-    })
-    expect(r).toEqual({ target: 200, capOverride: false })
-  })
-
-  it('crise prouvée : le dépassement du plafond est autorisé, et signalé', () => {
-    const r = computeTaskDayTarget({
-      remainingNeed: 900,
-      dayCapacity: 500,
-      remainingDayCapacities: [500, 500],
-      isCrisis: true,
     })
     expect(r).toEqual({ target: 450, capOverride: true })
+  })
+
+  it('la part du jour ne dépasse jamais la capacité effective de ce jour', () => {
+    // Besoin 2000 sur 2 jours de 500 : la part brute vaut 1000, le jour n'en offre que 500.
+    const r = computeTaskDayTarget({
+      remainingNeed: 2000,
+      dayCapacity: 500,
+      remainingDayCapacities: [500, 500],
+    })
+    expect(r).toEqual({ target: 500, capOverride: true })
+  })
+
+  it('une charge confortable garde son plafond : on n’entasse pas sans raison', () => {
+    const r = computeTaskDayTarget({
+      remainingNeed: 300,
+      dayCapacity: 500,
+      remainingDayCapacities: [500, 500, 500],
+    })
+    expect(r.capOverride).toBe(false)
+    expect(r.target).toBeLessThanOrEqual(200)
   })
 })
 

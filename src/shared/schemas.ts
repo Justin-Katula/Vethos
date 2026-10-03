@@ -231,10 +231,10 @@ export const TaskSchema = z.object({
   workKind: z.enum(['routine', 'novel']).default('routine'),
   /** Estimation brute de l'utilisateur, en minutes. (B.1/B.3) */
   estimatedMinutes: z.number().int().min(1).max(10000).default(60),
-  /** Travail restant en minutes, corrigé par le facteur. Diminue au fil des sessions. (C.1) */
+  /** Travail restant en minutes : ce que l'utilisateur a demandé, sans majoration. Diminue au fil des sessions. (C.1) */
   remainingMinutes: z.number().int().min(0).max(10000).default(60),
-  /** Facteur appliqué à l'estimation (B.1/B.4). Défaut B.3 tant que <5 tâches complétées. */
-  correctionFactor: z.number().min(0.5).max(3).default(1.4),
+  /** Facteur appliqué à l'estimation : 1 — l'application planifie exactement ce qui est demandé. Les tâches créées avant ce changement gardent leur ancien facteur. */
+  correctionFactor: z.number().min(0.5).max(3).default(1),
   /** Regroupement visuel : id de la tâche d'origine quand elle a été découpée (B.5). */
   parentTaskId: z.string().uuid().nullable().default(null),
   /**
@@ -252,6 +252,13 @@ export const TaskSchema = z.object({
    * (B.2 compare réel ÷ estimé — gonfler l'estimé annulerait le signal).
    */
   extraMinutes: z.number().int().min(0).max(10000).default(0),
+  /**
+   * Bonus LIBÉRÉ : du temps de travail en plus, devenu travail normal de la
+   * tâche (voir `bonus.ts`). Séparé du plancher À DESSEIN : le plancher — ce que
+   * l'utilisateur a demandé, rallonges comprises — est seul à compter pour la
+   * faisabilité, les déficits et les signaux. Absent = 0.
+   */
+  bonusMinutes: z.number().int().min(0).max(10000).optional(),
   /**
    * D.8 : applications bloquées PENDANT un bloc de cette tâche, déclarées à la
    * création. Ids de `declared_apps`, spécifiques à CE bloc — jamais une liste

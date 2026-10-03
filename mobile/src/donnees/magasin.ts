@@ -45,10 +45,17 @@ export const TacheSchema = z.object({
    * l'application vient elle-même d'écrire.
    */
   minutesRestantes: z.number().int().min(0).max(20000).default(60),
-  /** Le facteur retenu à la création. Conservé pour que le plan reste explicable. */
-  facteurCorrection: z.number().min(1).max(3).default(1.4),
+  /** Le facteur retenu à la création : 1, le plan est exactement ce qui a été demandé. Les tâches plus anciennes gardent le leur. */
+  facteurCorrection: z.number().min(1).max(3).default(1),
   /** B.5.2 : le temps accordé par « il m'en faut plus ». S'ajoute APRÈS le facteur. */
   minutesSupplementaires: z.number().int().min(0).max(20000).default(0),
+  /**
+   * Le bonus LIBÉRÉ : du travail en plus, devenu travail normal (voir
+   * `@shared/planning/bonus`). Il n'entre jamais dans la faisabilité.
+   */
+  minutesBonus: z.number().int().min(0).max(20000).default(0),
+  /** Chaque libération (date, minutes) : la pente des 7 derniers jours s'y lit. */
+  bonusLibere: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), minutes: z.number().int().min(1).max(600) })).max(60).default([]),
   /** B.5 : la tâche d'origine quand celle-ci n'est qu'une de ses parties. */
   parentId: z.string().nullable().default(null),
   /** B.5.1 : le rang de la partie. C'est lui qui la verrouille tant qu'une sœur traîne. */
@@ -196,6 +203,8 @@ type EtatDonnees = Contenu & {
     options?: { maxParJourMinutes?: number },
   ) => Promise<void>
   ajouterDuTemps: (id: string, minutes: number) => Promise<void>
+  /** Libère du bonus : des minutes de plus, devenues travail normal de la tâche. */
+  libererBonus: (liberations: readonly { id: string; minutes: number; date: string }[]) => Promise<void>
   /**
    * B.5.2 : la seule voie par laquelle une tache se termine — la pendule, sur
    * du temps REELLEMENT mesure. Il n'existe deliberement aucune fonction pour
@@ -371,6 +380,25 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
               }
             : t,
         ),
+      })
+    },
+
+    async libererBonus(liberations) {
+      const utiles = liberations.filter((l) => l.minutes > 0)
+      if (utiles.length === 0) return
+      await enregistrer({
+        taches: get().taches.map((t) => {
+          const mes = utiles.filter((l) => l.id === t.id)
+          if (mes.length === 0) return t
+          const total = mes.reduce((s, l) => s + Math.round(l.minutes), 0)
+          return {
+            ...t,
+            minutesBonus: t.minutesBonus + total,
+            bonusLibere: [...t.bonusLibere, ...mes.map((l) => ({ date: l.date, minutes: Math.round(l.minutes) }))].slice(-60),
+            // Du travail est revenu : la tâche, si l'horloge venait de la clore, reste ouverte.
+            terminee: false,
+          }
+        }),
       })
     },
 

@@ -757,7 +757,7 @@ describe('E — repos réservé avant distribution', () => {
     )
   })
 
-  it('E.4 : une crise prouvée rogne la protection de fatigue sans jamais l’annuler', () => {
+  it('E.4 : une crise prouvée LÈVE la réduction de fatigue — le plus de travail possible, chiffré', () => {
     const fatigue = {
       '2026-08-08': 90,
       '2026-08-09': 92,
@@ -777,25 +777,16 @@ describe('E — repos réservé avant distribution', () => {
     const jourSansCrise = sansCrise.capacities.find((c) => c.date === TODAY)!
     const jourEnCrise = enCrise.capacities.find((c) => c.date === TODAY)!
 
-    // 3 jours consécutifs >85 % → réduction de 60 % hors crise, plafonnée à
-    // 40 % quand la crise est prouvée : la protection cède, elle ne disparaît
-    // jamais (plancher absolu 60 % de la capacité normale).
-    expect(jourSansCrise.fatiguePenaltyMinutes).toBeGreaterThan(jourEnCrise.fatiguePenaltyMinutes)
-    expect(jourEnCrise.fatiguePenaltyMinutes).toBeGreaterThan(0)
+    // 3 jours consécutifs >85 % → réduction de 60 % hors crise. Quand la charge
+    // demandée ne tient pas, l'application fait travailler le plus possible :
+    // la réduction est levée entièrement.
+    expect(jourSansCrise.fatiguePenaltyMinutes).toBeGreaterThan(0)
+    expect(jourEnCrise.fatiguePenaltyMinutes).toBe(0)
 
-    // C.3 : l'écart rendu par le plancher de crise est chiffré, jamais silencieux.
+    // C.3 : ce que la crise a rendu est chiffré, jamais silencieux.
     expect(jourEnCrise.fatigueCrisisReliefMinutes).toBeGreaterThan(0)
     // Hors crise, rien n'est rendu — le chiffre reste à zéro.
     expect(jourSansCrise.fatigueCrisisReliefMinutes).toBe(0)
-
-    // Plancher absolu, mesuré sur le socle du jour en crise lui-même (les deux
-    // jours n'ont pas le même socle : la crise libère aussi la zone de réveil,
-    // comparer les pénalités d'un plan à l'autre mélangerait deux effets).
-    // La réduction passe de 60 % à 40 % du socle : la pénalité retenue vaut
-    // donc les deux tiers de celle qui se serait appliquée sans crise.
-    const penaliteSansPlancher =
-      jourEnCrise.fatiguePenaltyMinutes + jourEnCrise.fatigueCrisisReliefMinutes
-    expect(jourEnCrise.fatiguePenaltyMinutes / penaliteSansPlancher).toBeCloseTo(40 / 60, 2)
   })
 
   it('sans mesure, aucune pénalité inventée', () => {

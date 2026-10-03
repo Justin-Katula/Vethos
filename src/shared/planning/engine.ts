@@ -22,7 +22,6 @@ import {
   datesBetween,
   daysBetween,
   dayOfWeek,
-  minutesUntilEndOf,
   startOfWeek,
 } from './dates'
 import { COULEUR_TACHE } from '../palettes'
@@ -60,6 +59,7 @@ import {
   workOfFootprint,
   computeFatigue,
   computeRestFloor,
+  REST_FLOOR_ABSOLUTE_MINUTES,
   computeWeeklyBreathing,
 } from './rest'
 
@@ -152,8 +152,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // sessions. Quand une mesure de session existe (B.2), elle prime sur toute
   // comptabilité : c'est du temps réellement passé, pas une déclaration.
   const needByTask = new Map<string, number>()
+  // Le plancher seul : la faisabilité ne voit jamais le bonus (voir `bonus.ts`).
+  const floorNeedByTask = new Map<string, number>()
   for (const task of activeTasks) {
     needByTask.set(task.id, cinq(remainingWorkFor(task, input.durationSource)))
+    floorNeedByTask.set(task.id, Math.min(cinq(floorWorkFor(task, input.durationSource)), needByTask.get(task.id)!))
   }
 
   const ancresFor = (dow: number): AncreItem[] =>
@@ -218,7 +221,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     // partager la même.
     const notBeforeMinute = date === input.today && !fullDay ? nowMinute : undefined
 
-    const restFloor = computeRestFloor(
+    // E.2 : le plancher de repos est max(60 min, 20 % de la capacité brute).
+    // Quand la charge demandée ne tient pas (crise prouvée), il descend à son
+    // minimum absolu de 60 min : l'application fait travailler le plus possible,
+    // et le chiffre est rendu visible (C.3), jamais silencieux.
+    const restFloorNormal = computeRestFloor(
       buildDayCapacity({
         date,
         dayOfWeek: dow,
@@ -232,6 +239,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         windowAt,
       }).rawCapacityMinutes,
     )
+    const restFloor = isCrisis ? REST_FLOOR_ABSOLUTE_MINUTES : restFloorNormal
 
     // E.4 : la fatigue se mesure sur les jours écoulés, jamais sur une
     // projection — sans mesure, pas de pénalité (G.3).
@@ -296,7 +304,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     activeTasks.map((t) => ({
       title: t.title,
       deadline: t.deadline,
-      remainingMinutes: needByTask.get(t.id) ?? t.remainingMinutes,
+      remainingMinutes: floorNeedByTask.get(t.id) ?? t.remainingMinutes,
     }))
 
   // ─── C.2. Test de charge, puis D.3 saturation réelle ────────────────────
@@ -339,12 +347,28 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   const averageCapacityByWeek = averageEffectiveCapacityByWeek(capacities)
 
   // ─── C.1 + D.6. Marges et cascade ───────────────────────────────────────
+  //
+  // La marge se mesure en CAPACITÉ, plus en temps d'horloge : (capacité
+  // effective cumulée jusqu'à l'échéance) − (travail dû d'ici là). Marge < 0 ⇔
+  // densité > 1 (C.2). Avec l'horloge, 100 h sur 10 jours semblaient laisser
+  // 140 h de marge alors que la capacité n'en offrait que 106 : la crise n'était
+  // presque jamais reconnue et le plafond de 40 % laissait 58 h sans créneau.
+  const capacityUntil = (deadline: string): number => {
+    let total = capacities.filter((c) => c.date <= deadline).reduce((s, c) => s + c.effectiveCapacityMinutes, 0)
+    // Une échéance au-delà de l'horizon : les jours manquants comptent à la
+    // capacité moyenne de l'horizon, comme pour la cible du jour.
+    if (deadline > input.rangeEnd && capacities.length > 0) {
+      total += (total / capacities.length) * daysBetween(input.rangeEnd, deadline)
+    }
+    return total
+  }
+  const needOf = (t: TaskItem): number => floorNeedByTask.get(t.id) ?? t.remainingMinutes
   const withMargin: TaskWithMargin[] = activeTasks.map((t) => {
-    const need = needByTask.get(t.id) ?? t.remainingMinutes
+    const loadDueBy = activeTasks.filter((o) => o.deadline <= t.deadline).reduce((s, o) => s + needOf(o), 0)
     return {
       ...t,
-      remainingMinutes: need,
-      ...computeMargin(minutesUntilEndOf(t.deadline, input.today, nowMinute), need),
+      remainingMinutes: needOf(t),
+      ...computeMargin(capacityUntil(t.deadline), loadDueBy),
     }
   })
   const ordered = sortTasksByCascade(withMargin)
@@ -827,7 +851,6 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           remainingNeed: members.reduce((s, t) => s + (remainingNeed.get(t.id) ?? 0), 0),
           dayCapacity: cap.effectiveCapacityMinutes,
           remainingDayCapacities,
-          isCrisis: members.some((t) => t.marginMinutes < 0),
         })
         family = { left: target, capOverride, ids: new Set(members.map((t) => t.id)) }
         familyLeft.set(familyKey, family)
@@ -845,12 +868,23 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
 
       // Une miette sous 25 min ne se place jamais seule : le bloc la prend.
       let dayTarget = cinq(absorbCrumb(Math.min(family.left, need), need))
+      // Part du jour qui dépasse le plafond de 40 % : on la répartit en blocs ÉGAUX
+      // (545 min → 7 blocs de 80 et 65, pas 6 blocs de 90 et 5 min perdues). Les
+      // miettes sous 25 min tombaient entre les blocs de 90 ; cumulées, elles
+      // laissaient une heure demandée sans place le dernier jour, où la capacité
+      // ne peut plus l'absorber.
+      const blocsEgaux = capOverride && dayTarget > TASK_CONSTANTS.targetBlockMinutes
+        ? Math.min(
+            TASK_CONSTANTS.targetBlockMinutes,
+            Math.ceil(dayTarget / Math.ceil(dayTarget / TASK_CONSTANTS.targetBlockMinutes) / 5) * 5,
+          )
+        : TASK_CONSTANTS.targetBlockMinutes
       while (
         dayTarget >= TASK_CONSTANTS.minBlockMinutes &&
         budget >= TASK_CONSTANTS.minBlockMinutes
       ) {
         const work = absorbCrumb(
-          Math.min(dayTarget, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
+          Math.min(dayTarget, blocsEgaux, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
           remainingNeed.get(task.id) ?? 0,
         )
 
@@ -867,7 +901,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const taskSession = placedToday.filter((b) => b.refId === task.id).length
         const slot = allocator.take(footprint, {
           avoid: deepWindowMinutes + work > DEEP_BUDGET_MINUTES ? 'PROFONDE' : undefined,
-          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0, task.category, familyScore),
+          // Une tâche qui ne tient plus sous le plafond de 40 % (ou en crise) ne reçoit
+          // aucun trou forcé : l'espacement préféré fragmenterait la fenêtre du jour
+          // et laisserait du temps demandé sans créneau.
+          score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0 && !capOverride, task.category, familyScore),
           ...(learn
             ? {
                 lengthAt: (start: number) =>
@@ -1054,8 +1091,24 @@ export function remainingWorkFor(task: TaskItem, source?: DurationRealSource): n
 }
 
 /** Le total à faire pour cette tâche : planifié à la création, plus les rallonges. */
-export function plannedTotalFor(task: Pick<TaskItem, 'remainingMinutes' | 'extraMinutes'>): number {
+export function plannedTotalFor(
+  task: Pick<TaskItem, 'remainingMinutes' | 'extraMinutes' | 'bonusMinutes'>,
+): number {
+  return floorTotalFor(task) + (task.bonusMinutes ?? 0)
+}
+
+/**
+ * Le PLANCHER : ce que l'utilisateur a demandé (rallonges « il m'en faut plus »
+ * comprises), sans le bonus libéré. Seul le plancher entre dans la densité, le
+ * déficit et les signaux — un bonus non placé ne crée jamais de déficit.
+ */
+export function floorTotalFor(task: Pick<TaskItem, 'remainingMinutes' | 'extraMinutes'>): number {
   return task.remainingMinutes + (task.extraMinutes ?? 0)
+}
+
+/** Le plancher qui reste à faire : le temps déjà travaillé s'en retranche d'abord. */
+export function floorWorkFor(task: TaskItem, source?: DurationRealSource): number {
+  return Math.max(0, floorTotalFor(task) - (source?.getActualMinutes(task.id) ?? 0))
 }
 
 /**

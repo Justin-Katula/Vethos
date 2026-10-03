@@ -47,6 +47,8 @@ const tache = (p: Partial<Tache> = {}): Tache => ({
   minutesRestantes: p.minutesRestantes ?? 60,
   facteurCorrection: 1.4,
   minutesSupplementaires: p.minutesSupplementaires ?? 0,
+  minutesBonus: p.minutesBonus ?? 0,
+  bonusLibere: [],
   parentId: p.parentId ?? null,
   rangPartie: p.rangPartie ?? null,
   nature: 'routine',

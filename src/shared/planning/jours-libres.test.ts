@@ -95,8 +95,11 @@ describe('Jours libres', () => {
       importance: 5,
       category: 'général',
       workKind: 'routine',
-      estimatedMinutes: 2400,
-      remainingMinutes: 2400,
+      // 70 h : assez lourd pour que retirer un jour lui prenne des minutes. Depuis que
+      // le plafond de 40 % saute quand la tâche ne tient pas dessous, une charge de
+      // 40 h tient aussi sans ce jour — et un jour libre est alors légitime.
+      estimatedMinutes: 4200,
+      remainingMinutes: 4200,
       correctionFactor: 1,
       parentTaskId: null,
       partOrder: null,

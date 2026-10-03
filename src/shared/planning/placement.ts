@@ -167,15 +167,19 @@ export function computeProportionalShare(
 /**
  * D.5 : la cible du jour pour une tâche.
  * L'idéal (un bloc de 90 min, plafonné à 40 % du jour) tient tant qu'il suffit
- * avant la deadline. Sinon, pression prouvée → répartition proportionnelle,
- * et si même elle dépasse le plafond, la crise autorise le dépassement.
+ * avant la deadline. Sinon, répartition proportionnelle sur les jours restants,
+ * et si même elle dépasse le plafond, le plafond SAUTE.
+ *
+ * Quand l'utilisateur demande 100 h, l'application lui fait travailler 100 h :
+ * le plafond de 40 % protège une journée tant qu'il y a du jeu, jamais contre
+ * ce qui a été demandé. Il ne dépend donc d'aucune « crise » à déclarer — il
+ * saute dès que la tâche ne tient plus dessous, et la part du jour ne dépasse
+ * jamais la capacité effective de ce jour.
  */
 export function computeTaskDayTarget(args: {
   remainingNeed: number
   dayCapacity: number
   remainingDayCapacities: number[]
-  /** Marge négative = crise prouvée : le plafond de 40 % saute. */
-  isCrisis: boolean
 }): { target: number; capOverride: boolean } {
   const cap40 = Math.floor(args.dayCapacity * TASK_CONSTANTS.maxPercentPerDay)
   const idealTotal = args.remainingDayCapacities.reduce(
@@ -201,9 +205,8 @@ export function computeTaskDayTarget(args: {
   const share = computeProportionalShare(args.dayCapacity, totalCapacity, args.remainingNeed)
 
   if (share <= cap40) return { target: Math.min(share, args.dayCapacity), capOverride: false }
-  // Même la répartition dépasse 40 % : crise prouvée → dépassement autorisé.
-  if (args.isCrisis) return { target: Math.min(share, args.dayCapacity), capOverride: true }
-  return { target: Math.min(cap40, args.dayCapacity), capOverride: false }
+  // Même la répartition dépasse 40 % : la tâche ne tient pas sous le plafond.
+  return { target: Math.min(share, args.dayCapacity), capOverride: true }
 }
 
 /**

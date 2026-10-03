@@ -6,11 +6,10 @@ import type { Tache } from './magasin'
  *
  * Deux lois s'appliquent là, et nulle part ailleurs :
  *
- * - **B.1/B.4 — l'estimation est corrigée.** On estime tous trop bas, et plus
- *   bas encore sur ce qu'on n'a jamais fait. L'application ne prend donc jamais
- *   le chiffre au mot : elle le multiplie par un facteur (1,4 pour du connu,
- *   1,7 pour une première fois) avant de le ranger. Corriger après coup, en
- *   constatant le dépassement, arriverait toujours trop tard pour le plan.
+ * - **L'estimation est prise telle quelle.** Quand l'utilisateur demande 100 h,
+ *   l'application lui fait travailler 100 h : plus de multiplicateur (×1,4 /
+ *   ×1,7), qui transformait 100 h en 140 ou 170 sans que rien ne le dise. Le
+ *   facteur reste mesuré pour le Coach, il ne gonfle plus le plan.
  * - **B.5 — la tâche trop grosse est découpée.** Si la durée corrigée ne tient
  *   plus dans une journée sous le plafond de D.5, elle devient des parties
  *   numérotées. Automatiquement, jamais en posant la question : demander
@@ -29,6 +28,8 @@ export type BrouillonTache = Omit<
   | 'minutesRestantes'
   | 'facteurCorrection'
   | 'minutesSupplementaires'
+  | 'minutesBonus'
+  | 'bonusLibere'
   | 'parentId'
   | 'rangPartie'
 >
@@ -59,6 +60,8 @@ export function preparerTache(
     minutesRestantes: prevu,
     facteurCorrection: facteur.factor,
     minutesSupplementaires: 0,
+    minutesBonus: 0,
+    bonusLibere: [],
     parentId: null,
     rangPartie: null,
     creeeLe,

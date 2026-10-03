@@ -105,21 +105,26 @@ describe('B.4 — percentile de planification', () => {
     expect(percentile(ratios, 0.75)).toBeCloseTo(1.6, 5)
   })
 
-  it('une tâche à deadline réserve au 75e percentile, pas à la médiane', () => {
-    const withDeadline = planningFactor({
-      observations: mathsObservations,
-      category: 'maths',
-      workKind: 'routine',
-      hasDeadline: true,
-    })
-    const without = planningFactor({
-      observations: mathsObservations,
-      category: 'maths',
-      workKind: 'routine',
-      hasDeadline: false,
-    })
-    expect(withDeadline.factor).toBeCloseTo(1.6, 5)
-    expect(without.factor).toBe(1.4)
+  it('la planification n’applique JAMAIS le facteur : 100 h demandées, 100 h planifiées', () => {
+    for (const hasDeadline of [true, false]) {
+      const f = planningFactor({
+        observations: mathsObservations,
+        category: 'maths',
+        workKind: 'routine',
+        hasDeadline,
+      })
+      expect(f.factor).toBe(1)
+    }
+    // Sans aucune observation non plus : ni ×1,4 ni ×1,7 par défaut.
+    expect(planningFactor({ observations: [], category: 'dessin', workKind: 'novel', hasDeadline: true }).factor).toBe(1)
+  })
+
+  it('le facteur reste MESURÉ pour le Coach, même s’il ne gonfle plus le plan', () => {
+    const mesure = computeCorrectionFactor({ observations: mathsObservations, category: 'maths', workKind: 'routine' })
+    expect(mesure.factor).toBe(1.4)
+    const planifie = planningFactor({ observations: mathsObservations, category: 'maths', workKind: 'routine', hasDeadline: true })
+    expect(planifie.confidence).toBe(mesure.confidence)
+    expect(planifie.sampleSize).toBe(mesure.sampleSize)
   })
 
   it('durée planifiée = estimation × facteur : 100 × 1.4 = 140', () => {
@@ -135,16 +140,16 @@ describe('B.2 — durée réelle mesurée', () => {
       observations: mathsObservations,
       durationSource: { getActualMinutes: () => 90 },
     })
-    // 100 × 1.6 (75e percentile) = 160 planifiées, dont 90 déjà mesurées.
-    expect(e.plannedDuration).toBe(160)
+    // 100 demandées = 100 planifiées, dont 90 déjà mesurées.
+    expect(e.plannedDuration).toBe(100)
     expect(e.measuredMinutes).toBe(90)
-    expect(e.remainingMinutes).toBe(70)
+    expect(e.remainingMinutes).toBe(10)
   })
 
   it('sans mesure, rien n’est retranché — on n’invente pas du temps passé', () => {
     const e = estimateTask({ task: task(), observations: mathsObservations })
     expect(e.measuredMinutes).toBeNull()
-    expect(e.remainingMinutes).toBe(160)
+    expect(e.remainingMinutes).toBe(100)
   })
 
   it('produit le fait brut : facteur, raison, confiance (B.6)', () => {

@@ -11,7 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
-import { cleDate } from '@/plan/moteur'
+import { cleDate, versTachesMoteur } from '@/plan/moteur'
+import { messagesCharge } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { cancelObjectiveRemoval, effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
@@ -160,13 +161,13 @@ export default function Engagements() {
           <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
               <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{t.titre}</Text>
-              <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(Math.max(0, g.total - g.fait))} left`}</Text>
+              <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(g.fait)} of ${hm(g.total)}`}</Text>
             </View>
             <View style={{ height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.1)', overflow: 'hidden' }}>
               <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: A.t1 }} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'} · ${hm(g.total)} total`}</Text>
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'} · ${hm(g.total)} asked`}</Text>
               <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
                 {Array.from({ length: 10 }, (_, i) => (
                   <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
@@ -363,8 +364,23 @@ export default function Engagements() {
       </>
     ) : null
 
+  // Quand la charge demandée est lourde, l'application le dit avec des chiffres :
+  // ce que ça demande par jour, ou ce qui est placé et ce qui manque. Jamais un
+  // jugement, jamais une question.
+  const avis = messagesCharge({
+    result: resultat,
+    tasks: versTachesMoteur(d.taches),
+    today: cleDate(maintenant),
+    durationSource: { getActualMinutes: (id: string) => fait[id] ?? null },
+  }).map((m) => (
+    <View key={`avis-${m.deadline}`} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: A.ligne }}>
+      <View style={{ width: 6, height: 6, marginTop: 6, borderRadius: 3, backgroundColor: m.niveau === 'deficit' ? acc : A.t3 }} />
+      <Text style={{ flex: 1, color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{m.texte}</Text>
+    </View>
+  ))
+
   const sections = [
-    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', couper(groupes).map(ligneTache), finiesBloc),
+    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', [...avis, ...couper(groupes).map(ligneTache)], finiesBloc),
     section(
       'GOAL',
       d.objectifs.length,

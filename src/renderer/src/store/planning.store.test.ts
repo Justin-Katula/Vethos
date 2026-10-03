@@ -75,24 +75,24 @@ beforeEach(() => {
   })
 })
 
-describe('B.1 — l’estimation de l’utilisateur n’entre jamais brute dans le plan', () => {
-  it('le facteur par défaut est appliqué à la création : 100 × 1.4 = 140', async () => {
+describe('100 h demandées = 100 h planifiées', () => {
+  it('aucun facteur n’est appliqué à la création : 100 reste 100', async () => {
     await usePlanningStore.getState().addTask(taskDraft())
     const [task] = usePlanningStore.getState().tasks
     expect(task!.estimatedMinutes).toBe(100)
-    expect(task!.remainingMinutes).toBe(140)
-    expect(task!.correctionFactor).toBe(1.4)
+    expect(task!.remainingMinutes).toBe(100)
+    expect(task!.correctionFactor).toBe(1)
   })
 
-  it('un travail nouveau/créatif réserve davantage : 100 × 1.7 = 170', async () => {
+  it('un travail nouveau/créatif non plus : 100 reste 100', async () => {
     await usePlanningStore.getState().addTask(taskDraft({ workKind: 'novel' }))
-    expect(usePlanningStore.getState().tasks[0]!.remainingMinutes).toBe(170)
+    expect(usePlanningStore.getState().tasks[0]!.remainingMinutes).toBe(100)
   })
 })
 
 describe('B.5 — découpage automatique, jamais une question', () => {
   it('une tâche qui ne tient pas dans un jour est découpée d’office', async () => {
-    // 300 × 1.4 = 420 min planifiées, plafond 90 min/jour → 5 parts de 84.
+    // 300 min planifiées telles que demandées, plafond 90 min/jour → 4 parts de 75.
     await usePlanningStore
       .getState()
       .addTask(taskDraft({ estimatedMinutes: 300 }), { maxPerDayMinutes: 90 })
@@ -101,8 +101,8 @@ describe('B.5 — découpage automatique, jamais une question', () => {
     const group = tasks.find((t) => t.parentTaskId === null)!
     const parts = tasks.filter((t) => t.parentTaskId === group.id)
 
-    expect(parts).toHaveLength(5)
-    expect(parts.reduce((s, t) => s + t.remainingMinutes, 0)).toBe(420)
+    expect(parts).toHaveLength(4)
+    expect(parts.reduce((s, t) => s + t.remainingMinutes, 0)).toBe(300)
     expect(parts[0]!.title).toBe('Dossier — Partie 1')
     // La tâche d'origine n'est plus qu'un regroupement visuel.
     expect(group.remainingMinutes).toBe(0)

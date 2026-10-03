@@ -19,14 +19,17 @@ export type Margin = {
 }
 
 /**
- * C.1 : marge_tâche = (deadline − maintenant) − travail_restant.
+ * C.1 : marge_tâche = capacité_effective_cumulée(jusqu'à la deadline) − travail_dû.
  *   marge > 0 → du jeu.
  *   marge = 0 → commencer maintenant, urgence maximale.
- *   marge < 0 → PROUVÉ EN RETARD.
+ *   marge < 0 → PROUVÉ EN RETARD (densité > 1, C.2).
+ * Elle se mesure en CAPACITÉ, jamais en temps d'horloge : le temps d'horloge
+ * compte les nuits et les obligations, donc une tâche qui remplit presque toute
+ * la capacité semblait avoir une marge énorme. Une seule notion de crise.
  * Ne s'applique jamais aux objectifs ni aux ancres.
  */
-export function computeMargin(minutesUntilDeadline: number, remainingWork: number): Margin {
-  const m = minutesUntilDeadline - remainingWork
+export function computeMargin(capacityUntilDeadline: number, workDue: number): Margin {
+  const m = capacityUntilDeadline - workDue
   return {
     marginMinutes: m,
     urgency: m <= 0 ? Number.POSITIVE_INFINITY : 1 / m,

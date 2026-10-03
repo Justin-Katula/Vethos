@@ -7,7 +7,6 @@ import {
   computeRestFloor,
   computeWeeklyBreathing,
   countConsecutiveHighDays,
-  FATIGUE_CRISIS_FLOOR_PERCENT,
   isBreakVisible,
   nextOccupiedMinute,
   explainBlock,
@@ -210,26 +209,27 @@ describe('E.4 — fatigue accumulée', () => {
     ).toBe(0)
   })
 
-  it('une crise prouvée rogne la protection sans jamais l’annuler', () => {
+  it('une crise prouvée LÈVE la réduction : le plus de travail possible, et c’est chiffré', () => {
     const f = computeFatigue({
       consecutiveHighDays: 3,
       effectiveCapacityBeforePenalty: 480,
       isCrisis: true,
     })
-    // Plancher absolu : jamais sous 60 % de la capacité normale.
-    expect(f.reductionPercent).toBe(100 - FATIGUE_CRISIS_FLOOR_PERCENT)
-    expect(f.penaltyMinutes).toBe(192)
+    expect(f.reductionPercent).toBe(0)
+    expect(f.penaltyMinutes).toBe(0)
     expect(f.crisisReduced).toBe(true)
-    expect(480 - f.penaltyMinutes).toBe(288)
+    // L'écart rendu se lit en comparant avec la même journée hors crise.
+    const horsCrise = computeFatigue({ consecutiveHighDays: 3, effectiveCapacityBeforePenalty: 480 })
+    expect(horsCrise.penaltyMinutes - f.penaltyMinutes).toBe(288)
   })
 
-  it('une crise ne touche pas une protection déjà sous le plancher', () => {
+  it('une crise sans fatigue accumulée ne signale rien', () => {
     const f = computeFatigue({
-      consecutiveHighDays: 2,
+      consecutiveHighDays: 1,
       effectiveCapacityBeforePenalty: 480,
       isCrisis: true,
     })
-    expect(f.reductionPercent).toBe(25)
+    expect(f.reductionPercent).toBe(0)
     expect(f.crisisReduced).toBe(false)
   })
 

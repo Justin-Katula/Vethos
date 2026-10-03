@@ -25,25 +25,21 @@ const brouillon = (p: Partial<BrouillonTache> = {}): BrouillonTache => ({
   nature: p.nature ?? 'routine',
 })
 
-describe('B.1/B.4 — l’estimation n’est jamais prise au mot', () => {
-  it('majore une estimation de travail connu', () => {
+describe('100 h demandées = 100 h planifiées', () => {
+  it('un travail connu n’est pas majoré', () => {
     const [t] = preparerTache(brouillon({ minutesEstimees: 100 }), options())
-    expect(t!.minutesRestantes).toBe(140)
-    expect(t!.facteurCorrection).toBe(1.4)
+    expect(t!.minutesRestantes).toBe(100)
+    expect(t!.facteurCorrection).toBe(1)
   })
 
-  it('majore davantage une première fois', () => {
-    // On se trompe plus lourdement sur ce qu'on n'a jamais fait. Si les deux
-    // natures donnaient le même chiffre, le choix « nouveau » du formulaire ne
-    // servirait à rien — et l'utilisateur croirait pourtant l'avoir déclaré.
+  it('une première fois non plus : 100 h restent 100 h', () => {
+    // Plus de ×1,7 : le travail demandé n'est jamais gonflé en silence.
     const [t] = preparerTache(brouillon({ minutesEstimees: 100, nature: 'nouveau' }), options())
-    expect(t!.minutesRestantes).toBe(170)
-    expect(t!.facteurCorrection).toBe(1.7)
+    expect(t!.minutesRestantes).toBe(100)
+    expect(t!.facteurCorrection).toBe(1)
   })
 
-  it('garde l’estimation annoncée intacte, à côté de la corrigée', () => {
-    // Les deux chiffres servent : l'annoncé pour se souvenir de ce qu'on
-    // pensait, le corrigé pour planifier.
+  it('garde l’estimation annoncée intacte', () => {
     const [t] = preparerTache(brouillon({ minutesEstimees: 100 }), options())
     expect(t!.minutesEstimees).toBe(100)
   })
