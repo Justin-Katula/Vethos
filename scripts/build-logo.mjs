@@ -1,10 +1,11 @@
 /**
  * Génère toutes les variantes du logo Vethos à partir du PNG source.
  *
- * - Rend le fond blanc transparent (chroma-key, tolérance configurable).
+ * - Préserve la transparence du PNG source (ou détoure l'ancien fond blanc RGB).
  * - Génère un PNG RGBA pour l'usage dans l'app (renderer).
  * - Génère un .ico multi-résolution (16→256) pour Windows (taskbar, .exe).
  * - Génère un PNG 256x256 pour l'installer NSIS.
+ * - Génère les variantes mobile : logo transparent, icône et écran de démarrage.
  *
  * 100 % Node pur (pas de sharp / imagemagick / dépendance externe) :
  * décodage PNG manuel, downscale nearest-neighbor, encodage PNG via zlib,
@@ -22,6 +23,7 @@ const ROOT = path.resolve(path.dirname(__filename), '..')
 const SRC = path.join(ROOT, 'Logo', 'new-logo.png')
 const OUT_DIR = path.join(ROOT, 'build')
 const RENDERER_OUT = path.join(ROOT, 'src', 'renderer', 'src', 'assets')
+const MOBILE_OUT = path.join(ROOT, 'mobile', 'assets')
 const WHITE_THRESHOLD = Number(process.argv[2] ?? 235) // au-dessus = considéré blanc
 
 // ---------------------------------------------------------------------------
@@ -137,11 +139,12 @@ function encodePngRgba(width, height, rgba) {
 }
 
 // ---------------------------------------------------------------------------
-// Traitement : chroma-key du blanc → RGBA transparent
+// Traitement : conserver l'alpha source, ou détourer l'ancien PNG RGB
 // ---------------------------------------------------------------------------
 
 function toRgbaWithWhiteKey(decoded, threshold) {
   const { width, height, channels, data } = decoded
+  if (channels === 4) return { width, height, rgba: data }
   const rgba = Buffer.alloc(width * height * 4)
   for (let i = 0, j = 0; i < data.length; i += channels, j += 4) {
     const r = data[i]
@@ -173,6 +176,29 @@ function toRgbaWithWhiteKey(decoded, threshold) {
     }
   }
   return { width, height, rgba }
+}
+
+// Centrer le symbole sur un canevas transparent ou noir opaque.
+function onCanvas(rgba, size, logoSize, opaqueBackground = false) {
+  const canvas = Buffer.alloc(size * size * 4)
+  if (opaqueBackground) {
+    for (let i = 3; i < canvas.length; i += 4) canvas[i] = 255
+  }
+  const offset = Math.floor((size - logoSize) / 2)
+  for (let y = 0; y < logoSize; y++) {
+    for (let x = 0; x < logoSize; x++) {
+      const src = (y * logoSize + x) * 4
+      const dst = ((y + offset) * size + x + offset) * 4
+      const alpha = rgba[src + 3] / 255
+      for (let channel = 0; channel < 3; channel++) {
+        canvas[dst + channel] = opaqueBackground
+          ? Math.round(rgba[src + channel] * alpha)
+          : rgba[src + channel]
+      }
+      if (!opaqueBackground) canvas[dst + 3] = rgba[src + 3]
+    }
+  }
+  return canvas
 }
 
 // ---------------------------------------------------------------------------
@@ -272,11 +298,12 @@ const decoded = decodePng(srcBuf)
 console.log(`Source : ${decoded.width}x${decoded.height}, ${decoded.channels} canaux`)
 
 const keyed = toRgbaWithWhiteKey(decoded, WHITE_THRESHOLD)
-console.log(`Chroma-key appliqué (seuil blanc = ${WHITE_THRESHOLD})`)
+console.log(decoded.channels === 4 ? 'Transparence source conservée' : `Chroma-key appliqué (seuil blanc = ${WHITE_THRESHOLD})`)
 
 // S'assurer que les dossiers de sortie existent
 fs.mkdirSync(OUT_DIR, { recursive: true })
 fs.mkdirSync(RENDERER_OUT, { recursive: true })
+fs.mkdirSync(MOBILE_OUT, { recursive: true })
 
 // 1. PNG RGBA pour l'app renderer (256x256, taille raisonnable)
 {
@@ -288,7 +315,30 @@ fs.mkdirSync(RENDERER_OUT, { recursive: true })
   console.log(`✓ Logo app (RGBA ${appSize}x${appSize}) : ${outPath} (${png.length} octets)`)
 }
 
-// 2. PNG haute-résolution NSIS (256x256)
+// 2. Logo mobile transparent, utilisé dans les écrans de l'application.
+{
+  const size = 1024
+  const resized = resizeBox(keyed.rgba, keyed.width, keyed.height, size, size)
+  fs.writeFileSync(path.join(MOBILE_OUT, 'vethos-logo-argent.png'), encodePngRgba(size, size, resized))
+}
+
+// 3. Icône iOS / web : fond opaque et marge pour le masque arrondi du système.
+{
+  const size = 1024
+  const logoSize = 800
+  const resized = resizeBox(keyed.rgba, keyed.width, keyed.height, logoSize, logoSize)
+  fs.writeFileSync(path.join(MOBILE_OUT, 'icon-argent.png'), encodePngRgba(size, size, onCanvas(resized, size, logoSize, true)))
+}
+
+// 4. Symbole centré sur le fond noir de l'écran de démarrage Expo.
+{
+  const size = 1024
+  const logoSize = 420
+  const resized = resizeBox(keyed.rgba, keyed.width, keyed.height, logoSize, logoSize)
+  fs.writeFileSync(path.join(MOBILE_OUT, 'splash-icon-argent.png'), encodePngRgba(size, size, onCanvas(resized, size, logoSize)))
+}
+
+// 5. PNG haute-résolution NSIS (256x256)
 {
   const nsisSize = 256
   const resized = resizeBox(keyed.rgba, keyed.width, keyed.height, nsisSize, nsisSize)
@@ -298,7 +348,7 @@ fs.mkdirSync(RENDERER_OUT, { recursive: true })
   console.log(`✓ Icône NSIS (${nsisSize}x${nsisSize}) : ${outPath}`)
 }
 
-// 3. ICO multi-résolution pour Windows
+// 6. ICO multi-résolution pour Windows
 {
   const sizes = [256, 128, 64, 48, 32, 16]
   const frames = sizes.map((size) => {

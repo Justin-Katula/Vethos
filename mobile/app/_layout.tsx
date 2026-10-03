@@ -1,5 +1,5 @@
 import { tiroirDejaOuvert } from '@/compte/rechargement'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { AppState } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -27,9 +27,8 @@ import { useSeances } from '@/seances/magasin-seances'
 import { cleDate } from '@/plan/moteur'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 
-// On garde l'écran de lancement jusqu'à ce que les polices soient là. Sans cela
-// la première image s'affiche en police système puis saute vers Geist — et ce
-// saut est la première chose que l'utilisateur voit de l'application.
+// On garde l'écran natif jusqu'au premier rendu React. Notre logo animé prend
+// alors le relais pendant le chargement des polices et des données.
 void SplashScreen.preventAutoHideAsync()
 
 function Coque() {
@@ -128,7 +127,7 @@ function Coque() {
 }
 
 export default function Racine() {
-  const [policesPretes] = useFonts({
+  const [policesPretes, erreurPolices] = useFonts({
     Geist_400Regular,
     Geist_500Medium,
     Geist_600SemiBold,
@@ -136,18 +135,20 @@ export default function Racine() {
     GeistMono_600SemiBold,
   })
 
-  useEffect(() => {
-    if (policesPretes) void SplashScreen.hideAsync()
-  }, [policesPretes])
-
-  if (!policesPretes) return null
+  const cacherEcranNatif = useCallback(() => {
+    void SplashScreen.hideAsync()
+  }, [])
 
   return (
     <SafeAreaProvider>
       {/* Vethos est sombre : la maquette n'a qu'une apparence, et la lumière
           de l'heure n'existe que sur du noir. */}
       <FournisseurTheme force="sombre">
-        <FournisseurPlan><Coque /></FournisseurPlan>
+        <View style={{ flex: 1, backgroundColor: '#000' }} onLayout={cacherEcranNatif}>
+          {policesPretes || erreurPolices
+            ? <FournisseurPlan><Coque /></FournisseurPlan>
+            : <ChargementVethos pleinEcran />}
+        </View>
       </FournisseurTheme>
     </SafeAreaProvider>
   )

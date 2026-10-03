@@ -121,7 +121,7 @@ Sources: `Introduction.tsx` (story), `recit-introduction.tsx` (week audit, year 
 - **Silence** — a red point decelerates and stops; auto-advance (screen readers get Continue).
 - **Year** — counter and 52 × 7 grid fill together (1.5 s), then everything stops; the action appears only after.
 - **Thought** — the user's sentence alone, then last week's count, then the action after 2.6 s.
-- **Activation** — the real logo (`assets/vethos-logo.png`) arrives with one haptic; no ring animation.
+- **Activation** — the real logo (`assets/vethos-logo-argent.png`) arrives with one haptic; no ring animation.
 - **Commitment** — cards show a mini-week in the app's map language (Task: sessions working back from DUE; Goal: hours spread; Anchor: same time, same days). The chosen card becomes the form; the name is pre-filled with what they put off; parameters use wheels. No corner mark.
 - **Protection** — a phone: the focus session on top, anonymous apps below that dim and lock. No explanatory copy.
 - **Time** — the home screen's 24 h dial (`Horloge`) with free time in its centre; wheels for bedtime, wake-up, work/school hours; construction orbits the commitment arc around the real dial and locks it into the engine's slot; the week is the real `CarteSemaine` plus `AgendaJour`.

@@ -94,7 +94,7 @@ export function EcranAbonnement() {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: apparition, zIndex: 100 }]}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-        <Image source={require('../../assets/vethos-logo.png')} accessibilityLabel="Vethos" style={{ width: 96, height: 96 }} resizeMode="contain" />
+        <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 96, height: 96 }} resizeMode="contain" />
         {f?.essaiJours ? (
           <Text accessibilityRole="header" style={{ marginTop: 24, color: A.t1, fontFamily: GEIST.demi, fontSize: 30, lineHeight: 36, letterSpacing: -0.8, textAlign: 'center' }}>
             {`${f.essaiJours} days free.`}

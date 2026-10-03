@@ -8,6 +8,7 @@ import { introVueSurAppareil, marquerIntroVue } from './espace'
 import { LogoApple, LogoGoogle, useConnexion } from './CarteCompte'
 import { useAbonnement } from '@/abonnement/achats'
 import { EcranAbonnement } from '@/abonnement/EcranAbonnement'
+import { ChargementVethos } from '@/ui/MouvementVethos'
 
 /** Un bouton en pilule, comme les écrans de connexion d'iOS. */
 function Pilule({ onPress, clair, children, label }: { onPress: () => void; clair?: boolean; children: React.ReactNode; label: string }) {
@@ -76,8 +77,10 @@ export function PorteCompte() {
   }, [fermee, apparition])
 
   if (introFaite && session && abonnement === 'inactif') return <EcranAbonnement />
-  // Pendant qu'on demande au Store : du noir, pas un aperçu de l'app.
-  if (introFaite && session && abonnement === 'chargement') return <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 100 }]} />
+  // Pendant qu'on demande au Store : le logo masque l'app jusqu'à la réponse.
+  if (introFaite && session && abonnement === 'chargement') {
+    return <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]}><ChargementVethos pleinEcran /></View>
+  }
   if (!fermee || !connexion.dispo) return null
   const { apple, google } = connexion.dispo
   return (
@@ -125,7 +128,7 @@ export function PorteCompte() {
         </Pressable>
 
         <View style={{ flex: 1 }} />
-        <Image source={require('../../assets/vethos-logo.png')} accessibilityLabel="Vethos" style={{ width: 40, height: 40, alignSelf: 'center', opacity: 0.9 }} resizeMode="contain" />
+        <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 40, height: 40, alignSelf: 'center', opacity: 0.9 }} resizeMode="contain" />
       </View>
     </Animated.View>
   )

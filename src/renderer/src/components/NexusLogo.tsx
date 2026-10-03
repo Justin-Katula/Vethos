@@ -1,7 +1,7 @@
 /**
- * Logo Vethos — bouclier avec un V central entouré d'un cercle segmenté.
- * L'image source (Logo/new-logo.png, 1254px) est downscalée et chroma-keyée
- * (fond blanc → transparent) par scripts/build-logo.mjs.
+ * Logo Vethos — V argenté dans un cercle segmenté.
+ * L'image source transparente (Logo/new-logo.png) est redimensionnée
+ * par scripts/build-logo.mjs.
  */
 import logoUrl from '@/assets/vethos-logo.png'
 

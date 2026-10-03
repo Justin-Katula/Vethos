@@ -504,7 +504,7 @@ export function EcranVethos({ ctx }: { ctx: Ctx }) {
           }}
         >
           <Image
-            source={require('../../assets/vethos-logo.png')}
+            source={require('../../assets/vethos-logo-argent.png')}
             accessibilityLabel="Vethos"
             style={{ width: 168, height: 168 }}
             resizeMode="contain"
