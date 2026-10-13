@@ -1,7 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 import * as Crypto from 'expo-crypto'
-import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
@@ -36,8 +35,9 @@ export async function fournisseurs(): Promise<{ apple: boolean; google: boolean 
       apple = await AppleAuthentication.isAvailableAsync().catch(() => false)
     } else if (Platform.OS === 'web') apple = true
   }
-  const google =
-    Platform.OS === 'web' || dansExpoGo() ? !!c.googleWeb : Platform.OS === 'ios' ? !!(c.googleWeb && c.googleIos) : !!c.googleWeb
+  // Sur l'iPhone, sans identifiant Google iOS, la connexion passe par le
+  // navigateur (comme dans Expo Go) : elle reste disponible.
+  const google = !!c.googleWeb
   return { apple, google }
 }
 
@@ -66,8 +66,9 @@ async function parNavigateur(provider: 'apple' | 'google'): Promise<Resultat> {
   // Expo Go : la feuille de connexion d'iOS rattrape le retour par son schéma
   // (`exp`), quel que soit l'hôte. On vise l'hôte du Site URL (`localhost`),
   // que Supabase accepte toujours — il ignore les `exp://` de la liste des
-  // redirections (vérifié le 2026-09-30). Hors Expo Go : le schéma de l'app.
-  const retour = dansExpoGo() ? 'exp://localhost/--/auth' : Linking.createURL('auth')
+  // redirections (vérifié le 2026-09-30). Hors Expo Go : le schéma de l'app,
+  // sur le même hôte, pour la même raison.
+  const retour = dansExpoGo() ? 'exp://localhost/--/auth' : 'vethos://localhost/auth'
   const { data, error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: retour, skipBrowserRedirect: true, queryParams: choixDuCompte(provider) } })
   if (error || !data.url) return { ok: false, raison: 'erreur' }
   const r = await WebBrowser.openAuthSessionAsync(data.url, retour)
@@ -106,7 +107,8 @@ export async function connecterGoogle(): Promise<Resultat> {
   const c = config()
   if (!sb || !c.googleWeb) return { ok: false, raison: 'indisponible' }
   if (Platform.OS === 'web') return parRedirection('google')
-  if (dansExpoGo()) return parNavigateur('google')
+  // Expo Go, ou une vraie build sans identifiant Google iOS : le navigateur.
+  if (dansExpoGo() || (Platform.OS === 'ios' && !c.googleIos)) return parNavigateur('google')
   try {
     // Chargé à la demande : le module natif n'existe que dans une vraie build.
     const { GoogleSignin, isSuccessResponse } = await import('@react-native-google-signin/google-signin')
