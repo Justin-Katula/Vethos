@@ -15,7 +15,7 @@
       "appleTeamId": "7R7TRVFDCW",
       "usesAppleSignIn": true,
       "supportsTablet": true,
-      "deploymentTarget": "16.0",
+      "deploymentTarget": "16.4",
       "infoPlist": {
         "NSFamilyControlsUsageDescription": "Vethos uses Screen Time to set aside the apps you picked yourself, for the length of a session you started. Nothing leaves your phone — iOS never tells Vethos which apps they are.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -118,6 +118,13 @@
       }
     },
     "owner": "justin-katula",
-    "icon": "./assets/icon-argent.png"
+    "icon": "./assets/icon-argent.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/862f46d8-f1a7-404e-8ea9-cd20027d21fd"
+    },
+    "android": {}
   }
 }
