@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computePlan } from './engine'
-import { messagesCharge, formatHeures } from './charge-message'
+import { messagesCharge, formatHeures, tempsPerdu } from './charge-message'
 import { sleepScheduleEntries } from '@shared/sleep'
 import type { PlanningInput, ScheduleEntry, TaskItem } from './types'
 
@@ -69,5 +69,36 @@ describe('messages de charge — chiffrés, sans jugement, sans question', () =>
   it('le plancher seul compte : un bonus libéré ne change ni le chiffre demandé ni le déficit', () => {
     const avec = { ...tache(170), bonusMinutes: 300 }
     expect(messages(avec)[0]!.texte).toContain('170 h asked')
+  })
+})
+
+describe('temps perdu — seulement ce qui ne tiendra vraiment pas', () => {
+  const perdu = (t: TaskItem, rangeEnd = '2026-08-17') => {
+    const r = computePlan(
+      {
+        today: '2026-08-11', rangeEnd, tasks: [t], objectives: [], ancres: [],
+        schedule: [...sleepScheduleEntries('23:00', '07:00'), ...fixe], observations: [],
+        anchorMissCounts: {}, dailyUtilization: {}, weeklyObjectiveServed: {}, objectiveLastServed: {},
+        lastSignalAt: {}, tasksCreatedPerWeek: {}, consecutiveDelays: {},
+      },
+      NOW,
+    )
+    return { r, n: tempsPerdu({ result: r, tasks: [t], today: '2026-08-11' }).get(t.id) ?? 0 }
+  }
+
+  it('échéance dans trois semaines : la part de cette semaine n’est pas du temps perdu', () => {
+    // Défaut réel du 2026-10-14 : 30 h dans 19 jours → « 19 h 30 lost » à tort.
+    expect(perdu(tache(30, '2026-08-30')).n).toBe(0)
+  })
+
+  it('dans la semaine : ce que le plan n’a pas pu poser', () => {
+    const { r, n } = perdu(tache(150, '2026-08-14'))
+    const place = r.verdicts[0]!.placedMinutes
+    expect(n).toBeGreaterThan(0)
+    expect(n).toBe(150 * 60 - place)
+  })
+
+  it('loin mais vraiment trop : le dépassement projeté', () => {
+    expect(perdu(tache(1000, '2026-08-30')).n).toBeGreaterThan(0)
   })
 })

@@ -1,6 +1,7 @@
 import { BONUS_SEUIL_DENSITE } from './bonus'
 import { daysBetween } from './dates'
 import { floorWorkFor } from './engine'
+import { capaciteJusqua } from './feasibility'
 import type { DurationRealSource, PlanningResult, TaskItem } from './types'
 
 // ═══ MESSAGES DE CHARGE ═════════════════════════════════════════════════════
@@ -92,4 +93,48 @@ export function messagesCharge(args: {
     }
   }
   return sorties
+}
+
+/**
+ * Le temps qui ne pourra PAS être fait avant l'échéance, tâche par tâche.
+ *
+ * - Échéance dans les jours calculés : ce que le plan n'a pas réussi à poser.
+ *   C'est la vérité du placement, pauses et protections comprises.
+ * - Échéance plus loin : le plan ne pose que la part de la semaine — le reste
+ *   n'est pas « perdu », il viendra. On compare alors la charge à la capacité
+ *   projetée jusqu'à l'échéance ; le dépassement de chaque échéance (au-delà
+ *   de celui des échéances plus proches) se répartit sur ses tâches.
+ */
+export function tempsPerdu(args: {
+  result: PlanningResult
+  tasks: readonly TaskItem[]
+  today: string
+  durationSource?: DurationRealSource
+}): Map<string, number> {
+  const perdu = new Map<string, number>()
+  const actives = args.tasks.filter((t) => t.status === 'active')
+  const plancher = new Map(actives.map((t) => [t.id, floorWorkFor(t, args.durationSource)]))
+  const finHorizon = args.result.capacities.reduce((m, c) => (c.date > m ? c.date : m), args.today)
+  const points = args.result.capacities.map((c) => ({ date: c.date, capacityMinutes: c.effectiveCapacityMinutes }))
+
+  let dejaCompte = 0
+  for (const echeance of [...new Set(actives.map((t) => t.deadline))].sort()) {
+    const ici = actives.filter((t) => t.deadline === echeance)
+    if (echeance <= finHorizon) {
+      for (const t of ici) {
+        const p = plancher.get(t.id) ?? 0
+        const place = args.result.verdicts.find((v) => v.taskId === t.id)?.placedMinutes ?? 0
+        perdu.set(t.id, Math.max(0, p - Math.min(p, place)))
+      }
+      dejaCompte = Math.max(dejaCompte, actives.filter((t) => t.deadline <= echeance).reduce((s, t) => s + (perdu.get(t.id) ?? 0), 0))
+      continue
+    }
+    const charge = actives.filter((t) => t.deadline <= echeance).reduce((s, t) => s + (plancher.get(t.id) ?? 0), 0)
+    const manque = Math.max(0, charge - capaciteJusqua(points, args.today, echeance))
+    const nouveau = Math.max(0, manque - dejaCompte)
+    dejaCompte = Math.max(dejaCompte, manque)
+    const total = ici.reduce((s, t) => s + (plancher.get(t.id) ?? 0), 0)
+    for (const t of ici) perdu.set(t.id, total > 0 ? Math.round((nouveau * (plancher.get(t.id) ?? 0)) / total) : 0)
+  }
+  return perdu
 }

@@ -12,7 +12,7 @@ import Svg, { Circle } from 'react-native-svg'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { cleDate, versTachesMoteur } from '@/plan/moteur'
-import { floorWorkFor } from '@shared/planning/engine'
+import { tempsPerdu } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { cancelObjectiveRemoval, effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
@@ -175,20 +175,23 @@ export default function Engagements() {
               <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: traitDe('TASK', t.couleur, t.id) }} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              {perdu >= 5 ? (
-                <View accessibilityLabel={`You will lose ${hm(perdu)}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 20, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.16)' }}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: A.rouge }} />
-                  <Text numberOfLines={1} style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 11 }}>{`${hm(perdu)} lost`}</Text>
-                </View>
-              ) : (
-                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'}`}</Text>
-              )}
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'}`}</Text>
               <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
                 {Array.from({ length: 10 }, (_, i) => (
                   <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
                 ))}
               </View>
             </View>
+            {perdu >= 5 ? (
+              // Ce qui ne tiendra pas : dit sans détour, et pourquoi c'est impossible.
+              <View accessible accessibilityLabel={`${hm(perdu)} can't fit. Impossible before ${dateCourte(t.echeance)}, even with all your free time.`} style={{ marginTop: 4, flexDirection: 'row', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.12)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.28)' }}>
+                <View style={{ width: 3, borderRadius: 2, backgroundColor: A.rouge }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 15, lineHeight: 20, letterSpacing: -0.2 }}>{`${hm(perdu)} can't fit`}</Text>
+                  <Text style={{ color: 'rgba(240,82,95,0.8)', fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17 }}>{`Impossible before ${dateCourte(t.echeance)}, even with all your free time.`}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
         {o ? (
@@ -401,15 +404,13 @@ export default function Engagements() {
 
   // Le temps qui ne tient pas avant l'échéance : chiffré, en rouge, sur la
   // tâche elle-même. Rien d'autre à lire.
-  const manqueDe = (() => {
-    const parId = new Map<string, number>()
-    for (const t of versTachesMoteur(d.taches)) {
-      const plancher = floorWorkFor(t, { getActualMinutes: (id: string) => fait[id] ?? null })
-      const place = resultat.verdicts.find((v) => v.taskId === t.id)?.placedMinutes ?? 0
-      parId.set(t.id, Math.max(0, plancher - Math.min(plancher, place)))
-    }
-    return (g: Groupe) => [g.racine, ...g.parties].reduce((q, t) => q + (parId.get(t.id) ?? 0), 0)
-  })()
+  const perdus = tempsPerdu({
+    result: resultat,
+    tasks: versTachesMoteur(d.taches),
+    today: cleDate(maintenant),
+    durationSource: { getActualMinutes: (id: string) => fait[id] ?? null },
+  })
+  const manqueDe = (g: Groupe) => [g.racine, ...g.parties].reduce((q, t) => q + (perdus.get(t.id) ?? 0), 0)
 
   const sections = [
     section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', couper(groupes).map(ligneTache)),
