@@ -330,6 +330,30 @@ describe('CRITÈRE 6 — deux ancres ne peuvent pas occuper le même créneau', 
     )
     expect(overlaps).toEqual([])
   })
+
+  it('l’ancre est du travail : rien ne commence moins de 5 min après sa fin', () => {
+    // Ancre 18 h → 19 h : la tâche qui suit commence à 19 h 05 au plus tôt.
+    const plan = computePlan(
+      input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 600 })] }),
+      NOW,
+    )
+    const collees = plan.blocks.filter((b) => b.kind !== 'ancre' && b.startMinute >= 1140 && b.startMinute < 1145)
+    expect(collees).toEqual([])
+  })
+
+  it('aucun bloc de travail ne touche le suivant sans 5 min de pause', () => {
+    const plan = computePlan(
+      input({ ancres: [ancre()], tasks: [task({ remainingMinutes: 600 })] }),
+      NOW,
+    )
+    for (const date of new Set(plan.blocks.map((b) => b.date))) {
+      const jour = plan.blocks.filter((b) => b.date === date).sort((a, b) => a.startMinute - b.startMinute)
+      for (let i = 1; i < jour.length; i++) {
+        const avant = jour[i - 1]!
+        expect(jour[i]!.startMinute - (avant.startMinute + avant.workMinutes)).toBeGreaterThanOrEqual(5)
+      }
+    }
+  })
 })
 
 describe('CRITÈRE 8 — cascade : deadline → importance → SRPT → création', () => {

@@ -26,8 +26,9 @@ describe('E.1 — micro-repos inclus dans le bloc', () => {
     expect(computeBreakMinutes(120)).toBe(20)
   })
 
-  it('sous 25 min, pas de pause à prévoir', () => {
-    expect(computeBreakMinutes(20)).toBe(0)
+  it('sous 25 min, quand même 5 min : jamais deux travaux bout à bout', () => {
+    expect(computeBreakMinutes(20)).toBe(5)
+    expect(computeBreakMinutes(0)).toBe(0)
   })
 
   it('la pause ferme le bloc : 7 h 30 → 9 h 20 travaille jusqu’à 9 h pile', () => {

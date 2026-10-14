@@ -7,15 +7,21 @@ import type { PlacedBlock } from './types'
 
 /**
  * E.1 : la pause qui SUIT un bloc — 20 min après 90 min de travail, 10 après
- * 50, 5 après 25. Elle n'existe que si quelque chose commence dans les 30 min
+ * 50, 5 sinon (jamais deux travaux bout à bout). Elle n'existe que si quelque chose commence dans les 30 min
  * qui suivent le travail (`settleBreaks`) ; sinon le temps libre en tient lieu.
  */
 export function computeBreakMinutes(workMinutes: number): number {
   if (workMinutes >= 90) return 20
   if (workMinutes >= 50) return 10
-  if (workMinutes >= 25) return 5
+  if (workMinutes > 0) return PAUSE_ENTRE_TRAVAUX
   return 0
 }
+
+/**
+ * Jamais deux travaux bout à bout : au moins 5 min entre deux blocs, une ancre
+ * comptant comme du travail. Une ancre qui finit à 17 h 00 → rien avant 17 h 05.
+ */
+export const PAUSE_ENTRE_TRAVAUX = 5
 
 /**
  * Le travail que contient une empreinte réservée : le plus grand travail dont

@@ -55,6 +55,7 @@ import {
 } from './placement'
 import {
   computeBreakMinutes,
+  PAUSE_ENTRE_TRAVAUX,
   settleBreaks,
   workOfFootprint,
   computeFatigue,
@@ -575,7 +576,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
             : ancresFor(dow).find((a) => a.id === session.refId)
 
       if (source !== undefined) {
-        allocator.reserve(session.startMinute, session.endMinute)
+        // Une ancre en cours est du travail : 5 min de pause avant la suite.
+        allocator.reserve(session.startMinute, Math.min(1440, session.endMinute + (session.kind === 'ancre' ? PAUSE_ENTRE_TRAVAUX : 0)))
         if (session && !placedToday.some((b) => b.refId === session.refId && b.startMinute <= session.startMinute && session.startMinute < b.endMinute)) {
         placedToday.push({ refId: session.refId, startMinute: session.startMinute, endMinute: session.endMinute, work: session.workMinutes })
       }
@@ -632,7 +634,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       const source =
         p.kind === 'task' ? activeTasks.find((t) => t.id === p.refId) : input.objectives.find((o) => o.id === p.refId)
       if (source === undefined) continue
-      allocator.reserve(p.startMinute, end)
+      allocator.reserve(p.startMinute, Math.min(1440, end + PAUSE_ENTRE_TRAVAUX))
       const work = end - p.startMinute
       blocks.push({
         id,
@@ -662,7 +664,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       if (session?.kind === 'ancre' && session.refId === ancre.id) continue
       const reduced = saturated.has(date) || freeDays.has(date)
       const duration = reduced ? ancre.minimumMinutes : ancre.normalMaxMinutes
-      allocator.reserve(ancre.anchorMinute, ancre.anchorMinute + duration)
+      // L'ancre est du travail : rien ne commence moins de 5 min après sa fin.
+      allocator.reserve(ancre.anchorMinute, Math.min(1440, ancre.anchorMinute + duration + PAUSE_ENTRE_TRAVAUX))
       blocks.push({
         id: `ancre-${ancre.id}-${date}`,
         date,
