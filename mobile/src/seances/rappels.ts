@@ -25,8 +25,8 @@ function natif(): typeof ModuleNotifications | null {
   return module
 }
 
-/** Ce que l'utilisateur a touché sur une notification : la feuille à ouvrir sur « Je commence ». */
-export const useDemandeReport = create<{ demande: 'tard' | 'demain' | null; poser: (d: 'tard' | 'demain' | null) => void }>((set) => ({
+/** « Later » touché sur une notification : la question à ouvrir sur « Je commence ». */
+export const useDemandeReport = create<{ demande: 'tard' | null; poser: (d: 'tard' | null) => void }>((set) => ({
   demande: null,
   poser: (demande) => set({ demande }),
 }))
@@ -42,13 +42,14 @@ export async function preparerRappels(): Promise<void> {
       handleNotification: async () => ({ shouldShowBanner: false, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
     })
     await N.setNotificationCategoryAsync(CATEGORIE, [
+      // « Tomorrow » n'est jamais un bouton : il ne vient qu'après « Later », et
+      // « Later » se demande avec une raison, dans Vethos.
       { identifier: 'tard', buttonTitle: 'Later', options: { opensAppToForeground: true } },
-      { identifier: 'demain', buttonTitle: 'Tomorrow', options: { opensAppToForeground: true } },
     ])
     await N.setNotificationCategoryAsync(CATEGORIE_ANCRE, [])
     N.addNotificationResponseReceivedListener((r) => {
       const a = r.actionIdentifier
-      if (a === 'tard' || a === 'demain') useDemandeReport.getState().poser(a)
+      if (a === 'tard') useDemandeReport.getState().poser(a)
     })
     pret = true
   } catch {

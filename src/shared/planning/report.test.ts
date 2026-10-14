@@ -109,3 +109,13 @@ describe('« Later » et « Tomorrow » sur un vrai plan', () => {
     expect(travailDuJour(planSerre, '2026-08-12')).toBeGreaterThan(0)
   })
 })
+
+describe('« Later » suit la raison, comme un Stop', () => {
+  it('« Tired » : demain matin seulement', () => {
+    const plan = computePlan(entree({ tasks: [tache()] }), new Date(2026, 7, 11, 9, 0))
+    const o = optionsPlusTard({ plan, today: '2026-08-11', nowMinute: 540, bloc: { kind: 'task', refId: 'tache-1', workMinutes: 90 }, deadline: '2026-08-20', preference: 'repose' })
+    expect(o).toHaveLength(1)
+    expect(o[0]!.date).toBe('2026-08-12')
+    expect(o[0]!.startMinute).toBeLessThanOrEqual(12 * 60)
+  })
+})

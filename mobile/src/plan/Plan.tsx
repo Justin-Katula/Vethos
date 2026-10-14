@@ -60,7 +60,7 @@ import {
   travailDuJour,
   type OptionPlusTard,
 } from '@shared/planning/report'
-import { creerPromesse } from '@shared/planning/trust'
+import { creerPromesse, echeanceDe, reactionRaison } from '@shared/planning/trust'
 import { addDays as ajouterJours } from '@shared/planning/dates'
 import { lireSemaine, seancesTenues } from './lecture'
 import { liberationsDuJour } from './bonus-tache'
@@ -69,11 +69,25 @@ import { liberationsDuJour } from './bonus-tache'
  * « Later » : la séance devient une promesse à l'heure choisie, et sa source
  * ne se place plus aujourd'hui (la promesse, elle, reste posée).
  */
+type BlocReportable = { id: string; kind: string; refId: string; workMinutes: number; label: string }
+export type OptionPlusTardVue = OptionPlusTard & { demainMinutes: number }
+export type ReactionPlusTard =
+  | { etape: 'message'; message: string }
+  | {
+      etape: 'reaction'
+      lignes: string[]
+      dixMinutes: boolean
+      options: OptionPlusTardVue[]
+      /** « Tomorrow » : null s'il n'est pas permis cette semaine ou ne tient pas. */
+      journee: { aujourdhuiMinutes: number; demainAvant: number; demainApres: number } | null
+    }
+
 function reporterPlusTard(
   l: LearningState,
   bloc: { id: string; kind: string; refId: string; workMinutes: number; label: string },
   option: OptionPlusTard,
   aujourdHui: string,
+  raison?: StopReason,
 ): LearningState {
   const avecPromesse = creerPromesse(l, {
     id: `report-${bloc.id}`,
@@ -86,7 +100,7 @@ function reporterPlusTard(
     minutes: Math.max(1, Math.min(600, bloc.workMinutes)),
     createdAt: new Date().toISOString(),
   })
-  return noterReport(avecPromesse, { date: aujourdHui, kind: 'later', blockId: bloc.id, refId: bloc.refId })
+  return noterReport(avecPromesse, { date: aujourdHui, kind: 'later', blockId: bloc.id, refId: bloc.refId, ...(raison ? { reason: raison } : {}) })
 }
 
 function useSourcePlan() {
@@ -726,66 +740,83 @@ function useSourcePlan() {
      * montre d'abord ce que demain devient — le travail ne disparaît jamais.
      */
     reports: {
-      /** « Later » : permis pour ce bloc ? (une fois par séance) */
+      /** « Later » : permis pour ce bloc ? (une fois par séance, jamais pour une ancre) */
       plusTardPermis: (bloc: { id: string; kind: string }) =>
         plusTardPermis(apprentissage, { id: bloc.id, kind: bloc.kind as 'task' | 'objective' | 'ancre' }),
-      /** Les heures proposées, chacune avec le travail de demain si on la choisit. */
-      optionsPlusTard: (bloc: { id: string; kind: string; refId: string; workMinutes: number; label: string }) => {
+      /**
+       * « Later » se demande comme un Stop : la raison est donnée, et voici la
+       * réaction propre à la raison, puis les heures choisies selon elle —
+       * chacune avec ce que demain devient — et, en dernier recours seulement,
+       * « Tomorrow ». Une détresse lue dans le texte : on lève tout et on
+       * oriente vers une aide humaine.
+       */
+      reagir: async (bloc: BlocReportable, raison: StopReason, texte?: string): Promise<ReactionPlusTard> => {
         const frais = useSeances.getState()
         const { d, minute } = maintenantMinute()
+        if (texte && detecteDetresse(texte)) {
+          await poser({
+            apprentissage: { ...frais.apprentissage, lastSignalAt: { ...frais.apprentissage.lastSignalAt, [SUJET_DETRESSE]: d.toISOString() } },
+            confirmations: frais.confirmations,
+          })
+          await blocage().remplacerPlage(bloc.id, null)
+          return { etape: 'message', message: MESSAGE_AIDE }
+        }
         const aujourdHui = cleDate(d)
         const demain = ajouterJours(aujourdHui, 1)
-        const { plan } = planApres(frais.apprentissage, frais.confirmations)
+        const avant = planApres(frais.apprentissage, frais.confirmations)
+        const tache = tacheEnCours(bloc)
+        const reaction = reactionRaison(
+          raison,
+          {
+            heldMinutes: 0,
+            plannedMinutes: bloc.workMinutes,
+            attemptsBefore: tentativesRecentes(undefined),
+            kind: bloc.kind as 'task' | 'objective',
+            nowMinute: minute,
+            sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
+          },
+          { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: tache.echeance }) : null },
+        )
         const options = optionsPlusTard({
-          plan, today: aujourdHui, nowMinute: minute,
+          plan: avant.plan, today: aujourdHui, nowMinute: minute,
           bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: bloc.workMinutes },
-          deadline: tacheEnCours(bloc)?.echeance ?? null,
-        })
-        return options.map((o) => {
-          const l = reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui)
-          return { ...o, demainMinutes: travailDuJour(planApres(l, frais.confirmations).plan, demain) }
-        })
+          deadline: tache?.echeance ?? null,
+          preference: reaction.placement.preference,
+        }).map((o) => ({
+          ...o,
+          demainMinutes: travailDuJour(planApres(reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui, raison), frais.confirmations).plan, demain),
+        }))
+        // « Tomorrow », en dernier recours : permis cette semaine, et seulement si tout tient encore.
+        const apres = planApres(noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' }), frais.confirmations)
+        const refs = avant.plan.blocks
+          .filter((x) => x.date === aujourdHui && (x.kind === 'task' || x.kind === 'objective'))
+          .map((x) => ({ kind: x.kind as 'task' | 'objective', refId: x.refId }))
+        const journee =
+          reportJourneePermis(frais.apprentissage, aujourdHui) && journeeReportable({ planApres: apres.plan, inputApres: apres.input, refs })
+            ? { aujourdhuiMinutes: travailDuJour(avant.plan, aujourdHui), demainAvant: travailDuJour(avant.plan, demain), demainApres: travailDuJour(apres.plan, demain) }
+            : null
+        return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, options, journee }
       },
       /** Repose la séance à l'heure choisie ; l'écart et les rappels de maintenant s'arrêtent. */
-      choisirPlusTard: async (bloc: { id: string; kind: string; refId: string; workMinutes: number; label: string }, option: OptionPlusTard) => {
+      choisirPlusTard: async (bloc: BlocReportable, option: OptionPlusTard, raison: StopReason) => {
         const frais = useSeances.getState()
         const aujourdHui = cleDate(new Date())
         // Le bloc reporté n'est plus suivi : sans ça, sa fenêtre d'origine se
         // fermerait plus tard et compterait comme une séance ratée.
         const c = frais.confirmations
         const confirmations = c.observedPending?.blockId === bloc.id ? { ...c, observedPending: null } : c
-        await poser({ apprentissage: reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui), confirmations })
+        await poser({ apprentissage: reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui, raison), confirmations })
         await blocage().remplacerPlage(bloc.id, null)
       },
-      /** « Tomorrow » : permis cette semaine ? possible sans rien faire déborder ? et demain, avant / après. */
-      apercuDemain: () => {
-        const frais = useSeances.getState()
-        const aujourdHui = cleDate(new Date())
-        const demain = ajouterJours(aujourdHui, 1)
-        const permis = reportJourneePermis(frais.apprentissage, aujourdHui)
-        const avant = planApres(frais.apprentissage, frais.confirmations)
-        const l = noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' })
-        const apres = planApres(l, frais.confirmations)
-        const refs = avant.plan.blocks
-          .filter((b) => b.date === aujourdHui && (b.kind === 'task' || b.kind === 'objective'))
-          .map((b) => ({ kind: b.kind as 'task' | 'objective', refId: b.refId }))
-        return {
-          permis,
-          possible: journeeReportable({ planApres: apres.plan, inputApres: apres.input, refs }),
-          aujourdhuiMinutes: travailDuJour(avant.plan, aujourdHui),
-          demainAvant: travailDuJour(avant.plan, demain),
-          demainApres: travailDuJour(apres.plan, demain),
-        }
-      },
-      /** Tout ce qui reste aujourd'hui passe aux jours suivants. */
-      reporterJournee: async () => {
+      /** « Tomorrow » : tout ce qui reste aujourd'hui passe aux jours suivants. */
+      reporterJournee: async (raison: StopReason) => {
         const frais = useSeances.getState()
         const aujourdHui = cleDate(new Date())
         const c = frais.confirmations
         const enCours = c.observedPending && c.observedPending.blockId in c.confirmedAt
         const confirmations = c.observedPending && !enCours ? { ...c, observedPending: null } : c
-        await poser({ apprentissage: noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' }), confirmations })
-        const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((b) => b.id === p.blocId && !(b.id in frais.confirmations.confirmedAt)))
+        await poser({ apprentissage: noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day', reason: raison }), confirmations })
+        const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt)))
         await blocage().appliquerPlan(plages)
       },
     },

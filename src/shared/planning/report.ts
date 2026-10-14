@@ -1,7 +1,7 @@
-import type { LearningState } from '@shared/schemas'
+import type { LearningState, StopReason } from '@shared/schemas'
 import type { PlacedBlock, PlanningInput, PlanningResult } from './types'
 import { addDays, startOfWeek } from './dates'
-import { debutsLibres, placePourReporter } from './trust'
+import { debutsLibres, placePourReporter, type Preference } from './trust'
 
 // ═══ AVANT DE COMMENCER : BLOCAGE, RAPPELS, REPORTS (décidé le 2026-10-13) ═══
 //
@@ -10,12 +10,12 @@ import { debutsLibres, placePourReporter } from './trust'
 // demandent « Je commence ». Sans confirmation, l'écart dure une heure au
 // plus, ne compte pas comme du travail, puis s'arrête : la séance est ratée.
 //
-// Deux sorties, toutes deux visibles et chiffrées — jamais un abandon :
-// - « Later » : la séance se repose à une heure choisie, aujourd'hui ou
-//   demain. Une fois par séance.
-// - « Tomorrow » : tout ce qui reste aujourd'hui passe aux jours suivants.
-//   Seulement si ça tient encore, et deux fois par semaine au plus.
-// Dans les deux cas, on montre d'abord ce que demain devient.
+// Une seule sortie, « Later », qui se demande comme un Stop : la raison
+// d'abord (un tap), puis la réaction propre à la raison, puis les heures —
+// choisies selon la raison — chacune avec ce que demain devient. Une fois par
+// séance. En dernier recours seulement, dans la même liste : « Tomorrow »,
+// tout ce qui reste aujourd'hui passe aux jours suivants — si ça tient
+// encore, et deux fois par semaine au plus. Jamais un abandon.
 
 /** Sans « Je commence », l'écart dure au plus ça. */
 export const BLOCAGE_SANS_CONFIRMATION_MINUTES = 60
@@ -82,6 +82,10 @@ export type OptionPlusTard = { date: string; startMinute: number }
  * Les heures proposées pour « Later » : jusqu'à trois aujourd'hui, espacées
  * d'au moins une heure, puis la première demain. Jamais dans le passé (15 min
  * de marge), jamais après l'échéance d'une tâche, jamais par-dessus un autre bloc.
+ *
+ * La préférence vient de la raison, comme pour un Stop : « fatigué » → demain
+ * matin seulement ; « trop dur » → une fenêtre profonde. Rien ne correspond :
+ * au plus tôt.
  */
 export function optionsPlusTard(a: {
   plan: PlanningResult
@@ -89,25 +93,34 @@ export function optionsPlusTard(a: {
   nowMinute: number
   bloc: Pick<PlacedBlock, 'kind' | 'refId' | 'workMinutes'>
   deadline?: string | null
+  preference?: Preference
 }): OptionPlusTard[] {
   if (a.bloc.kind !== 'task' && a.bloc.kind !== 'objective') return []
   const kind = a.bloc.kind
   const span = Math.max(1, a.bloc.workMinutes)
-  const options: OptionPlusTard[] = []
-  const plancher = Math.ceil((a.nowMinute + 15) / 5) * 5
-  let dernier = -Infinity
-  for (const d of debutsLibres(a.plan, a.today, span, kind, a.bloc.refId, plancher, 1440)) {
-    if (options.length >= OPTIONS_PLUS_TARD_MAX - 1) break
-    if (d - dernier < 60) continue
-    options.push({ date: a.today, startMinute: d })
-    dernier = d
+  const chercher = (pref: Preference): OptionPlusTard[] => {
+    const filtre = pref === 'profonde' ? (s: { cognitiveWindow: string }) => s.cognitiveWindow === 'PROFONDE' : () => true
+    const options: OptionPlusTard[] = []
+    if (pref !== 'repose') {
+      const plancher = Math.ceil((a.nowMinute + 15) / 5) * 5
+      let dernier = -Infinity
+      for (const d of debutsLibres(a.plan, a.today, span, kind, a.bloc.refId, plancher, 1440, filtre)) {
+        if (options.length >= OPTIONS_PLUS_TARD_MAX - 1) break
+        if (d - dernier < 60) continue
+        options.push({ date: a.today, startMinute: d })
+        dernier = d
+      }
+    }
+    const demain = addDays(a.today, 1)
+    if (!a.deadline || a.deadline >= demain) {
+      const d = debutsLibres(a.plan, demain, span, kind, a.bloc.refId, 0, pref === 'repose' ? 12 * 60 : 1440, filtre)[0]
+      if (d !== undefined) options.push({ date: demain, startMinute: d })
+    }
+    return options
   }
-  const demain = addDays(a.today, 1)
-  if (!a.deadline || a.deadline >= demain) {
-    const d = debutsLibres(a.plan, demain, span, kind, a.bloc.refId, 0, 1440)[0]
-    if (d !== undefined) options.push({ date: demain, startMinute: d })
-  }
-  return options
+  const pref = a.preference ?? 'tot'
+  const voulu = chercher(pref)
+  return voulu.length > 0 || pref === 'tot' ? voulu : chercher('tot')
 }
 
 /** Le travail posé un jour donné (tâches et objectifs), en minutes. */
@@ -139,7 +152,7 @@ export function reportJourneePermis(l: Pick<LearningState, 'postponements'>, tod
 /** Note un report. */
 export function noterReport(
   l: LearningState,
-  r: { date: string; kind: 'later' | 'day'; blockId?: string; refId?: string },
+  r: { date: string; kind: 'later' | 'day'; blockId?: string; refId?: string; reason?: StopReason },
 ): LearningState {
   return { ...l, postponements: [...reports(l), r].slice(-300) }
 }

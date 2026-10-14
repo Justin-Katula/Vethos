@@ -411,6 +411,8 @@ export const LearningStateSchema = z.object({
         kind: z.enum(['later', 'day']),
         blockId: z.string().optional(),
         refId: z.string().optional(),
+        /** « Later » se demande comme un Stop : la raison d'abord. */
+        reason: z.lazy(() => z.enum(STOP_REASONS)).optional(),
       }),
     )
     .max(300)

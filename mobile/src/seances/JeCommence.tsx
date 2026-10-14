@@ -1,9 +1,11 @@
 import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Modal, Pressable, Text, View } from 'react-native'
+import { Keyboard, Modal, Pressable, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Polygon } from 'react-native-svg'
-import { usePlan } from '@/plan/Plan'
+import { usePlan, type ReactionPlusTard } from '@/plan/Plan'
+import { RAISONS } from '@shared/planning/arrets'
+import { STOP_REASONS, type StopReason } from '@shared/schemas'
 import { enHeure } from '@/plan/lecture'
 import { A, GEIST, hm, MONO, useLumiere } from '@/ui/app-briques'
 import { FondLumiere } from '@/ui/FondLumiere'
@@ -58,14 +60,12 @@ export function JeCommence() {
   const [encours, setEncours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [feuille, setFeuille] = useState<Feuille | null>(null)
-  // « Later » / « Tomorrow » touché sur une notification : la feuille s'ouvre ici.
+  // « Later » touché sur une notification : la question s'ouvre ici.
   const demande = useDemandeReport((e) => e.demande)
   useEffect(() => {
     if (!demande || !enAttente) return
     useDemandeReport.getState().poser(null)
-    if (enAttente.kind !== 'task' && enAttente.kind !== 'objective') return
-    if (demande === 'tard' && reports.plusTardPermis(enAttente)) setFeuille({ sorte: 'tard', options: reports.optionsPlusTard(enAttente) })
-    if (demande === 'demain') setFeuille({ sorte: 'demain', apercu: reports.apercuDemain() })
+    if (reports.plusTardPermis(enAttente)) setFeuille({ e: 'raison' })
   }, [demande, enAttente, reports])
 
   // Après le souffle d'une promesse, l'overlay revient tout seul : on reprend.
@@ -80,11 +80,8 @@ export function JeCommence() {
   const plusTard = enAttente ? confiance.ancreDecalable(enAttente) : 0
   const nature = NATURE[bloc.kind] ?? NATURE.task!
   const acc = accentIntro(H)
-  // Les reports, sur un bloc pas encore commencé (jamais pour une ancre).
-  const reportable = !!enAttente && (enAttente.kind === 'task' || enAttente.kind === 'objective')
-  const plusTardOk = reportable && reports.plusTardPermis(enAttente!)
-  const ouvrirPlusTard = () => setFeuille({ sorte: 'tard', options: reports.optionsPlusTard(enAttente!) })
-  const ouvrirDemain = () => setFeuille({ sorte: 'demain', apercu: reports.apercuDemain() })
+  // « Later » : sur un bloc pas encore commencé, une fois, jamais pour une ancre.
+  const plusTardOk = !!enAttente && reports.plusTardPermis(enAttente)
 
   const valider = async () => {
     setErreur(null)
@@ -201,24 +198,32 @@ export function JeCommence() {
           <View style={{ flexDirection: 'row', gap: 8, minHeight: 48 }}>
             {souffle ? <Discret onPress={() => void confiance.souffle(enAttente!.id)}>I need 15 min</Discret> : null}
             {plusTard > 0 ? <Discret onPress={() => void confiance.decalerAncre(enAttente!)}>{`In ${plusTard} min`}</Discret> : null}
-            {plusTardOk ? <Discret onPress={ouvrirPlusTard}>Later</Discret> : null}
-            {reportable ? <Discret onPress={ouvrirDemain}>Tomorrow</Discret> : null}
+            {plusTardOk ? <Discret onPress={() => setFeuille({ e: 'raison' })}>Later</Discret> : null}
           </View>
         </View>
 
-        {feuille ? (
-          <FeuilleReport
+        {feuille && enAttente ? (
+          <FeuillePlusTard
             feuille={feuille}
+            titre={bloc.label}
             acc={acc}
             basMarge={marges.bottom}
             fermer={() => setFeuille(null)}
-            choisirPlusTard={async (o) => {
-              setFeuille(null)
-              await reports.choisirPlusTard(enAttente!, o)
+            raisonChoisie={async (raison, texte) => {
+              const r = await reports.reagir(enAttente, raison, texte)
+              setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, r })
             }}
-            reporterJournee={async () => {
+            commencer={() => {
               setFeuille(null)
-              await reports.reporterJournee()
+              void valider()
+            }}
+            choisir={async (raison, o) => {
+              setFeuille(null)
+              await reports.choisirPlusTard(enAttente, o, raison)
+            }}
+            reporterJournee={async (raison) => {
+              setFeuille(null)
+              await reports.reporterJournee(raison)
             }}
           />
         ) : null}
@@ -227,83 +232,147 @@ export function JeCommence() {
   )
 }
 
-type OptionVue = { date: string; startMinute: number; demainMinutes: number }
-type Feuille =
-  | { sorte: 'tard'; options: OptionVue[] }
-  | { sorte: 'demain'; apercu: { permis: boolean; possible: boolean; aujourdhuiMinutes: number; demainAvant: number; demainApres: number } }
+type Reaction = Extract<ReactionPlusTard, { etape: 'reaction' }>
+type Feuille = { e: 'raison' } | { e: 'reaction'; raison: StopReason; r: Reaction } | { e: 'message'; texte: string }
+
+const ligne = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, minHeight: 52, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(242,242,242,0.08)' }
+const corps = { color: A.t1, fontFamily: GEIST.normal, fontSize: 16, lineHeight: 23 } as const
+const titreFeuille = { color: A.t1, fontFamily: GEIST.demi, fontSize: 22, lineHeight: 28, letterSpacing: -0.4 } as const
 
 /**
- * Le choix d'un report, dans la même fenêtre que « Je commence » : iOS ne
- * superpose pas deux fenêtres. Chaque option montre d'abord ce que demain
- * devient — c'est ce chiffre qui doit pousser à finir aujourd'hui.
+ * « Later » se demande comme un Stop — c'est la loi de Vethos : on ne repousse
+ * pas sans dire pourquoi. La raison d'abord (un tap, un mot facultatif), puis
+ * la réaction propre à la raison et ses faits, puis les heures choisies selon
+ * elle, chacune avec ce que demain devient. « Tomorrow » n'arrive qu'en
+ * dernier, et seulement s'il tient. Dans la même fenêtre que « Je commence » :
+ * iOS ne superpose pas deux fenêtres.
  */
-function FeuilleReport({
+function FeuillePlusTard({
   feuille,
+  titre,
   acc,
   basMarge,
   fermer,
-  choisirPlusTard,
+  raisonChoisie,
+  commencer,
+  choisir,
   reporterJournee,
 }: {
   feuille: Feuille
+  titre: string
   acc: string
   basMarge: number
   fermer: () => void
-  choisirPlusTard: (o: OptionVue) => Promise<void>
-  reporterJournee: () => Promise<void>
+  raisonChoisie: (raison: StopReason, texte?: string) => Promise<void>
+  commencer: () => void
+  choisir: (raison: StopReason, o: Reaction['options'][number]) => Promise<void>
+  reporterJournee: (raison: StopReason) => Promise<void>
 }) {
-  const aujourdhui = new Date()
-  const cle = `${aujourdhui.getFullYear()}-${String(aujourdhui.getMonth() + 1).padStart(2, '0')}-${String(aujourdhui.getDate()).padStart(2, '0')}`
-  const ligne = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, minHeight: 56, paddingHorizontal: 16, borderRadius: 12, backgroundColor: 'rgba(242,242,242,0.06)' }
+  const [texte, setTexte] = useState('')
+  const [occupe, setOccupe] = useState(false)
+  const maintenant = new Date()
+  const cle = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}-${String(maintenant.getDate()).padStart(2, '0')}`
+  const agir = async (f: () => Promise<void>) => {
+    if (occupe) return
+    setOccupe(true)
+    try {
+      await f()
+    } finally {
+      setOccupe(false)
+    }
+  }
+  const quitter = () => {
+    Keyboard.dismiss()
+    fermer()
+  }
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={fermer} style={{ flex: 1 }} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={quitter} style={{ flex: 1 }} />
       <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: basMarge + 16, gap: 8 }}>
-        <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, marginBottom: 8 }}>{feuille.sorte === 'tard' ? 'Later' : 'Tomorrow'}</Text>
+        {feuille.e !== 'message' ? (
+          <Text accessibilityRole="header" style={{ ...titreFeuille, marginBottom: 4 }}>{`Push ${titre} back?`}</Text>
+        ) : null}
 
-        {feuille.sorte === 'tard' ? (
-          feuille.options.length ? (
-            feuille.options.map((o) => (
+        {feuille.e === 'raison' ? (
+          <>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {STOP_REASONS.map((r) => (
+                <Pressable
+                  key={r}
+                  accessibilityRole="button"
+                  disabled={occupe}
+                  onPress={() => {
+                    Keyboard.dismiss()
+                    void agir(() => raisonChoisie(r, texte.trim() || undefined))
+                  }}
+                  style={({ pressed }) => ({ ...ligne, width: '48.5%', opacity: pressed ? 0.7 : 1 })}
+                >
+                  <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 }}>{RAISONS[r].libelle}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput
+              value={texte}
+              onChangeText={(v) => setTexte(v.slice(0, 500))}
+              placeholder="Anything else? (optional)"
+              placeholderTextColor={A.t4}
+              accessibilityLabel="Anything else"
+              selectionColor={A.t1}
+              style={{ marginTop: 4, height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.normal, fontSize: 15 }}
+            />
+          </>
+        ) : null}
+
+        {feuille.e === 'reaction' ? (
+          <>
+            {feuille.r.lignes.map((l) => (
+              <Text key={l} accessibilityLiveRegion="polite" style={corps}>{l}</Text>
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={commencer}
+              style={({ pressed }) => ({ height: 52, marginTop: 4, borderRadius: 12, backgroundColor: acc, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            >
+              <Text style={{ color: encreSur(acc), fontFamily: GEIST.demi, fontSize: 17 }}>I’m starting</Text>
+            </Pressable>
+            {feuille.r.options.map((o) => (
               <Pressable
                 key={`${o.date}-${o.startMinute}`}
                 accessibilityRole="button"
-                onPress={() => void choisirPlusTard(o)}
+                disabled={occupe}
+                onPress={() => void agir(() => choisir(feuille.raison, o))}
                 style={({ pressed }) => ({ ...ligne, opacity: pressed ? 0.7 : 1 })}
               >
-                <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 17, fontVariant: ['tabular-nums'] }}>
+                <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 16, fontVariant: ['tabular-nums'] }}>
                   {`${o.date === cle ? 'Today' : 'Tomorrow'} ${enHeure(o.startMinute)}`}
                 </Text>
                 <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>{`Tomorrow · ${hm(o.demainMinutes)}`}</Text>
               </Pressable>
-            ))
-          ) : (
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 15 }}>No free time before the deadline.</Text>
-          )
-        ) : !feuille.apercu.permis ? (
-          <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 15 }}>Already used twice this week.</Text>
-        ) : !feuille.apercu.possible ? (
-          <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 15 }}>Doesn’t fit before the deadline.</Text>
-        ) : (
-          <>
-            <View style={ligne}>
-              <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 15 }}>Tomorrow</Text>
-              <Text style={{ color: A.t1, fontFamily: MONO.normal, fontSize: 14, fontVariant: ['tabular-nums'] }}>
-                {`${hm(feuille.apercu.demainAvant)} → `}
-                <Text style={{ color: acc }}>{hm(feuille.apercu.demainApres)}</Text>
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void reporterJournee()}
-              style={({ pressed }) => ({ height: 52, marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)', alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
-            >
-              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 17 }}>{`Move ${hm(feuille.apercu.aujourdhuiMinutes)} to tomorrow`}</Text>
-            </Pressable>
+            ))}
+            {feuille.r.journee ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={occupe}
+                onPress={() => void agir(() => reporterJournee(feuille.raison))}
+                style={({ pressed }) => ({ ...ligne, opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 15 }}>{`All of today · ${hm(feuille.r.journee.aujourdhuiMinutes)}`}</Text>
+                <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                  {`Tomorrow · ${hm(feuille.r.journee.demainAvant)} → `}
+                  <Text style={{ color: acc }}>{hm(feuille.r.journee.demainApres)}</Text>
+                </Text>
+              </Pressable>
+            ) : null}
+            {!feuille.r.options.length && !feuille.r.journee ? (
+              <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 15 }}>No free time before the deadline.</Text>
+            ) : null}
           </>
-        )}
+        ) : null}
 
-        <Pressable accessibilityRole="button" onPress={fermer} style={({ pressed }) => ({ height: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>Cancel</Text>
+        {feuille.e === 'message' ? <Text accessibilityLiveRegion="polite" style={corps}>{feuille.texte}</Text> : null}
+
+        <Pressable accessibilityRole="button" onPress={quitter} style={({ pressed }) => ({ height: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>{feuille.e === 'message' ? 'OK' : 'Cancel'}</Text>
         </Pressable>
       </View>
     </View>
