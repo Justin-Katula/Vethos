@@ -3,7 +3,7 @@
  * lumière de l'heure, le toast, la feuille qui monte, la carte arrondie.
  */
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Animated, Easing, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { accentApp, heureDecimale, lumiere, teinteApp } from './lumiere'
@@ -116,6 +116,24 @@ export function Carte({ children, style }: { children: ReactNode; style?: StyleP
 }
 
 /** Une feuille qui monte du bas, arrondie à 40, sur un voile. */
+/**
+ * La hauteur du clavier, 0 s'il est fermé. `KeyboardAvoidingView` ne déplace
+ * pas un contenu en position absolue (nos feuilles) : on la lit directement.
+ */
+export function useHauteurClavier(): number {
+  const [h, setH] = useState(0)
+  useEffect(() => {
+    const ios = Platform.OS === 'ios'
+    const ouvre = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) => setH(e.endCoordinates.height))
+    const ferme = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setH(0))
+    return () => {
+      ouvre.remove()
+      ferme.remove()
+    }
+  }, [])
+  return h
+}
+
 export function Feuille({
   ouverte,
   fermer,
@@ -130,6 +148,8 @@ export function Feuille({
   style?: StyleProp<ViewStyle>
 }) {
   const marges = useSafeAreaInsets()
+  const clavier = useHauteurClavier()
+  const { height: hauteurEcran } = useWindowDimensions()
   const p = useRef(new Animated.Value(0)).current
   const [monte, setMonte] = useState(ouverte)
   useEffect(() => {
@@ -141,7 +161,7 @@ export function Feuille({
   if (!monte) return null
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={fermer}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <View style={StyleSheet.absoluteFill} pointerEvents={ouverte ? 'auto' : 'none'}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: voile ? 'rgba(0,0,0,0.45)' : 'transparent', opacity: p }]}>
             <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={fermer} />
@@ -153,13 +173,14 @@ export function Feuille({
                 position: 'absolute',
                 left: 8,
                 right: 8,
-                bottom: Math.max(8, marges.bottom - 26),
+                // Le clavier ouvert : la feuille se pose juste au-dessus, champ et bouton visibles.
+                bottom: clavier > 0 ? clavier + 8 : Math.max(8, marges.bottom - 26),
                 borderRadius: 40,
                 backgroundColor: 'rgba(22,22,22,0.97)',
                 borderTopWidth: 1,
                 borderTopColor: 'rgba(242,242,242,0.08)',
                 paddingTop: 14,
-                maxHeight: '92%',
+                maxHeight: clavier > 0 ? hauteurEcran - clavier - marges.top - 16 : '92%',
                 transform: [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [900, 0] }) }],
               },
               style,
@@ -169,7 +190,7 @@ export function Feuille({
             {children}
           </Animated.View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }

@@ -7,7 +7,7 @@ import { usePlan, type ReactionPlusTard } from '@/plan/Plan'
 import { RAISONS } from '@shared/planning/arrets'
 import { STOP_REASONS, type StopReason } from '@shared/schemas'
 import { enHeure } from '@/plan/lecture'
-import { A, GEIST, hm, MONO, useLumiere } from '@/ui/app-briques'
+import { A, GEIST, hm, MONO, useHauteurClavier, useLumiere } from '@/ui/app-briques'
 import { FondLumiere } from '@/ui/FondLumiere'
 import { accentIntro, encreSur } from '@/ui/lumiere'
 import { useDemandeReport } from './rappels'
@@ -289,6 +289,8 @@ function FeuillePlusTard({
 }) {
   const [texte, setTexte] = useState('')
   const [occupe, setOccupe] = useState(false)
+  // Le clavier ouvert : la feuille remonte au-dessus, champ et choix visibles.
+  const clavier = useHauteurClavier()
   // Le temps de réponse : une raison tapée en moins d'une seconde ne compte que pour moitié.
   const [ouverteA] = useState(() => Date.now())
   const maintenant = new Date()
@@ -310,7 +312,7 @@ function FeuillePlusTard({
     <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
       {/* Pendant l'examen, on ne ferme pas : on répond. */}
       <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={feuille.e === 'juge'} onPress={quitter} style={{ flex: 1 }} />
-      <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: basMarge + 16, gap: 8 }}>
+      <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: (clavier > 0 ? clavier : basMarge) + 16, gap: 8 }}>
         {feuille.e === 'raison' || feuille.e === 'reaction' ? (
           <Text accessibilityRole="header" style={{ ...titreFeuille, marginBottom: 4 }}>{`Push ${titre} back?`}</Text>
         ) : null}
