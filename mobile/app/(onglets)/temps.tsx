@@ -37,12 +37,11 @@ import {
   MONO,
   Plus,
   TitrePage,
-  TRAIT,
-  TYPEC,
   useLumiere,
   useToast,
   type NatureApp,
 } from '@/ui/app-briques'
+import { traitDe } from '@/ui/couleurs-engagement'
 
 const AUJ = 6
 const ND = 13
@@ -268,7 +267,7 @@ export default function MonTemps() {
                           top={Y(a)}
                           hauteur={hb}
                           pause={hp}
-                          trait={TRAIT[n]}
+                          trait={traitDe(n, s.couleur, s.ref)}
                           bord={on ? A.t1 : vivant ? acc : null}
                           devant={on}
                           surPression={() => (vibrer(), setSel(s))}
@@ -442,7 +441,7 @@ function FeuilleSeance({
     <Feuille ouverte={!!seg} fermer={fermer} style={{ paddingHorizontal: 24, paddingBottom: 24 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TYPEC[n] }} />
+          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: traitDe(n, s.couleur, s.ref) }} />
           <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 11, letterSpacing: 1 }}>{typeL}</Text>
         </View>
         <View style={{ paddingVertical: 4, paddingHorizontal: 9, borderRadius: 6, backgroundColor: A.s1 }}>

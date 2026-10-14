@@ -20,6 +20,7 @@ import { afterMissLine, effectiveContract } from '@shared/contract'
 import { peutParler } from '@shared/coach/coach'
 import { autonomie } from '@shared/planning/habitudes'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
+import { traitDe } from '@/ui/couleurs-engagement'
 
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -138,7 +139,7 @@ export default function Aujourdhui() {
   const nxt = visibles.find((s) => s.debut > N)
   const couleurSeg = (s: SegmentTemps) => {
     const n = naturePlan(s)
-    return n ? TYPEC[n] : FIXE
+    return n ? traitDe(n, s.couleur, s.ref) : FIXE
   }
   // Après un raté : un constat en une phrase, puis la prochaine action — au
   // ton du contrat. Visible une heure et demie, puis il s'efface.
@@ -294,7 +295,7 @@ export default function Aujourdhui() {
                 ))}
                 {N > WAKE ? <Path d={arc(WAKE, Math.min(N, BED), 168)} fill="none" stroke={A.t1} strokeWidth={2} strokeOpacity={0.35} /> : null}
                 {blocs.map((b) => (
-                  <Path key={b.id} d={arc(b.debut, b.fin, 168)} fill="none" stroke={TRAIT[naturePlan(b)!]} strokeWidth={8} strokeOpacity={b.fin <= N ? 0.45 : 1} />
+                  <Path key={b.id} d={arc(b.debut, b.fin, 168)} fill="none" stroke={traitDe(naturePlan(b)!, b.couleur, b.ref)} strokeWidth={8} strokeOpacity={b.fin <= N ? 0.45 : 1} />
                 ))}
               </Svg>
               {focus
