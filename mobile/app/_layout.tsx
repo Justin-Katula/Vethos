@@ -18,6 +18,7 @@ import { useBlocage } from '@/blocage/etat'
 import { useDonnees } from '@/donnees/magasin'
 import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
+import { ZoomSeance } from '@/seances/ZoomSeance'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
@@ -118,6 +119,8 @@ function Coque() {
       {/* D.8 : au-dessus de TOUT, quel que soit l'onglet ouvert. Une question
           qu'on peut eviter en changeant d'onglet n'est pas une friction. */}
       <JeCommence />
+      {/* Revenu d'un bouclier pendant une séance : le cadran zoome sur elle. */}
+      <ZoomSeance />
       {/* Au-dessus encore : un compte neuf n'a rien derrière. */}
       <Introduction />
       {/* Puis le mur d'abonnement, une fois l'introduction faite. */}
