@@ -11,11 +11,13 @@ export type ProprietesJetons = {
   taillePolice?: number
   /** Un « × » par élément pour le retirer. */
   modifiable?: boolean
-  onChange?: (e: { nativeEvent: Comptes }) => void
+  /** Un élément retiré par son « × » : les nouveaux comptes. (Pas « onChange » : nom réservé par React Native.) */
+  onRetrait?: (e: { nativeEvent: Comptes }) => void
   style?: unknown
 }
 
 type ModuleJetons = {
+  version(): number
   compter(id: string): Comptes
   vider(id: string): void
   fusionner(cible: string, ajout: string): Comptes
@@ -28,8 +30,13 @@ const natif = (): ModuleJetons | null => (Platform.OS === 'ios' ? requireOptiona
  * null — Expo Go, le web, ou une build plus ancienne qui ne l'embarque pas.
  * L'appelant retombe alors sur les nombres.
  */
+/** La version de la vue native que ce JS attend (voir `version` côté Swift). */
+const VERSION_VUE = 2
+
 export function vueJetons(): ComponentType<ProprietesJetons> | null {
-  if (!natif()) return null
+  // Une build plus ancienne (événement « onChange », nom réservé par React
+  // Native) fait planter l'écran : on retombe alors sur les nombres.
+  if (fonction('version')?.() !== VERSION_VUE) return null
   try {
     return requireNativeViewManager<ProprietesJetons>('VethosJetons')
   } catch {

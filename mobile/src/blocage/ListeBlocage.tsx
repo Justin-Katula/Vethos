@@ -82,7 +82,7 @@ export function ListeBlocage({
               couleur={A.t1}
               taillePolice={16}
               modifiable={!verrou}
-              onChange={(e) => retire(e.nativeEvent)}
+              onRetrait={(e) => retire(e.nativeEvent)}
               style={{ width: '100%', height: hauteur }}
             />
           ) : (
