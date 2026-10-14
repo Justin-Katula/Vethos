@@ -6,6 +6,7 @@ import type {
   SeverityLevel,
   TensionWarning,
 } from './types'
+import { addDays, dayOfWeek } from './dates'
 
 // ═══ PARTIE C — TEST DE FAISABILITÉ ═══════════════════════════════════════
 
@@ -66,9 +67,7 @@ export function computeDensities(args: {
     const load = args.tasks
       .filter((t) => t.deadline <= deadline)
       .reduce((s, t) => s + t.remainingMinutes, 0)
-    const capacity = args.dailyCapacity
-      .filter((c) => c.date >= args.today && c.date <= deadline)
-      .reduce((s, c) => s + c.capacityMinutes, 0)
+    const capacity = capaciteJusqua(args.dailyCapacity, args.today, deadline)
     const density = capacity > 0 ? load / capacity : load > 0 ? Number.POSITIVE_INFINITY : 0
     return {
       deadline,
@@ -78,6 +77,27 @@ export function computeDensities(args: {
       feasible: density <= 1,
     }
   })
+}
+
+/**
+ * La capacité cumulée d'aujourd'hui à `deadline`. Au-delà des jours calculés,
+ * chaque jour manquant compte comme le même jour de la semaine déjà calculé
+ * (un samedi comme le samedi de l'horizon), à défaut à la moyenne. Sans ça, une
+ * échéance dans trois semaines n'avait que sept jours de capacité : 30 h dans
+ * 19 jours passaient pour presque pleines, 150 h pour « impossibles » à tort.
+ */
+export function capaciteJusqua(dailyCapacity: DayCapacityPoint[], today: string, deadline: string): number {
+  const dedans = dailyCapacity.filter((c) => c.date >= today)
+  let total = dedans.filter((c) => c.date <= deadline).reduce((s, c) => s + c.capacityMinutes, 0)
+  if (dedans.length === 0) return total
+  const dernier = dedans.reduce((m, c) => (c.date > m ? c.date : m), dedans[0]!.date)
+  if (deadline <= dernier) return total
+  const moyenne = dedans.reduce((s, c) => s + c.capacityMinutes, 0) / dedans.length
+  // Aujourd'hui est souvent entamé : son jour de la semaine se projette à la moyenne.
+  const parJour = new Map<number, number>()
+  for (const c of dedans) if (c.date !== today) parJour.set(dayOfWeek(c.date), c.capacityMinutes)
+  for (let d = addDays(dernier, 1); d <= deadline; d = addDays(d, 1)) total += parJour.get(dayOfWeek(d)) ?? moyenne
+  return total
 }
 
 // ─── D.2 — Vol de temps progressif entre tâche et objectif ────────────────

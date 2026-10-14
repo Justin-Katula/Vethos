@@ -28,6 +28,7 @@ import { COULEUR_TACHE } from '../palettes'
 import { isPartLocked } from './estimation'
 import {
   buildFeasibilityResult,
+  capaciteJusqua,
   computeMargin,
   postPlacementCheck,
   produceSignals,
@@ -355,15 +356,9 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // densité > 1 (C.2). Avec l'horloge, 100 h sur 10 jours semblaient laisser
   // 140 h de marge alors que la capacité n'en offrait que 106 : la crise n'était
   // presque jamais reconnue et le plafond de 40 % laissait 58 h sans créneau.
-  const capacityUntil = (deadline: string): number => {
-    let total = capacities.filter((c) => c.date <= deadline).reduce((s, c) => s + c.effectiveCapacityMinutes, 0)
-    // Une échéance au-delà de l'horizon : les jours manquants comptent à la
-    // capacité moyenne de l'horizon, comme pour la cible du jour.
-    if (deadline > input.rangeEnd && capacities.length > 0) {
-      total += (total / capacities.length) * daysBetween(input.rangeEnd, deadline)
-    }
-    return total
-  }
+  // Une échéance au-delà de l'horizon : les jours manquants comptent comme le
+  // même jour de la semaine calculé — la même règle que la faisabilité (C.2).
+  const capacityUntil = (deadline: string): number => capaciteJusqua(dailyPoints(capacities), input.today, deadline)
   const needOf = (t: TaskItem): number => floorNeedByTask.get(t.id) ?? t.remainingMinutes
   const withMargin: TaskWithMargin[] = activeTasks.map((t) => {
     const loadDueBy = activeTasks.filter((o) => o.deadline <= t.deadline).reduce((s, o) => s + needOf(o), 0)
