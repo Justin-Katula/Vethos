@@ -130,18 +130,24 @@ export default function Engagements() {
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [page, setPage] = useState<NatureApp | null>(null)
-  const [finiesOuvertes, setFiniesOuvertes] = useState(false)
+  const [historique, setHistorique] = useState(false)
   const [forme, setForme] = useState<NatureApp | null>(null)
   const defile = useRef<ScrollView>(null)
 
   const aujourdHui = dateLocale(cleDate(maintenant))
   const jours = (cle: string) => Math.round((dateLocale(cle).getTime() - aujourdHui.getTime()) / 864e5)
-  const groupes = grouper(d.taches.filter((t) => !t.terminee), fait)
+  // Une tâche dont l'échéance est passée sans être finie n'est plus « en cours » :
+  // elle part dans l'historique, marquée comme échouée.
+  const cleDuJour = cleDate(maintenant)
+  const tousLesGroupes = grouper(d.taches.filter((t) => !t.terminee), fait)
+  const groupes = tousLesGroupes.filter((g) => g.racine.echeance >= cleDuJour)
+  const echouees = tousLesGroupes.filter((g) => g.racine.echeance < cleDuJour)
   const finies = d.taches.filter((t) => t.terminee && t.parentId === null)
   const couper = <T,>(l: T[]) => (page ? l : l.slice(0, 2))
   const basculer = (id: string) => setOuvert((x) => (x === id ? null : id))
   const allerPage = (p: NatureApp | null) => {
     setPage(p)
+    setHistorique(false)
     setOuvert(null)
     defile.current?.scrollTo({ y: 0, animated: false })
   }
@@ -340,29 +346,50 @@ export default function Engagements() {
     )
   }
 
-  const finiesBloc =
-    page === 'TASK' && finies.length ? (
-      <>
-        <Pressable onPress={() => setFiniesOuvertes((v) => !v)} style={{ height: 44, borderTopWidth: 1, borderTopColor: A.ligne, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>{`${finies.length} finished`}</Text>
-          <View style={{ transform: [{ rotate: finiesOuvertes ? '180deg' : '0deg' }] }}>
-            <Chevron sens="bas" couleur={A.t4} />
+  const dateCourte = (cle: string) => {
+    const q = dateLocale(cle)
+    return `${q.getDate()} ${MOIS3[q.getMonth()]}`
+  }
+
+  /** L'historique : ce qui a échoué (bien visible), puis ce qui est fait. */
+  const pageHistorique = (
+    <View style={{ marginTop: 24, gap: 12 }}>
+      {echouees.length ? (
+        <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingBottom: 10 }}>
+            <Text accessibilityRole="header" style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Failed</Text>
+            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{echouees.length}</Text>
           </View>
-        </Pressable>
-        {finiesOuvertes
-          ? finies.map((t) => {
-              const q = dateLocale(t.echeance)
-              return (
-                <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 40 }}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: A.t4 }} />
-                  <Text numberOfLines={1} style={{ flex: 1, color: A.t4, fontFamily: GEIST.normal, fontSize: 14, textDecorationLine: 'line-through' }}>{t.titre}</Text>
-                  <Text style={{ color: A.t4, fontFamily: MONO.normal, fontSize: 11 }}>{`${q.getDate()} ${MOIS3[q.getMonth()]}`}</Text>
-                </View>
-              )
-            })
-          : null}
-      </>
-    ) : null
+          {echouees.map((g) => (
+            <View key={g.racine.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+              <View style={{ paddingHorizontal: 8, height: 22, borderRadius: 11, backgroundColor: 'rgba(240,82,95,0.16)', justifyContent: 'center' }}>
+                <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 11 }}>Failed</Text>
+              </View>
+              <Text numberOfLines={1} style={{ flex: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 15 }}>{g.racine.titre}</Text>
+              <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 11, fontVariant: ['tabular-nums'] }}>{`${hm(g.fait)} of ${hm(g.total)} · ${dateCourte(g.racine.echeance)}`}</Text>
+            </View>
+          ))}
+        </Carte>
+      ) : null}
+      <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingBottom: 10 }}>
+          <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Done</Text>
+          <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{finies.length}</Text>
+        </View>
+        {finies.length ? (
+          finies.map((t) => (
+            <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, borderTopWidth: 1, borderTopColor: A.ligne }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: A.t3 }} />
+              <Text numberOfLines={1} style={{ flex: 1, color: A.t2, fontFamily: GEIST.normal, fontSize: 15 }}>{t.titre}</Text>
+              <Text style={{ color: A.t4, fontFamily: MONO.normal, fontSize: 11 }}>{dateCourte(t.echeance)}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={{ paddingVertical: 12, color: A.t4, fontFamily: GEIST.normal, fontSize: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>Nothing finished yet.</Text>
+        )}
+      </Carte>
+    </View>
+  )
 
   // Quand la charge demandée est lourde, l'application le dit avec des chiffres :
   // ce que ça demande par jour, ou ce qui est placé et ce qui manque. Jamais un
@@ -380,7 +407,7 @@ export default function Engagements() {
   ))
 
   const sections = [
-    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', [...avis, ...couper(groupes).map(ligneTache)], finiesBloc),
+    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', [...avis, ...couper(groupes).map(ligneTache)]),
     section(
       'GOAL',
       d.objectifs.length,
@@ -399,15 +426,31 @@ export default function Engagements() {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView ref={defile} contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
-        {page ? (
+        {page || historique ? (
           <Pressable accessibilityRole="button" onPress={() => allerPage(null)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, height: 38, alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}>
             <Chevron sens="gauche" taille={14} />
             <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 16 }}>Commitments</Text>
           </Pressable>
         ) : (
-          <TitrePage>Commitments</TitrePage>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <TitrePage>Commitments</TitrePage>
+            {/* L'historique : discret, mais là. Un point rouge s'il y a un échec. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={echouees.length ? `History, ${echouees.length} failed` : 'History'}
+              onPress={() => {
+                setHistorique(true)
+                setPage(null)
+                defile.current?.scrollTo({ y: 0, animated: false })
+              }}
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: A.s, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}
+            >
+              {echouees.length ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: A.rouge }} /> : null}
+              <Text style={{ color: A.t2, fontFamily: GEIST.demi, fontSize: 13 }}>History</Text>
+            </Pressable>
+          </View>
         )}
-        {visibles}
+        {historique ? pageHistorique : visibles}
       </ScrollView>
       <Formulaire
         nature={forme}
