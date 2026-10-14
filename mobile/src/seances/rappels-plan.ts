@@ -12,6 +12,9 @@ import type { PlacedBlock } from '@shared/planning/types'
  */
 export const RAPPELS_EN_ATTENTE_MAX = 60
 
+/** Le préavis : prévenu 5 min avant l'heure. */
+export const PREAVIS_MINUTES = 5
+
 export type Rappel = {
   id: string
   blocId: string
@@ -33,6 +36,11 @@ export function rappelsAProgrammer(a: {
   const out: Rappel[] = []
   for (const b of a.blocsDuJour) {
     if (a.confirmes.has(b.id)) continue
+    // 5 min avant : prévenu, pas encore appelé.
+    const avant = a.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
+    if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
+      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b) })
+    }
     for (const m of minutesDeRappel(b)) {
       const quand = a.minuitMs + m * 60_000
       if (quand <= a.maintenantMs) continue
@@ -42,7 +50,9 @@ export function rappelsAProgrammer(a: {
         blocId: b.id,
         quand,
         titre: b.label,
-        corps: retard === 0 ? 'It’s time' : `${retard} min late`,
+        // Sans « I'm starting », rien n'a commencé : le rappel le dit, pour qu'on
+        // ne croie jamais être déjà en séance.
+        corps: retard === 0 ? 'It’s time. Not started yet — tap I’m starting.' : `${retard} min late. Not started yet — tap I’m starting.`,
         reportable: reportable(b),
       })
     }
