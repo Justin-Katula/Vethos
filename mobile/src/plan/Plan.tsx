@@ -3,6 +3,8 @@ import { AppState } from 'react-native'
 import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
+import { fusionnerAuto, memesPlages, plagesAuto } from '@/blocage/blocage-auto'
+import { selectionEstVide } from '@/blocage/contrat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
 import { decalageAncre, decalerAncre, decalageRestant, journalContextFor, overlayDueFor, recordDailyUtilization, setBlockedAttempts } from '@shared/planning/clock'
@@ -175,6 +177,32 @@ function useSourcePlan() {
     () => calcul.resultat.blocks.filter((b) => b.date === calcul.aujourdHui && b.preview !== true),
     [calcul.resultat, calcul.aujourdHui],
   )
+
+  // Le blocage commence à l'heure, sans attendre « Je commence » : chaque bloc
+  // pas encore confirmé reçoit son écart (une heure au plus), qu'iOS applique
+  // lui-même, Vethos fermé. On ne reprogramme iOS que si les plages voulues
+  // ont changé — pas à chaque minute.
+  const dernieresVoulues = useRef<string | null>(null)
+  useEffect(() => {
+    if (!prets) return
+    const b = useBlocage.getState()
+    const selection = b.selection
+    if (!selection || selectionEstVide(selection)) return
+    const confirmes = new Set(Object.keys(confirmations.confirmedAt))
+    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant })
+    const voulues = fusionnerAuto({ actives: b.plagesActives, auto, idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
+    const cle = JSON.stringify(voulues.map((p) => [p.blocId, p.debutMinute, p.finMinute]).sort())
+    if (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives)) {
+      dernieresVoulues.current = cle
+      return
+    }
+    dernieresVoulues.current = cle
+    // Le bouclier nomme le prochain bloc écarté — sauf pendant une séance, qui garde le sien.
+    const prochain = [...auto].sort((x, y) => x.debutMinute - y.debutMinute)[0]
+    const bloc = prochain && blocsDuJour.find((x) => x.id === prochain.blocId)
+    if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
+    void b.appliquerPlan(voulues)
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, theme])
 
   // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
   // la cause est écrite dans la console de Metro (données rechargées, tâches
