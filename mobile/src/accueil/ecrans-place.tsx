@@ -41,6 +41,8 @@ import {
 import { useMinuteries } from './ecrans-ecoute'
 import type { TrancheAge } from '@/donnees/regle-sommeil'
 import { toneSample, type Mode } from '@shared/contract'
+import { useBlocage } from '@/blocage/etat'
+import { ApercuSelection } from '@/blocage/ApercuSelection'
 
 export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
@@ -418,6 +420,10 @@ export function EcranProtection({
 }) {
   const verrou = ctx.e.locked
   const [occupe, setOccupe] = useState(false)
+  const [sansCategorie, setSansCategorie] = useState(false)
+  // La vraie sélection, dessinée par iOS, remplace l'illustration une fois choisie.
+  const selection = useBlocage((b) => b.selection)
+  const simule = useBlocage((b) => b.simule)
   const pill = useVers(verrou ? 1 : 0, 420, SORTIE, 500)
   let n = 0
   const verrouiller = async () => {
@@ -425,6 +431,15 @@ export function EcranProtection({
     setOccupe(true)
     try {
       if (await proteger()) {
+        // Les catégories entières (Social, Games, Entertainment) d'abord : elles
+        // couvrent aussi les apps installées plus tard. Vethos ne voit que leur
+        // nombre — il redemande s'il n'y en a aucune.
+        const s = useBlocage.getState().selection
+        if (!useBlocage.getState().simule && (!s || s.nbCategories === 0)) {
+          setSansCategorie(true)
+          return
+        }
+        setSansCategorie(false)
         vibrer('medium')
         ctx.maj(() => ({ locked: true }))
       }
@@ -438,6 +453,18 @@ export function EcranProtection({
         <Entree dl={150} reduit={ctx.reduit}>
           <Titre>Give it your undivided attention.</Titre>
         </Entree>
+        {!verrou ? (
+          <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
+            <Text style={{ color: sansCategorie ? C.t1 : C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
+              {sansCategorie ? 'Pick at least one whole category.' : 'Tap Social, Games and Entertainment.'}
+            </Text>
+          </Entree>
+        ) : null}
+        {verrou && selection && !simule ? (
+          <Entree dl={200} reduit={ctx.reduit} style={{ marginTop: 28 }}>
+            <ApercuSelection selection={selection} couleur={C.t1} taillePolice={17} maxLignes={9} />
+          </Entree>
+        ) : (
         <Entree dl={370} reduit={ctx.reduit} style={{ alignSelf: 'center', marginTop: 28 }}>
           <View
             accessible
@@ -494,6 +521,7 @@ export function EcranProtection({
             </View>
           </View>
         </Entree>
+        )}
       </View>
       <Entree dl={600} reduit={ctx.reduit} style={{ position: 'absolute', left: 24, right: 24, bottom: ctx.bas, gap: 4 }}>
         <Bouton

@@ -1,4 +1,6 @@
 /** Blocking, dans la forme de la maquette. iOS ne donne que des jetons opaques : on montre les vrais compteurs. */
+import { ApercuSelection } from '@/blocage/ApercuSelection'
+import { vueJetons } from '../../modules/vethos-jetons'
 import { useState } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -60,6 +62,7 @@ export default function Blocage() {
       ]
     : []
   const total = selection ? selection.nbApplications + selection.nbCategories + selection.nbSitesWeb : 0
+  const apercuNatif = vueJetons() !== null
 
   return (
     <ScrollView contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
@@ -85,7 +88,13 @@ export default function Blocage() {
             </View>
           ) : (
             <View style={{ borderTopWidth: 1, borderTopColor: A.ligne }}>
-              {chiffres.map(([k, v], i) => (
+              {/* Les vrais noms et icônes, dessinés par iOS ; sans la vue native, les nombres. */}
+              {apercuNatif && !simule ? (
+                <View style={{ paddingTop: 14, paddingBottom: 4 }}>
+                  <ApercuSelection selection={selection!} couleur={A.t1} taillePolice={16} />
+                </View>
+              ) : null}
+              {(apercuNatif && !simule ? [] : chiffres).map(([k, v], i) => (
                 <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: A.ligne }}>
                   <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center' }}>
                     <Cadenas taille={14} couleur={v ? A.t1 : A.t4} />

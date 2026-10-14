@@ -1,0 +1,8 @@
+{
+  "name": "vethos-jetons",
+  "version": "0.1.0",
+  "description": "Affiche, dans l'interface de Vethos, les apps et catégories écartées — dessinées par iOS, jamais lues par l'app.",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "index.ts"
+}

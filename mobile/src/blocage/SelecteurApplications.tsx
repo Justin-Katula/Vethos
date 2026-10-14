@@ -60,8 +60,8 @@ export type RoleSelecteur = 'ecarte' | 'garde' | 'urgence'
 const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied: string }> = {
   ecarte: {
     identifiant: IDENTIFIANT_SELECTION,
-    entete: 'What Vethos sets aside during a session',
-    pied: 'Vethos only sees the count. Not the names, not the icons.',
+    entete: 'Tap Social, Games and Entertainment',
+    pied: 'Whole categories include the apps you install later. Vethos never reads the names — iOS draws them.',
   },
   garde: {
     identifiant: IDENTIFIANT_GARDEE,
