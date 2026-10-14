@@ -37,11 +37,21 @@ export function vueJetons(): ComponentType<ProprietesJetons> | null {
   }
 }
 
+/**
+ * Une fonction du module, ou null — une build plus ancienne peut embarquer le
+ * module SANS cette fonction (le JS arrive par Metro, le natif par EAS).
+ */
+function fonction<K extends keyof ModuleJetons>(nom: K): ModuleJetons[K] | null {
+  const m = natif()
+  return m && typeof m[nom] === 'function' ? ((m[nom] as (...a: unknown[]) => unknown).bind(m) as ModuleJetons[K]) : null
+}
+
 /** Les opérations sur les sélections rangées (null sans le module). */
 export const jetons = {
-  disponible: () => natif() !== null,
-  compter: (id: string) => natif()?.compter(id) ?? null,
-  vider: (id: string) => natif()?.vider(id),
+  /** Le « + » qui n'ajoute que a besoin des trois. */
+  disponible: () => fonction('compter') !== null && fonction('vider') !== null && fonction('fusionner') !== null,
+  compter: (id: string) => fonction('compter')?.(id) ?? null,
+  vider: (id: string) => void fonction('vider')?.(id),
   /** Ajoute `ajout` à `cible` (et vide `ajout`) : « + » n'ajoute que. */
-  fusionner: (cible: string, ajout: string) => natif()?.fusionner(cible, ajout) ?? null,
+  fusionner: (cible: string, ajout: string) => fonction('fusionner')?.(cible, ajout) ?? null,
 }

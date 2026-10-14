@@ -512,7 +512,7 @@ export default function Aujourdhui() {
     const vide = (t: string, b: string, cta: string) => (
       <View style={{ borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(242,242,242,0.16)', paddingVertical: 18, paddingHorizontal: 16, alignItems: 'center', gap: 6 }}>
         <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 15 }}>{t}</Text>
-        <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18, textAlign: 'center' }}>{b}</Text>
+        {b ? <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18, textAlign: 'center' }}>{b}</Text> : null}
         <Pressable accessibilityRole="button" onPress={() => router.navigate('/engagements')} style={{ marginTop: 8, height: 40, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(242,242,242,0.2)', justifyContent: 'center' }}>
           <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 14 }}>{cta}</Text>
         </Pressable>
@@ -543,7 +543,7 @@ export default function Aujourdhui() {
               <View style={{ gap: 4 }}>{goals.map((g) => ligne(`${g.nom} · ${g.n} times a week`, `${g.n * WK} sessions`))}</View>
             </View>
           ) : (
-            vide('No long-term goal declared', 'A goal has no deadline: it is a steady quota — 4 h of guitar or 5 h of coding a week, say.', 'Set my first goal')
+            vide('No long-term goal declared', '', 'Set my first goal')
           )}
           {nt ? (
             <View style={carte}>

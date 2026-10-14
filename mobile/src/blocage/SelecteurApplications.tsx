@@ -62,17 +62,17 @@ const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied:
   ecarte: {
     identifiant: IDENTIFIANT_SELECTION,
     entete: 'Tap Social, Games and Entertainment',
-    pied: 'Whole categories include the apps you install later. Vethos never reads the names — iOS draws them.',
+    pied: '',
   },
   garde: {
     identifiant: IDENTIFIANT_GARDEE,
     entete: 'Always allowed',
-    pied: 'Never blocked, even in deep focus. Keep Vethos itself here, or you will have to lift from iOS Settings.',
+    pied: '',
   },
   jamais: {
     identifiant: IDENTIFIANT_JAMAIS,
     entete: 'Never allowed',
-    pied: 'Blocked all the time, session or not.',
+    pied: '',
   },
   urgence: {
     identifiant: IDENTIFIANT_URGENCE,
