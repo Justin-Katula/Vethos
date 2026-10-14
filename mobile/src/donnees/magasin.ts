@@ -145,6 +145,12 @@ export const ReglagesSchema = z.object({
   sombreDes: z.string().default('19:00'),
   /** Le premier lancement a-t-il ete fait ? Relançable depuis les reglages. */
   introductionFaite: z.boolean().default(false),
+  /**
+   * L'accord pour que l'IA examine les demandes de Stop et de Later (règle
+   * 5.1.2 d'Apple : permission explicite avant d'envoyer des données à une IA
+   * tierce). Sans accord : les règles fixes. Changeable dans Profil.
+   */
+  consentementIA: z.enum(['oui', 'non']).nullish(),
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
   lever: z.string().default('07:00'),

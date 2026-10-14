@@ -418,6 +418,31 @@ export const LearningStateSchema = z.object({
     .max(300)
     .optional(),
   /**
+   * Chaque demande de Stop ou de Later jugée (`./planning/justification`) :
+   * la raison, le texte, les réponses aux questions, le verdict. Le juge relit
+   * les 30 derniers jours pour y chercher des incohérences.
+   */
+  justifications: z
+    .array(
+      z.object({
+        date: z.string().regex(DATE_REGEX),
+        sorte: z.enum(['stop', 'later']),
+        blockId: z.string(),
+        reason: z.lazy(() => z.enum(STOP_REASONS)),
+        text: z.string().max(500),
+        answers: z.array(z.string().max(500)).max(5).default([]),
+        verdict: z.enum(['accepte', 'refuse']),
+        /** Refusé pour une incohérence citée. */
+        incoherence: z.boolean().default(false),
+        /** Jugé par les règles fixes (sans internet, ou sans accord pour l'IA). */
+        rules: z.boolean().default(false),
+        /** Refusé, puis la séance a été tenue quand même : la confiance l'a compté. */
+        rewarded: z.boolean().default(false),
+      }),
+    )
+    .max(300)
+    .optional(),
+  /**
    * La version idéale de chaque tâche (et de chaque objectif, par semaine) :
    * le plan figé la première fois qu'il la place, avant tout pli. `base` : le
    * travail déjà fait à ce moment ; `points` : le cumul prévu jour par jour.

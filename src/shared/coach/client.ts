@@ -7,6 +7,7 @@
 
 import { detecteDetresse, filtrerReponse, MESSAGE_AIDE } from './garde-fous'
 import type { DemandeCoach } from './prompt'
+import type { DemandeArbitre } from './arbitre'
 
 /** Une réponse du Coach, et la signature du serveur qui l'accompagne (pour la renvoyer dans la conversation). */
 export type Tour = { texte: string; sig?: string }
@@ -17,7 +18,18 @@ export type ClientCoach = {
   converser: (d: DemandeCoach) => Promise<Tour | null>
   /** Le texte seul. */
   demander: (d: DemandeCoach) => Promise<string | null>
+  /**
+   * Le juge d'un Stop ou d'un Later. Ne lève jamais : hors ligne, serveur
+   * muet ou plafond atteint → `indecis`, et l'app applique ses règles fixes.
+   */
+  arbitrer: (d: DemandeArbitre) => Promise<ReponseArbitre>
 }
+
+export type ReponseArbitre =
+  | { action: 'question'; question: string; sig: string }
+  | { action: 'decision'; decision: 'accepte' | 'refuse'; incoherence: { a: string; b: string } | null }
+  | { action: 'aide'; message: string }
+  | { action: 'indecis' }
 
 export function creerClientCoach(args: {
   url: string | null | undefined
@@ -25,18 +37,20 @@ export function creerClientCoach(args: {
   ecrireJeton: (jeton: string | null) => Promise<void>
   fetchImpl?: typeof fetch
   delaiMs?: number
+  /** La session du compte, pour le plafond par compte du juge. */
+  session?: () => Promise<string | null>
 }): ClientCoach {
   const base = args.url?.replace(/\/+$/, '') ?? ''
   const f = args.fetchImpl ?? fetch
-  if (!base) return { disponible: false, converser: async () => null, demander: async () => null }
+  if (!base) return { disponible: false, converser: async () => null, demander: async () => null, arbitrer: async () => ({ action: 'indecis' }) }
 
-  const appeler = async (chemin: string, corps: unknown, jeton?: string) => {
+  const appeler = async (chemin: string, corps: unknown, jeton?: string, entetes: Record<string, string> = {}) => {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), args.delaiMs ?? 20_000)
     try {
       return await f(`${base}${chemin}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}), ...entetes },
         body: JSON.stringify(corps),
         signal: ctrl.signal,
       })
@@ -90,9 +104,38 @@ export function creerClientCoach(args: {
     }
   }
 
+  const arbitrer = async (d: DemandeArbitre): Promise<ReponseArbitre> => {
+    if ([d.texte, ...d.echanges.map((e) => e.reponse)].some((t) => detecteDetresse(t))) return { action: 'aide', message: MESSAGE_AIDE }
+    try {
+      const session = (await args.session?.().catch(() => null)) ?? null
+      const entetes: Record<string, string> = session ? { 'x-vethos-session': session } : {}
+      let j = await jeton()
+      if (!j) return { action: 'indecis' }
+      let r = await appeler('/v1/arbitre', d, j, entetes)
+      if (r.status === 401) {
+        await args.ecrireJeton(null)
+        j = await jeton(true)
+        if (!j) return { action: 'indecis' }
+        r = await appeler('/v1/arbitre', d, j, entetes)
+      }
+      if (!r.ok) return { action: 'indecis' }
+      const c = (await r.json()) as Record<string, unknown>
+      if (c.action === 'question' && typeof c.question === 'string' && typeof c.sig === 'string') return { action: 'question', question: c.question, sig: c.sig }
+      if (c.action === 'decision' && (c.decision === 'accepte' || c.decision === 'refuse')) {
+        const i = c.incoherence as { a?: unknown; b?: unknown } | null | undefined
+        return { action: 'decision', decision: c.decision, incoherence: i && typeof i.a === 'string' && typeof i.b === 'string' ? { a: i.a, b: i.b } : null }
+      }
+      if (c.action === 'aide' && typeof c.message === 'string') return { action: 'aide', message: c.message }
+      return { action: 'indecis' }
+    } catch {
+      return { action: 'indecis' }
+    }
+  }
+
   return {
     disponible: true,
     converser,
     demander: async (d) => (await converser(d))?.texte ?? null,
+    arbitrer,
   }
 }

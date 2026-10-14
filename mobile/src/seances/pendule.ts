@@ -15,6 +15,7 @@ import {
 } from '@shared/planning/clock'
 import { activeConfirmedSession } from '@shared/planning/session'
 import { promesseDuBloc, retourDuSouffleAvant, ticConfiance } from '@shared/planning/trust'
+import { recompenserRefus } from '@shared/planning/justification'
 import type { PlacedBlock } from '@shared/planning/types'
 import type { LearningState, SessionConfirmationsState, StopReason } from '@shared/schemas'
 import { versTachesMoteur } from '@/plan/moteur'
@@ -261,6 +262,13 @@ export function tictac(args: {
   if (t.change) {
     apprentissage = t.learning
     confirmations = t.confirmations
+    change = true
+  }
+
+  // Refusé, puis tenu quand même : la confiance monte un peu.
+  const recompense = recompenserRefus(apprentissage, confirmations, confirmations.date)
+  if (recompense !== apprentissage) {
+    apprentissage = recompense
     change = true
   }
 

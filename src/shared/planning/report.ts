@@ -51,9 +51,11 @@ export function minutesDeRappel(bloc: Pick<PlacedBlock, 'startMinute' | 'endMinu
 const reports = (l: Pick<LearningState, 'postponements'>) => l.postponements ?? []
 
 /** « Later » est-il encore permis pour ce bloc ? Une fois par séance : une séance déjà reportée ne se reporte plus. */
-export function plusTardPermis(l: Pick<LearningState, 'postponements'>, bloc: Pick<PlacedBlock, 'id' | 'kind'>): boolean {
+export function plusTardPermis(l: Pick<LearningState, 'postponements' | 'justifications'>, bloc: Pick<PlacedBlock, 'id' | 'kind'>): boolean {
   if (!reportable(bloc)) return false
   if (bloc.id.startsWith('promesse-report-')) return false
+  // Refusé une fois : c'est réglé pour cette séance — pas de seconde chance à tirer au sort.
+  if ((l.justifications ?? []).some((j) => j.blockId === bloc.id && j.verdict === 'refuse')) return false
   return !reports(l).some((r) => r.kind === 'later' && r.blockId === bloc.id)
 }
 

@@ -7,6 +7,8 @@ import { A, BoutonBlanc, Feuille, fmt, GEIST, hm, MONO } from '@/ui/app-briques'
 import { SelecteurApplications } from '@/blocage/SelecteurApplications'
 import { URGENCE_APPS_MAX, type OptionRattrapage } from '@shared/planning/trust'
 import { vibrer } from '@/accueil/briques-introduction'
+import { texteSuffisant } from '@shared/planning/report'
+import { Juge } from './Juge'
 
 const pilule = (pressed: boolean) => ({
   height: 32,
@@ -20,6 +22,7 @@ const pilule = (pressed: boolean) => ({
 type Etape =
   | { e: 'ferme' }
   | { e: 'raison' }
+  | { e: 'juge'; raison: StopReason }
   | { e: 'reaction'; raison: StopReason; lignes: string[]; dixMinutes: boolean; attenteMinutes: number }
   | { e: 'message'; texte: string }
   | { e: 'urgence'; options: OptionRattrapage[]; minutes: number }
@@ -51,7 +54,7 @@ const corps = { color: A.t1, fontFamily: GEIST.normal, fontSize: 16, lineHeight:
  * du rattrapage survit à la fin de la séance.
  */
 export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: string; pilule?: boolean }) {
-  const { arreter, enProlongation, confiance, aujourdHui } = usePlan()
+  const { arreter, enProlongation, confiance, aujourdHui, justification } = usePlan()
   const [etape, setEtape] = useState<Etape>({ e: 'ferme' })
   const [texte, setTexte] = useState('')
   const [occupe, setOccupe] = useState(false)
@@ -74,9 +77,17 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
     setRefus(null)
   }
 
-  const raisonChoisie = async (raison: StopReason) => {
-    if (occupe) return
+  // La raison mène d'abord au juge : il faut s'expliquer, puis répondre.
+  const raisonChoisie = (raison: StopReason) => {
+    if (occupe || !texteSuffisant(texte)) return
     vibrer('medium')
+    Keyboard.dismiss()
+    setEtape({ e: 'juge', raison })
+  }
+
+  // Accepté par le juge : la suite habituelle du Stop.
+  const apresJuge = async (raison: StopReason) => {
+    if (occupe) return
     setOccupe(true)
     try {
       // L'urgence n'attend pas — sauf quand elle est devenue trop fréquente.
@@ -140,6 +151,8 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
     // Dans la prolongation, le bloc prévu est fait : « Stop » est la fin.
     if (enProlongation) return void arreter(null)
     if (!confiance.stopPermis) return setEtape({ e: 'pause' })
+    const bloc = justification.blocDe('stop')
+    if (bloc && justification.refusePour(bloc.id)) return setEtape({ e: 'message', texte: 'Keep going.' })
     setEtape({ e: 'raison' })
   }
 
@@ -214,34 +227,62 @@ export function ArretSeance({ titre, pilule: montrerPilule = true }: { titre: st
       </Feuille>
 
       {/* Fermer la question « Stop ? », c'est continuer. */}
-      <Feuille ouverte={etape.e !== 'ferme'} fermer={etape.e === 'reaction' ? () => (void confiance.continuer(), fermer()) : fermer} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+      <Feuille
+        ouverte={etape.e !== 'ferme'}
+        fermer={etape.e === 'juge' ? () => undefined : etape.e === 'reaction' ? () => (void confiance.continuer(), fermer()) : fermer}
+        style={{ paddingHorizontal: 20, paddingBottom: 24 }}
+      >
         {etape.e === 'raison' ? (
           <>
             <Text accessibilityRole="header" style={titreFeuille}>{`Stop ${titre}?`}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            <TextInput
+              value={texte}
+              onChangeText={(v) => setTexte(v.slice(0, 500))}
+              placeholder="What happened?"
+              placeholderTextColor={A.t4}
+              accessibilityLabel="What happened"
+              selectionColor={A.t1}
+              multiline
+              style={{ minHeight: 72, maxHeight: 140, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, color: A.t1, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21, textAlignVertical: 'top' }}
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, opacity: texteSuffisant(texte) ? 1 : 0.35 }}>
               {STOP_REASONS.map((r) => (
                 <Pressable
                   key={r}
                   accessibilityRole="button"
-                  disabled={occupe}
-                  onPress={() => void raisonChoisie(r)}
+                  disabled={occupe || !texteSuffisant(texte)}
+                  onPress={() => raisonChoisie(r)}
                   style={({ pressed }) => ({ ...ligne(pressed), width: '48.5%' })}
                 >
                   <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 }}>{RAISONS[r].libelle}</Text>
                 </Pressable>
               ))}
             </View>
-            <TextInput
-              value={texte}
-              onChangeText={(v) => setTexte(v.slice(0, 500))}
-              placeholder="Anything else? (optional)"
-              placeholderTextColor={A.t4}
-              accessibilityLabel="Anything else"
-              selectionColor={A.t1}
-              style={{ marginTop: 12, height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.normal, fontSize: 15 }}
-            />
           </>
         ) : null}
+
+        {etape.e === 'juge'
+          ? (() => {
+              const bloc = justification.blocDe('stop')
+              if (!bloc) return null
+              return (
+                <Juge
+                  sorte="stop"
+                  bloc={bloc}
+                  raison={etape.raison}
+                  texte={texte.trim()}
+                  acc={A.t1}
+                  encre="#000"
+                  onAccepte={() => void apresJuge(etape.raison)}
+                  onRefuse={() => {
+                    void confiance.continuer()
+                    fermer()
+                  }}
+                  onAide={(message) => setEtape({ e: 'message', texte: message })}
+                />
+              )
+            })()
+          : null}
 
         {etape.e === 'reaction' ? (
           <View style={{ gap: 12 }}>

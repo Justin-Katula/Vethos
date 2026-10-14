@@ -2,6 +2,7 @@ import Constants from 'expo-constants'
 import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
 import { creerClientCoach, type ClientCoach } from '@shared/coach/client'
+import { supabase } from '@/compte/supabase'
 
 /**
  * Le Coach, côté téléphone. L'adresse du serveur vient de `extra.coachUrl`
@@ -27,7 +28,13 @@ let client: ClientCoach | null = null
 export function coach(): ClientCoach {
   if (!client) {
     const url = (Constants.expoConfig?.extra as { coachUrl?: string } | undefined)?.coachUrl
-    client = creerClientCoach({ url, lireJeton: lire, ecrireJeton: ecrire })
+    client = creerClientCoach({
+      url,
+      lireJeton: lire,
+      ecrireJeton: ecrire,
+      // La session du compte : le juge plafonne par compte, pas seulement par appareil.
+      session: async () => (await supabase()?.auth.getSession())?.data.session?.access_token ?? null,
+    })
   }
   return client
 }

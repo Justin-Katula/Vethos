@@ -63,7 +63,10 @@ import {
   type OptionPlusTard,
 } from '@shared/planning/report'
 import { creerPromesses, echeanceDe, empreinteRattrapage, reactionRaison, type Placement } from '@shared/planning/trust'
-import { addDays as ajouterJours } from '@shared/planning/dates'
+import { addDays as ajouterJours, daysBetween } from '@shared/planning/dates'
+import { coach } from '@/coach/client'
+import type { ReponseArbitre } from '@shared/coach/client'
+import { exclureDuTravail, historiquePourJuge, noterJustification, reglesFixes } from '@shared/planning/justification'
 import { lireSemaine, seancesTenues } from './lecture'
 import { liberationsDuJour } from './bonus-tache'
 
@@ -851,6 +854,98 @@ function useSourcePlan() {
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt)))
         await blocage().appliquerPlan(plages)
+      },
+    },
+    /**
+     * Le juge d'un Stop ou d'un Later (`@shared/coach/arbitre`) : 2 à 5
+     * questions, puis accepté ou refusé. Sans accord pour l'IA, hors ligne ou
+     * sans réponse : les règles fixes.
+     */
+    justification: {
+      /** Déjà refusé pour ce bloc : pas de seconde demande pendant la même séance. */
+      refusePour: (blockId: string) => (apprentissage.justifications ?? []).some((j) => j.blockId === blockId && j.verdict === 'refuse'),
+      /** L'accord pour l'IA : 'oui', 'non', ou null (pas encore demandé). */
+      consentement: reglages.consentementIA ?? null,
+      consentir: (oui: boolean) => majReglages({ consentementIA: oui ? 'oui' : 'non' }),
+      /** Le bloc concerné : celui qui attend « Je commence » (Later), ou la séance en cours (Stop). */
+      blocDe: (sorte: 'stop' | 'later', attente?: BlocReportable & { startMinute: number }) => {
+        if (sorte === 'later') return attente ?? null
+        const o = useSeances.getState().confirmations.observedPending
+        if (!o) return null
+        const b = calcul.resultat.blocks.find((x) => x.id === o.blockId)
+        return { id: o.blockId, kind: o.kind, refId: o.refId, label: b?.label ?? '', startMinute: o.startMinute, workMinutes: o.workMinutes ?? o.endMinute - o.startMinute }
+      },
+      juger: async (a: {
+        sorte: 'stop' | 'later'
+        bloc: BlocReportable & { startMinute: number }
+        raison: StopReason
+        texte: string
+        echanges: { question: string; sig: string; reponse: string }[]
+      }): Promise<ReponseArbitre> => {
+        if (reglages.consentementIA !== 'oui') return { action: 'indecis' }
+        if (a.bloc.kind !== 'task' && a.bloc.kind !== 'objective') return { action: 'indecis' }
+        const frais = useSeances.getState()
+        const aujourdHui = cleDate(new Date())
+        const confirmeA = frais.confirmations.confirmedAt[a.bloc.id]
+        const tache = tacheEnCours(a.bloc)
+        return coach().arbitrer({
+          sorte: a.sorte,
+          raison: a.raison,
+          texte: a.texte.slice(0, 500),
+          echanges: a.echanges,
+          confiance: niveau,
+          faits: {
+            titre: a.bloc.label.slice(0, 80),
+            nature: a.bloc.kind,
+            heure: `${String(Math.floor(a.bloc.startMinute / 60) % 24).padStart(2, '0')}:${String(a.bloc.startMinute % 60).padStart(2, '0')}`,
+            minutesPrevues: Math.max(0, Math.min(1440, a.bloc.workMinutes)),
+            minutesTenues: a.sorte === 'stop' && confirmeA ? Math.max(0, Math.min(1440, Math.round((Date.now() - confirmeA) / 60_000))) : 0,
+            tentativesApps: Math.min(500, tentativesRecentes(confirmeA)),
+            echeanceJours: tache ? Math.max(0, daysBetween(aujourdHui, tache.echeance)) : null,
+          },
+          historique: historiquePourJuge(frais.apprentissage, aujourdHui),
+        })
+      },
+      /** Les règles fixes : quelques mots ET une confiance d'au moins 2. */
+      regles: (texte: string) => reglesFixes({ texte, niveau }),
+      /**
+       * La décision est rendue : elle entre au journal des justifications (le
+       * juge la relira), une incohérence citée fait baisser la confiance, et
+       * pendant une séance le temps passé à se justifier ne compte pas.
+       */
+      conclure: async (a: {
+        sorte: 'stop' | 'later'
+        bloc: BlocReportable & { startMinute: number }
+        raison: StopReason
+        texte: string
+        reponses: string[]
+        verdict: 'accepte' | 'refuse'
+        incoherence: boolean
+        regles: boolean
+        depuisMs: number
+      }) => {
+        const frais = useSeances.getState()
+        const aujourdHui = cleDate(new Date())
+        let c = frais.confirmations
+        if (a.sorte === 'stop' && a.bloc.id in c.confirmedAt) {
+          const debut = new Date(a.depuisMs)
+          const fin = new Date()
+          c = exclureDuTravail(c, debut.getHours() * 60 + debut.getMinutes(), fin.getHours() * 60 + fin.getMinutes() + 1)
+        }
+        await poser({
+          apprentissage: noterJustification(frais.apprentissage, {
+            date: aujourdHui,
+            sorte: a.sorte,
+            blockId: a.bloc.id,
+            reason: a.raison,
+            text: a.texte.slice(0, 500),
+            answers: a.reponses.map((r) => r.slice(0, 500)).slice(0, 5),
+            verdict: a.verdict,
+            incoherence: a.incoherence,
+            rules: a.regles,
+          }),
+          confirmations: c,
+        })
       },
     },
     /** Les séances faites un jour passé, relues du journal. */

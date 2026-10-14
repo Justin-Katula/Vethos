@@ -11,6 +11,8 @@ import { A, GEIST, hm, MONO, useLumiere } from '@/ui/app-briques'
 import { FondLumiere } from '@/ui/FondLumiere'
 import { accentIntro, encreSur } from '@/ui/lumiere'
 import { useDemandeReport } from './rappels'
+import { Juge } from './Juge'
+import { texteSuffisant } from '@shared/planning/report'
 
 /**
  * « Je commence » — D.7/D.8.
@@ -205,10 +207,13 @@ export function JeCommence() {
         {feuille && enAttente ? (
           <FeuillePlusTard
             feuille={feuille}
+            bloc={enAttente}
+            changer={setFeuille}
             titre={bloc.label}
             acc={acc}
             basMarge={marges.bottom}
             fermer={() => setFeuille(null)}
+            onAide={(message) => setFeuille({ e: 'message', texte: message })}
             raisonChoisie={async (raison, texte, reponseMs) => {
               const r = await reports.reagir(enAttente, raison, texte)
               setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, texte: texte ?? '', reponseMs, r })
@@ -237,7 +242,11 @@ export function JeCommence() {
 
 type Reaction = Extract<ReactionPlusTard, { etape: 'reaction' }>
 type EnReaction = { e: 'reaction'; raison: StopReason; texte: string; reponseMs?: number; r: Reaction }
-type Feuille = { e: 'raison' } | EnReaction | { e: 'message'; texte: string }
+type Feuille =
+  | { e: 'raison' }
+  | { e: 'juge'; raison: StopReason; texte: string; reponseMs: number }
+  | EnReaction
+  | { e: 'message'; texte: string }
 
 const ligne = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, minHeight: 52, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(242,242,242,0.08)' }
 const corps = { color: A.t1, fontFamily: GEIST.normal, fontSize: 16, lineHeight: 23 } as const
@@ -253,6 +262,9 @@ const titreFeuille = { color: A.t1, fontFamily: GEIST.demi, fontSize: 22, lineHe
  */
 function FeuillePlusTard({
   feuille,
+  bloc,
+  changer,
+  onAide,
   titre,
   acc,
   basMarge,
@@ -263,6 +275,9 @@ function FeuillePlusTard({
   reporterJournee,
 }: {
   feuille: Feuille
+  bloc: { id: string; kind: string; refId: string; label: string; startMinute: number; workMinutes: number }
+  changer: (f: Feuille) => void
+  onAide: (message: string) => void
   titre: string
   acc: string
   basMarge: number
@@ -293,30 +308,15 @@ function FeuillePlusTard({
   }
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={quitter} style={{ flex: 1 }} />
+      {/* Pendant l'examen, on ne ferme pas : on répond. */}
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={feuille.e === 'juge'} onPress={quitter} style={{ flex: 1 }} />
       <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: basMarge + 16, gap: 8 }}>
-        {feuille.e !== 'message' ? (
+        {feuille.e === 'raison' || feuille.e === 'reaction' ? (
           <Text accessibilityRole="header" style={{ ...titreFeuille, marginBottom: 4 }}>{`Push ${titre} back?`}</Text>
         ) : null}
 
         {feuille.e === 'raison' ? (
           <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {STOP_REASONS.map((r) => (
-                <Pressable
-                  key={r}
-                  accessibilityRole="button"
-                  disabled={occupe}
-                  onPress={() => {
-                    Keyboard.dismiss()
-                    void agir(() => raisonChoisie(r, texte.trim() || undefined, Date.now() - ouverteA))
-                  }}
-                  style={({ pressed }) => ({ ...ligne, width: '48.5%', opacity: pressed ? 0.7 : 1 })}
-                >
-                  <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 }}>{RAISONS[r].libelle}</Text>
-                </Pressable>
-              ))}
-            </View>
             <TextInput
               value={texte}
               onChangeText={(v) => setTexte(v.slice(0, 500))}
@@ -324,9 +324,40 @@ function FeuillePlusTard({
               placeholderTextColor={A.t4}
               accessibilityLabel="What happened"
               selectionColor={A.t1}
-              style={{ marginTop: 4, height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.normal, fontSize: 15 }}
+              multiline
+              style={{ minHeight: 72, maxHeight: 140, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, color: A.t1, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21, textAlignVertical: 'top' }}
             />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, opacity: texteSuffisant(texte) ? 1 : 0.35 }}>
+              {STOP_REASONS.map((r) => (
+                <Pressable
+                  key={r}
+                  accessibilityRole="button"
+                  disabled={occupe || !texteSuffisant(texte)}
+                  onPress={() => {
+                    Keyboard.dismiss()
+                    changer({ e: 'juge', raison: r, texte: texte.trim(), reponseMs: Date.now() - ouverteA })
+                  }}
+                  style={({ pressed }) => ({ ...ligne, width: '48.5%', opacity: pressed ? 0.7 : 1 })}
+                >
+                  <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 }}>{RAISONS[r].libelle}</Text>
+                </Pressable>
+              ))}
+            </View>
           </>
+        ) : null}
+
+        {feuille.e === 'juge' ? (
+          <Juge
+            sorte="later"
+            bloc={bloc}
+            raison={feuille.raison}
+            texte={feuille.texte}
+            acc={acc}
+            encre={encreSur(acc)}
+            onAccepte={() => void agir(() => raisonChoisie(feuille.raison, feuille.texte, feuille.reponseMs))}
+            onRefuse={() => void commencer(false)}
+            onAide={onAide}
+          />
         ) : null}
 
         {feuille.e === 'reaction' ? (
@@ -377,9 +408,11 @@ function FeuillePlusTard({
 
         {feuille.e === 'message' ? <Text accessibilityLiveRegion="polite" style={corps}>{feuille.texte}</Text> : null}
 
-        <Pressable accessibilityRole="button" onPress={quitter} style={({ pressed }) => ({ height: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>{feuille.e === 'message' ? 'OK' : 'Cancel'}</Text>
-        </Pressable>
+        {feuille.e !== 'juge' ? (
+          <Pressable accessibilityRole="button" onPress={quitter} style={({ pressed }) => ({ height: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+            <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>{feuille.e === 'message' ? 'OK' : 'Cancel'}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   )
