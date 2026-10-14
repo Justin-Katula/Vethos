@@ -311,8 +311,9 @@ function FeuillePlusTard({
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
       {/* Pendant l'examen, on ne ferme pas : on répond. */}
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={feuille.e === 'juge'} onPress={quitter} style={{ flex: 1 }} />
-      <View style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: (clavier > 0 ? clavier : basMarge) + 16, gap: 8 }}>
+      {/* Clavier ouvert : toucher au-dessus le ferme, et seulement lui — le texte reste. */}
+      <Pressable accessibilityRole="button" accessibilityLabel="Close" disabled={feuille.e === 'juge' && clavier === 0} onPress={() => (clavier > 0 ? Keyboard.dismiss() : quitter())} style={{ flex: 1 }} />
+      <Pressable accessible={false} onPress={Keyboard.dismiss} style={{ backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingHorizontal: 20, paddingBottom: (clavier > 0 ? clavier : basMarge) + 16, gap: 8 }}>
         {feuille.e === 'raison' || feuille.e === 'reaction' ? (
           <Text accessibilityRole="header" style={{ ...titreFeuille, marginBottom: 4 }}>{`Push ${titre} back?`}</Text>
         ) : null}
@@ -415,7 +416,7 @@ function FeuillePlusTard({
             <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>{feuille.e === 'message' ? 'OK' : 'Cancel'}</Text>
           </Pressable>
         ) : null}
-      </View>
+      </Pressable>
     </View>
   )
 }

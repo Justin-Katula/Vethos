@@ -164,7 +164,8 @@ export function Feuille({
       <View style={{ flex: 1 }}>
         <View style={StyleSheet.absoluteFill} pointerEvents={ouverte ? 'auto' : 'none'}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: voile ? 'rgba(0,0,0,0.45)' : 'transparent', opacity: p }]}>
-            <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={fermer} />
+            {/* Clavier ouvert : toucher à côté le ferme, et seulement lui — jamais la feuille ni ce qu'on écrivait. */}
+            <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={() => (clavier > 0 ? Keyboard.dismiss() : fermer())} />
           </Animated.View>
           <Animated.View
             accessibilityViewIsModal
@@ -186,8 +187,11 @@ export function Feuille({
               style,
             ]}
           >
-            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(242,242,242,0.2)', alignSelf: 'center', marginBottom: 16 }} />
-            {children}
+            {/* Toucher la feuille hors d'un champ ferme le clavier. */}
+            <Pressable accessible={false} onPress={Keyboard.dismiss} style={{ flexShrink: 1 }}>
+              <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(242,242,242,0.2)', alignSelf: 'center', marginBottom: 16 }} />
+              {children}
+            </Pressable>
           </Animated.View>
         </View>
       </View>
