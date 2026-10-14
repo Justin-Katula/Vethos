@@ -17,6 +17,7 @@ import { Buffer } from 'node:buffer'
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { DemandeCoachSchema, messagesPourModele } from '@shared/coach/prompt'
 import { detecteDetresse, filtrerReponse, MESSAGE_AIDE } from '@shared/coach/garde-fous'
+import { DemandeArbitreSchema, lireVerdict, messagesArbitre } from '@shared/coach/arbitre'
 
 export type Config = {
   deepseekKey: string
@@ -29,6 +30,8 @@ export type Config = {
   parAdresseParJour: number
   /** Durée de vie d'un jeton, en jours. */
   joursJeton?: number
+  /** Le juge : appels par compte et par jour (au-delà, l'app applique ses règles fixes). */
+  parCompteParJour?: number
 }
 
 export type Reponse = { status: number; corps: Record<string, unknown> }
@@ -200,6 +203,71 @@ export function creerCoeur(
       } finally {
         clearTimeout(t)
       }
+    },
+
+    /**
+     * Le juge d'un Stop ou d'un Later (`@shared/coach/arbitre`). Rend une
+     * question signée, une décision, `aide` (détresse) ou `indecis` — l'app
+     * applique alors ses règles fixes, comme sans internet.
+     */
+    async arbitrer(autorisation: string | undefined, brut: unknown, ip = 'inconnue', compte: string | null = null): Promise<Reponse> {
+      const cle = cleAdresse(ip)
+      if ((await compteurs.lire(`echecs:${cle}`, 'heure')) >= MAX_ECHECS)
+        return { status: 429, corps: { erreur: 'trop d’échecs' } }
+      const jeton = autorisation?.startsWith('Bearer ') ? autorisation.slice(7) : ''
+      const id = verifier(jeton)
+      if (!id) {
+        await compteurs.prendre([{ cle: `echecs:${cle}`, fenetre: 'heure', plafond: MAX_ECHECS }])
+        return { status: 401, corps: { erreur: 'jeton invalide' } }
+      }
+      const d = DemandeArbitreSchema.safeParse(brut)
+      if (!d.success) return { status: 400, corps: { erreur: 'demande invalide' } }
+      // Une question que ce serveur n'a pas posée ne passe pas.
+      for (const e of d.data.echanges) {
+        if (!egal(hmac(`question:${id}:${e.question}`), e.sig)) return { status: 400, corps: { erreur: 'question non signée' } }
+      }
+      // La détresse ne coûte rien et ne dépend pas du modèle.
+      if ([d.data.texte, ...d.data.echanges.map((e) => e.reponse)].some((t) => detecteDetresse(t)))
+        return { status: 200, corps: { action: 'aide', message: MESSAGE_AIDE } }
+
+      const pris = await compteurs.prendre([
+        { cle: `installation:${id}`, fenetre: 'jour', plafond: cfg.parInstallationParJour },
+        { cle: `adresse:${cle}`, fenetre: 'jour', plafond: cfg.parAdresseParJour },
+        { cle: 'global', fenetre: 'jour', plafond: cfg.globalParJour },
+        ...(compte ? [{ cle: `compte:${compte}`, fenetre: 'jour' as const, plafond: cfg.parCompteParJour ?? 40 }] : []),
+      ])
+      if (!pris) return { status: 200, corps: { action: 'indecis' } }
+
+      const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = messagesArbitre(d.data)
+      // Une réponse qui enfreint les règles est renvoyée une fois, avec la correction.
+      for (let essai = 0; essai < 2; essai++) {
+        const ctrl = new AbortController()
+        const t = setTimeout(() => ctrl.abort(), 15_000)
+        try {
+          const r = await f('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.deepseekKey}` },
+            body: JSON.stringify({ model: cfg.model, messages, temperature: 0.2, max_tokens: 300, response_format: { type: 'json_object' } }),
+            signal: ctrl.signal,
+          })
+          if (!r.ok) return { status: 200, corps: { action: 'indecis' } }
+          const j = (await r.json()) as { choices?: Array<{ message?: { content?: unknown } }> }
+          const contenu = j.choices?.[0]?.message?.content
+          if (typeof contenu !== 'string') return { status: 200, corps: { action: 'indecis' } }
+          const v = lireVerdict(contenu, d.data)
+          if (v.ok) {
+            if (v.verdict.action === 'question')
+              return { status: 200, corps: { action: 'question', question: v.verdict.question, sig: hmac(`question:${id}:${v.verdict.question}`) } }
+            return { status: 200, corps: { action: 'decision', decision: v.verdict.decision, incoherence: v.verdict.incoherence } }
+          }
+          messages.push({ role: 'assistant', content: contenu }, { role: 'user', content: v.correction })
+        } catch {
+          return { status: 200, corps: { action: 'indecis' } }
+        } finally {
+          clearTimeout(t)
+        }
+      }
+      return { status: 200, corps: { action: 'indecis' } }
     },
   }
 }

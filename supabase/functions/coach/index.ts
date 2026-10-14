@@ -24,16 +24,32 @@ const cfg: Config = {
   secret: env('COACH_SECRET') ?? '',
   model: env('DEEPSEEK_MODEL') ?? 'deepseek-chat',
   parInstallationParJour: Number(env('COACH_PAR_INSTALLATION_PAR_JOUR') ?? 40),
-  globalParJour: Number(env('COACH_GLOBAL_PAR_JOUR') ?? 2000),
+  globalParJour: Number(env('COACH_GLOBAL_PAR_JOUR') ?? 100000),
   installationsParIpParHeure: Number(env('COACH_INSTALLATIONS_PAR_IP_PAR_HEURE') ?? 5),
   parAdresseParJour: Number(env('COACH_PAR_ADRESSE_PAR_JOUR') ?? 120),
   joursJeton: Number(env('COACH_JOURS_JETON') ?? 30),
+  parCompteParJour: Number(env('COACH_PAR_COMPTE_PAR_JOUR') ?? 40),
 }
 const erreurConfig = validerConfig(cfg)
 if (erreurConfig) console.error(`Configuration refusée : ${erreurConfig}.`)
 
 const URL_BASE = env('SUPABASE_URL') ?? ''
 const CLE_SERVICE = env('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const CLE_PUBLIQUE = env('SUPABASE_ANON_KEY') ?? ''
+
+/** Le compte derrière une session Supabase (en-tête `x-vethos-session`), ou null. */
+async function compteDe(req: Request): Promise<string | null> {
+  const session = req.headers.get('x-vethos-session')
+  if (!session || !URL_BASE || !CLE_PUBLIQUE) return null
+  try {
+    const qui = await fetch(`${URL_BASE}/auth/v1/user`, { headers: { apikey: CLE_PUBLIQUE, Authorization: `Bearer ${session}` } })
+    if (!qui.ok) return null
+    const { id } = (await qui.json()) as { id?: string }
+    return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null
+  } catch {
+    return null
+  }
+}
 
 /** Appelle une fonction Postgres avec la clé service_role — jamais exposée à l'app. */
 async function rpc(nom: string, args: unknown): Promise<unknown> {
@@ -83,7 +99,7 @@ const ipDe = (req: Request) => {
  */
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-vethos-session',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
@@ -111,6 +127,10 @@ Deno.serve(async (req) => {
     }
     if (chemin.endsWith('/v1/install')) {
       const r = await coeur.installer(ipDe(req))
+      return repondre(r.status, r.corps)
+    }
+    if (chemin.endsWith('/v1/arbitre')) {
+      const r = await coeur.arbitrer(req.headers.get('authorization') ?? undefined, corps, ipDe(req), await compteDe(req))
       return repondre(r.status, r.corps)
     }
     if (chemin.endsWith('/v1/coach')) {
