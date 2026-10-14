@@ -400,6 +400,22 @@ export const LearningStateSchema = z.object({
   /** Chaque pause d'urgence : début, fin, apps débloquées, tentatives. */
   emergencyPauses: z.array(z.lazy(() => EmergencyPauseSchema)).max(300).optional(),
   /**
+   * Les reports demandés avant d'avoir commencé (`./planning/report`) :
+   * « Later » (une séance, une fois) ou « Tomorrow » (toute la journée, deux
+   * fois par semaine au plus).
+   */
+  postponements: z
+    .array(
+      z.object({
+        date: z.string().regex(DATE_REGEX),
+        kind: z.enum(['later', 'day']),
+        blockId: z.string().optional(),
+        refId: z.string().optional(),
+      }),
+    )
+    .max(300)
+    .optional(),
+  /**
    * La version idéale de chaque tâche (et de chaque objectif, par semaine) :
    * le plan figé la première fois qu'il la place, avant tout pli. `base` : le
    * travail déjà fait à ce moment ; `points` : le cumul prévu jour par jour.

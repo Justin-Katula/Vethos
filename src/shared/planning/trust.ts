@@ -241,7 +241,7 @@ export function empreinteRattrapage(minutes: number, morceau?: number): number {
 }
 
 /** Les débuts possibles, un jour donné, d'un rattrapage de `span` minutes (pas de 30 min). */
-function debutsLibres(
+export function debutsLibres(
   plan: PlanningResult,
   date: string,
   span: number,
