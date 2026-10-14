@@ -96,6 +96,16 @@ const cinq = (m: number) => Math.round(m / 5) * 5
 const cinqDessous = (m: number) => Math.floor(m / 5) * 5
 const cinqDessus = (m: number) => Math.ceil(m / 5) * 5
 
+/**
+ * Ce qui reste à faire d'un engagement aujourd'hui tient en 1 h 30, et la
+ * journée a un créneau assez long pour le prendre : il se fait d'un seul coup.
+ */
+function unSeulBloc(travail: number, budget: number, plusGrandCreneau: number): boolean {
+  if (travail < TASK_CONSTANTS.minBlockMinutes || travail > TASK_CONSTANTS.targetBlockMinutes) return false
+  const empreinte = footprintFor(travail)
+  return empreinte <= budget && empreinte <= plusGrandCreneau
+}
+
 /** L'empreinte réelle d'un bloc : le travail plus sa pause (E.1). */
 function footprintFor(workMinutes: number): number {
   return workMinutes + computeBreakMinutes(workMinutes)
@@ -760,16 +770,20 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay
       ) {
         const objCategory = `objectif:${objective.id}`
+        // D'un seul coup : ce qui reste du jour tient en 1 h 30 et un créneau
+        // assez long existe → un seul bloc, jamais 20 min le matin et 20 min
+        // l'après-midi. Sinon, la longueur apprise découpe comme avant.
+        const enUnSeul = session === 0 && unSeulBloc(left, budget, allocator.largestFree())
         // Le plafond : la plus longue des tranches ; la longueur de CHAQUE départ
         // est ensuite celle de sa tranche (lengthAt).
-        const work = Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
+        const work = enUnSeul ? left : Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
         const slot = allocator.take(Math.min(footprint, budget), {
           avoid: deepExhausted ? 'PROFONDE' : undefined,
           score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective, true, objCategory),
           // La longueur apprise suit la tranche horaire du départ choisi.
-          ...(learn
+          ...(learn && !enUnSeul
             ? { lengthAt: (start: number) => footprintFor(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start)))) }
             : {}),
         })
@@ -882,12 +896,18 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
             Math.ceil(dayTarget / Math.ceil(dayTarget / TASK_CONSTANTS.targetBlockMinutes) / 5) * 5,
           )
         : TASK_CONSTANTS.targetBlockMinutes
+      // Seulement quand TOUT le travail du jour tient en 1 h 30 — jamais pour
+      // le reste d'une grosse journée déjà entamée.
+      let premierBloc = true
       while (
         dayTarget >= TASK_CONSTANTS.minBlockMinutes &&
         budget >= TASK_CONSTANTS.minBlockMinutes
       ) {
+        // D'un seul coup quand le travail du jour tient en 1 h 30 (voir les objectifs).
+        const enUnSeul = premierBloc && unSeulBloc(dayTarget, budget, allocator.largestFree())
+        premierBloc = false
         const work = absorbCrumb(
-          Math.min(dayTarget, blocsEgaux, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
+          enUnSeul ? dayTarget : Math.min(dayTarget, blocsEgaux, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
           remainingNeed.get(task.id) ?? 0,
         )
 
@@ -918,7 +938,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           // aucun trou forcé : l'espacement préféré fragmenterait la fenêtre du jour
           // et laisserait du temps demandé sans créneau.
           score: scorer(task.id, taskSession, 0, task.marginMinutes >= 0 && !capOverride, task.category, familyScore),
-          ...(learn
+          ...(learn && !enUnSeul
             ? {
                 lengthAt: (start: number) =>
                   Math.min(footprint, footprintFor(absorbCrumb(Math.min(dayTarget, learn.blockMax(task.id, task.category, trancheDe(start))), remainingNeed.get(task.id) ?? 0))),
