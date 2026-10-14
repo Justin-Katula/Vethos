@@ -1039,8 +1039,9 @@ function useSourcePlan() {
       return { ok: true as const }
     },
     /** D.7 : ouvre une séance. Le retard se mesure à cet instant précis. */
-    confirmer: async (bloc: NonNullable<ReturnType<typeof tictac>['enAttente']>) => {
-      const instant = new Date()
+    confirmer: async (bloc: NonNullable<ReturnType<typeof tictac>['enAttente']>, quand?: Date) => {
+      // `quand` : « I'm starting » touché sur une notification, un peu plus tôt.
+      const instant = quand ?? new Date()
       const minute = instant.getHours() * 60 + instant.getMinutes()
       const contexte = journalContextFor({
         learning: apprentissage,

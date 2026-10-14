@@ -7,10 +7,10 @@ import { usePlan, type ReactionPlusTard } from '@/plan/Plan'
 import { RAISONS } from '@shared/planning/arrets'
 import { STOP_REASONS, type StopReason } from '@shared/schemas'
 import { enHeure } from '@/plan/lecture'
-import { A, GEIST, hm, MONO, useHauteurClavier, useLumiere } from '@/ui/app-briques'
+import { A, fmt, GEIST, hm, MONO, useHauteurClavier, useLumiere } from '@/ui/app-briques'
 import { FondLumiere } from '@/ui/FondLumiere'
 import { accentIntro, encreSur } from '@/ui/lumiere'
-import { useDemandeReport } from './rappels'
+import { annoncer, useDemandeReport } from './rappels'
 import { Juge } from './Juge'
 import { texteSuffisant } from '@shared/planning/report'
 
@@ -62,13 +62,32 @@ export function JeCommence() {
   const [encours, setEncours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [feuille, setFeuille] = useState<Feuille | null>(null)
-  // « Later » touché sur une notification : la question s'ouvre ici.
+  // Un bouton touché sur une notification.
   const demande = useDemandeReport((e) => e.demande)
   useEffect(() => {
-    if (!demande || !enAttente) return
+    if (!demande) return
+    if (demande.type === 'tard') {
+      if (!enAttente) return
+      useDemandeReport.getState().poser(null)
+      // « Later » : la justification s'ouvre ici.
+      if (reports.plusTardPermis(enAttente)) setFeuille({ e: 'raison' })
+      return
+    }
+    // « I'm starting » : la même chose que le bouton de l'écran, à l'instant du
+    // toucher. Le plan peut être encore en train de charger : on attend un peu.
+    if (Date.now() - demande.a > 30 * 60_000) return void useDemandeReport.getState().poser(null)
+    if (!enAttente) return
     useDemandeReport.getState().poser(null)
-    if (reports.plusTardPermis(enAttente)) setFeuille({ e: 'raison' })
-  }, [demande, enAttente, reports])
+    if (enAttente.id !== demande.blocId) return
+    const b = enAttente
+    void (async () => {
+      const r = await confirmer(b, new Date(demande.a))
+      const debut = new Date(demande.a)
+      const fin = debut.getHours() * 60 + debut.getMinutes() + (b.endMinute - b.startMinute)
+      // Dit tout de suite, pour qu'on ne croie jamais avoir commencé quand ce n'est pas le cas.
+      await annoncer(b.label, r.ok ? `Started · until ${fmt(Math.min(1439, fin))}` : 'Couldn’t start. Open Vethos.')
+    })()
+  }, [demande, enAttente, reports, confirmer])
 
   // Après le souffle d'une promesse, l'overlay revient tout seul : on reprend.
   const retour = confiance.retourAttendu

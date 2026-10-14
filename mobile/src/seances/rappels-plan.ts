@@ -22,8 +22,10 @@ export type Rappel = {
   quand: number
   titre: string
   corps: string
-  /** « Later » et « Tomorrow » sur la notification : seulement pour une tâche ou un objectif. */
+  /** « Later » sur la notification : seulement pour une tâche ou un objectif. */
   reportable: boolean
+  /** Le préavis : rien à commencer encore. */
+  avant?: boolean
 }
 
 export function rappelsAProgrammer(a: {
@@ -39,7 +41,7 @@ export function rappelsAProgrammer(a: {
     // 5 min avant : prévenu, pas encore appelé.
     const avant = a.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
     if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
-      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b) })
+      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
     }
     for (const m of minutesDeRappel(b)) {
       const quand = a.minuitMs + m * 60_000

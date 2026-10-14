@@ -19,6 +19,7 @@ import { useDonnees } from '@/donnees/magasin'
 import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
 import { ZoomSeance } from '@/seances/ZoomSeance'
+import { ecouterReponses } from '@/seances/rappels'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
@@ -128,6 +129,10 @@ function Coque() {
     </View>
   )
 }
+
+// Dès le premier instant : un « I'm starting » touché sur une notification peut
+// avoir réveillé Vethos en arrière-plan — la réponse ne doit pas se perdre.
+ecouterReponses()
 
 export default function Racine() {
   const [policesPretes, erreurPolices] = useFonts({
