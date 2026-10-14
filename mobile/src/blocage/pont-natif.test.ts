@@ -421,7 +421,15 @@ describe('l’urgence et le mode profond d’une seule séance', () => {
     })
     expect(appels).toContain('garder:vethos.garde')
     expect(appels).toContain('configureActions:intervalDidStart:enableBlockAllMode')
-    expect(appels).toContain('configureActions:intervalDidStart:blockSelection')
+    // L'autre séance, normale : écartée, et « Always allowed » retiré du blocage.
+    expect(appels).toContain('configureActions:intervalDidStart:blockSelection+unblockSelection')
     expect(appels.at(-1)).toBe('enableBlockAllMode')
+  })
+
+  it('« Never allowed » : bloqué hors séance, et reposé à chaque fin de séance', async () => {
+    const { natif, appels } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage()], { maintenant: 7 * 60, jamaisId: 'vethos.jamais' })
+    expect(appels).toContain('configureActions:intervalDidEnd:resetBlocks+blockSelection')
+    expect(appels.at(-1)).toBe('blockSelection:vethos.jamais')
   })
 })

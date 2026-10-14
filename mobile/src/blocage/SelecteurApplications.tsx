@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Modal, Platform, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from './etat'
-import { IDENTIFIANT_GARDEE, IDENTIFIANT_SELECTION, IDENTIFIANT_URGENCE, type Selection } from './contrat'
+import { IDENTIFIANT_GARDEE, IDENTIFIANT_JAMAIS, IDENTIFIANT_SELECTION, IDENTIFIANT_URGENCE, idAjout, type Selection } from './contrat'
+import { jetons } from '../../modules/vethos-jetons'
 import { pontEcran } from './ecran-natif'
 import { useJetons } from '@/theme/Theme'
 import { PAS } from '@/theme/jetons'
@@ -55,7 +56,7 @@ function chargerFeuille(): React.ComponentType<Record<string, unknown>> | null {
  * ignorance de notre côté — seul l'identifiant sous lequel iOS range le jeton
  * change, et c'est lui seul que Vethos manipule.
  */
-export type RoleSelecteur = 'ecarte' | 'garde' | 'urgence'
+export type RoleSelecteur = 'ecarte' | 'garde' | 'jamais' | 'urgence'
 
 const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied: string }> = {
   ecarte: {
@@ -65,8 +66,13 @@ const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied:
   },
   garde: {
     identifiant: IDENTIFIANT_GARDEE,
-    entete: 'What stays reachable in deep focus',
-    pied: 'Everything else is set aside. Keep Vethos itself here, or you will have to lift from iOS Settings.',
+    entete: 'Always allowed',
+    pied: 'Never blocked, even in deep focus. Keep Vethos itself here, or you will have to lift from iOS Settings.',
+  },
+  jamais: {
+    identifiant: IDENTIFIANT_JAMAIS,
+    entete: 'Never allowed',
+    pied: 'Blocked all the time, session or not.',
   },
   urgence: {
     identifiant: IDENTIFIANT_URGENCE,
@@ -75,9 +81,15 @@ const TEXTES: Record<RoleSelecteur, { identifiant: string; entete: string; pied:
   },
 }
 
-export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', surChoix }: {
+export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', surChoix, ajout = false }: {
   ouvert: boolean
   surFermeture: () => void
+  /**
+   * « + » : le sélecteur s'ouvre VIDE, et ce qu'on y coche s'AJOUTE à la liste.
+   * Rien ne peut donc s'y décocher en douce — retirer passe par le « × » d'un
+   * élément, hors séance. (Sans le module natif, retombe sur l'ancien sélecteur.)
+   */
+  ajout?: boolean
   role?: RoleSelecteur
   /** Pour l'urgence : le choix revient à l'appelant, il n'est pas rangé. */
   surChoix?: (s: Selection) => void
@@ -86,10 +98,13 @@ export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', s
   const marges = useSafeAreaInsets()
   const poserSelection = useBlocage((e) => e.poserSelection)
   const poserGardee = useBlocage((e) => e.poserGardee)
+  const poserJamais = useBlocage((e) => e.poserJamais)
   const [comptes, setComptes] = useState<Comptes | null>(null)
 
   const textes = TEXTES[role]
   const Feuille = chargerFeuille()
+  const enAjout = ajout && jetons.disponible()
+  const idFeuille = enAjout ? idAjout(textes.identifiant) : textes.identifiant
   if (!ouvert) return null
 
   const enregistrer = async () => {
@@ -105,14 +120,15 @@ export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', s
         creeeLe: new Date().toISOString(),
       })
     } else if (comptes) {
-      const poser = role === 'garde' ? poserGardee : poserSelection
+      const poser = role === 'garde' ? poserGardee : role === 'jamais' ? poserJamais : poserSelection
+      // En ajout : ce qui vient d'être coché rejoint la liste, et c'est le compte de la liste qui compte.
+      const total = enAjout ? (jetons.fusionner(textes.identifiant, idFeuille) ?? comptes) : comptes
       await poser({
         identifiant: textes.identifiant,
-        nbApplications: comptes.applicationCount,
-        nbCategories: comptes.categoryCount,
-        nbSitesWeb: comptes.webDomainCount,
-        libelle:
-          role === 'garde' ? 'What I keep in deep focus' : 'What I set aside during a session',
+        nbApplications: total.applicationCount,
+        nbCategories: total.categoryCount,
+        nbSitesWeb: total.webDomainCount,
+        libelle: '',
         creeeLe: new Date().toISOString(),
       })
     }
@@ -125,11 +141,11 @@ export function SelecteurApplications({ ouvert, surFermeture, role = 'ecarte', s
         {Feuille ? (
           <Feuille
             style={{ flex: 1 }}
-            familyActivitySelectionId={textes.identifiant}
+            familyActivitySelectionId={idFeuille}
             // Sans ce drapeau, une CATÉGORIE cochée dans la liste gardée est
             // ignorée : le mode profond masquerait alors tout ce que
             // l'utilisateur croyait s'être gardé, sans un mot pour le dire.
-            includeEntireCategory={role === 'garde'}
+            includeEntireCategory={role === 'garde' || role === 'jamais'}
             headerText={textes.entete}
             footerText={textes.pied}
             onSelectionChange={(e: { nativeEvent: Comptes }) => setComptes(e.nativeEvent)}

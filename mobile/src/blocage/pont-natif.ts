@@ -200,6 +200,12 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       const profondDe = (p: Plage) => profondPartout || p.profond === true
       const profond = profondPartout || plages.some((p) => p.profond === true)
       const politique = options.filtrerLeWeb === true ? FILTRE_WEB : null
+      // « Never allowed » : écarté tout le temps. La bibliothèque ADDITIONNE ce
+      // qu'on bloque (union) et `resetBlocks` vide tout : on le repose donc
+      // après chaque remise à zéro, et à chaque fin de séance.
+      const jamais = options.jamaisId ?? null
+      // « Always allowed » : retiré de ce qu'une séance normale bloque.
+      const garde = options.gardeeId ?? null
 
       // On repart toujours de zéro : réconcilier des surveillances existantes
       // avec un plan recalculé coûte plus cher que de tout reposer, et laisse
@@ -255,6 +261,8 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
               ? { type: 'enableBlockAllMode' }
               : { type: 'blockSelection', familyActivitySelectionId: plage.selectionId },
             ...(!ici && sauf ? [{ type: 'unblockSelection' as const, familyActivitySelectionId: sauf }] : []),
+            ...(!ici && garde ? [{ type: 'unblockSelection' as const, familyActivitySelectionId: garde }] : []),
+            ...(jamais ? [{ type: 'blockSelection' as const, familyActivitySelectionId: jamais }] : []),
             ...(politique ? [{ type: 'setWebContentFilterPolicy' as const, policy: politique }] : []),
           ],
         })
@@ -273,6 +281,7 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
               : []),
             ...(politique ? [{ type: 'clearWebContentFilterPolicy' as const }] : []),
             { type: 'resetBlocks' },
+            ...(jamais ? [{ type: 'blockSelection' as const, familyActivitySelectionId: jamais }] : []),
           ],
         })
 
@@ -303,12 +312,15 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         if (profondDe(enCours)) natif.enableBlockAllMode(parQui)
         else natif.blockSelection({ activitySelectionId: enCours.selectionId }, parQui)
         if (!profondDe(enCours) && enCours.exceptionId) natif.unblockSelection({ activitySelectionId: enCours.exceptionId }, parQui)
+        if (!profondDe(enCours) && garde) natif.unblockSelection({ activitySelectionId: garde }, parQui)
+        if (jamais) natif.blockSelection({ activitySelectionId: jamais }, parQui)
         if (politique) natif.setWebContentFilterPolicy(politique, parQui)
       } else {
         // Aucune séance en cours : rien ne doit rester levé d'une précédente.
         natif.disableBlockAllMode('vethos:aucune-seance')
         natif.clearWebContentFilterPolicy('vethos:aucune-seance')
         natif.resetBlocks('vethos:aucune-seance')
+        if (jamais) natif.blockSelection({ activitySelectionId: jamais }, 'vethos:jamais')
       }
 
       return plages.length

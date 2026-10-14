@@ -250,6 +250,8 @@ export type OptionsProgrammation = {
   gardeeId?: string | null
   /** Ajoute le filtre web d'Apple pendant la séance. */
   filtrerLeWeb?: boolean
+  /** « Never allowed » : écarté en permanence, reposé après chaque fin de séance. */
+  jamaisId?: string | null
   /**
    * `maintenant` n'existe que pour les tests : le pont doit savoir laquelle
    * des plages a DÉJÀ commencé, et une horloge qu'on ne peut pas figer rend
@@ -260,6 +262,12 @@ export type OptionsProgrammation = {
 
 /** L'identifiant de la liste gardée en mode profond. Fixe, comme l'autre. */
 export const IDENTIFIANT_GARDEE = 'vethos.garde'
+
+/** « Never allowed » : écarté tout le temps, séance ou pas. */
+export const IDENTIFIANT_JAMAIS = 'vethos.jamais'
+
+/** Où le sélecteur d'Apple range un AJOUT, avant qu'il soit fusionné dans sa liste (« + » n'ajoute que). */
+export const idAjout = (liste: string) => `${liste}.ajout`
 
 /** L'état réel du Temps d'écran, tel que le système le rend. */
 export type Diagnostic = {

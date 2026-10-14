@@ -1,122 +1,52 @@
-/** Blocking, dans la forme de la maquette. iOS ne donne que des jetons opaques : on montre les vrais compteurs. */
-import { ApercuSelection } from '@/blocage/ApercuSelection'
-import { vueJetons } from '../../modules/vethos-jetons'
-import { useState } from 'react'
+/**
+ * Blocking, à la Opal : trois listes, chacune montrant ce qu'elle contient
+ * (icônes et noms dessinés par iOS — jamais lus par Vethos), un « × » par
+ * élément et un « + ». Rien ne se modifie pendant une séance.
+ *
+ * - Distraction : écarté pendant les séances.
+ * - Never allowed : écarté tout le temps.
+ * - Always allowed : jamais écarté, même en mode profond.
+ */
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
-import { SelecteurApplications } from '@/blocage/SelecteurApplications'
-import { selectionEstVide } from '@/blocage/contrat'
-import { A, Cadenas, Carte, GEIST, MONO, Plus, TitrePage } from '@/ui/app-briques'
-
-function Pilule({ children, onPress, plein = true }: { children: React.ReactNode; onPress: () => void; plein?: boolean }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({
-        height: 36,
-        paddingHorizontal: 16,
-        borderRadius: 18,
-        backgroundColor: plein ? 'rgba(242,242,242,0.1)' : 'transparent',
-        borderWidth: plein ? 0 : 1,
-        borderColor: 'rgba(242,242,242,0.2)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        alignSelf: 'flex-start',
-        transform: [{ scale: pressed ? 0.96 : 1 }],
-      })}
-    >
-      {children}
-    </Pressable>
-  )
-}
+import { ListeBlocage } from '@/blocage/ListeBlocage'
+import { usePlan } from '@/plan/Plan'
+import { A, Carte, GEIST, TitrePage } from '@/ui/app-briques'
 
 export default function Blocage() {
   const marges = useSafeAreaInsets()
-  const { autorisation, selection, simule } = useBlocage()
+  const { autorisation, selection, gardee, jamais, simule } = useBlocage()
   const demander = useBlocage((e) => e.demanderAutorisation)
-  const choisir = useBlocage((e) => e.choisirApplications)
-  const [selecteur, setSelecteur] = useState(false)
-  const accordee = autorisation === 'accordee'
+  const { seanceEnCours } = usePlan()
+  const accordee = autorisation === 'accordee' || simule
   const refusee = autorisation === 'refusee' || autorisation === 'revoquee'
-  const vide = !selection || selectionEstVide(selection)
-  const ouvrir = async () => {
-    if (!accordee) {
-      if (refusee) {
-        void Linking.openSettings()
-        return
-      }
-      await demander()
-      if (useBlocage.getState().autorisation !== 'accordee') return
-    }
-    if (simule) void choisir()
-    else setSelecteur(true)
+
+  const autoriser = async () => {
+    if (refusee) return void Linking.openSettings()
+    await demander()
   }
-  const chiffres: [string, number][] = selection
-    ? [
-        ['apps', selection.nbApplications],
-        ['categories', selection.nbCategories],
-        ['sites', selection.nbSitesWeb],
-      ]
-    : []
-  const total = selection ? selection.nbApplications + selection.nbCategories + selection.nbSitesWeb : 0
-  const apercuNatif = vueJetons() !== null
 
   return (
     <ScrollView contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' }} showsVerticalScrollIndicator={false}>
       <TitrePage>Blocking</TitrePage>
       <View style={{ gap: 12, marginTop: 24 }}>
-        <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 18 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingBottom: 10 }}>
-            <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Blocked apps</Text>
-            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{total}</Text>
-          </View>
-          {!accordee ? (
-            <View style={{ paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
-              <Pilule onPress={() => void ouvrir()}>
-                <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{refusee ? 'Open Settings' : 'Allow Screen Time'}</Text>
-              </Pilule>
-            </View>
-          ) : vide ? (
-            <View style={{ paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
-              <Pilule onPress={() => void ouvrir()}>
-                <Plus />
-                <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Pick my apps</Text>
-              </Pilule>
-            </View>
-          ) : (
-            <View style={{ borderTopWidth: 1, borderTopColor: A.ligne }}>
-              {/* Les vrais noms et icônes, dessinés par iOS ; sans la vue native, les nombres. */}
-              {apercuNatif && !simule ? (
-                <View style={{ paddingTop: 14, paddingBottom: 4 }}>
-                  <ApercuSelection selection={selection!} couleur={A.t1} taillePolice={16} />
-                </View>
-              ) : null}
-              {(apercuNatif && !simule ? [] : chiffres).map(([k, v], i) => (
-                <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: A.ligne }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: A.s, alignItems: 'center', justifyContent: 'center' }}>
-                    <Cadenas taille={14} couleur={v ? A.t1 : A.t4} />
-                  </View>
-                  <Text style={{ flex: 1, color: v ? A.t1 : A.t4, fontFamily: GEIST.demi, fontSize: 16 }}>{k[0]!.toUpperCase() + k.slice(1)}</Text>
-                  <Text style={{ color: v ? A.t1 : A.t4, fontFamily: MONO.normal, fontSize: 16 }}>{v}</Text>
-                </View>
-              ))}
-              <View style={{ marginTop: 8 }}>
-                <Pilule onPress={() => void ouvrir()}>
-                  <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Change my selection</Text>
-                </Pilule>
-              </View>
-            </View>
-          )}
-        </Carte>
-
+        {!accordee ? (
+          <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 18, gap: 14 }}>
+            <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Screen Time</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void autoriser()}
+              style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: 'rgba(242,242,242,0.1)', alignSelf: 'flex-start', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}
+            >
+              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>{refusee ? 'Open Settings' : 'Allow Screen Time'}</Text>
+            </Pressable>
+          </Carte>
+        ) : null}
+        <ListeBlocage role="ecarte" titre="Distraction" sous="Blocked during your sessions" selection={selection} verrou={seanceEnCours} pret={accordee} />
+        <ListeBlocage role="jamais" titre="Never allowed" sous="Blocked all the time" selection={jamais} verrou={seanceEnCours} pret={accordee} />
+        <ListeBlocage role="garde" titre="Always allowed" sous="Never blocked, even in deep focus" selection={gardee} verrou={seanceEnCours} pret={accordee} />
       </View>
-      <SelecteurApplications
-        ouvert={selecteur}
-        surFermeture={() => setSelecteur(false)}
-      />
     </ScrollView>
   )
 }

@@ -35,8 +35,10 @@ function cleDuJour(d = new Date()): string {
 type EtatBlocage = {
   autorisation: EtatAutorisation
   selection: Selection | null
-  /** La liste que le mode profond laisse passer. Sans objet en mode normal. */
+  /** « Always allowed » : ce qu'aucune séance ne masque, même en mode profond. */
   gardee: Selection | null
+  /** « Never allowed » : masqué tout le temps, séance ou pas. */
+  jamais: Selection | null
   mode: ModeBlocage
   filtrerLeWeb: boolean
   /** Ce qui est réellement programmé sur l'appareil, après les limites d'iOS. */
@@ -76,6 +78,8 @@ type EtatBlocage = {
    */
   relireAutorisation: () => Promise<void>
   choisirApplications: () => Promise<void>
+  /** « Never allowed » a changé : il est reposé tout de suite. */
+  poserJamais: (s: Selection | null) => Promise<void>
   /** Enregistre une selection venue du selecteur natif, qui est une VUE. */
   poserSelection: (s: Selection) => Promise<void>
   poserGardee: (s: Selection) => Promise<void>
@@ -114,6 +118,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   autorisation: 'inconnue',
   selection: null,
   gardee: null,
+  jamais: null,
   mode: 'ecarter',
   filtrerLeWeb: false,
   plagesActives: [],
@@ -138,11 +143,13 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
       const lu = JSON.parse(brut) as Record<string, unknown>
       const selection = SelectionSchema.safeParse(lu['selection'])
       const gardee = SelectionSchema.safeParse(lu['gardee'])
+      const jamais = SelectionSchema.safeParse(lu['jamais'])
       const plages = PlageSchema.array().safeParse(lu['plages'])
       const date = typeof lu['date'] === 'string' ? lu['date'] : ''
       set({
         ...(selection.success ? { selection: selection.data } : {}),
         ...(gardee.success ? { gardee: gardee.data } : {}),
+        ...(jamais.success ? { jamais: jamais.data } : {}),
         mode: lu['mode'] === 'profond' ? 'profond' : 'ecarter',
         filtrerLeWeb: lu['filtrerLeWeb'] === true,
         plagesActives: plages.success ? plagesDuJour(plages.data, date, cleDuJour()) : [],
@@ -203,6 +210,13 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     // lit sur l'appareil. La reposer tout de suite evite qu'une seance en
     // cours continue avec l'ancienne, ce que rien a l'ecran ne montrerait.
     if (get().plagesActives.length > 0) await get().appliquerPlan(get().plagesActives)
+  },
+
+  async poserJamais(jamais) {
+    set({ jamais })
+    await ranger(get())
+    // Écarté tout le temps : on reprogramme tout de suite, séance ou pas.
+    await get().appliquerPlan(get().plagesActives)
   },
 
   async choisirMode(mode) {
@@ -267,7 +281,8 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
 
   async appliquerPlan(plages) {
     const selection = get().selection
-    if (!selection) return
+    // Sans liste de distractions, « Never allowed » doit encore tenir.
+    if (!selection && !get().jamais) return
 
     set({ occupe: true })
     try {
@@ -279,6 +294,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
       await pontEcran().programmer(retenues, {
         mode: get().mode,
         gardeeId: get().gardee?.identifiant ?? null,
+        jamaisId: get().jamais && !selectionEstVide(get().jamais!) ? get().jamais!.identifiant : null,
         filtrerLeWeb: get().filtrerLeWeb,
       })
       set({
@@ -334,6 +350,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
 async function ranger(e: {
   selection: Selection | null
   gardee: Selection | null
+  jamais: Selection | null
   mode: ModeBlocage
   filtrerLeWeb: boolean
   plagesActives: Plage[]
@@ -349,6 +366,7 @@ async function ranger(e: {
         date: cleDuJour(),
         selection: e.selection,
         gardee: e.gardee,
+        jamais: e.jamais,
         mode: e.mode,
         filtrerLeWeb: e.filtrerLeWeb,
         plages: e.plagesActives,
