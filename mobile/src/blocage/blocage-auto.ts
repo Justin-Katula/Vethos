@@ -20,12 +20,21 @@ export function plagesAuto(a: {
   confirmes: ReadonlySet<string>
   nowMinute: number
   selectionId: string
+  /**
+   * Un report accepté suspend le blocage automatique jusqu'à cette minute :
+   * rien d'automatique ne bloque avant (le bloc qui prend la place libérée non
+   * plus) ; ce qui déborde au-delà commence à cette minute.
+   */
+  leveeJusqua?: number | null
 }): Plage[] {
   const out: Plage[] = []
+  const levee = a.leveeJusqua != null && a.leveeJusqua > a.nowMinute ? a.leveeJusqua : null
   for (const b of a.blocsDuJour) {
     if (a.confirmes.has(b.id)) continue
-    const { debut, fin } = fenetreSansConfirmation(b)
-    if (fin <= a.nowMinute) continue
+    const fenetre = fenetreSansConfirmation(b)
+    const debut = levee !== null ? Math.max(fenetre.debut, levee) : fenetre.debut
+    const fin = fenetre.fin
+    if (fin <= a.nowMinute || fin <= debut) continue
     // Déjà ouverte : le début reste celui du bloc (stable d'une minute à
     // l'autre, donc rien à reprogrammer) ; le pont lève tout de suite une
     // fenêtre en cours, iOS ne rappelant que les bornes à venir.

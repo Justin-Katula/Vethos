@@ -210,13 +210,14 @@ function useSourcePlan() {
   // lui-même, Vethos fermé. On ne reprogramme iOS que si les plages voulues
   // ont changé — pas à chaque minute.
   const dernieresVoulues = useRef<string | null>(null)
+  const levee = useBlocage((e) => e.levee)
   useEffect(() => {
     if (!prets) return
     const b = useBlocage.getState()
     const selection = b.selection
     if (!selection || selectionEstVide(selection)) return
     const confirmes = new Set(Object.keys(confirmations.confirmedAt))
-    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant })
+    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua: levee })
     const voulues = fusionnerAuto({ actives: b.plagesActives, auto, idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
     const cle = JSON.stringify(voulues.map((p) => [p.blocId, p.debutMinute, p.finMinute]).sort())
     if (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives)) {
@@ -229,7 +230,7 @@ function useSourcePlan() {
     const bloc = prochain && blocsDuJour.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, theme])
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, theme, levee])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.
@@ -527,7 +528,10 @@ function useSourcePlan() {
       const frais = useSeances.getState()
       const d = new Date()
       const c = decalerAncre(frais.confirmations, bloc, d.getHours() * 60 + d.getMinutes())
-      if (c) await poser({ apprentissage: frais.apprentissage, confirmations: c })
+      if (!c) return
+      await poser({ apprentissage: frais.apprentissage, confirmations: c })
+      // Libre jusqu'à la nouvelle heure de l'ancre ; son blocage reprend à cette heure-là.
+      await useBlocage.getState().suspendre(bloc.startMinute + decalageAncre(c, bloc.id))
     },
     /** « 10 more minutes » en cours : l'heure où « Stop ? » revient. */
     dixMinutesJusqua: confirmationsDuJour?.dixMinutes && !confirmationsDuJour.dixMinutes.repondu ? confirmationsDuJour.dixMinutes.untilMs : null,
@@ -623,6 +627,9 @@ function useSourcePlan() {
       if (!c) return false
       await poser({ apprentissage: frais.apprentissage, confirmations: c })
       const plage = blocage().plagesActives.find((p) => p.blocId === o.blockId)
+      // Le reste du créneau du bloc arrêté est libre : un autre bloc qui viendrait
+      // s'y glisser ne se bloque pas aussitôt.
+      await blocage().suspendre(o.endMinute)
       if (plage) await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: Math.max(plage.debutMinute + 1, c.stopPending!.untilMinute) })
       return true
     },
@@ -634,7 +641,11 @@ function useSourcePlan() {
       await poser({ apprentissage: r.learning, confirmations: r.confirmations })
       const o = r.confirmations.observedPending
       const plage = o ? blocage().plagesActives.find((p) => p.blocId === o.blockId) : undefined
-      if (o && plage && frais.confirmations.stopPending) await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: o.endMinute })
+      if (o && plage && frais.confirmations.stopPending) {
+        // On continue finalement : plus rien à suspendre.
+        await blocage().suspendre(0)
+        await blocage().remplacerPlage(o.blockId, { ...plage, finMinute: o.endMinute })
+      }
     },
 
     /** « 10 more minutes » : on continue, « Stop ? » revient dans 10 min. */
@@ -840,6 +851,8 @@ function useSourcePlan() {
         const confirmations = c.observedPending?.blockId === bloc.id ? { ...c, observedPending: null } : c
         const l = reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui, raison, option.placement)
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
+        // Libre jusqu'à l'heure choisie (aujourd'hui), ou jusqu'à la fin du bloc reporté à demain.
+        await blocage().suspendre(option.date === aujourdHui ? option.startMinute : bloc.startMinute + bloc.workMinutes)
         await blocage().remplacerPlage(bloc.id, null)
       },
       /** « Tomorrow » : tout ce qui reste aujourd'hui passe aux jours suivants. */
@@ -852,6 +865,8 @@ function useSourcePlan() {
         const confirmations = c.observedPending && !enCours ? { ...c, observedPending: null } : c
         const l = noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day', reason: raison })
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
+        // Toute la journée est reportée : plus rien d'automatique ne bloque aujourd'hui.
+        await blocage().suspendre(1440)
         const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt)))
         await blocage().appliquerPlan(plages)
       },

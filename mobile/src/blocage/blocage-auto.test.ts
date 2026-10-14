@@ -16,6 +16,22 @@ describe('Le blocage qui commence à l’heure', () => {
     ])
   })
 
+  it('après un « Later » jusqu’à 11 h : le bloc qui prend la place libérée ne bloque pas avant 11 h', () => {
+    // Défaut réel du 2026-10-14 : reporté, puis aussitôt rebloqué par le plan recalculé.
+    const remplacant = [bloc('objective-g', 605, 650)]
+    expect(plagesAuto({ blocsDuJour: remplacant, confirmes: new Set(), nowMinute: 605, selectionId: 's', leveeJusqua: 660 })).toEqual([])
+    // Ce qui déborde au-delà commence à l’heure dite.
+    const long = [bloc('objective-g', 605, 720)]
+    expect(plagesAuto({ blocsDuJour: long, confirmes: new Set(), nowMinute: 605, selectionId: 's', leveeJusqua: 640 })).toEqual([
+      { blocId: 'objective-g', debutMinute: 640, finMinute: 665, selectionId: 's' },
+    ])
+  })
+
+  it('une suspension passée ne change plus rien', () => {
+    const p = plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 560, selectionId: 's', leveeJusqua: 500 })
+    expect(p.map((x) => x.debutMinute)).toEqual([600, 840])
+  })
+
   it('une fenêtre ouverte garde son début : rien à reprogrammer d’une minute à l’autre', () => {
     const a = plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 610, selectionId: 's' })
     const b = plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 611, selectionId: 's' })

@@ -44,6 +44,13 @@ type EtatBlocage = {
   /** Ce qui est réellement programmé sur l'appareil, après les limites d'iOS. */
   plagesActives: Plage[]
   /**
+   * Un report accepté (« Later », la journée, une ancre « dans 5 min ») : le
+   * blocage AUTOMATIQUE est suspendu jusqu'à cette minute du jour. Sans ça, le
+   * plan recalculé posait aussitôt un autre bloc dans la place libérée, et il
+   * se bloquait sur-le-champ — on restait bloqué après avoir dit qu'on était pris.
+   */
+  levee: number | null
+  /**
    * Le titre du bloc que porte le bouclier en ce moment.
    *
    * Gardé ici et pas seulement passé en argument : le bouclier se repose à
@@ -112,6 +119,8 @@ type EtatBlocage = {
    * (tout écarté sauf les apps choisies, jusqu'à l'heure de reprise).
    */
   remplacerPlage: (blocId: string, nouvelle: Plage | null) => Promise<void>
+  /** Suspend le blocage automatique jusqu'à `jusqua` (minute du jour). */
+  suspendre: (jusqua: number) => Promise<void>
 }
 
 export const useBlocage = create<EtatBlocage>((set, get) => ({
@@ -122,6 +131,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   mode: 'ecarter',
   filtrerLeWeb: false,
   plagesActives: [],
+  levee: null,
   titreSeance: null,
   ecartees: { courtes: 0, plafond: 0 },
   occupe: false,
@@ -153,6 +163,8 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
         mode: lu['mode'] === 'profond' ? 'profond' : 'ecarter',
         filtrerLeWeb: lu['filtrerLeWeb'] === true,
         plagesActives: plages.success ? plagesDuJour(plages.data, date, cleDuJour()) : [],
+        // D'un jour à l'autre, la suspension tombe.
+        levee: date === cleDuJour() && typeof lu['levee'] === 'number' ? lu['levee'] : null,
       })
     } catch {
       // Une memoire abimee ne doit pas empecher l'ecran de s'ouvrir : sans
@@ -344,6 +356,11 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
       set({ occupe: false })
     }
   },
+
+  async suspendre(jusqua) {
+    set({ levee: Math.max(0, Math.min(1440, Math.round(jusqua))) })
+    await ranger(get())
+  },
 }))
 
 /** Ecrit l'etat durable. Les choix et les plages, jamais l'autorisation. */
@@ -354,6 +371,7 @@ async function ranger(e: {
   mode: ModeBlocage
   filtrerLeWeb: boolean
   plagesActives: Plage[]
+  levee: number | null
 }): Promise<void> {
   try {
     await AsyncStorage.setItem(
@@ -370,6 +388,7 @@ async function ranger(e: {
         mode: e.mode,
         filtrerLeWeb: e.filtrerLeWeb,
         plages: e.plagesActives,
+        levee: e.levee,
       }),
     )
   } catch {
