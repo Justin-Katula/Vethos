@@ -48,6 +48,7 @@ function Colonne({
   alignement = 'center',
   taillePolice = 21,
   mono = false,
+  pris,
 }: {
   libelles: string[]
   index: number
@@ -59,6 +60,8 @@ function Colonne({
   alignement?: 'center' | 'left' | 'right'
   taillePolice?: number
   mono?: boolean
+  /** Ce cran est déjà pris : il s'affiche en gris. */
+  pris?: (i: number) => boolean
 }) {
   const j = useJetons()
   const L = libelles.length
@@ -196,7 +199,8 @@ function Colonne({
                 numberOfLines={1}
                 style={{
                   textAlign: alignement,
-                  color: j.text,
+                  color: pris?.(rang % L) ? j.text3 : j.text,
+                  textDecorationLine: pris?.(rang % L) ? 'line-through' : 'none',
                   fontFamily: mono ? MONO.normal : GEIST.moyen,
                   fontWeight: '500',
                   fontSize: taillePolice,
@@ -265,11 +269,14 @@ export function RoueHeure({
   etiquette,
   pasMinutes = 5,
   bande,
+  prise,
 }: {
   valeur: string
   changer: (v: string) => void
   etiquette: string
   pasMinutes?: number
+  /** Une minute de la journée déjà prise : grise sur la roue. */
+  prise?: (minuteDuJour: number) => boolean
   /** Couleur de la bande de sélection (surface du dessous). */
   bande?: string
   /** Conservé pour compatibilité : les roues ont toujours cinq crans visibles. */
@@ -293,6 +300,8 @@ export function RoueHeure({
         cyclique
         changer={(nh) => changer(`${deux(nh)}:${deux(derniere.current.iMin * pasMinutes)}`)}
         etiquette={`${etiquette}, hours`}
+        // Une heure n'est grise que si TOUTES ses minutes sont prises.
+        pris={prise ? (hh) => minutes.every((_, k) => prise(hh * 60 + k * pasMinutes)) : undefined}
       />
       <Colonne
         libelles={minutes}
@@ -300,6 +309,7 @@ export function RoueHeure({
         cyclique
         changer={(ni) => changer(`${deux(derniere.current.h)}:${deux(ni * pasMinutes)}`)}
         etiquette={`${etiquette}, minutes`}
+        pris={prise ? (k) => prise(h * 60 + k * pasMinutes) : undefined}
       />
     </Cadre>
   )

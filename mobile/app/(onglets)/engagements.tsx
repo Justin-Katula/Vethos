@@ -12,7 +12,7 @@ import Svg, { Circle } from 'react-native-svg'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { cleDate, versTachesMoteur } from '@/plan/moteur'
-import { messagesCharge } from '@shared/planning/charge-message'
+import { floorWorkFor } from '@shared/planning/engine'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { cancelObjectiveRemoval, effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
@@ -20,6 +20,7 @@ import { useSeances } from '@/seances/magasin-seances'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
+import { ancreCollee, debutAvecPause, heurePrise, joursPris, type AncrePosee, type Voisine } from '@/plan/ancres-libres'
 import {
   A,
   BoutonFermer,
@@ -37,6 +38,7 @@ import {
   useToast,
   type NatureApp,
 } from '@/ui/app-briques'
+import { traitDe } from '@/ui/couleurs-engagement'
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -156,6 +158,7 @@ export default function Engagements() {
     const k = jours(t.echeance)
     const o = ouvert === t.id
     const n = Math.max(1, g.parties.length)
+    const perdu = manqueDe(g)
     return (
       <Pressable key={t.id} accessibilityRole="button" accessibilityState={{ expanded: o }} onPress={() => basculer(t.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
         <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
@@ -169,10 +172,17 @@ export default function Engagements() {
               <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(g.fait)} of ${hm(g.total)}`}</Text>
             </View>
             <View style={{ height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.1)', overflow: 'hidden' }}>
-              <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: A.t1 }} />
+              <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: traitDe('TASK', t.couleur, t.id) }} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'} · ${hm(g.total)} asked`}</Text>
+              {perdu >= 5 ? (
+                <View accessibilityLabel={`You will lose ${hm(perdu)}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 20, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.16)' }}>
+                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: A.rouge }} />
+                  <Text numberOfLines={1} style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 11 }}>{`${hm(perdu)} lost`}</Text>
+                </View>
+              ) : (
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'}`}</Text>
+              )}
               <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
                 {Array.from({ length: 10 }, (_, i) => (
                   <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
@@ -229,7 +239,7 @@ export default function Engagements() {
           <View style={{ width: 34, height: 34 }}>
             <Svg width={34} height={34} viewBox="0 0 34 34" style={{ transform: [{ rotate: '-90deg' }] }}>
               <Circle cx={17} cy={17} r={15} fill="none" stroke="rgba(242,242,242,0.1)" strokeWidth={2.5} />
-              <Circle cx={17} cy={17} r={15} fill="none" stroke={A.t1} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
+              <Circle cx={17} cy={17} r={15} fill="none" stroke={traitDe('GOAL', o.couleur, o.id)} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
             </Svg>
             <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{debut ? '' : `${Math.round(fr * 100)}%`}</Text>
           </View>
@@ -279,7 +289,7 @@ export default function Engagements() {
               {DOW.map((t, i) => {
                 const on = a.jours.includes((i + 1) % 7)
                 return (
-                  <View key={i} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: on ? COULEUR.ANCHOR : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                  <View key={i} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: on ? traitDe('ANCHOR', a.couleur, a.id) : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ color: on ? A.t1 : A.t4, fontFamily: GEIST.demi, fontSize: 10 }}>{t}</Text>
                   </View>
                 )
@@ -389,23 +399,20 @@ export default function Engagements() {
     </View>
   )
 
-  // Quand la charge demandée est lourde, l'application le dit avec des chiffres :
-  // ce que ça demande par jour, ou ce qui est placé et ce qui manque. Jamais un
-  // jugement, jamais une question.
-  const avis = messagesCharge({
-    result: resultat,
-    tasks: versTachesMoteur(d.taches),
-    today: cleDate(maintenant),
-    durationSource: { getActualMinutes: (id: string) => fait[id] ?? null },
-  }).map((m) => (
-    <View key={`avis-${m.deadline}`} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: A.ligne }}>
-      <View style={{ width: 6, height: 6, marginTop: 6, borderRadius: 3, backgroundColor: m.niveau === 'deficit' ? acc : A.t3 }} />
-      <Text style={{ flex: 1, color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{m.texte}</Text>
-    </View>
-  ))
+  // Le temps qui ne tient pas avant l'échéance : chiffré, en rouge, sur la
+  // tâche elle-même. Rien d'autre à lire.
+  const manqueDe = (() => {
+    const parId = new Map<string, number>()
+    for (const t of versTachesMoteur(d.taches)) {
+      const plancher = floorWorkFor(t, { getActualMinutes: (id: string) => fait[id] ?? null })
+      const place = resultat.verdicts.find((v) => v.taskId === t.id)?.placedMinutes ?? 0
+      parId.set(t.id, Math.max(0, plancher - Math.min(plancher, place)))
+    }
+    return (g: Groupe) => [g.racine, ...g.parties].reduce((q, t) => q + (parId.get(t.id) ?? 0), 0)
+  })()
 
   const sections = [
-    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', [...avis, ...couper(groupes).map(ligneTache)]),
+    section('TASK', groupes.length, groupes.length ? `Next due ${relD(jours(groupes[0]!.racine.echeance))}` : '', couper(groupes).map(ligneTache)),
     section(
       'GOAL',
       d.objectifs.length,
@@ -452,6 +459,7 @@ export default function Engagements() {
       </ScrollView>
       <Formulaire
         nature={forme}
+        ancres={d.ancres}
         fermer={() => setForme(null)}
         creer={async (f) => {
           if (f.K === 'TASK') {
@@ -476,7 +484,7 @@ export default function Engagements() {
 
 type Saisie = { K: NatureApp; nom: string; plan: string; minutes: number; echeance: string; imp: number; premiere: boolean; a: number; jours: number[] }
 
-function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; fermer: () => void; creer: (f: Saisie) => Promise<void> }) {
+function Formulaire({ nature, ancres, fermer, creer }: { nature: NatureApp | null; ancres: readonly AncrePosee[]; fermer: () => void; creer: (f: Saisie) => Promise<void> }) {
   const [K, setK] = useState<NatureApp>('TASK')
   const [nom, setNom] = useState('')
   const [plan, setPlan] = useState('')
@@ -490,6 +498,8 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
   const [jours, setJours] = useState<number[]>([])
   const [err, setErr] = useState('')
   const [occupe, setOccupe] = useState(false)
+  // Deux ancres bout à bout : on demande s'il faut une pause entre elles.
+  const [voisine, setVoisine] = useState<Voisine | null>(null)
   const ouvert = nature !== null
   const precedent = useRef<NatureApp | null>(null)
   if (nature && precedent.current !== nature) {
@@ -499,6 +509,7 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
     setPlan('')
     setJours([])
     setErr('')
+    setVoisine(null)
     const d = new Date()
     d.setDate(d.getDate() + 6)
     setDue(cleDate(d))
@@ -509,18 +520,29 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
   const pret = nom.trim().length > 0 && plan.trim().length > 0
   const champ = { height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 } as const
   const etiquette = (t: string) => <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 13, textAlign: 'center' }}>{t}</Text>
-  const enregistrer = async () => {
+  // Ce qui est déjà pris à l'heure choisie : l'heure grise si c'est tous les
+  // jours, sinon seulement les jours pris.
+  const [hA, mA] = a.split(':').map(Number)
+  const debutA = (hA ?? 0) * 60 + (mA ?? 0)
+  const pris = K === 'ANCHOR' ? joursPris(ancres, debutA, len) : []
+  const joursLibres = jours.filter((g) => !pris.includes(g))
+  const enregistrer = async (choix?: { debut: number }) => {
     if (occupe) return
     if (!nom.trim()) return setErr('Give it a name.')
     if (!plan.trim()) return setErr('Explain what you will do.')
     if (K === 'TASK' && !dur) return setErr('How much work does it need?')
     if (K === 'GOAL' && !hebdo) return setErr('How much time each week?')
     if (K === 'ANCHOR' && !len) return setErr('How long does it last?')
-    if (K === 'ANCHOR' && !jours.length) return setErr('Pick at least one day.')
-    const [h, m] = a.split(':').map(Number)
+    if (K === 'ANCHOR' && heurePrise(ancres, debutA, len)) return setErr('This time is taken every day.')
+    if (K === 'ANCHOR' && !joursLibres.length) return setErr(jours.length ? 'Those days are taken at this time.' : 'Pick at least one day.')
+    if (K === 'ANCHOR' && !choix) {
+      const v = ancreCollee(ancres, debutA, len, joursLibres)
+      if (v) return setVoisine(v)
+    }
+    setVoisine(null)
     setOccupe(true)
     try {
-      await creer({ K, nom: nom.trim(), plan: plan.trim(), minutes: K === 'TASK' ? dur : K === 'GOAL' ? hebdo : len, echeance: due, imp, premiere, a: (h ?? 0) * 60 + (m ?? 0), jours })
+      await creer({ K, nom: nom.trim(), plan: plan.trim(), minutes: K === 'TASK' ? dur : K === 'GOAL' ? hebdo : len, echeance: due, imp, premiere, a: choix?.debut ?? debutA, jours: K === 'ANCHOR' ? joursLibres : jours })
       Keyboard.dismiss()
       fermer()
     } catch (e) {
@@ -591,20 +613,30 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 1, gap: 2 }}>
                   {etiquette('At')}
-                  <RoueHeure valeur={a} changer={setA} etiquette="At" bande="rgba(242,242,242,0.08)" />
+                  <RoueHeure valeur={a} changer={(v) => (setA(v), setErr(''), setVoisine(null))} etiquette="At" bande="rgba(242,242,242,0.08)" prise={(m) => heurePrise(ancres, m, len)} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   {etiquette('For')}
-                  <RoueDuree minutes={len} changer={setLen} maxHeures={8} etiquette="For" bande="rgba(242,242,242,0.08)" />
+                  <RoueDuree minutes={len} changer={(v) => (setLen(v), setErr(''), setVoisine(null))} maxHeures={8} etiquette="For" bande="rgba(242,242,242,0.08)" />
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 {DOW.map((t, i) => {
                   const g = (i + 1) % 7
-                  const on = jours.includes(g)
+                  // Déjà pris à cette heure par une autre ancre : marqué, et non choisissable.
+                  const prisCeJour = pris.includes(g)
+                  const on = jours.includes(g) && !prisCeJour
                   return (
-                    <Pressable key={i} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => setJours((j) => (on ? j.filter((x) => x !== g) : [...j, g]))} style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: on ? A.t1 : 'rgba(242,242,242,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: on ? '#000' : A.t3, fontFamily: GEIST.demi, fontSize: 13 }}>{t}</Text>
+                    <Pressable
+                      key={i}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={prisCeJour ? `${t}, taken` : t}
+                      accessibilityState={{ checked: on, disabled: prisCeJour }}
+                      disabled={prisCeJour}
+                      onPress={() => (setErr(''), setVoisine(null), setJours((j) => (on ? j.filter((x) => x !== g) : [...j, g])))}
+                      style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: on ? A.t1 : prisCeJour ? 'rgba(242,242,242,0.03)' : 'rgba(242,242,242,0.1)', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: on ? '#000' : prisCeJour ? A.t4 : A.t3, fontFamily: GEIST.demi, fontSize: 13, textDecorationLine: prisCeJour ? 'line-through' : 'none' }}>{t}</Text>
                     </Pressable>
                   )
                 })}
@@ -612,12 +644,25 @@ function Formulaire({ nature, fermer, creer }: { nature: NatureApp | null; ferme
             </>
           ) : null}
         </View>
-        <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+        {voisine ? (
+          <View style={{ gap: 10, paddingHorizontal: 8, paddingTop: 4 }}>
+            <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 15, lineHeight: 20 }}>
+              {`${voisine.sens === 'apres' ? 'Right after' : 'Right before'} ${voisine.ancre.nom}. A 5 min break between them?`}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pilule onPress={() => void enregistrer({ debut: debutAvecPause(debutA, voisine) })}>{`Yes, at ${fmt(debutAvecPause(debutA, voisine))}`}</Pilule>
+              <Pilule contour onPress={() => void enregistrer({ debut: debutA })}>No break</Pilule>
+            </View>
+          </View>
+        ) : (
+          <Text style={{ minHeight: 18, paddingHorizontal: 8, color: A.rouge, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{err}</Text>
+        )}
       </ScrollView>
       <Pressable
         accessibilityRole="button"
         onPress={() => void enregistrer()}
-        style={({ pressed }) => ({ marginTop: 4, height: 52, borderRadius: 8, backgroundColor: A.t1, alignItems: 'center', justifyContent: 'center', opacity: pret ? 1 : 0.4, transform: [{ scale: pressed ? 0.975 : 1 }] })}
+        disabled={!!voisine}
+        style={({ pressed }) => ({ marginTop: 4, height: 52, borderRadius: 8, backgroundColor: A.t1, alignItems: 'center', justifyContent: 'center', opacity: pret && !voisine ? 1 : 0.4, transform: [{ scale: pressed ? 0.975 : 1 }] })}
       >
         <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 16 }}>{occupe ? 'Adding…' : cta}</Text>
       </Pressable>

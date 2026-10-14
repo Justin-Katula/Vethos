@@ -484,8 +484,8 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
           conflit.trigger.trim().toLowerCase() === (a.declencheur || a.nom).trim().toLowerCase()
         throw new Error(
           memeDeclencheur
-            ? `« ${conflit.name} » utilise déjà le déclencheur « ${conflit.trigger} ».`
-            : `Conflit d’horaire avec « ${conflit.name} ». Choisis une autre heure.`,
+            ? `${conflit.name} already exists.`
+            : `This time is taken by ${conflit.name}.`,
         )
       }
 
