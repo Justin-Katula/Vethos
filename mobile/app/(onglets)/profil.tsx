@@ -7,7 +7,6 @@ import { A, Carte, Chevron, GEIST, MONO, useToast } from '@/ui/app-briques'
 import { effectiveContract, requestModeChange, signContract, type Mode } from '@shared/contract'
 import { usePlan } from '@/plan/Plan'
 import { coach } from '@/coach/client'
-import { FeuilleCoach } from '@/coach/FeuilleCoach'
 import { CarteCompte } from '@/compte/CarteCompte'
 
 const MOIS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -38,7 +37,6 @@ export default function Profil() {
     void majReglages({ contrat: r.contract })
   }
   const effetLe = contrat?.pending ? new Date(contrat.pending.effectiveAt) : null
-  const [coachOuvert, setCoachOuvert] = useState(false)
   return (
     <ScrollView contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120 }}>
       <Pressable
@@ -104,17 +102,7 @@ export default function Profil() {
         ) : null}
       </Carte>
 
-      {coach().disponible ? (
-        <Pressable accessibilityRole="button" onPress={() => setCoachOuvert(true)} style={({ pressed }) => ({ marginTop: 12, transform: [{ scale: pressed ? 0.985 : 1 }] })}>
-          <Carte style={{ paddingVertical: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Coach</Text>
-              {reglages.planSiAlors ? <Text numberOfLines={2} style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{reglages.planSiAlors}</Text> : null}
-            </View>
-            <Chevron />
-          </Carte>
-        </Pressable>
-      ) : null}
+      {/* Le Coach n'a pas d'entrée à lui : il ne sert qu'aux moments de justification (Stop, Later). */}
       {coach().disponible ? (
         // L'accord pour que l'IA examine les demandes de Stop et de Later — changeable à tout moment.
         <Pressable
@@ -135,7 +123,6 @@ export default function Profil() {
         </Pressable>
       ) : null}
       <CarteCompte />
-      <FeuilleCoach ouverte={coachOuvert} fermer={() => setCoachOuvert(false)} />
     </ScrollView>
   )
 }

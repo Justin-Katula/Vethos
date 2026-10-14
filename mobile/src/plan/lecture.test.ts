@@ -90,3 +90,21 @@ describe('Les séances faites restent sur la carte', () => {
     expect(r[0]).toMatchObject({ debut: 572, fin: 662, titre: 'Rapport', nature: 'task', tenue: true })
   })
 })
+
+import { fusionnerContigus } from './lecture'
+describe('Un même engagement sans vraie pause = un seul bloc', () => {
+  const seg = (id: string, ref: string, debut: number, fin: number, over: object = {}) =>
+    ({ id, date: '2026-10-14', debut, fin, titre: ref, nature: 'task', travail: fin - debut, ref, ...over }) as Parameters<typeof fusionnerContigus>[0][number]
+  it('moins de 5 min entre deux blocs de la même tâche : fusionnés', () => {
+    const r = fusionnerContigus([seg('a', 't1', 600, 690), seg('b', 't1', 693, 780)])
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ id: 'a', debut: 600, fin: 780, travail: 177 })
+  })
+  it('5 min ou plus, ou deux engagements différents : séparés', () => {
+    expect(fusionnerContigus([seg('a', 't1', 600, 690), seg('b', 't1', 695, 780)])).toHaveLength(2)
+    expect(fusionnerContigus([seg('a', 'r1', 1020, 1050), seg('b', 'r2', 1050, 1080)])).toHaveLength(2)
+  })
+  it('jamais une séance faite avec une séance prévue', () => {
+    expect(fusionnerContigus([seg('a', 't1', 600, 690, { tenue: true }), seg('b', 't1', 690, 780)])).toHaveLength(2)
+  })
+})

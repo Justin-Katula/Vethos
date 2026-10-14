@@ -106,11 +106,39 @@ export function lireSemaine(
 
     return {
       date: c.date,
-      segments: [...sommeil, ...fixes, ...places].sort((a, b) => a.debut - b.debut),
+      segments: fusionnerContigus([...sommeil, ...fixes, ...places].sort((a, b) => a.debut - b.debut)),
       capacite: c.effectiveCapacityMinutes,
       travail: places.reduce((s, b) => s + b.travail, 0),
     }
   })
+}
+
+/** Moins que ça entre deux blocs du même engagement : c'est le même bloc. */
+export const ECART_MIN_MINUTES = 5
+
+/**
+ * Deux blocs du MÊME engagement qui se suivent à moins de 5 min ne sont pas
+ * deux séances : on les montre comme un seul bloc. Jamais deux engagements
+ * différents, jamais une séance faite avec une séance prévue.
+ */
+export function fusionnerContigus(segments: readonly SegmentTemps[]): SegmentTemps[] {
+  const out: SegmentTemps[] = []
+  for (const s of segments) {
+    const p = out[out.length - 1]
+    if (p && p.ref && p.ref === s.ref && p.nature === s.nature && !!p.tenue === !!s.tenue && s.debut >= p.fin && s.debut - p.fin < ECART_MIN_MINUTES) {
+      out[out.length - 1] = {
+        ...p,
+        fin: Math.max(p.fin, s.fin),
+        finEmpreinte: Math.max(p.finEmpreinte ?? p.fin, s.finEmpreinte ?? s.fin),
+        travail: p.travail + s.travail,
+        ...(s.pause !== undefined ? { pause: s.pause } : {}),
+        ...(s.pauseVisible !== undefined ? { pauseVisible: s.pauseVisible } : {}),
+      }
+      continue
+    }
+    out.push(s)
+  }
+  return out
 }
 
 export function segmentActuel(segments: readonly SegmentTemps[], minute: number) {

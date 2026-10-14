@@ -112,14 +112,6 @@ export default function Blocage() {
           )}
         </Carte>
 
-        <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 18 }}>
-          <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Installed apps</Text>
-          <View style={{ marginTop: 14 }}>
-            <Pilule plein={false} onPress={() => void ouvrir()}>
-              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 13 }}>Browse my apps</Text>
-            </Pilule>
-          </View>
-        </Carte>
       </View>
       <SelecteurApplications
         ouvert={selecteur}

@@ -317,7 +317,10 @@ function BlocTemps({ id, titre, heures, top, hauteur, pause, trait, bord, devant
   devant: boolean
   surPression: () => void
 }) {
-  const afficherTitre = hauteur >= 16
+  // Même un bloc court porte son nom : sans lui, quatre ancres d'affilée
+  // ressemblaient à des miettes d'une seule chose.
+  const compact = hauteur < 20
+  const afficherTitre = hauteur >= 11
   const afficherHeures = hauteur >= 34
   return (
     <Pressable
@@ -338,14 +341,15 @@ function BlocTemps({ id, titre, heures, top, hauteur, pause, trait, bord, devant
         borderLeftWidth: 3.5,
         borderLeftColor: trait,
         paddingHorizontal: afficherTitre ? 6 : 0,
-        paddingVertical: afficherTitre ? 3 : 0,
+        paddingVertical: afficherTitre && !compact ? 3 : 0,
+        justifyContent: compact ? ('center' as const) : ('flex-start' as const),
         zIndex: devant ? 15 : 5,
         opacity: pressed ? 0.72 : 1,
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
     >
       {afficherTitre ? (
-        <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 10.5, letterSpacing: -0.2 }}>{titre}</Text>
+        <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: compact ? 9 : 10.5, lineHeight: compact ? 11 : undefined, letterSpacing: -0.2 }}>{titre}</Text>
       ) : null}
       {afficherHeures ? (
         <Text numberOfLines={1} style={{ marginTop: 1, color: A.t3, fontFamily: MONO.normal, fontSize: 9, fontVariant: ['tabular-nums'] }}>{heures}</Text>
