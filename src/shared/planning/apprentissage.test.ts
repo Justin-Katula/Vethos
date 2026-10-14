@@ -9,6 +9,7 @@ import {
   rng,
   sampleBeta,
   seedFrom,
+  survieDe,
   updateBeta,
 } from './bayes'
 import { autonomie, discipline, doseSemaine, estJourTest, facteurDifficulte, niveauDifficulte, phaseHabitude, RAMPE, tenue } from './habitudes'
@@ -96,6 +97,18 @@ describe('Kaplan-Meier', () => {
     expect(dureeCible(obs)).toBe(44)
     expect(dureeCible(obs.slice(0, 4))).toBe(90) // < 5 observations : défaut
     expect(dureeCible([...Array(6).fill({ minutes: 5, arret: true })])).toBe(25)
+  })
+
+  it('un Stop pour un vrai imprévu ne raccourcit pas les blocs', () => {
+    // Six appels urgents à la 10e minute : ça ne dit pas qu'on ne tient que 10 min.
+    const urgences = Array.from({ length: 6 }, () =>
+      ev({ heldMinutes: 10, stoppedEarly: true, stop: { reason: 'real-event', attemptsBefore: 0 } }),
+    )
+    const obs = survieDe(urgences, 'objectif:obj')
+    expect(obs.every((o) => !o.arret)).toBe(true)
+    // La fatigue, elle, compte.
+    const fatigue = urgences.map((e) => ({ ...e, stop: { reason: 'tired' as const, attemptsBefore: 0 } }))
+    expect(survieDe(fatigue, 'objectif:obj').every((o) => o.arret)).toBe(true)
   })
 })
 

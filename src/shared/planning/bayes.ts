@@ -176,7 +176,12 @@ export function survieDe(events: SessionEvent[], category: string, tranche?: Tra
   // sait jusqu'où l'on tient), jamais pour la discipline.
   return retenus.map((e) => ({
     minutes: e.heldMinutes!,
-    arret: e.stoppedEarly || (e.extensionMinutes !== undefined && e.heldMinutes! < e.plannedMinutes + e.extensionMinutes),
+    // Un Stop pour un vrai imprévu (« real-event ») ne dit rien de l'endurance :
+    // on sait seulement qu'on tenait encore à cette minute — censuré, comme un
+    // bloc fini. Sinon un appel à la 10e minute raccourcirait tous les blocs.
+    arret:
+      (e.stoppedEarly && e.stop?.reason !== 'real-event') ||
+      (e.extensionMinutes !== undefined && e.heldMinutes! < e.plannedMinutes + e.extensionMinutes),
   }))
 }
 
