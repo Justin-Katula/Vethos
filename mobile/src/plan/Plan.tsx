@@ -51,8 +51,10 @@ import {
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
 import { cleDate, entreeEtPlan } from './moteur'
 import {
+  evenementDuReport,
   journeeReportable,
   noterReport,
+  texteSuffisant,
   optionsPlusTard,
   pliesParReport,
   plusTardPermis,
@@ -60,7 +62,7 @@ import {
   travailDuJour,
   type OptionPlusTard,
 } from '@shared/planning/report'
-import { creerPromesse, echeanceDe, reactionRaison } from '@shared/planning/trust'
+import { creerPromesses, echeanceDe, empreinteRattrapage, reactionRaison, type Placement } from '@shared/planning/trust'
 import { addDays as ajouterJours } from '@shared/planning/dates'
 import { lireSemaine, seancesTenues } from './lecture'
 import { liberationsDuJour } from './bonus-tache'
@@ -70,13 +72,15 @@ import { liberationsDuJour } from './bonus-tache'
  * ne se place plus aujourd'hui (la promesse, elle, reste posée).
  */
 type BlocReportable = { id: string; kind: string; refId: string; workMinutes: number; label: string }
-export type OptionPlusTardVue = OptionPlusTard & { demainMinutes: number }
+export type OptionPlusTardVue = OptionPlusTard & { demainMinutes: number; placement: Placement }
 export type ReactionPlusTard =
   | { etape: 'message'; message: string }
   | {
       etape: 'reaction'
       lignes: string[]
       dixMinutes: boolean
+      /** Sans quelques mots d'explication, pas de report : seul « Je commence » reste. */
+      sansTexte: boolean
       options: OptionPlusTardVue[]
       /** « Tomorrow » : null s'il n'est pas permis cette semaine ou ne tient pas. */
       journee: { aujourdhuiMinutes: number; demainAvant: number; demainApres: number } | null
@@ -88,8 +92,11 @@ function reporterPlusTard(
   option: OptionPlusTard,
   aujourdHui: string,
   raison?: StopReason,
+  placement?: Placement,
 ): LearningState {
-  const avecPromesse = creerPromesse(l, {
+  // Comme le rattrapage d'un Stop : « trop dur » / « ennuyeux » → blocs de 25 min,
+  // « distrait » → mode profond.
+  const avecPromesse = creerPromesses(l, {
     id: `report-${bloc.id}`,
     kind: bloc.kind as 'task' | 'objective',
     refId: bloc.refId,
@@ -99,7 +106,8 @@ function reporterPlusTard(
     startMinute: option.startMinute,
     minutes: Math.max(1, Math.min(600, bloc.workMinutes)),
     createdAt: new Date().toISOString(),
-  })
+    ...(placement?.deep ? { deep: true } : {}),
+  }, placement?.morceau)
   return noterReport(avecPromesse, { date: aujourdHui, kind: 'later', blockId: bloc.id, refId: bloc.refId, ...(raison ? { reason: raison } : {}) })
 }
 
@@ -466,6 +474,19 @@ function useSourcePlan() {
     pontEcran()
       .lireTentatives()
       .filter((t) => Date.now() - t < 10 * 60_000 && (confirmeA === undefined || t >= confirmeA)).length
+  /** La trace d'un report au journal : la raison compte, comme celle d'un Stop. */
+  const traceDuReport = (bloc: BlocReportable & { startMinute: number }, date: string, raison: StopReason, texte: string, reponseMs?: number) =>
+    evenementDuReport({
+      bloc: { ...bloc, kind: bloc.kind as 'task' | 'objective' },
+      date,
+      raison,
+      texte,
+      raisonTexte: lireTexteArret(texte),
+      ...(reponseMs !== undefined ? { answerMs: reponseMs } : {}),
+      attemptsBefore: tentativesRecentes(undefined),
+      niveau,
+      nowIso: new Date().toISOString(),
+    })
   const tacheEnCours = (o: { kind: string; refId: string } | null | undefined) =>
     o?.kind === 'task' ? taches.find((t) => t.id === o.refId) : undefined
 
@@ -751,6 +772,7 @@ function useSourcePlan() {
        * oriente vers une aide humaine.
        */
       reagir: async (bloc: BlocReportable, raison: StopReason, texte?: string): Promise<ReactionPlusTard> => {
+        // (Le texte est obligatoire : sans lui, la réaction s'affiche, mais aucune heure.)
         const frais = useSeances.getState()
         const { d, minute } = maintenantMinute()
         if (texte && detecteDetresse(texte)) {
@@ -777,14 +799,19 @@ function useSourcePlan() {
           },
           { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: tache.echeance }) : null },
         )
+        if (!texteSuffisant(texte)) {
+          return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, sansTexte: true, options: [], journee: null }
+        }
+        const placement = reaction.placement
         const options = optionsPlusTard({
           plan: avant.plan, today: aujourdHui, nowMinute: minute,
-          bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: bloc.workMinutes },
+          bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: empreinteRattrapage(bloc.workMinutes, placement.morceau) },
           deadline: tache?.echeance ?? null,
-          preference: reaction.placement.preference,
+          preference: placement.preference,
         }).map((o) => ({
           ...o,
-          demainMinutes: travailDuJour(planApres(reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui, raison), frais.confirmations).plan, demain),
+          placement,
+          demainMinutes: travailDuJour(planApres(reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui, raison, placement), frais.confirmations).plan, demain),
         }))
         // « Tomorrow », en dernier recours : permis cette semaine, et seulement si tout tient encore.
         const apres = planApres(noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' }), frais.confirmations)
@@ -795,27 +822,33 @@ function useSourcePlan() {
           reportJourneePermis(frais.apprentissage, aujourdHui) && journeeReportable({ planApres: apres.plan, inputApres: apres.input, refs })
             ? { aujourdhuiMinutes: travailDuJour(avant.plan, aujourdHui), demainAvant: travailDuJour(avant.plan, demain), demainApres: travailDuJour(apres.plan, demain) }
             : null
-        return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, options, journee }
+        return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, sansTexte: false, options, journee }
       },
+      /** « Ennuyeux » : 10 minutes d'abord, puis la question revient (comme « 10 more minutes » d'un Stop). */
+      dixMinutes: (raison: StopReason, texte?: string) => confiance.dixMinutesDePlus(raison, texte),
       /** Repose la séance à l'heure choisie ; l'écart et les rappels de maintenant s'arrêtent. */
-      choisirPlusTard: async (bloc: BlocReportable, option: OptionPlusTard, raison: StopReason) => {
+      choisirPlusTard: async (bloc: BlocReportable & { startMinute: number }, option: OptionPlusTardVue, raison: StopReason, texte: string, reponseMs?: number) => {
         const frais = useSeances.getState()
         const aujourdHui = cleDate(new Date())
+        const trace = traceDuReport(bloc, aujourdHui, raison, texte, reponseMs)
         // Le bloc reporté n'est plus suivi : sans ça, sa fenêtre d'origine se
         // fermerait plus tard et compterait comme une séance ratée.
         const c = frais.confirmations
         const confirmations = c.observedPending?.blockId === bloc.id ? { ...c, observedPending: null } : c
-        await poser({ apprentissage: reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui, raison), confirmations })
+        const l = reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui, raison, option.placement)
+        await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         await blocage().remplacerPlage(bloc.id, null)
       },
       /** « Tomorrow » : tout ce qui reste aujourd'hui passe aux jours suivants. */
-      reporterJournee: async (raison: StopReason) => {
+      reporterJournee: async (bloc: BlocReportable & { startMinute: number }, raison: StopReason, texte: string, reponseMs?: number) => {
         const frais = useSeances.getState()
         const aujourdHui = cleDate(new Date())
+        const trace = traceDuReport(bloc, aujourdHui, raison, texte, reponseMs)
         const c = frais.confirmations
         const enCours = c.observedPending && c.observedPending.blockId in c.confirmedAt
         const confirmations = c.observedPending && !enCours ? { ...c, observedPending: null } : c
-        await poser({ apprentissage: noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day', reason: raison }), confirmations })
+        const l = noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day', reason: raison })
+        await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt)))
         await blocage().appliquerPlan(plages)
       },

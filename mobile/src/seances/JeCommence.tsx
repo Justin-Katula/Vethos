@@ -209,21 +209,24 @@ export function JeCommence() {
             acc={acc}
             basMarge={marges.bottom}
             fermer={() => setFeuille(null)}
-            raisonChoisie={async (raison, texte) => {
+            raisonChoisie={async (raison, texte, reponseMs) => {
               const r = await reports.reagir(enAttente, raison, texte)
-              setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, r })
+              setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, texte: texte ?? '', reponseMs, r })
             }}
-            commencer={() => {
+            commencer={async (dix) => {
+              const f = feuille
               setFeuille(null)
-              void valider()
+              await valider()
+              // « Ennuyeux » : 10 minutes, puis la question revient — comme pour un Stop.
+              if (dix && f?.e === 'reaction') await reports.dixMinutes(f.raison, f.texte || undefined)
             }}
-            choisir={async (raison, o) => {
+            choisir={async (f, o) => {
               setFeuille(null)
-              await reports.choisirPlusTard(enAttente, o, raison)
+              await reports.choisirPlusTard(enAttente, o, f.raison, f.texte, f.reponseMs)
             }}
-            reporterJournee={async (raison) => {
+            reporterJournee={async (f) => {
               setFeuille(null)
-              await reports.reporterJournee(raison)
+              await reports.reporterJournee(enAttente, f.raison, f.texte, f.reponseMs)
             }}
           />
         ) : null}
@@ -233,7 +236,8 @@ export function JeCommence() {
 }
 
 type Reaction = Extract<ReactionPlusTard, { etape: 'reaction' }>
-type Feuille = { e: 'raison' } | { e: 'reaction'; raison: StopReason; r: Reaction } | { e: 'message'; texte: string }
+type EnReaction = { e: 'reaction'; raison: StopReason; texte: string; reponseMs?: number; r: Reaction }
+type Feuille = { e: 'raison' } | EnReaction | { e: 'message'; texte: string }
 
 const ligne = { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, minHeight: 52, paddingHorizontal: 14, borderRadius: 12, backgroundColor: 'rgba(242,242,242,0.08)' }
 const corps = { color: A.t1, fontFamily: GEIST.normal, fontSize: 16, lineHeight: 23 } as const
@@ -263,13 +267,15 @@ function FeuillePlusTard({
   acc: string
   basMarge: number
   fermer: () => void
-  raisonChoisie: (raison: StopReason, texte?: string) => Promise<void>
-  commencer: () => void
-  choisir: (raison: StopReason, o: Reaction['options'][number]) => Promise<void>
-  reporterJournee: (raison: StopReason) => Promise<void>
+  raisonChoisie: (raison: StopReason, texte: string | undefined, reponseMs: number) => Promise<void>
+  commencer: (dix: boolean) => Promise<void>
+  choisir: (f: EnReaction, o: Reaction['options'][number]) => Promise<void>
+  reporterJournee: (f: EnReaction) => Promise<void>
 }) {
   const [texte, setTexte] = useState('')
   const [occupe, setOccupe] = useState(false)
+  // Le temps de réponse : une raison tapée en moins d'une seconde ne compte que pour moitié.
+  const [ouverteA] = useState(() => Date.now())
   const maintenant = new Date()
   const cle = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, '0')}-${String(maintenant.getDate()).padStart(2, '0')}`
   const agir = async (f: () => Promise<void>) => {
@@ -303,7 +309,7 @@ function FeuillePlusTard({
                   disabled={occupe}
                   onPress={() => {
                     Keyboard.dismiss()
-                    void agir(() => raisonChoisie(r, texte.trim() || undefined))
+                    void agir(() => raisonChoisie(r, texte.trim() || undefined, Date.now() - ouverteA))
                   }}
                   style={({ pressed }) => ({ ...ligne, width: '48.5%', opacity: pressed ? 0.7 : 1 })}
                 >
@@ -314,9 +320,9 @@ function FeuillePlusTard({
             <TextInput
               value={texte}
               onChangeText={(v) => setTexte(v.slice(0, 500))}
-              placeholder="Anything else? (optional)"
+              placeholder="What happened?"
               placeholderTextColor={A.t4}
-              accessibilityLabel="Anything else"
+              accessibilityLabel="What happened"
               selectionColor={A.t1}
               style={{ marginTop: 4, height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.normal, fontSize: 15 }}
             />
@@ -330,17 +336,17 @@ function FeuillePlusTard({
             ))}
             <Pressable
               accessibilityRole="button"
-              onPress={commencer}
+              onPress={() => void commencer(feuille.r.dixMinutes)}
               style={({ pressed }) => ({ height: 52, marginTop: 4, borderRadius: 12, backgroundColor: acc, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}
             >
-              <Text style={{ color: encreSur(acc), fontFamily: GEIST.demi, fontSize: 17 }}>I’m starting</Text>
+              <Text style={{ color: encreSur(acc), fontFamily: GEIST.demi, fontSize: 17 }}>{feuille.r.dixMinutes ? 'Just 10 minutes' : 'I’m starting'}</Text>
             </Pressable>
             {feuille.r.options.map((o) => (
               <Pressable
                 key={`${o.date}-${o.startMinute}`}
                 accessibilityRole="button"
                 disabled={occupe}
-                onPress={() => void agir(() => choisir(feuille.raison, o))}
+                onPress={() => void agir(() => choisir(feuille, o))}
                 style={({ pressed }) => ({ ...ligne, opacity: pressed ? 0.7 : 1 })}
               >
                 <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 16, fontVariant: ['tabular-nums'] }}>
@@ -353,7 +359,7 @@ function FeuillePlusTard({
               <Pressable
                 accessibilityRole="button"
                 disabled={occupe}
-                onPress={() => void agir(() => reporterJournee(feuille.raison))}
+                onPress={() => void agir(() => reporterJournee(feuille))}
                 style={({ pressed }) => ({ ...ligne, opacity: pressed ? 0.7 : 1 })}
               >
                 <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 15 }}>{`All of today · ${hm(feuille.r.journee.aujourdhuiMinutes)}`}</Text>
@@ -363,7 +369,7 @@ function FeuillePlusTard({
                 </Text>
               </Pressable>
             ) : null}
-            {!feuille.r.options.length && !feuille.r.journee ? (
+            {!feuille.r.sansTexte && !feuille.r.options.length && !feuille.r.journee ? (
               <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 15 }}>No free time before the deadline.</Text>
             ) : null}
           </>

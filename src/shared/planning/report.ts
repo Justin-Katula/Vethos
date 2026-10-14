@@ -1,4 +1,4 @@
-import type { LearningState, StopReason } from '@shared/schemas'
+import type { LearningState, SessionEvent, StopReason } from '@shared/schemas'
 import type { PlacedBlock, PlanningInput, PlanningResult } from './types'
 import { addDays, startOfWeek } from './dates'
 import { debutsLibres, placePourReporter, type Preference } from './trust'
@@ -156,3 +156,60 @@ export function noterReport(
 ): LearningState {
   return { ...l, postponements: [...reports(l), r].slice(-300) }
 }
+
+/**
+ * Le mot qui explique le report est OBLIGATOIRE : sans lui, Vethos considère
+ * qu'on n'a pas vraiment besoin de repousser — seul « Je commence » reste.
+ * Quelques mots au moins, pas une lettre au hasard.
+ */
+export const TEXTE_MIN_CARACTERES = 10
+export const texteSuffisant = (texte: string | undefined | null) => (texte ?? '').trim().length >= TEXTE_MIN_CARACTERES
+
+/**
+ * La trace d'un report dans le journal des séances : un arrêt à 0 minute,
+ * jamais commencé, verdict « postponed ». C'est elle qui fait compter la raison
+ * dans l'apprentissage (fiabilité, raisons anormales, « imprévu » trop
+ * fréquent = évitement), comme celle d'un Stop. Sans `promiseId` : une trace
+ * liée à une promesse n'est pas apprenable (`apprenable`).
+ */
+export function evenementDuReport(a: {
+  bloc: Pick<PlacedBlock, 'id' | 'kind' | 'refId' | 'startMinute' | 'workMinutes'> & { category?: string }
+  date: string
+  raison: StopReason
+  texte?: string
+  raisonTexte?: StopReason | null
+  answerMs?: number
+  attemptsBefore: number
+  niveau?: number
+  nowIso: string
+}): SessionEvent {
+  return {
+    blockId: a.bloc.id,
+    date: a.date,
+    kind: a.bloc.kind as SessionEvent['kind'],
+    refId: a.bloc.refId,
+    category: (a.bloc.category ?? 'général').slice(0, 60),
+    plannedStartMinute: a.bloc.startMinute,
+    plannedMinutes: Math.max(1, Math.min(1440, a.bloc.workMinutes)),
+    started: false,
+    delayMinutes: null,
+    spontaneous: false,
+    heldMinutes: 0,
+    stoppedEarly: true,
+    stop: {
+      reason: a.raison,
+      ...(a.texte ? { text: a.texte.slice(0, 500) } : {}),
+      ...(a.raisonTexte ? { textReason: a.raisonTexte } : {}),
+      ...(a.answerMs !== undefined ? { answerMs: Math.max(0, Math.round(a.answerMs)) } : {}),
+      attemptsBefore: a.attemptsBefore,
+      ...(a.niveau ? { level: a.niveau } : {}),
+      verdict: 'postponed',
+    },
+    blockedAttempts: 0,
+    load48hMinutes: 0,
+    createdAt: a.nowIso,
+  }
+}
+
+/** Un report vient-il d'avant le début (Later / Tomorrow) ? */
+export const reportAvantDebut = (e: Pick<SessionEvent, 'started' | 'stop'>) => !e.started && e.stop?.verdict === 'postponed'

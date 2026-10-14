@@ -119,3 +119,24 @@ describe('« Later » suit la raison, comme un Stop', () => {
     expect(o[0]!.startMinute).toBeLessThanOrEqual(12 * 60)
   })
 })
+
+import { fiabiliteRaison } from './arrets'
+import { evenementDuReport, texteSuffisant } from './report'
+
+describe('« Later » compte comme un arrêt, et s’explique par écrit', () => {
+  it('sans quelques mots, pas de report', () => {
+    expect(texteSuffisant('')).toBe(false)
+    expect(texteSuffisant('   bof   ')).toBe(false)
+    expect(texteSuffisant('Mon frère m’a appelé')).toBe(true)
+  })
+
+  it('la raison d’un Later pèse dans l’apprentissage comme celle d’un Stop', () => {
+    const ev = (i: number) =>
+      evenementDuReport({ bloc: { id: `task-t-${i}`, kind: 'task', refId: 't', startMinute: 600, workMinutes: 90 }, date: `2026-10-${String(10 + i).padStart(2, '0')}`, raison: 'boring', texte: 'Je n’avais pas envie du tout', attemptsBefore: 0, answerMs: 4000, nowIso: '2026-10-13T10:00:00.000Z' })
+    const events = [1, 2, 3].map(ev)
+    // « Boring » avant d'avoir commencé colle au comportement (moins de 15 min tenues) : la raison gagne en fiabilité.
+    expect(fiabiliteRaison(events, 'boring')).toBeGreaterThan(0.5)
+    expect(events[0]!.stop?.verdict).toBe('postponed')
+    expect(events[0]!.started).toBe(false)
+  })
+})

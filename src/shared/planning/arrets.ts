@@ -25,7 +25,10 @@ export { STOP_REASONS }
 
 export type Cause = 'fatigue' | 'evitement' | 'creneau' | 'tropLong'
 
-const arretsDe = (events: SessionEvent[]) => events.filter((e) => apprenable(e) && e.started && e.stoppedEarly && e.heldMinutes !== null)
+// Un report demandé avant le début (« Later », `./report`) compte comme un
+// arrêt à 0 minute : sa raison pèse dans l'apprentissage comme celle d'un Stop.
+const arretsDe = (events: SessionEvent[]) =>
+  events.filter((e) => apprenable(e) && (e.started || e.stop?.verdict === 'postponed') && e.stoppedEarly && e.heldMinutes !== null)
 
 function correlation(xs: number[], ys: number[]): number {
   const n = xs.length
