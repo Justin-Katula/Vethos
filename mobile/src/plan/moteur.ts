@@ -1,4 +1,5 @@
 import { computePlan } from '@shared/planning/engine'
+import { addDays } from '@shared/planning/dates'
 import { joursLibresPris } from '@shared/planning/jours-libres'
 import { promessesAPoser } from '@shared/planning/trust'
 import type {
@@ -170,6 +171,13 @@ function sourceConfirmation(apprentissage: LearningState): SessionConfirmationSo
  * traduction qui deriverait d'un champ ferait viser deux cibles differentes —
  * une tache qui ne se terminerait jamais toute seule.
  */
+/**
+ * Le jour choisi est celui AVANT lequel la tâche doit être finie : « due le 20 »
+ * = fini le 19 au soir. Le moteur, lui, lit une échéance comme le dernier jour
+ * de travail — on traduit ici, une seule fois, pour tout ce qui le nourrit.
+ */
+export const dernierJourDe = (echeance: string): string => addDays(echeance, -1)
+
 export function versTachesMoteur(taches: readonly Tache[]): TaskItem[] {
   return taches
     .filter((t) => !t.terminee)
@@ -177,7 +185,7 @@ export function versTachesMoteur(taches: readonly Tache[]): TaskItem[] {
       id: t.id,
       title: t.titre,
       plan: t.intention || t.titre,
-      deadline: t.echeance,
+      deadline: dernierJourDe(t.echeance),
       importance: t.importance,
       category: 'général',
       workKind: t.nature === 'nouveau' ? ('novel' as const) : ('routine' as const),

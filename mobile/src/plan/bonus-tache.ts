@@ -3,6 +3,7 @@ import { bonusALiberer, bonusCible } from '@shared/planning/bonus'
 import type { SessionEvent } from '@shared/schemas'
 import type { PlanningResult } from '@shared/planning/types'
 import type { Tache } from '@/donnees/magasin'
+import { dernierJourDe } from './moteur'
 
 /**
  * Le bonus d'une tâche : quelques minutes de plus, libérées quand le plan a du
@@ -31,7 +32,8 @@ export function liberationsDuJour(args: {
     const membres = parties.length > 0 ? parties : [racine]
     if (membres.every((m) => m.minutesRestantes + m.minutesSupplementaires <= 0)) continue
 
-    const point = args.resultat.feasibility.densities.find((d) => d.deadline === racine.echeance)
+    const dernier = dernierJourDe(racine.echeance)
+    const point = args.resultat.feasibility.densities.find((d) => d.deadline === dernier)
     if (!point) continue
 
     const ids = new Set(membres.map((m) => m.id))
@@ -50,7 +52,7 @@ export function liberationsDuJour(args: {
     // Une échéance au-delà de l'horizon calculé ne peut pas l'être encore : la
     // densité (déjà sous le seuil du bonus) fait alors foi.
     const finHorizon = args.resultat.capacities.at(-1)?.date ?? args.today
-    const plancherPlace = racine.echeance > finHorizon || membres.every((m) => {
+    const plancherPlace = dernier > finHorizon || membres.every((m) => {
       const reste = Math.max(0, m.minutesRestantes + m.minutesSupplementaires - (args.fait[m.id] ?? 0))
       if (reste <= 0) return true
       const verdict = args.resultat.verdicts.find((v) => v.taskId === m.id)
@@ -59,7 +61,7 @@ export function liberationsDuJour(args: {
 
     const cible = bonusCible({
       workKind: racine.nature === 'nouveau' ? 'novel' : 'routine',
-      joursRestants: Math.max(1, daysBetween(args.today, racine.echeance) + 1),
+      joursRestants: Math.max(1, daysBetween(args.today, dernier) + 1),
       jeuMinutes: point.capacityMinutes - point.loadMinutes,
       densite: point.density,
     })

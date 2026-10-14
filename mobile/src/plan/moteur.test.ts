@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculerPlan } from './moteur'
+import { calculerPlan, dernierJourDe } from './moteur'
 import type { Ancre, Objectif, Obligation, Reglages, Tache } from '@/donnees/magasin'
 
 /**
@@ -215,5 +215,12 @@ describe('les lois que le moteur fait respecter', () => {
     // un bug interne, jamais quelque chose que l'on absorbe en silence.
     const r = appeler({ taches: [tache({ minutesEstimees: 400, minutesRestantes: 400 })] })
     expect(r.internalError).toBeUndefined()
+  })
+})
+
+describe('le jour choisi = finir AVANT ce jour', () => {
+  it('« due le 20 » : le moteur vise le 19 comme dernier jour de travail', () => {
+    expect(dernierJourDe('2026-10-20')).toBe('2026-10-19')
+    expect(dernierJourDe('2026-11-01')).toBe('2026-10-31')
   })
 })

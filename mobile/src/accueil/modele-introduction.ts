@@ -176,8 +176,8 @@ export function preparerIntroduction(
   const creer = (e: EngagementIntroduction, strict: boolean) => {
     const nom = e.nom.trim()
     if (e.nature === 'tache') {
-      if (!dateValide(e.echeance) || e.echeance < cleDate(maintenant))
-        throw new Error('Choose a deadline today or later (YYYY-MM-DD).')
+      if (!dateValide(e.echeance) || e.echeance <= cleDate(maintenant))
+        throw new Error('Choose a day after today.')
       if (!Number.isInteger(e.minutes) || e.minutes < 5 || e.minutes > 10000)
         throw new Error('Estimate between 5 and 10,000 minutes.')
       let index = 0

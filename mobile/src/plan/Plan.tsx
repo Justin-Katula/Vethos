@@ -49,7 +49,7 @@ import {
   type OptionRattrapage,
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
-import { cleDate, entreeEtPlan } from './moteur'
+import { cleDate, dernierJourDe, entreeEtPlan } from './moteur'
 import {
   evenementDuReport,
   journeeReportable,
@@ -572,7 +572,7 @@ function useSourcePlan() {
         attemptsBefore: tentativesRecentes(confirmeA),
         sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
         coucher,
-        tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
+        tache: tache ? { id: tache.id, deadline: dernierJourDe(tache.echeance) } : null,
         planApres,
         pliage: pliage(o),
       })
@@ -605,7 +605,7 @@ function useSourcePlan() {
         attemptsBefore: tentativesRecentes(frais.confirmations.confirmedAt[o.blockId]),
         sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
         coucher,
-        tache: tache ? { id: tache.id, deadline: tache.echeance } : null,
+        tache: tache ? { id: tache.id, deadline: dernierJourDe(tache.echeance) } : null,
         planApres,
         pliage: pliage(o),
       })
@@ -662,7 +662,7 @@ function useSourcePlan() {
         confirmations: frais.confirmations,
         nowMs: d.getTime(),
         minute,
-        deadline: tacheEnCours(o)?.echeance ?? null,
+        deadline: tacheEnCours(o) ? dernierJourDe(tacheEnCours(o)!.echeance) : null,
         planApres,
       })
     },
@@ -800,7 +800,7 @@ function useSourcePlan() {
             nowMinute: minute,
             sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
           },
-          { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: tache.echeance }) : null },
+          { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: dernierJourDe(tache.echeance) }) : null },
         )
         if (!texteSuffisant(texte)) {
           return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, sansTexte: true, options: [], journee: null }
@@ -809,7 +809,7 @@ function useSourcePlan() {
         const options = optionsPlusTard({
           plan: avant.plan, today: aujourdHui, nowMinute: minute,
           bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: empreinteRattrapage(bloc.workMinutes, placement.morceau) },
-          deadline: tache?.echeance ?? null,
+          deadline: tache ? dernierJourDe(tache.echeance) : null,
           preference: placement.preference,
         }).map((o) => ({
           ...o,

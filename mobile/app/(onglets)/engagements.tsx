@@ -141,8 +141,8 @@ export default function Engagements() {
   // elle part dans l'historique, marquée comme échouée.
   const cleDuJour = cleDate(maintenant)
   const tousLesGroupes = grouper(d.taches.filter((t) => !t.terminee), fait)
-  const groupes = tousLesGroupes.filter((g) => g.racine.echeance >= cleDuJour)
-  const echouees = tousLesGroupes.filter((g) => g.racine.echeance < cleDuJour)
+  const groupes = tousLesGroupes.filter((g) => g.racine.echeance > cleDuJour)
+  const echouees = tousLesGroupes.filter((g) => g.racine.echeance <= cleDuJour)
   const finies = d.taches.filter((t) => t.terminee && t.parentId === null)
   const couper = <T,>(l: T[]) => (page ? l : l.slice(0, 2))
   const basculer = (id: string) => setOuvert((x) => (x === id ? null : id))
@@ -184,11 +184,11 @@ export default function Engagements() {
             </View>
             {perdu >= 5 ? (
               // Ce qui ne tiendra pas : dit sans détour, et pourquoi c'est impossible.
-              <View accessible accessibilityLabel={`${hm(perdu)} can't fit. Impossible before ${dateCourte(t.echeance)}, even with all your free time.`} style={{ marginTop: 4, flexDirection: 'row', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.12)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.28)' }}>
+              <View accessible accessibilityLabel={`${hm(perdu)} can't fit. Impossible before ${dateCourte(t.echeance)}.`} style={{ marginTop: 4, flexDirection: 'row', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.12)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.28)' }}>
                 <View style={{ width: 3, borderRadius: 2, backgroundColor: A.rouge }} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 15, lineHeight: 20, letterSpacing: -0.2 }}>{`${hm(perdu)} can't fit`}</Text>
-                  <Text style={{ color: 'rgba(240,82,95,0.8)', fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17 }}>{`Impossible before ${dateCourte(t.echeance)}, even with all your free time.`}</Text>
+                  <Text style={{ color: 'rgba(240,82,95,0.8)', fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17 }}>{`Impossible before ${dateCourte(t.echeance)}`}</Text>
                 </View>
               </View>
             ) : null}
