@@ -631,6 +631,58 @@ export function EcranContrat({ ctx }: { ctx: Ctx }) {
   )
 }
 
+// ——— L'examen par l'IA : l'accord, une fois, ici ———
+
+/**
+ * Repousser une séance se justifie, et l'IA examine la demande : la règle
+ * 5.1.2 d'Apple veut une permission explicite AVANT d'envoyer ce qu'on écrit
+ * à une IA tierce. Elle se donne ici, pendant l'introduction — jamais au
+ * milieu d'un Stop. Sans accord, les règles fixes décident.
+ */
+export function EcranIA({ ctx }: { ctx: Ctx }) {
+  const e = ctx.e
+  const choisir = (v: 'oui' | 'non') => {
+    vibrer('light')
+    ctx.maj(() => ({ ia: v }))
+  }
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ position: 'absolute', left: 24, right: 24, top: ctx.haut }}>
+        <Entree dl={150} reduit={ctx.reduit}>
+          <Titre>Stopping is reviewed.</Titre>
+        </Entree>
+        <Entree dl={330} reduit={ctx.reduit} style={{ marginTop: 20, gap: 10 }}>
+          <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
+            To stop or postpone a session, you explain why. AI asks a few questions, then decides.
+          </Text>
+          <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
+            What you write is sent to our server and processed by DeepSeek.
+          </Text>
+        </Entree>
+        <View style={{ gap: 8, marginTop: 24 }}>
+          <Entree dl={480} reduit={ctx.reduit}>
+            <Ligne titre="Allow AI review" sous="Questions, then a decision" forme="radio" pris={e.ia === 'oui'} onPress={() => choisir('oui')} />
+          </Entree>
+          <Entree dl={590} reduit={ctx.reduit}>
+            <Ligne titre="Fixed rules only" sous="Nothing is sent" forme="radio" pris={e.ia === 'non'} onPress={() => choisir('non')} />
+          </Entree>
+        </View>
+      </View>
+      <Entree dl={700} reduit={ctx.reduit} style={{ position: 'absolute', left: 24, right: 24, bottom: ctx.bas }}>
+        <Bouton
+          actif={e.ia !== null}
+          onPress={() => {
+            vibrer('success')
+            ctx.suivant()
+          }}
+        >
+          Continue
+        </Bouton>
+      </Entree>
+    </View>
+  )
+}
+
 // ——— L'âge : il fixe le plancher de la nuit ———
 
 const AGES: [TrancheAge, string][] = [

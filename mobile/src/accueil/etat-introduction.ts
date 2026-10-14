@@ -56,6 +56,8 @@ export type EtatIntro = {
   age: TrancheAge | null
   /** Le ton du contrat : Allié ou Sergent. */
   mode: Mode | null
+  /** L'accord pour que l'IA examine les demandes de Stop et de Later (règle 5.1.2 d'Apple). */
+  ia: 'oui' | 'non' | null
 }
 
 export function etatInitial(prenom: string, dans14: string): EtatIntro {
@@ -88,6 +90,7 @@ export function etatInitial(prenom: string, dans14: string): EtatIntro {
     locked: false,
     age: null,
     mode: null,
+    ia: null,
   }
 }
 
@@ -133,7 +136,7 @@ export function parcours(e: EtatIntro, maintenant: Date): Etape[] {
   })
   f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' }, { k: '12a' })
   if (e.things.length && natureDe(e, choisie(e, maintenant)) !== 'GOAL') f.push({ k: '12b' })
-  f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: 'contrat' }, { k: '17' })
+  f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: 'contrat' }, { k: 'ia' }, { k: '17' })
   return f
 }
 export const indexDe = (f: Etape[], st: Etape) => f.findIndex((x) => x.k === st.k && (x.t ?? 0) === (st.t ?? 0))

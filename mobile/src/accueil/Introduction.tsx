@@ -46,7 +46,7 @@ import { EcranBascule, EcranCout, EcranPensee, EcranVethos } from './ecrans-cout
 import {
   EcranFixes,
   EcranAge,
-  EcranContrat,
+  EcranIA, EcranContrat,
   EcranNuit,
   EcranPlace,
   EcranProtection,
@@ -82,6 +82,7 @@ const SCN: Record<string, [number, number, number, number, number, Mode]> = {
   '15': [0.12, 0.3, 0.8, 2.4, 0.05, 'h'],
   '16': [0, 0, 1, 2.4, 0, 'd'],
   contrat: [0.5, 0.95, 1, 2.2, 0.03, 'h'],
+  ia: [0.5, 0.95, 1, 2.2, 0.03, 'h'],
   '17': [0.5, 1.05, 1.1, 1.8, 0.03, 'h'],
 }
 function lueurDe(k: string, H: number): Lueur {
@@ -240,6 +241,8 @@ function IntroductionSombre() {
         setSortie(true)
         const m = eRef.current.mode
         await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age, m ? signContract(m, new Date()) : null)
+        // L'accord pour l'IA, donné pendant l'introduction (jamais demandé plus tard).
+        await useDonnees.getState().majReglages({ consentementIA: eRef.current.ia ?? 'non' })
         // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.
         router.replace('/')
         Animated.timing(monde, { toValue: 0, duration: reduit ? 200 : 650, easing: SORTIE, useNativeDriver: true }).start(() => {
@@ -330,6 +333,8 @@ function IntroductionSombre() {
         return placement ? <EcranPlace ctx={ctx} placement={placement} /> : null
       case 'contrat':
         return <EcranContrat ctx={ctx} />
+      case 'ia':
+        return <EcranIA ctx={ctx} />
       case '17':
         return placement ? <EcranSemaine ctx={ctx} placement={placement} entrer={entrer} /> : null
       default:

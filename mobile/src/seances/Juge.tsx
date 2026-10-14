@@ -9,15 +9,14 @@ import type { StopReason } from '@shared/schemas'
  * Le juge d'un Stop ou d'un Later, à l'écran (`@shared/coach/arbitre`).
  *
  * L'utilisateur voit l'application, pas une conversation : une question à la
- * fois, en titre, une réponse, « Send ». Trois points pendant l'examen. La
- * première fois seulement, l'accord pour l'IA (règle 5.1.2 d'Apple) ; sans
- * accord, hors ligne ou sans réponse, les règles fixes décident.
+ * fois, en titre, une réponse, « Send ». Trois points pendant l'examen.
+ * L'accord pour l'IA se donne pendant l'introduction (règle 5.1.2 d'Apple) ;
+ * sans accord, hors ligne ou sans réponse, les règles fixes décident.
  */
 
 type Bloc = { id: string; kind: string; refId: string; label: string; startMinute: number; workMinutes: number }
 type Echange = { question: string; sig: string; reponse: string }
 type Etat =
-  | { e: 'accord' }
   | { e: 'attente' }
   | { e: 'question'; question: string; sig: string }
   | { e: 'refus'; incoherence: { a: string; b: string } | null }
@@ -76,7 +75,7 @@ export function Juge({
   onAide: (message: string) => void
 }) {
   const { justification } = usePlan()
-  const [etat, setEtat] = useState<Etat>(justification.consentement === null ? { e: 'accord' } : { e: 'attente' })
+  const [etat, setEtat] = useState<Etat>({ e: 'attente' })
   const [reponse, setReponse] = useState('')
   const echanges = useRef<Echange[]>([])
   const depuis = useRef(Date.now())
@@ -121,38 +120,6 @@ export function Juge({
     echanges.current = [...echanges.current, { question: etat.question, sig: etat.sig, reponse: reponse.trim().slice(0, 500) }]
     setReponse('')
     void demander()
-  }
-
-  if (etat.e === 'accord') {
-    return (
-      <View style={{ gap: 12 }}>
-        <Text accessibilityRole="header" style={titre}>AI review</Text>
-        <Text style={corps}>
-          Vethos uses AI to review requests to stop or postpone a session. What you write here is sent to our server and processed by
-          DeepSeek. You can change this in Profile.
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={async () => {
-            await justification.consentir(true)
-            setEtat({ e: 'attente' })
-          }}
-          style={({ pressed }) => ({ height: 52, borderRadius: 12, backgroundColor: acc, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}
-        >
-          <Text style={{ color: encre, fontFamily: GEIST.demi, fontSize: 17 }}>Allow</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={async () => {
-            await justification.consentir(false)
-            setEtat({ e: 'attente' })
-          }}
-          style={({ pressed }) => ({ height: 48, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
-        >
-          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 16 }}>Not now</Text>
-        </Pressable>
-      </View>
-    )
   }
 
   if (etat.e === 'attente') return <Points couleur={acc} />
