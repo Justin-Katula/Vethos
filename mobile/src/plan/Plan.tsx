@@ -4,6 +4,8 @@ import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
 import { fusionnerAuto, memesPlages, plagesAuto } from '@/blocage/blocage-auto'
+import { empreinteRappels, rappelsAProgrammer } from '@/seances/rappels-plan'
+import { demanderAutorisation, preparerRappels, programmerRappels } from '@/seances/rappels'
 import { selectionEstVide } from '@/blocage/contrat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
@@ -203,6 +205,29 @@ function useSourcePlan() {
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
   }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, theme])
+
+  // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
+  // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.
+  const derniersRappels = useRef<string | null>(null)
+  useEffect(() => {
+    if (!prets) return
+    const minuit = new Date(calcul.maintenant)
+    minuit.setHours(0, 0, 0, 0)
+    const rappels = rappelsAProgrammer({
+      blocsDuJour,
+      confirmes: new Set(Object.keys(confirmations.confirmedAt)),
+      minuitMs: minuit.getTime(),
+      maintenantMs: Date.now(),
+    })
+    const e = empreinteRappels(rappels)
+    if (e === derniersRappels.current) return
+    derniersRappels.current = e
+    void (async () => {
+      await preparerRappels()
+      if (rappels.length > 0) await demanderAutorisation()
+      await programmerRappels(rappels)
+    })()
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.maintenant])
 
   // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
   // la cause est écrite dans la console de Metro (données rechargées, tâches

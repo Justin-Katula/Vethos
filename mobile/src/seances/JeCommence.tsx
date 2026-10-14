@@ -1,5 +1,5 @@
 import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Modal, Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Polygon } from 'react-native-svg'
@@ -8,6 +8,7 @@ import { enHeure } from '@/plan/lecture'
 import { A, GEIST, hm, MONO, useLumiere } from '@/ui/app-briques'
 import { FondLumiere } from '@/ui/FondLumiere'
 import { accentIntro, encreSur } from '@/ui/lumiere'
+import { useDemandeReport } from './rappels'
 
 /**
  * « Je commence » — D.7/D.8.
@@ -57,6 +58,15 @@ export function JeCommence() {
   const [encours, setEncours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [feuille, setFeuille] = useState<Feuille | null>(null)
+  // « Later » / « Tomorrow » touché sur une notification : la feuille s'ouvre ici.
+  const demande = useDemandeReport((e) => e.demande)
+  useEffect(() => {
+    if (!demande || !enAttente) return
+    useDemandeReport.getState().poser(null)
+    if (enAttente.kind !== 'task' && enAttente.kind !== 'objective') return
+    if (demande === 'tard' && reports.plusTardPermis(enAttente)) setFeuille({ sorte: 'tard', options: reports.optionsPlusTard(enAttente) })
+    if (demande === 'demain') setFeuille({ sorte: 'demain', apercu: reports.apercuDemain() })
+  }, [demande, enAttente, reports])
 
   // Après le souffle d'une promesse, l'overlay revient tout seul : on reprend.
   const retour = confiance.retourAttendu
