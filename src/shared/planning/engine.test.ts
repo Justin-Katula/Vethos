@@ -1208,6 +1208,19 @@ describe('B.5.1 — les parties se font DANS L’ORDRE, une à la fois', () => {
     }
   })
 
+  // Défaut réel du 2026-10-13 (iPhone) : une ancre confirmée en retard sortait
+  // DEUX fois — la séance épinglée à 18 h 00 et l'ancre replacée à 18 h 11 —
+  // sous le même id. Le cadran d'Aujourd'hui plantait sur la clé en double.
+  it('une ancre en cours n’est posée qu’une fois', () => {
+    const a = ancre({ anchorMinute: 1080, normalMaxMinutes: 30 })
+    const seance = { blockId: `ancre-${a.id}-${TODAY}`, kind: 'ancre' as const, refId: a.id, startMinute: 1080, endMinute: 1110, workMinutes: 30 }
+    const plan = computePlan(input({ ancres: [a], schedule: [], activeSession: seance }), new Date(2026, 7, 11, 18, 12))
+    const duJour = plan.blocks.filter((b) => b.date === TODAY && b.refId === a.id)
+    expect(duJour).toHaveLength(1)
+    expect(duJour[0]!.startMinute).toBe(1080)
+    expect(new Set(plan.blocks.map((b) => b.id)).size).toBe(plan.blocks.length)
+  })
+
   it('une tâche NON découpée n’est jamais mise en aperçu', () => {
     const plan = computePlan(input({ tasks: [task({ remainingMinutes: 120 })] }), NOW)
     expect(plan.blocks.filter((b) => b.kind === 'task').length).toBeGreaterThan(0)

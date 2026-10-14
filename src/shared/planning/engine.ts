@@ -656,6 +656,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
 
     // D.1.2 ANCRES — heure fixe, gelées, jamais déplacées.
     for (const ancre of ancresFor(dow)) {
+      // Déjà posée plus haut comme séance en cours : la reposer en ferait un
+      // second bloc au même id, décalé à l'heure de confirmation, et l'ancre
+      // compterait deux fois (défaut réel du 2026-10-13, iPhone).
+      if (session?.kind === 'ancre' && session.refId === ancre.id) continue
       const reduced = saturated.has(date) || freeDays.has(date)
       const duration = reduced ? ancre.minimumMinutes : ancre.normalMaxMinutes
       allocator.reserve(ancre.anchorMinute, ancre.anchorMinute + duration)
