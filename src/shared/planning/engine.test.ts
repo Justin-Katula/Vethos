@@ -1705,19 +1705,26 @@ describe('Apprentissage branché sur le moteur (spec moteur 2026-09-25)', () => 
     expect(plan.objectiveDoses[OBJ.id]).toEqual({ dose: 1200, cible: 1200 })
   })
 
-  it('journal vide : la première semaine porte la dose plancher, pas les 20 h', () => {
-    const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: [] }), NOW)
-    expect(plan.objectiveDoses[OBJ.id]).toEqual({ dose: 175, cible: 1200 })
-    expect(servi(plan, '2026-08-12')).toBeLessThanOrEqual(Math.ceil(175 / 7) + 5)
-  })
-
-  it('tenu à plus de 90 % : la dose monte de 15 % — figée pour la semaine, mesurée avant le lundi', () => {
-    // Lundi 10 août : la semaine d'avant compte, pas le lundi lui-même.
+  it('pas de rampe : ce qui est demandé est posé dès la première semaine', () => {
+    // Décidé le 2026-10-14 : 20 h demandées = 20 h, pas 7 × 25 min la première semaine.
+    const vide = computePlan(libre({ objectives: [OBJ], sessionEvents: [] }), NOW)
+    expect(vide.objectiveDoses[OBJ.id]).toEqual({ dose: 1200, cible: 1200 })
     const events = Array.from({ length: 7 }, (_, i) =>
       evenement(i, { date: addDays('2026-08-10', -(i + 1)), plannedMinutes: 50, heldMinutes: 50 }),
     )
-    const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
-    expect(plan.objectiveDoses[OBJ.id]!.dose).toBe(Math.round(350 * 1.15))
+    const tenu = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)
+    expect(tenu.objectiveDoses[OBJ.id]!.dose).toBe(1200)
+  })
+
+  it('le reste du jour sous 25 min n’est pas perdu : le bloc le prend', () => {
+    // 5 h par semaine = 43 min par jour. Des blocs appris de 30 min laissaient
+    // 13 min par jour jamais posées : 1 h 30 de moins chaque semaine.
+    const events = Array.from({ length: 8 }, (_, i) =>
+      evenement(i, { plannedMinutes: 60, heldMinutes: 30 + (i % 2), stoppedEarly: true, stop: { reason: 'tired', attemptsBefore: 0 } }),
+    )
+    const plan = computePlan(libre({ objectives: [{ ...OBJ, weeklyTargetMinutes: 300 }], sessionEvents: events }), NOW)
+    const jour = plan.blocks.filter((b) => b.kind === 'objective' && b.date === '2026-08-12')
+    expect(jour.reduce((q, b) => q + b.workMinutes, 0)).toBeGreaterThanOrEqual(40)
   })
 
   it('la longueur des blocs s’apprend : on décroche vers 40 min → blocs de ~40 min', () => {
@@ -1919,12 +1926,15 @@ describe('Revue 3 — longueur par tranche, et un gros journal', () => {
         ev(100 + i, { plannedStartMinute: 19 * 60, heldMinutes: 30 + (i % 3), stoppedEarly: true, stop: { reason: 'tired', attemptsBefore: 0 } }),
       ),
     ]
-    const plan = computePlan(input({ schedule: sleepScheduleEntries('23:00', '07:00'), objectives: [OBJ], sessionEvents: events }), NOW)
+    const plan = computePlan(input({ schedule: sleepScheduleEntries('23:00', '07:00'), objectives: [{ ...OBJ, weeklyTargetMinutes: 600 }], sessionEvents: events }), NOW)
     const blocs = plan.blocks.filter((b) => b.kind === 'objective' && b.date === '2026-08-12')
     for (const b of blocs) {
       if (b.startMinute >= 18 * 60) expect(b.workMinutes).toBeLessThanOrEqual(35)
     }
-    expect(blocs.some((b) => b.startMinute < 12 * 60 && b.workMinutes >= 60)).toBe(true)
+    const matin = blocs.filter((b) => b.startMinute < 12 * 60).map((b) => b.workMinutes)
+    const tard = blocs.filter((b) => b.startMinute >= 12 * 60).map((b) => b.workMinutes)
+    expect(matin.length).toBeGreaterThan(0)
+    expect(Math.max(...matin)).toBeGreaterThan(Math.max(0, ...tard))
   })
 
   it('3000 événements : un calcul reste sous la seconde', () => {

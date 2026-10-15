@@ -38,7 +38,7 @@ import {
 } from './feasibility'
 import { buildWindowMap, hasEnoughData, windowLookup } from './learning'
 import { apprenable, BLOC_MAX, BLOC_MIN, betaMean, dureeCible, GAMMA, inheritedPosterior, rng, sampleBeta, seedFrom, survieDe, trancheDe, type Tranche } from './bayes'
-import { doseSemaine, niveauDifficulte, phaseHabitude, rupturePossible, tenue, TOLERANCE_DEPART_MINUTES } from './habitudes'
+import { niveauDifficulte, phaseHabitude, rupturePossible, TOLERANCE_DEPART_MINUTES } from './habitudes'
 import { ajustementPour, diagnostiquer, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
 import {
@@ -109,25 +109,12 @@ function footprintFor(workMinutes: number): number {
  * faits chiffrés que d'autres points consommeront.
  */
 export function computePlan(rawInput: PlanningInput, now: Date = new Date()): PlanningResult {
-  // Rampe de départ (spec 2026-09-25) : l'obligation de placement porte sur
-  // la DOSE de la semaine, pas sur la cible complète. Toute la suite du moteur
-  // — faisabilité, rythme, quota — voit la dose ; la cible reste dans le
-  // contrat, et l'écart se montre comme une progression.
+  // Pas de rampe de départ (décidé le 2026-10-14) : ce qui est demandé est ce
+  // qui est placé, dès la première semaine. 5 h demandées = 5 h posées — pas
+  // 7 × 25 min la première semaine, puis cinq semaines pour y arriver.
   const events = rawInput.sessionEvents
   const objectiveDoses: Record<string, { dose: number; cible: number }> = {}
-  for (const o of rawInput.objectives) {
-    if (!events) {
-      objectiveDoses[o.id] = { dose: o.weeklyTargetMinutes, cible: o.weeklyTargetMinutes }
-      continue
-    }
-    // Figée pour la semaine : mesurée sur ce qui précède le lundi, jamais
-    // recalculée d'un jour à l'autre.
-    const t = tenue(events.filter(apprenable), o.id, startOfWeek(rawInput.today))
-    objectiveDoses[o.id] = {
-      dose: doseSemaine(o.weeklyTargetMinutes, t.tenuRecent, t.tauxTenue, t.observations),
-      cible: o.weeklyTargetMinutes,
-    }
-  }
+  for (const o of rawInput.objectives) objectiveDoses[o.id] = { dose: o.weeklyTargetMinutes, cible: o.weeklyTargetMinutes }
   const input: PlanningInput = {
     ...rawInput,
     objectives: rawInput.objectives.map((o) => ({ ...o, weeklyTargetMinutes: objectiveDoses[o.id]!.dose })),
@@ -752,7 +739,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         sacrificeLeft -= given
       }
 
-      let left = cinq(Math.min(quota, budget))
+      // Jamais plus que ce qui reste de la cible de la semaine : les quotas du
+      // jour, ajustés à la capacité, ne doivent pas la dépasser à eux tous.
+      const resteSemaine = Math.max(0, objective.weeklyTargetMinutes - (objectiveServed.get(key) ?? 0))
+      let left = cinq(Math.min(quota, budget, resteSemaine))
       // Au plus 2 séances par objectif et par jour, à 3 h d'écart au moins.
       // Si le quota tient en un bloc, une seule. Ce qui ne trouve pas sa place
       // part dans le report de D.4 — jamais en blocs collés.
@@ -765,7 +755,17 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const objCategory = `objectif:${objective.id}`
         // Le plafond : la plus longue des tranches ; la longueur de CHAQUE départ
         // est ensuite celle de sa tranche (lengthAt).
-        const work = Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes)
+        // Comme pour les tâches, une miette sous 25 min ne reste jamais seule :
+        // le bloc la prend. Sans ça, 43 min par jour avec des blocs appris de
+        // 30 laissaient 13 min par jour — 1 h 30 par semaine — jamais posées.
+        // Le reste pris au pas de 5 min inférieur : jamais au-delà du quota.
+        const reste = cinqDessous(left)
+        // …et sans dépasser le plus long bloc permis (1 h 30).
+        const absorbe = (w: number) => {
+          const a = absorbCrumb(w, reste)
+          return a <= TASK_CONSTANTS.targetBlockMinutes ? a : w
+        }
+        const work = absorbe(Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes))
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
         const slot = allocator.take(Math.min(footprint, budget), {
@@ -773,7 +773,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective, true, objCategory),
           // La longueur apprise suit la tranche horaire du départ choisi.
           ...(learn
-            ? { lengthAt: (start: number) => footprintFor(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start)))) }
+            ? { lengthAt: (start: number) => footprintFor(absorbe(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start))))) }
             : {}),
         })
         if (!slot) break

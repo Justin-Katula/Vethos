@@ -177,18 +177,7 @@ export function estJourTest(refId: string, date: string): boolean {
   return h % 5 === 0
 }
 
-// ─── Rampe de départ ──────────────────────────────────────────────────────
-
-export const RAMPE = {
-  /** On monte de 15 % quand plus de 90 % est tenu. Valeur de départ. */
-  hausse: 1.15,
-  seuilHausse: 0.9,
-  /** On redescend de 10 % sous 75 %. */
-  baisse: 0.9,
-  seuilBaisse: 0.75,
-  /** Première semaine : des blocs courts, tous les jours (7 × 25 min). */
-  dosePlancher: 7 * 25,
-} as const
+// ─── La tenue ─────────────────────────────────────────────────────────────
 
 /** Ce qui a été tenu, en minutes, sur les 7 derniers jours ; et la part tenue sur 14 jours. */
 export function tenue(
@@ -214,21 +203,6 @@ export function tenue(
       : 0,
     observations: quinzaine.length,
   }
-}
-
-/**
- * La dose de la semaine : structure dure, dose légère. La régularité est
- * stricte dès le jour 1 ; le volume monte selon ce que la personne tient
- * vraiment. La cible reste dans le contrat : c'est la destination, pas la
- * charge de la semaine 1.
- */
-export function doseSemaine(cible: number, tenuRecent: number, tauxTenue: number, observations: number): number {
-  const plancher = Math.min(cible, RAMPE.dosePlancher)
-  // Rien de mesuré encore : la première semaine, courte et quotidienne.
-  if (observations === 0) return plancher
-  if (tauxTenue > RAMPE.seuilHausse) return Math.round(Math.min(cible, Math.max(plancher, tenuRecent * RAMPE.hausse)))
-  if (tauxTenue < RAMPE.seuilBaisse) return Math.round(Math.min(cible, Math.max(plancher, tenuRecent * RAMPE.baisse)))
-  return Math.round(Math.min(cible, Math.max(plancher, tenuRecent)))
 }
 
 // ─── Difficulté visée : ~85 % de blocs tenus ─────────────────────────────

@@ -12,7 +12,7 @@ import {
   survieDe,
   updateBeta,
 } from './bayes'
-import { autonomie, discipline, doseSemaine, estJourTest, facteurDifficulte, niveauDifficulte, phaseHabitude, RAMPE, tenue } from './habitudes'
+import { autonomie, discipline, estJourTest, facteurDifficulte, niveauDifficulte, phaseHabitude, tenue } from './habitudes'
 import { ajustementPour, diagnostiquer, fiabiliteRaison, pauseAnticipee, raisonsAnormales } from './arrets'
 import { addDays } from './dates'
 
@@ -154,19 +154,7 @@ describe('Habitudes', () => {
   })
 })
 
-describe('Rampe de départ', () => {
-  it('première semaine : blocs courts, tous les jours', () => {
-    expect(doseSemaine(1200, 0, 0, 0)).toBe(RAMPE.dosePlancher)
-    expect(doseSemaine(120, 0, 0, 0)).toBe(120) // jamais au-dessus de la cible
-  })
-  it('on monte de 15 % quand plus de 90 % est tenu, sans dépasser la cible', () => {
-    expect(doseSemaine(1200, 400, 0.95, 7)).toBe(460)
-    expect(doseSemaine(420, 400, 0.95, 7)).toBe(420)
-  })
-  it('on consolide entre 75 et 90 %, on redescend sous 75 %', () => {
-    expect(doseSemaine(1200, 400, 0.8, 7)).toBe(400)
-    expect(doseSemaine(1200, 400, 0.5, 7)).toBe(360)
-  })
+describe('La tenue', () => {
   it('la tenue se lit dans le journal : 7 jours pour le volume, 14 pour le taux', () => {
     const t = tenue(serie(14, () => ({ heldMinutes: 45 })), 'obj', TODAY)
     expect(t.tauxTenue).toBeCloseTo(0.75)
