@@ -2,26 +2,22 @@
   "expo": {
     "name": "Vethos",
     "slug": "vethos",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "scheme": [
       "vethos",
       "device-activity"
     ],
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.vethos.app",
       "appleTeamId": "7R7TRVFDCW",
       "usesAppleSignIn": true,
-      "supportsTablet": true,
+      "supportsTablet": false,
       "deploymentTarget": "16.4",
       "infoPlist": {
         "NSFamilyControlsUsageDescription": "Vethos uses Screen Time to set aside the apps you picked yourself, for the length of a session you started. Nothing leaves your phone — iOS never tells Vethos which apps they are.",
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": [
-          "processing"
-        ]
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.family-controls": true
@@ -106,7 +102,7 @@
       "supabase": {
         "url": "https://aflefvivzyarsqwuwazz.supabase.co",
         "cle": "sb_publishable_yWPi5fusuadTzx7P-ZqJiA_Y5WUxcg7",
-        "apple": false,
+        "apple": true,
         "googleWeb": "444529886127-brgdi3l5b374egddk2g731ro8l5lh69q.apps.googleusercontent.com",
         "googleIos": ""
       },

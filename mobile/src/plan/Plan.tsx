@@ -283,8 +283,8 @@ function useSourcePlan() {
             wakeMinute: minutesDe(reglages.lever),
           }) })
       : null),
-    [mesuresPretes, chargees, calcul.maintenant, calcul.aujourdHui, blocsDuJour, taches,
-     apprentissage, confirmations],
+    [mesuresPretes, chargees, calcul.maintenant, calcul.minute, calcul.aujourdHui, blocsDuJour, taches,
+     apprentissage, confirmations, reglages.lever],
   )
 
   // Les séances se chargent avec le compte (voir `app/_layout.tsx`) : chaque
@@ -398,7 +398,8 @@ function useSourcePlan() {
     return debuts.length ? Math.min(...debuts) : null
   }
   const offre = useMemo(() => {
-    if (!actif || !evenementActif || suspendu) return null
+    // Une ancre ne se prolonge pas : elle tient son heure, puis c'est tout.
+    if (!actif || actif.kind === 'ancre' || !evenementActif || suspendu) return null
     const o = confirmations.observedPending
     if (!o || o.blockId !== actif.blockId) return null
     const finTravail = o.startMinute + (o.workMinutes ?? o.endMinute - o.startMinute)

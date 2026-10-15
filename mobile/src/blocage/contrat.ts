@@ -127,7 +127,7 @@ export const PlageSchema = z
     exceptionId: z.string().min(1).optional(),
   })
   .refine((p) => p.finMinute > p.debutMinute, {
-    message: 'Une plage se termine après son début.',
+    message: 'A window must end after it starts.',
   })
 export type Plage = z.infer<typeof PlageSchema>
 

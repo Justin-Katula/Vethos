@@ -305,7 +305,7 @@ export function confirmer(args: {
 }): EtatSeances & { retardMinutes: number; refuse?: string } {
   const minute = minuteDuJour(args.maintenant)
   if (args.bloc.id in args.etat.confirmations.confirmedAt) {
-    return { ...args.etat, retardMinutes: 0, refuse: 'Déjà confirmé.' }
+    return { ...args.etat, retardMinutes: 0, refuse: 'Already started.' }
   }
   const r = applyConfirmation(
     args.etat.apprentissage,
