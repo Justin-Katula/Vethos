@@ -217,7 +217,9 @@ function useSourcePlan() {
     const selection = b.selection
     if (!selection || selectionEstVide(selection)) return
     const confirmes = new Set(Object.keys(confirmations.confirmedAt))
-    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua: levee })
+    // Une suspension ne vaut que pour SON jour.
+    const leveeJusqua = levee && levee.date === calcul.aujourdHui ? levee.minute : null
+    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua })
     const voulues = fusionnerAuto({ actives: b.plagesActives, auto, idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
     const cle = JSON.stringify(voulues.map((p) => [p.blocId, p.debutMinute, p.finMinute]).sort())
     if (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives)) {
@@ -230,7 +232,7 @@ function useSourcePlan() {
     const bloc = prochain && blocsDuJour.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, theme, levee])
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, theme, levee])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.

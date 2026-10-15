@@ -49,7 +49,7 @@ type EtatBlocage = {
    * plan recalculé posait aussitôt un autre bloc dans la place libérée, et il
    * se bloquait sur-le-champ — on restait bloqué après avoir dit qu'on était pris.
    */
-  levee: number | null
+  levee: { date: string; minute: number } | null
   /**
    * Le titre du bloc que porte le bouclier en ce moment.
    *
@@ -164,7 +164,10 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
         filtrerLeWeb: lu['filtrerLeWeb'] === true,
         plagesActives: plages.success ? plagesDuJour(plages.data, date, cleDuJour()) : [],
         // D'un jour à l'autre, la suspension tombe.
-        levee: date === cleDuJour() && typeof lu['levee'] === 'number' ? lu['levee'] : null,
+        levee: (() => {
+          const l = lu['levee'] as { date?: unknown; minute?: unknown } | null | undefined
+          return l && l.date === cleDuJour() && typeof l.minute === 'number' ? { date: l.date, minute: l.minute } : null
+        })(),
       })
     } catch {
       // Une memoire abimee ne doit pas empecher l'ecran de s'ouvrir : sans
@@ -358,7 +361,8 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   },
 
   async suspendre(jusqua) {
-    set({ levee: Math.max(0, Math.min(1440, Math.round(jusqua))) })
+    // Datée : une suspension d'aujourd'hui ne déborde jamais sur demain, même app restée ouverte.
+    set({ levee: { date: cleDuJour(), minute: Math.max(0, Math.min(1440, Math.round(jusqua))) } })
     await ranger(get())
   },
 }))
@@ -371,7 +375,7 @@ async function ranger(e: {
   mode: ModeBlocage
   filtrerLeWeb: boolean
   plagesActives: Plage[]
-  levee: number | null
+  levee: { date: string; minute: number } | null
 }): Promise<void> {
   try {
     await AsyncStorage.setItem(
