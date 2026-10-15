@@ -132,7 +132,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     ...rawInput,
     objectives: rawInput.objectives.map((o) => ({ ...o, weeklyTargetMinutes: objectiveDoses[o.id]!.dose })),
   }
-  const learn = events ? buildLearningContext(events.filter(apprenable), rawInput.today, rawInput.schedule, objectiveDoses) : null
+  // Une tâche apprend avec ses parties : la famille d'un identifiant de tâche.
+  const parents = new Map(rawInput.tasks.map((t) => [t.id, t.parentTaskId ?? t.id]))
+  const familleDe = (refId: string) => parents.get(refId) ?? refId
+  const learn = events ? buildLearningContext(events.filter(apprenable), rawInput.today, rawInput.schedule, objectiveDoses, familleDe) : null
 
   const dates = datesBetween(input.today, input.rangeEnd)
   const nowMinute = dateKey(now) === input.today ? now.getHours() * 60 + now.getMinutes() : 0
@@ -869,6 +872,8 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       const familyScore = { ids: family.ids, notBefore: earlierEnd }
       const capOverride = family.capOverride
 
+      // La longueur des blocs s'apprend sur CETTE tâche (et ses parties), pas sur toutes.
+      const cleTache = `tache:${familyKey}`
       // Une miette sous 25 min ne se place jamais seule : le bloc la prend.
       let dayTarget = cinq(absorbCrumb(Math.min(family.left, need), need))
       // Part du jour qui dépasse le plafond de 40 % : on la répartit en blocs ÉGAUX
@@ -887,7 +892,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         budget >= TASK_CONSTANTS.minBlockMinutes
       ) {
         const work = absorbCrumb(
-          Math.min(dayTarget, blocsEgaux, learn ? learn.blockMaxToutesTranches(task.id, task.category) : TASK_CONSTANTS.targetBlockMinutes),
+          Math.min(dayTarget, blocsEgaux, learn ? learn.blockMaxToutesTranches(task.id, cleTache) : TASK_CONSTANTS.targetBlockMinutes),
           remainingNeed.get(task.id) ?? 0,
         )
 
@@ -921,7 +926,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           ...(learn
             ? {
                 lengthAt: (start: number) =>
-                  Math.min(footprint, footprintFor(absorbCrumb(Math.min(dayTarget, learn.blockMax(task.id, task.category, trancheDe(start))), remainingNeed.get(task.id) ?? 0))),
+                  Math.min(footprint, footprintFor(absorbCrumb(Math.min(dayTarget, learn.blockMax(task.id, cleTache, trancheDe(start))), remainingNeed.get(task.id) ?? 0))),
               }
             : {}),
         })
@@ -1324,6 +1329,7 @@ function buildLearningContext(
   today: string,
   schedule: PlanningInput['schedule'],
   doses: Record<string, { dose: number; cible: number }>,
+  familleDe?: (refId: string) => string,
 ) {
   // L'oubli (gamma) suppose l'ordre chronologique : on ne le suppose pas, on le fait.
   const events = [...rawEvents].sort(chrono)
@@ -1404,7 +1410,7 @@ function buildLearningContext(
   const blockMax = (refId: string, category: string, tranche?: Tranche) => {
     const k = `${refId}|${category}|${tranche ?? ''}`
     if (!blockMaxCache.has(k)) {
-      const survie = survieDe(events, category, tranche)
+      const survie = survieDe(events, category, tranche, familleDe)
       const base = dureeCible(survie)
       // Une seule croissance à la fois : quand Kaplan-Meier monte déjà depuis
       // le plus long bloc tenu (+10 %), le niveau ne peut que retenir, pas pousser.

@@ -1,5 +1,5 @@
 import type { LearningState, SessionConfirmationsState, SessionEvent } from '@shared/schemas'
-import { betaMean, kaplanMeier, survieDe, trancheDe, updateBeta, PRIOR_NEUTRE, type Survie } from './bayes'
+import { betaMean, cleApprentissage, kaplanMeier, survieDe, trancheDe, updateBeta, PRIOR_NEUTRE, type Survie } from './bayes'
 import { computeBreakMinutes, BREAK_HIDDEN_IF_FREE_MINUTES, HIGH_UTILIZATION_PERCENT } from './rest'
 import { addDays } from './dates'
 
@@ -110,7 +110,7 @@ export function proposerProlongation(a: ProlongationArgs): number | null {
 
   const obs = survieDe(
     a.events.filter((x) => !(x.blockId === e.blockId && x.date === e.date)),
-    e.category,
+    cleApprentissage(e),
     trancheDe(e.plannedStartMinute),
   )
   const seuilFatigue = (a.capaciteDuJour * HIGH_UTILIZATION_PERCENT) / 100

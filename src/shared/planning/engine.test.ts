@@ -1736,6 +1736,28 @@ describe('Apprentissage branché sur le moteur (spec moteur 2026-09-25)', () => 
     for (const b of blocs) expect(b.workMinutes).toBeLessThanOrEqual(45)
   })
 
+  it('chaque tâche apprend seule : lâcher tôt une tâche dure ne raccourcit pas les autres', () => {
+    const DURE = uuid(1)
+    const AUTRE = uuid(2)
+    // On décroche vers 30 min sur la tâche dure, six fois.
+    const events = Array.from({ length: 6 }, (_, i) =>
+      evenement(i, { kind: 'task', refId: DURE, category: 'général', plannedMinutes: 90, heldMinutes: 28 + i, stoppedEarly: true, stop: { reason: 'tired', attemptsBefore: 0 } }),
+    )
+    const plan = computePlan(
+      libre({
+        tasks: [
+          task({ id: DURE, title: 'Dure', remainingMinutes: 600, deadline: '2026-08-13' }),
+          task({ id: AUTRE, title: 'Autre', remainingMinutes: 600, deadline: '2026-08-13' }),
+        ],
+        sessionEvents: events,
+      }),
+      NOW,
+    )
+    const demain = (id: string) => plan.blocks.filter((b) => b.refId === id && b.date === '2026-08-12')
+    for (const b of demain(DURE)) expect(b.workMinutes).toBeLessThanOrEqual(35)
+    expect(Math.max(...demain(AUTRE).map((b) => b.workMinutes))).toBeGreaterThan(45)
+  })
+
   it('reste déterministe : mêmes entrées, même plan — le hasard de Thompson est à graine', () => {
     const events = Array.from({ length: 12 }, (_, i) => evenement(i, { plannedStartMinute: (8 + (i % 6)) * 60 }))
     const a = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), NOW)

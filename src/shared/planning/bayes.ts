@@ -168,8 +168,18 @@ export const trancheDe = (minute: number): Tranche => (minute < 12 * 60 ? 'matin
  */
 export const apprenable = (e: SessionEvent) => e.promiseId === undefined && !e.forced
 
-export function survieDe(events: SessionEvent[], category: string, tranche?: Tranche): Survie[] {
-  const cat = events.filter((e) => apprenable(e) && e.category === category && e.started && e.heldMinutes !== null)
+/**
+ * Ce sur quoi la longueur des blocs s'apprend. Une TÂCHE apprend seule — sa
+ * famille (la tâche et ses parties) quand on la connaît : lâcher souvent tôt
+ * une tâche difficile ne raccourcit plus les blocs de toutes les autres. Un
+ * objectif ou une ancre garde sa catégorie (déjà propre à lui).
+ */
+export function cleApprentissage(e: Pick<SessionEvent, 'kind' | 'refId' | 'category'>, familleDe?: (refId: string) => string): string {
+  return e.kind === 'task' ? `tache:${familleDe ? familleDe(e.refId) : e.refId}` : e.category
+}
+
+export function survieDe(events: SessionEvent[], cle: string, tranche?: Tranche, familleDe?: (refId: string) => string): Survie[] {
+  const cat = events.filter((e) => apprenable(e) && cleApprentissage(e, familleDe) === cle && e.started && e.heldMinutes !== null)
   const dans = tranche ? cat.filter((e) => trancheDe(e.plannedStartMinute) === tranche) : cat
   const retenus = dans.length >= 5 ? dans : cat
   // Une prolongation lâchée avant sa fin est un arrêt pour la courbe (elle
