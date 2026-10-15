@@ -28,9 +28,10 @@ describe('Les rappels de « Je commence »', () => {
     expect(r[0]!.quand).toBe(minuit + 969 * 60_000)
   })
 
-  it('une ancre est rappelée mais ne se reporte pas', () => {
+  it('une ancre démarre toute seule : seulement le préavis, sans bouton', () => {
     const r = rappelsAProgrammer({ blocsDuJour: [bloc('ancre-a', 1080, 1110, 'ancre')], confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit })
-    expect(r.every((x) => !x.reportable)).toBe(true)
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ corps: 'Starts in 5 min', avant: true, reportable: false })
   })
 
   it('jamais plus de 60 en attente : les plus proches d’abord', () => {

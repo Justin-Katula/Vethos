@@ -87,6 +87,8 @@ describe('le bloc qui attend son « Je commence »', () => {
   })
 })
 
+const minuteDe = (ms: number) => new Date(ms).getHours() * 60 + new Date(ms).getMinutes()
+
 describe('D.7 — le retard se mesure, il ne se suppose pas', () => {
   it('compte le retard à la confirmation, et pas une minute avant', () => {
     const r = confirmer({ maintenant: a(9, 17), bloc: bloc(), etat: vide() })
@@ -119,15 +121,18 @@ describe('D.7 — le retard se mesure, il ne se suppose pas', () => {
     expect(apres.apprentissage.dailyDelayMinutes[JOUR]).toBe(60)
   })
 
-  it('fait avancer le compteur de ratés d’une ancre jamais confirmée', () => {
+  it('une ancre démarre toute seule à son heure : rien à confirmer, jamais ratée', () => {
     const ancre = bloc({ kind: 'ancre', refId: 'a1', label: 'Course' })
     const dedans = tic({ maintenant: a(9, 30), blocs: [ancre] })
+    // Pas d'écran « Je commence » : elle a démarré à 9 h, pas à 9 h 30.
+    expect(dedans.enAttente).toBeNull()
+    expect(minuteDe(dedans.confirmations.confirmedAt[ancre.id]!)).toBe(9 * 60)
     const apres = tic({
       maintenant: a(10, 5),
       blocs: [ancre],
       etat: { apprentissage: dedans.apprentissage, confirmations: dedans.confirmations },
     })
-    expect(apres.apprentissage.anchorMissCounts['a1']).toBe(1)
+    expect(apres.apprentissage.anchorMissCounts['a1'] ?? 0).toBe(0)
   })
 
   it('remet le compteur à zéro dès qu’on démarre, même en retard', () => {

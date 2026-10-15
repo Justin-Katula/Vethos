@@ -27,6 +27,15 @@ describe('Le blocage qui commence à l’heure', () => {
     ])
   })
 
+  it('une ancre bloque toute sa durée, même démarrée, et aucun report ne la suspend', () => {
+    const ancre = { ...bloc('ancre-x', 600, 720), kind: 'ancre' } as PlacedBlock
+    const p = plagesAuto({ blocsDuJour: [ancre], confirmes: new Set(['ancre-x']), nowMinute: 610, selectionId: 's', leveeJusqua: 700 })
+    expect(p).toEqual([{ blocId: 'ancre-x', debutMinute: 600, finMinute: 720, selectionId: 's' }])
+    // Sa plage est remplacée par l'automatique, jamais doublée.
+    const v = fusionnerAuto({ actives: p, auto: p, idsDuPlan: new Set(['ancre-x']), confirmes: new Set(['ancre-x']) })
+    expect(v).toHaveLength(1)
+  })
+
   it('une suspension passée ne change plus rien', () => {
     const p = plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 560, selectionId: 's', leveeJusqua: 500 })
     expect(p.map((x) => x.debutMinute)).toEqual([600, 840])

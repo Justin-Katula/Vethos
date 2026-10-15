@@ -247,7 +247,8 @@ export default function Aujourdhui() {
           </Text>
         </View>
         {/* Toujours monté : la feuille du rattrapage survit à la fin de la séance. */}
-        <ArretSeance titre={cur?.titre ?? maintenantCarte.titre} pilule={!!seanceActive} />
+        {/* Une ancre ne s'arrête pas : pas de Stop pendant elle. */}
+        <ArretSeance titre={cur?.titre ?? maintenantCarte.titre} pilule={!!seanceActive && seanceActive.kind !== 'ancre'} />
         {seanceActive ? null : demarrable ? (
           <DemarrerSeance />
         ) : (

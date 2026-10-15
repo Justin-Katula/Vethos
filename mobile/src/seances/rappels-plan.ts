@@ -43,6 +43,8 @@ export function rappelsAProgrammer(a: {
     if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
       out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
     }
+    // Une ancre démarre toute seule : seulement le préavis.
+    if (b.kind === 'ancre') continue
     for (const m of minutesDeRappel(b)) {
       const quand = a.minuitMs + m * 60_000
       if (quand <= a.maintenantMs) continue

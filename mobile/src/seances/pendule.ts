@@ -116,7 +116,7 @@ export function tictac(args: {
 
   const dejaConfirmes = new Set(Object.keys(confirmations.confirmedAt))
 
-  const enAttente = pendingConfirmation({
+  let enAttente = pendingConfirmation({
     blocks: [...args.blocsDuJour],
     today: confirmations.date,
     nowMinute: minute,
@@ -124,6 +124,20 @@ export function tictac(args: {
     ...(confirmations.observedPending ? { observedPending: confirmations.observedPending } : {}),
     stoppedBlockIds: confirmations.stoppedBlockIds,
   })
+
+  // Une ancre n'attend personne : elle démarre toute seule, à son heure — ni
+  // « Je commence », ni Stop, ni Later, ni « dans 5 min ». Son blocage tient
+  // toute sa durée (`blocage-auto`).
+  if (enAttente?.kind === 'ancre') {
+    const debut = new Date(args.maintenant)
+    debut.setHours(0, enAttente.startMinute, 0, 0)
+    const r = applyConfirmation(apprentissage, confirmations, enAttente, debut.getTime(), enAttente.startMinute)
+    apprentissage = r.learning
+    confirmations = r.confirmations
+    dejaConfirmes.add(enAttente.id)
+    change = true
+    enAttente = null
+  }
 
   // Le bloc actif MAINTENANT, confirmé ou non — il entretient `observedPending`.
   // Jamais `enAttente` pour ça : il devient `null` dès la confirmation, ce qui

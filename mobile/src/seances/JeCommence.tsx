@@ -91,6 +91,8 @@ export function JeCommence() {
 
   // Après le souffle d'une promesse, l'overlay revient tout seul : on reprend.
   const retour = confiance.retourAttendu
+  // Une ancre démarre toute seule : rien à confirmer.
+  if (enAttente?.kind === 'ancre') return null
   if (!enAttente && !retour) return null
 
   const bloc = enAttente ?? { kind: 'task', startMinute: retour!.sinceMinute, label: confiance.titreRetour, id: '', promiseId: 'retour' }

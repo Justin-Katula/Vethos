@@ -30,9 +30,12 @@ export function plagesAuto(a: {
   const out: Plage[] = []
   const levee = a.leveeJusqua != null && a.leveeJusqua > a.nowMinute ? a.leveeJusqua : null
   for (const b of a.blocsDuJour) {
-    if (a.confirmes.has(b.id)) continue
-    const fenetre = fenetreSansConfirmation(b)
-    const debut = levee !== null ? Math.max(fenetre.debut, levee) : fenetre.debut
+    // Une ancre bloque à son heure, toute sa durée, qu'elle ait démarré ou non —
+    // et aucun report ne la suspend.
+    const ancre = b.kind === 'ancre'
+    if (a.confirmes.has(b.id) && !ancre) continue
+    const fenetre = ancre ? { debut: b.startMinute, fin: b.endMinute } : fenetreSansConfirmation(b)
+    const debut = levee !== null && !ancre ? Math.max(fenetre.debut, levee) : fenetre.debut
     const fin = fenetre.fin
     if (fin <= a.nowMinute || fin <= debut) continue
     // Déjà ouverte : le début reste celui du bloc (stable d'une minute à
@@ -55,7 +58,9 @@ export function fusionnerAuto(a: {
   idsDuPlan: ReadonlySet<string>
   confirmes: ReadonlySet<string>
 }): Plage[] {
-  const automatique = (p: Plage) => !a.confirmes.has(p.blocId) && (a.idsDuPlan.has(p.blocId) || /^(task|objective|ancre|promesse)-/.test(p.blocId))
+  // Une ancre est toujours automatique (elle n'a pas de séance à elle).
+  const automatique = (p: Plage) =>
+    /^ancre-/.test(p.blocId) || (!a.confirmes.has(p.blocId) && (a.idsDuPlan.has(p.blocId) || /^(task|objective|ancre|promesse)-/.test(p.blocId)))
   return [...a.actives.filter((p) => !automatique(p)), ...a.auto]
 }
 
