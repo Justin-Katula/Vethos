@@ -42,7 +42,6 @@ import { niveauDifficulte, phaseHabitude, rupturePossible, TOLERANCE_DEPART_MINU
 import { ajustementPour, diagnostiquer, pauseAnticipee } from './arrets'
 import type { SessionEvent } from '@shared/schemas'
 import {
-  computeObjectiveQuota,
   computeTaskDayTarget,
   computeWIPLimit,
   dailyRhythm,
@@ -386,6 +385,9 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   // C.4 : photo de départ des compteurs, pour mesurer ce qui a réellement été
   // débité une fois le placement terminé.
   const objectiveServedAtStart = new Map(objectiveServed)
+  // Par semaine et par objectif : ce que le plan doit poser, la capacité des
+  // jours qui restaient, et ce qu'un jour n'a pas pu prendre (reporté).
+  const semaineObjectif = new Map<string, { aPoser: number; sommeCapacite: number; report: number }>()
   const remainingNeed = new Map(needByTask)
 
   // C.4 : la part de la session confirmée qui reste à produire. Elle débite
@@ -431,6 +433,15 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
   const capaciteJourEntier = learn
     ? capacities.map((c) => (c.date === input.today ? buildDayFor(c.date, saturated, true) : c))
     : capacities
+  // La capacité d'une JOURNÉE ENTIÈRE : aujourd'hui compté en entier, pour que
+  // la part d'un objectif ne bouge pas d'une heure à l'autre ; un jour hors de
+  // l'horizon, à la moyenne de sa semaine (ou de l'horizon).
+  const capaciteAujourdhuiPleine = buildDayFor(input.today, saturated, true).effectiveCapacityMinutes
+  const moyenneHorizon = capacities.length ? capacities.reduce((t, c) => t + c.effectiveCapacityMinutes, 0) / capacities.length : 0
+  const capacitePleine = (d: string, semaineDe: string) =>
+    d === input.today
+      ? capaciteAujourdhuiPleine
+      : (capacities.find((c) => c.date === d)?.effectiveCapacityMinutes ?? averageCapacityByWeek.get(semaineDe) ?? moyenneHorizon)
 
   for (let di = 0; di < dates.length; di++) {
     const date = dates[di]!
@@ -710,17 +721,47 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
 
     // D.1.4 OBJECTIFS — quota du jour, de préférence en fenêtre PROFONDE.
     for (const objective of objectivesBySacrificeOrder) {
-      const lastServed = input.objectiveLastServed[objective.id]
       const key = servedKey(week, objective.id)
-      let quota = computeObjectiveQuota({
-        objective,
-        servedThisWeekMinutes: objectiveServed.get(key) ?? 0,
-        todayCapacityMinutes: cap.effectiveCapacityMinutes,
-        averageDayCapacityMinutes: averageCapacityByWeek.get(week) ?? 0,
-        daysSinceLastService: lastServed ? Math.max(0, daysBetween(lastServed, date)) : 0,
-        activeDaysPerWeek: learn ? learn.activeDays(objective.id) : undefined,
-      })
-      if (learn && learn.isDayOff(objective.id, date, capaciteJourEntier)) quota = 0
+      // « 15 h demandées = 15 h posées » (2026-10-14). Au premier jour calculé
+      // de la semaine, on fixe ce que le plan doit poser : la part des jours
+      // qui restent (jamais les jours déjà passés entassés sur la fin — un
+      // retard se règle en proposant d'ajuster la cible, pas en écrasant
+      // dimanche), et jamais plus que ce qui manque à la cible. Chaque jour en
+      // reçoit une part au prorata de sa capacité de JOURNÉE ENTIÈRE (stable
+      // d'une heure à l'autre) ; ce qu'un jour à venir ne peut pas prendre
+      // passe aux suivants. Aucun plafond de séances : seule la place compte.
+      const offLe = (d: string) => !!learn && learn.isDayOff(objective.id, d, capaciteJourEntier)
+      let semaine = semaineObjectif.get(key)
+      if (!semaine) {
+        const debut = [startOfWeek(date), input.today, dateKey(new Date(objective.createdAt))]
+          .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+          .reduce((m, d) => (d > m ? d : m))
+        const joursRestants = Math.max(0, daysBetween(debut, addDays(week, 6)) + 1)
+        // Le travail déjà fait AUJOURD'HUI compte dans la part d'aujourd'hui, pas
+        // dans ce qui précède : sinon deux séances faites ce matin réduiraient
+        // la semaine sans réduire la journée, et seraient reposées l'après-midi.
+        const faitAujourdhui =
+          date === input.today && events
+            ? events
+                .filter((e) => e.date === date && e.started && e.refId === objective.id)
+                .reduce((t, e) => t + (e.heldMinutes ?? Math.max(0, Math.min(e.plannedMinutes, nowMinute - (e.plannedStartMinute + (e.delayMinutes ?? 0))))), 0)
+            : 0
+        const dejaFait = Math.max(0, (objectiveServedAtStart.get(key) ?? 0) - faitAujourdhui)
+        let sommeCapacite = 0
+        for (let d = date; startOfWeek(d) === week; d = addDays(d, 1)) if (!offLe(d)) sommeCapacite += capacitePleine(d, week)
+        semaine = {
+          aPoser: Math.max(0, Math.min(objective.weeklyTargetMinutes - dejaFait, (objective.weeklyTargetMinutes * joursRestants) / DAYS_PER_WEEK)),
+          sommeCapacite,
+          report: 0,
+        }
+        semaineObjectif.set(key, semaine)
+      }
+      const part = offLe(date) || semaine.sommeCapacite <= 0 ? 0 : (semaine.aPoser * capacitePleine(date, week)) / semaine.sommeCapacite
+      // Ce qui est déjà sur ce jour pour cet objectif — séances vécues, séance en
+      // cours, rattrapages promis — se retire de sa part.
+      const dejaSurJour = placedToday.filter((b) => b.refId === objective.id).reduce((t, b) => t + b.work, 0)
+      const quotaBase = Math.max(0, Math.round(part + semaine.report - dejaSurJour))
+      let quota = quotaBase
       // Plié aujourd'hui : le reste épaissit les jours suivants (report D.4).
       if (date === input.today && folded.has(objective.id)) quota = 0
 
@@ -748,10 +789,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       // part dans le report de D.4 — jamais en blocs collés.
       // Les séances déjà vécues aujourd'hui (journal) comptent dans le plafond.
       let session = placedToday.filter((b) => b.refId === objective.id).length
-      while (
-        left >= TASK_CONSTANTS.minBlockMinutes &&
-        session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay
-      ) {
+      const servieAvant = objectiveServed.get(key) ?? 0
+      // Ce que l'utilisateur demande est posé : au-delà de 2 séances, on
+      // continue tant qu'il reste du quota et de la place — l'écart de 3 h
+      // devient une préférence, plus une interdiction.
+      while (left >= TASK_CONSTANTS.minBlockMinutes && budget >= TASK_CONSTANTS.minBlockMinutes) {
         const objCategory = `objectif:${objective.id}`
         // Le plafond : la plus longue des tranches ; la longueur de CHAQUE départ
         // est ensuite celle de sa tranche (lengthAt).
@@ -768,14 +810,19 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         const work = absorbe(Math.min(left, learn ? learn.blockMaxToutesTranches(objective.id, objCategory) : TASK_CONSTANTS.targetBlockMinutes))
         const footprint = footprintFor(work)
         const deepExhausted = deepWindowMinutes + work > DEEP_BUDGET_MINUTES
-        const slot = allocator.take(Math.min(footprint, budget), {
-          avoid: deepExhausted ? 'PROFONDE' : undefined,
-          score: scorer(objective.id, session, SCORE_DEFAULTS.minGapSameObjective, true, objCategory),
-          // La longueur apprise suit la tranche horaire du départ choisi.
-          ...(learn
-            ? { lengthAt: (start: number) => footprintFor(absorbe(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start))))) }
-            : {}),
-        })
+        const prendre = (ecartDur: number) =>
+          allocator.take(Math.min(footprint, budget), {
+            avoid: deepExhausted ? 'PROFONDE' : undefined,
+            score: scorer(objective.id, session, ecartDur, true, objCategory),
+            // La longueur apprise suit la tranche horaire du départ choisi.
+            ...(learn
+              ? { lengthAt: (start: number) => footprintFor(absorbe(Math.min(left, learn.blockMax(objective.id, objCategory, trancheDe(start))))) }
+              : {}),
+          })
+        // Les 2 premières séances gardent leurs 3 h d'écart si la journée le
+        // permet ; sinon, et au-delà, l'écart n'est plus qu'une préférence.
+        const slot =
+          (session < SCORE_DEFAULTS.maxSessionsPerObjectivePerDay ? prendre(SCORE_DEFAULTS.minGapSameObjective) : null) ?? prendre(0)
         if (!slot) break
         session++
 
@@ -812,6 +859,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         left -= workMinutes
         objectiveServed.set(key, (objectiveServed.get(key) ?? 0) + workMinutes)
       }
+      // Ce qu'un jour à venir n'a pas pu prendre passe aux suivants. Aujourd'hui,
+      // seul ce qui a été cédé (plié, cédé à une tâche en tension, sacrifié) passe :
+      // l'heure déjà écoulée n'entasse rien sur demain.
+      const pose = (objectiveServed.get(key) ?? 0) - servieAvant
+      semaine.report = date === input.today ? Math.max(0, quotaBase - quota) : Math.max(0, quotaBase - pose)
     }
 
     // D.1.5 TÂCHES — cascade D.6, découpage encouragé, plafond 40 %.

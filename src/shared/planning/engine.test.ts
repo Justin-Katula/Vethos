@@ -13,7 +13,7 @@ import type {
   SessionEvent,
   TaskItem,
 } from './types'
-import { addDays } from './dates'
+import { addDays, startOfWeek } from './dates'
 
 // Mardi 11 août 2026, 8 h du matin.
 const NOW = new Date(2026, 7, 11, 8, 0)
@@ -227,11 +227,37 @@ describe('CRITÈRE 5 — un objectif ne peut jamais avoir de deadline', () => {
 
   it('un objectif est servi par quota hebdomadaire, jamais par urgence', () => {
     const plan = computePlan(input({ objectives: [objective({ weeklyTargetMinutes: 420 })] }), NOW)
-    const served = plan.blocks
-      .filter((b) => b.kind === 'objective')
-      .reduce((s, b) => s + b.workMinutes, 0)
-    expect(served).toBeGreaterThan(0)
-    expect(served).toBeLessThanOrEqual(420)
+    // Le plan couvre deux semaines calendaires (mardi → lundi) : chacune sa cible.
+    const parSemaine = new Map<string, number>()
+    for (const b of plan.blocks.filter((x) => x.kind === 'objective'))
+      parSemaine.set(startOfWeek(b.date), (parSemaine.get(startOfWeek(b.date)) ?? 0) + b.workMinutes)
+    expect([...parSemaine.values()].reduce((a, b) => a + b, 0)).toBeGreaterThan(0)
+    for (const v of parSemaine.values()) expect(v).toBeLessThanOrEqual(420)
+  })
+})
+
+describe('Ce qui est demandé est posé (2026-10-14)', () => {
+  const LUNDI = new Date(2026, 7, 10, 7, 0)
+  const semaine = (plan: ReturnType<typeof computePlan>) =>
+    plan.blocks.filter((b) => b.kind === 'objective' && b.date <= '2026-08-16').reduce((q, b) => q + b.workMinutes, 0)
+  const courts = Array.from({ length: 10 }, (_, i) => ({
+    blockId: `c${i}`, date: addDays('2026-08-10', -(i + 1)), kind: 'objective' as const, refId: uuid(9), category: `objectif:${uuid(9)}`,
+    plannedStartMinute: 19 * 60, plannedMinutes: 60, started: true, delayMinutes: 0, spontaneous: false, heldMinutes: 30,
+    stoppedEarly: true, stop: { reason: 'tired' as const, attemptsBefore: 0 }, blockedAttempts: 0, load48hMinutes: 0, createdAt: '2026-08-01T10:00:00.000Z',
+  }))
+
+  it('15 h par semaine : 15 h posées, cours de 8 h à 16 h compris', () => {
+    // Avant : 2 séances par jour au plus, et ce qui ne rentrait pas était perdu — 13 h 05.
+    const plan = computePlan(input({ today: '2026-08-10', rangeEnd: '2026-08-16', objectives: [objective({ weeklyTargetMinutes: 900 })] }), LUNDI)
+    expect(semaine(plan)).toBe(900)
+  })
+
+  it('même avec des blocs appris de 30 min : 15 h posées, pas 5 h', () => {
+    const plan = computePlan(
+      input({ today: '2026-08-10', rangeEnd: '2026-08-16', objectives: [objective({ weeklyTargetMinutes: 900 })], sessionEvents: courts }),
+      LUNDI,
+    )
+    expect(semaine(plan)).toBe(900)
   })
 })
 
@@ -1812,10 +1838,13 @@ describe('Revue du moteur — correctifs (spec moteur 2026-09-25)', () => {
     ...over,
   })
 
-  it('deux séances déjà faites aujourd’hui : plus aucune ce jour-là', () => {
+  it('deux séances déjà faites aujourd’hui : seul ce qui manque à la part du jour est posé', () => {
+    // 20 h par semaine ≈ 2 h 50 par jour ; 2 h faites ce matin → environ 50 min de plus, pas 2 h 50.
     const events = [ev({ plannedStartMinute: 480 }), ev({ plannedStartMinute: 660, blockId: 'b2' })]
     const plan = computePlan(libre({ objectives: [OBJ], sessionEvents: events }), new Date(2026, 7, 11, 13, 0))
-    expect(plan.blocks.filter((b) => b.kind === 'objective' && b.date === TODAY)).toHaveLength(0)
+    const ajoute = plan.blocks.filter((b) => b.kind === 'objective' && b.date === TODAY).reduce((q, b) => q + b.workMinutes, 0)
+    expect(ajoute).toBeGreaterThan(0)
+    expect(ajoute).toBeLessThanOrEqual(Math.ceil(1200 / 7) - 120 + 10)
   })
 
   it('la première heure après le réveil est interdite, même face à une fenêtre PROFONDE', () => {
