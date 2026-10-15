@@ -15,7 +15,9 @@ import { cleDate, versTachesMoteur } from '@/plan/moteur'
 import { tempsPerdu } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
-import { cancelObjectiveRemoval, effectiveContract, removalDate, requestObjectiveRemoval } from '@shared/contract'
+import { FeuilleRetrait, type CibleRetrait } from '@/engagements/FeuilleRetrait'
+import { useRetrait } from '@/engagements/useRetrait'
+import { cancelObjectiveRemoval, removalDate } from '@shared/contract'
 import { useSeances } from '@/seances/magasin-seances'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
@@ -114,18 +116,13 @@ export default function Engagements() {
   const contratSigne = d.reglages.contrat
   const jourCourt = (x: Date) =>
     `${x.getDate()} ${MOIS3[x.getMonth()]}, ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
-  // Retirer un objectif, c'est modifier le contrat : effectif 48 h plus tard.
-  const retirerObjectif = (id: string, nom: string) => {
-    if (!contratSigne) {
-      void d.supprimerObjectif(id)
-      toast(`${nom} removed.`)
-      return
-    }
-    const r = requestObjectiveRemoval(effectiveContract(contratSigne, new Date()), id, new Date(), false)
-    if (!r.ok) return
-    void d.majReglages({ contrat: r.contract })
-    const quand = removalDate(r.contract, id)
-    if (quand) toast(`${nom} leaves on ${jourCourt(quand)}.`)
+  // Retirer ne se fait pas d'un geste : on s'explique, on voit ce qu'on perdrait,
+  // et si l'on insiste, la demande attend une heure dans Profil.
+  const [retrait, setRetrait] = useState<CibleRetrait | null>(null)
+  const { bloquePendantSeance } = useRetrait()
+  const demanderRetrait = (c: CibleRetrait) => {
+    if (bloquePendantSeance() || !garde()) return
+    setRetrait(c)
   }
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
@@ -209,12 +206,7 @@ export default function Engagements() {
               </Pilule>
               <Pilule
                 contour
-                onPress={() => {
-                  if (!garde()) return
-                  for (const p of g.parties) void d.supprimerTache(p.id)
-                  void d.supprimerTache(t.id)
-                  toast(`${t.titre} removed.`)
-                }}
+                onPress={() => demanderRetrait({ nature: 'TASK', refId: t.id, nom: t.titre, ids: [t.id, ...g.parties.map((p) => p.id)], total: g.total, creeLe: t.creeeLe })}
               >
                 Remove
               </Pilule>
@@ -267,7 +259,7 @@ export default function Engagements() {
                   Keep
                 </Pilule>
               ) : null}
-              <Pilule contour onPress={() => garde() && retirerObjectif(o.id, o.nom)}>
+              <Pilule contour onPress={() => demanderRetrait({ nature: 'GOAL', refId: o.id, nom: o.nom, ids: [o.id], total: null, creeLe: o.creeLe })}>
                 Remove
               </Pilule>
             </View>
@@ -304,7 +296,7 @@ export default function Engagements() {
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 70 }}>
             {a.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{a.intention}</Text> : null}
             <View style={{ flexDirection: 'row' }}>
-              <Pilule contour onPress={() => garde() && (void d.supprimerAncre(a.id), toast(`${a.nom} removed.`))}>
+              <Pilule contour onPress={() => demanderRetrait({ nature: 'ANCHOR', refId: a.id, nom: a.nom, ids: [a.id], total: null, creeLe: a.creeeLe })}>
                 Remove
               </Pilule>
             </View>
@@ -458,6 +450,7 @@ export default function Engagements() {
         )}
         {historique ? pageHistorique : visibles}
       </ScrollView>
+      <FeuilleRetrait cible={retrait} fermer={() => setRetrait(null)} />
       <Formulaire
         nature={forme}
         ancres={d.ancres}

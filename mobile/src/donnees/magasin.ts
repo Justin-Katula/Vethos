@@ -151,6 +151,23 @@ export const ReglagesSchema = z.object({
    * tierce). Sans accord : les règles fixes. Changeable dans Profil.
    */
   consentementIA: z.enum(['oui', 'non']).nullish(),
+  /**
+   * « Remove anyway » : la demande attend une heure dans Profil, où seulement
+   * l'engagement se retire pour de bon (`@/engagements/retrait`).
+   */
+  demandesRetrait: z
+    .array(
+      z.object({
+        id: z.string(),
+        nature: z.enum(['TASK', 'GOAL', 'ANCHOR']),
+        refId: z.string(),
+        nom: z.string().max(80),
+        texte: z.string().max(500),
+        a: z.string(),
+      }),
+    )
+    .max(50)
+    .optional(),
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
   lever: z.string().default('07:00'),
