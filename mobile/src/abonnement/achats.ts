@@ -4,7 +4,7 @@ import { create } from 'zustand'
 
 /**
  * L'abonnement Vethos, par RevenueCat (au-dessus des achats Apple et Google).
- * Une seule chose compte : le droit « pro » est-il actif ? Un essai gratuit
+ * Une seule chose compte : le droit « vethos_pro » est-il actif ? Un essai gratuit
  * en cours compte comme actif.
  *
  * La clé RevenueCat de l'app (`extra.revenuecat.ios` / `.android`) est une clé
@@ -13,7 +13,8 @@ import { create } from 'zustand'
  * le monde dehors.
  */
 
-export const DROIT = 'pro'
+/** L'identifiant du droit dans RevenueCat (Entitlements). */
+export const DROIT = 'vethos_pro'
 
 export type Formule = {
   id: string
@@ -137,6 +138,20 @@ export const useAbonnement = create<Etat>((set, get) => ({
     }
   },
 }))
+
+/**
+ * Gérer ou annuler son abonnement : la feuille d'Apple (« Manage
+ * subscription »). Sans le kit RevenueCat, la page des abonnements d'Apple.
+ */
+export async function gererAbonnement(): Promise<void> {
+  try {
+    const { default: Purchases } = await import('react-native-purchases')
+    await Purchases.showManageSubscriptions()
+  } catch {
+    const { Linking } = await import('react-native')
+    await Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => undefined)
+  }
+}
 
 /** L'économie de l'annuel sur douze mois de mensuel, en pour cent entier. */
 export function economie(formules: readonly Formule[]): number | null {

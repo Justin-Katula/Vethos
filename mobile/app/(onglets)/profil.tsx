@@ -8,6 +8,7 @@ import { effectiveContract, requestModeChange, signContract, type Mode } from '@
 import { usePlan } from '@/plan/Plan'
 import { coach } from '@/coach/client'
 import { CarteCompte } from '@/compte/CarteCompte'
+import { gererAbonnement, useAbonnement } from '@/abonnement/achats'
 import { useRetrait } from '@/engagements/useRetrait'
 import { minutesRestantes } from '@/engagements/retrait'
 
@@ -41,6 +42,7 @@ export default function Profil() {
   const effetLe = contrat?.pending ? new Date(contrat.pending.effectiveAt) : null
   // Les demandes de retrait : une heure ici, puis elles disparaissent.
   const retrait = useRetrait()
+  const abonne = useAbonnement((e) => e.etat === 'actif')
   const NATURE = { TASK: 'Task', GOAL: 'Goal', ANCHOR: 'Anchor' } as const
   return (
     <ScrollView contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120 }}>
@@ -155,6 +157,19 @@ export default function Profil() {
             <View style={{ width: 44, height: 26, borderRadius: 13, padding: 3, backgroundColor: reglages.consentementIA === 'oui' ? A.t1 : 'rgba(242,242,242,0.16)', alignItems: reglages.consentementIA === 'oui' ? 'flex-end' : 'flex-start' }}>
               <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: reglages.consentementIA === 'oui' ? '#000' : A.t2 }} />
             </View>
+          </Carte>
+        </Pressable>
+      ) : null}
+      {/* Gérer ou annuler l'abonnement : la feuille d'Apple, sans quitter l'app. */}
+      {abonne ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void gererAbonnement()}
+          style={({ pressed }) => ({ marginTop: 12, transform: [{ scale: pressed ? 0.985 : 1 }] })}
+        >
+          <Carte style={{ paddingVertical: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Manage subscription</Text>
+            <Chevron sens="droite" taille={14} />
           </Carte>
         </Pressable>
       ) : null}
