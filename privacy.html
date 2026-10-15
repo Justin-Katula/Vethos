@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Vethos privacy policy: what the Vethos app collects, why, and who processes it." />
+    <meta name="description" content="Vethos privacy policy: what the Vethos app collects, why, and who processes it. Made by Katula Labs." />
     <title>Privacy Policy · Vethos</title>
     <link rel="canonical" href="https://justin-katula.github.io/Vethos/privacy.html" />
     <style>
@@ -34,20 +34,20 @@
   <body>
     <main>
       <h1>Privacy Policy</h1>
-      <p class="date">Last updated: October 13, 2026</p>
+      <p class="date">Last updated: October 15, 2026</p>
 
       <p>
         Vethos helps you plan your time and keep distracting apps aside while you work. This policy explains what the
-        Vethos app collects, why, and who processes it. The short version: we keep what you create in Vethos so you can find it on any
-        device you sign in to, we collect what we need to run your subscription and the Coach, and nothing for
-        advertising.
+        Vethos app collects, why, and who processes it. The short version: we keep what you create in Vethos so you can
+        find it on any device you sign in to, we collect what we need to run your subscription and the optional AI review
+        described below, and nothing for advertising.
       </p>
 
       <h2>Your plans and history</h2>
       <p>
         Your tasks, goals, anchors, schedule, sleep times, session history and settings are stored on your device, and a
         copy is backed up to your account so you get them back when you sign in on another device. Only your account can
-        read this backup. It is deleted when you delete your account.
+        read this backup. It is deleted when you delete your account. Reminders are scheduled on your device.
       </p>
       <p>
         <strong>Blocking uses Apple's Screen Time.</strong> When you choose apps to set aside, iOS gives Vethos opaque
@@ -62,7 +62,7 @@
         </thead>
         <tbody>
           <tr>
-            <td>Account: your email address, your name if you share it, and the ID from Apple or Google</td>
+            <td>Account: an email address, your name if you share it, and the account ID from Apple or Google</td>
             <td>To sign you in and keep your subscription tied to you</td>
             <td>Supabase (hosting and authentication)</td>
           </tr>
@@ -77,76 +77,72 @@
             <td>Apple (payment) and RevenueCat (subscription status)</td>
           </tr>
           <tr>
-            <td>Coach requests: the short facts and text you send to the Coach (for example a task title, minutes left, or what you type in a Coach conversation)</td>
-            <td>To write the Coach's reply</td>
-            <td>Supabase (our server) and DeepSeek (the language model)</td>
-          </tr>
-          <tr>
-            <td>AI review of Stop and Later requests (only if you allow it): the reason you pick, what you write, your answers to the follow-up questions, facts about the session (title, planned and done minutes, blocked-app attempts, deadline), your trust level, and your requests from the last 30 days</td>
-            <td>To ask follow-up questions and decide whether the session can be stopped or postponed</td>
+            <td>AI review of your requests to end or postpone a session (only if you allow it): the reason you pick, what you write, your answers to the follow-up questions, facts about the session (title, planned and done minutes, attempts to open blocked apps, deadline), your trust level, and your requests from the last 30 days</td>
+            <td>To ask follow-up questions and decide whether the session can end early or be postponed</td>
             <td>Supabase (our server) and DeepSeek (the language model)</td>
           </tr>
           <tr>
             <td>IP address</td>
-            <td>To limit abuse of the Coach. Counters derived from it are deleted within about a day</td>
+            <td>To limit abuse of the AI review. Counters derived from it are deleted within about a day</td>
             <td>Supabase</td>
           </tr>
         </tbody>
       </table>
-      <p>
-        <strong>We never sell your data, show you ads, or use advertising identifiers or analytics trackers.</strong>
-      </p>
+      <p>We never sell your data, show you ads, or use advertising identifiers or analytics trackers.</p>
 
-      <h2>The Coach</h2>
+      <h2>AI review of requests to end or postpone a session</h2>
       <p>
-        The Coach is optional. When you use it, your request goes to our server, which forwards it to DeepSeek to
-        generate a reply. Requests are sent with an anonymous installation token, not your name or email. DeepSeek
-        processes data on servers that may be located outside your country, including in China. Don't type anything in
-        the Coach you wouldn't want processed this way. If a message suggests you may be in distress, the Coach does not
-        call the model and points you to human help instead.
-      </p>
-
-      <h2>AI review of Stop and Later</h2>
-      <p>
-        When you ask to stop a session early or to postpone it, you explain why. If you allow it, Vethos uses AI to
-        review the request: it may ask up to five follow-up questions, compare your answers with your requests from the
-        last 30 days (older ones count less), and decide whether to let you stop or postpone. Vethos asks for your
-        permission the first time, and you can turn it off at any time in Profile → AI review. Without permission, when
-        you are offline, or if the review is unavailable, fixed rules decide instead and nothing is sent.
+        In Vethos, a work session can be ended before its planned end with the <strong>Stop</strong> button, and a session
+        that has not started yet can be pushed to a later time with the <strong>Later</strong> button. Both ask you to
+        write what happened.
       </p>
       <p>
-        What you send goes to our server and is processed by DeepSeek, on servers that may be outside your country,
-        including in China. Your requests and the decisions are kept with your Vethos data (on your device and in your
-        account backup) so the review can look back over 30 days; they are deleted when you delete your account.
+        If you allow it, Vethos uses AI to review the request: it may ask up to five follow-up questions, compare your
+        answers with your requests from the last 30 days (older ones count less), and decide whether the session can end
+        early or be postponed. Vethos asks for your permission when you set up the app, and you can turn it off at any
+        time in Profile &rarr; AI review. Without permission, when you are offline, or if the review is unavailable, fixed
+        rules decide instead and nothing is sent.
+      </p>
+      <p>
+        What you send goes to our server and is processed by DeepSeek, on servers that may be located outside your
+        country, including in China. Our server links the request to your account only to limit how many reviews can be
+        requested each day; your name and email are never sent to DeepSeek. Don't write
+        anything you wouldn't want processed this way. Your requests and the decisions are kept with your Vethos data (on
+        your device and in your account backup) so the review can look back over 30 days; they are deleted when you
+        delete your account.
+      </p>
+      <p>
+        If what you write suggests you may be in distress, nothing is sent to the AI: Vethos pauses your plan and shows
+        how to reach immediate help (for example, call or text 988 in the US and Canada).
       </p>
 
       <h2>Sign in with Apple and Google</h2>
       <p>
-        We receive only what Apple or Google share with us: an account ID, and your email and name if you allow it. With
-        Apple, you can choose to hide your email; we then receive a private relay address. We never receive your Apple or
-        Google password.
+        We always receive an email address and an account ID. With Apple, you can choose "Hide My Email": Apple then
+        gives us a private address that forwards our messages to your real inbox. Sharing your name is optional. We never
+        receive your Apple or Google password.
       </p>
 
       <h2>How long we keep data</h2>
       <ul>
         <li>Account data and your backed-up Vethos data: until you delete your account.</li>
         <li>Subscription records: as long as required for accounting and tax purposes, and by Apple and RevenueCat under their own policies.</li>
-        <li>Coach requests: not stored by us after the reply is sent, apart from short-lived technical logs kept by our hosting provider.</li>
-        <li>Stop and Later requests and their decisions: with your Vethos data, until you delete your account; the AI review only looks at the last 30 days.</li>
+        <li>Requests sent to the AI review: not stored on our server once the decision is made, apart from short-lived technical logs kept by our hosting provider. The requests and decisions themselves stay with your Vethos data until you delete your account; the review only looks at the last 30 days.</li>
         <li>Abuse-limit counters: about one day.</li>
       </ul>
 
       <h2>Deleting your account</h2>
       <p>
-        In the app, go to <strong>Profile → Account → Delete account</strong>. Your account and your backed-up data are erased
-        from our servers immediately, and removed from that device. Deleting your account does not cancel an
-        App Store subscription: cancel it in your iPhone's Settings → Apple ID → Subscriptions.
+        In the app, go to Profile &rarr; Account &rarr; Delete account. Your account and your backed-up data are erased
+        from our servers immediately, and removed from that device. Deleting your account does not cancel an App Store
+        subscription: cancel it in your iPhone's Settings &rarr; your name &rarr; Subscriptions.
       </p>
 
       <h2>Your rights</h2>
       <p>
-        Depending on where you live, you may have the right to access, correct, export or delete your personal data, and
-        to object to or restrict its processing. Contact us and we will respond within 30 days.
+        You can delete your account and all its data yourself in the app, and edit your plans at any time. To get a copy
+        of your data, or to have it corrected, email us and we will respond within 30 days. Depending on where you live,
+        you may also have the right to object to or restrict how your data is processed.
       </p>
 
       <h2>Children</h2>
@@ -162,7 +158,7 @@
       <p>If we change this policy, we will update the date above and, for significant changes, let you know in the app.</p>
 
       <h2>Contact</h2>
-      <p>Questions or requests: <a href="mailto:obedi.katula@gmail.com">obedi.katula@gmail.com</a></p>
+      <p>Vethos is made by Katula Labs. Questions or requests: <a href="mailto:support@katulalabs.com">support@katulalabs.com</a></p>
     </main>
   </body>
 </html>
