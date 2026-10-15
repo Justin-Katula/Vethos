@@ -155,6 +155,8 @@ export const ReglagesSchema = z.object({
    * « Remove anyway » : la demande attend une heure dans Profil, où seulement
    * l'engagement se retire pour de bon (`@/engagements/retrait`).
    */
+  /** Une proposition de cible (baisser, monter) déjà répondue : l'instant, par objectif. Rien d'autre avant 7 jours. */
+  propositionsCible: z.record(z.string(), z.string()).optional(),
   demandesRetrait: z
     .array(
       z.object({
@@ -239,6 +241,8 @@ type EtatDonnees = Contenu & {
 
   ajouterObjectif: (o: Omit<Objectif, 'id' | 'creeLe'>) => Promise<void>
   supprimerObjectif: (id: string) => Promise<void>
+  /** La cible d'un objectif, changée sur proposition de l'app (et seulement avec l'accord de l'utilisateur). */
+  changerCibleObjectif: (id: string, minutes: number) => Promise<void>
 
   ajouterAncre: (a: Omit<Ancre, 'id' | 'creeeLe'>) => Promise<void>
   supprimerAncre: (id: string) => Promise<void>
@@ -461,6 +465,11 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
 
     async supprimerObjectif(id) {
       await enregistrer({ objectifs: get().objectifs.filter((o) => o.id !== id) })
+    },
+
+    async changerCibleObjectif(id, minutes) {
+      const m = Math.max(15, Math.min(100 * 60, Math.round(minutes / 15) * 15))
+      await enregistrer({ objectifs: get().objectifs.map((o) => (o.id === id ? { ...o, cibleHebdoMinutes: m } : o)) })
     },
 
     async ajouterAncre(a) {

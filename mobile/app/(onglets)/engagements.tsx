@@ -17,6 +17,7 @@ import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { FeuilleRetrait, type CibleRetrait } from '@/engagements/FeuilleRetrait'
 import { useRetrait } from '@/engagements/useRetrait'
+import { propositionCible } from '@/engagements/ajuster-cible'
 import { cancelObjectiveRemoval, removalDate } from '@shared/contract'
 import { useSeances } from '@/seances/magasin-seances'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
@@ -126,6 +127,7 @@ export default function Engagements() {
   }
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)
   const servis = useSeances((e) => e.apprentissage.weeklyObjectiveServed)
+  const journal = useSeances((e) => e.apprentissage.sessionEvents ?? [])
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [page, setPage] = useState<NatureApp | null>(null)
   const [historique, setHistorique] = useState(false)
@@ -228,6 +230,19 @@ export default function Engagements() {
     const ageJours = Math.floor((maintenant.getTime() - new Date(o.creeLe).getTime()) / 86_400_000)
     const debut = ageJours < 14
     const ou = ouvert === o.id
+    // L'app ne change jamais une cible d'elle-même : elle propose, on décide.
+    const prop = propositionCible({
+      objectifId: o.id,
+      cibleMinutes: o.cibleHebdoMinutes,
+      events: journal,
+      today: cleDuJour,
+      derniereReponse: d.reglages.propositionsCible?.[o.id],
+      maintenantMs: maintenant.getTime(),
+    })
+    const repondre = async (accepte: boolean) => {
+      if (prop && accepte) await d.changerCibleObjectif(o.id, prop.minutes)
+      await d.majReglages({ propositionsCible: { ...(d.reglages.propositionsCible ?? {}), [o.id]: new Date().toISOString() } })
+    }
     return (
       <Pressable key={o.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
         <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
@@ -250,6 +265,20 @@ export default function Engagements() {
                   : `About ${hm(dose / 7)} a day · this week`}</Text>
           </View>
         </View>
+        {prop ? (
+          <View style={{ marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.06)', gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <Text style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 15 }}>
+                {`${prop.sens === 'baisser' ? 'Lower' : 'Raise'} to ${hm(prop.minutes)} a week?`}
+              </Text>
+              <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12 }}>{`${prop.tenuPourcent}% held`}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pilule onPress={() => void repondre(true)}>{prop.sens === 'baisser' ? 'Lower' : 'Raise'}</Pilule>
+              <Pilule contour onPress={() => void repondre(false)}>{`Keep ${hm(o.cibleHebdoMinutes)}`}</Pilule>
+            </View>
+          </View>
+        ) : null}
         {ou ? (
           <View style={{ gap: 12, paddingTop: 12 }}>
             {o.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{o.intention}</Text> : null}
