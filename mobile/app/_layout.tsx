@@ -23,7 +23,7 @@ import { ecouterReponses } from '@/seances/rappels'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
-import { definirCompte, oublierTiroirCommun } from '@/compte/espace'
+import { definirCompte, ecranDeDepart, lireIntroEnAttente, marquerIntroVue, oublierTiroirCommun, useAppareil } from '@/compte/espace'
 import { accorder } from '@/compte/nuage'
 import { useSeances } from '@/seances/magasin-seances'
 import { cleDate } from '@/plan/moteur'
@@ -60,6 +60,12 @@ function Coque() {
   // l'autre. Déconnecté, il n'y a pas de tiroir du tout.
   const session = useSession()
   const compte = session === undefined ? undefined : (session?.user.id ?? null)
+  // Ce que l'appareil sait avant tout compte : l'introduction déjà vue ici ?
+  const introVue = useAppareil((e) => e.introVue)
+  const enAttente = useAppareil((e) => e.enAttente)
+  useEffect(() => {
+    void useAppareil.getState().charger()
+  }, [])
   useEffect(() => {
     if (compte === undefined) return
     let annule = false
@@ -83,18 +89,42 @@ function Coque() {
       definirCompte(compte)
       await charger()
       await useSeances.getState().charger(cleDate(new Date()))
+      // L'introduction faite avant la connexion (téléchargement neuf) : un compte
+      // neuf la reçoit ; un compte qui a déjà la sienne la garde, et celle-ci s'oublie.
+      const attente = await lireIntroEnAttente()
+      if (attente && !annule) {
+        const d = useDonnees.getState()
+        if (!d.reglages.introductionFaite) {
+          await d.finaliserIntroduction(attente.ajouts as never, attente.prenom, attente.age as never, attente.contrat as never)
+          await useDonnees.getState().majReglages({ consentementIA: attente.ia })
+        }
+        await useAppareil.getState().liberer()
+      }
+      if (useDonnees.getState().reglages.introductionFaite) void marquerIntroVue()
     })()
     return () => {
       annule = true
     }
   }, [compte, charger])
 
-  if (compte === undefined) return <ChargementVethos pleinEcran />
+  const depart = ecranDeDepart(compte, introVue)
+  if (depart === 'chargement') return <ChargementVethos pleinEcran />
 
-  // Déconnecté : la porte, et RIEN derrière — ni introduction, ni « Je
-  // commence », ni onglets. Ces écrans sont des fenêtres iOS qui passent
-  // au-dessus de tout ; s'ils existaient ici, ils couvriraient la porte.
-  if (compte === null) {
+  // Téléchargement neuf : l'introduction d'abord, avant tout compte. Puis la
+  // porte (« Sign Up »). Ses réponses attendent la connexion.
+  if (depart === 'introduction') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <StatusBar style="light" />
+        <IntroductionSansCompte />
+      </View>
+    )
+  }
+
+  // Déconnecté (l'appareil a déjà vu l'introduction) : la porte, et RIEN
+  // derrière — ni introduction, ni « Je commence », ni onglets. Ces écrans sont
+  // des fenêtres iOS qui passent au-dessus de tout ; ils couvriraient la porte.
+  if (depart === 'porte') {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar style="light" />
@@ -122,12 +152,23 @@ function Coque() {
       <JeCommence />
       {/* Revenu d'un bouclier pendant une séance : le cadran zoome sur elle. */}
       <ZoomSeance />
-      {/* Au-dessus encore : un compte neuf n'a rien derrière. */}
-      <Introduction />
+      {/* Au-dessus encore : un compte neuf n'a rien derrière — sauf si son
+          introduction, faite avant la connexion, est en train de lui être remise. */}
+      {enAttente ? null : <Introduction />}
       {/* Puis le mur d'abonnement, une fois l'introduction faite. */}
       <PorteCompte />
     </View>
   )
+}
+
+/** L'introduction d'un téléchargement neuf : un état vide, en mémoire, sans compte. */
+function IntroductionSansCompte() {
+  const pret = useDonnees((e) => e.chargees && e.proprietaire === null)
+  // Rouvert à chaque fois qu'un changement de compte l'a refermé.
+  useEffect(() => {
+    if (!pret) useDonnees.getState().ouvrirSansCompte()
+  }, [pret])
+  return pret ? <Introduction /> : <ChargementVethos pleinEcran />
 }
 
 // Dès le premier instant : un « I'm starting » touché sur une notification peut

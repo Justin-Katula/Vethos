@@ -12,7 +12,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 const envois: string[] = []
 vi.mock('./nuage', () => ({ noterEcriture: async (compte: string) => void envois.push(compte) }))
 
-import { cleCompte, definirCompte, ecrireTiroir, oublierTiroirCommun } from './espace'
+import { cleCompte, definirCompte, ecranDeDepart, ecrireTiroir, oublierTiroirCommun } from './espace'
 
 beforeEach(() => {
   disque.clear()
@@ -44,5 +44,22 @@ describe('Un tiroir par compte', () => {
     disque.set('vethos:donnees:v1:u:tom', '{"a":"sien"}')
     await oublierTiroirCommun()
     expect([...disque.keys()]).toEqual(['vethos:donnees:v1:u:tom'])
+  })
+})
+
+describe('au lancement', () => {
+  it('téléchargement neuf : l’introduction d’abord, puis la porte', () => {
+    expect(ecranDeDepart(null, false)).toBe('introduction')
+  })
+  it('déconnecté sur un téléphone qui a déjà servi : la porte, jamais l’introduction', () => {
+    expect(ecranDeDepart(null, true)).toBe('porte')
+  })
+  it('connecté : l’app (l’introduction ne s’y joue que pour un compte neuf)', () => {
+    expect(ecranDeDepart('u1', true)).toBe('app')
+    expect(ecranDeDepart('u1', false)).toBe('app')
+  })
+  it('tant qu’on ne sait pas : le chargement', () => {
+    expect(ecranDeDepart(undefined, true)).toBe('chargement')
+    expect(ecranDeDepart(null, undefined)).toBe('chargement')
   })
 })

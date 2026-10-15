@@ -251,6 +251,8 @@ type EtatDonnees = Contenu & {
   supprimerObligation: (id: string) => Promise<void>
 
   majReglages: (r: Partial<Reglages>) => Promise<void>
+  /** Avant tout compte : un état vide, jamais écrit. */
+  ouvrirSansCompte: () => void
   finaliserIntroduction: (
     ajouts: AjoutsIntroduction,
     prenom: string,
@@ -295,6 +297,11 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
     ...VIDE,
     chargees: false,
     proprietaire: null,
+
+    /** Avant tout compte (introduction d'un téléchargement neuf) : un état vide, en mémoire seulement. */
+    ouvrirSansCompte() {
+      set({ ...VIDE, proprietaire: null, chargees: true })
+    },
 
     async charger() {
       // Le tiroir du compte connecté. Un tiroir vide est un compte neuf : il

@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useDonnees } from '@/donnees/magasin'
+import { compteCourant, useAppareil } from '@/compte/espace'
 import { useBlocage } from '@/blocage/etat'
 import { SelecteurApplications } from '@/blocage/SelecteurApplications'
 import { selectionEstVide } from '@/blocage/contrat'
@@ -238,9 +239,18 @@ function IntroductionSombre() {
     setTimeout(async () => {
       try {
         const r = preparerIntroduction(useDonnees.getState(), b, new Date(), autres)
-        setSortie(true)
         const m = eRef.current.mode
-        await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age, m ? signContract(m, new Date()) : null)
+        const contrat = m ? signContract(m, new Date()) : null
+        // Téléchargement neuf, pas encore de compte : les réponses attendent la
+        // connexion (`useAppareil`). Un compte neuf les recevra ; un compte qui a
+        // déjà fait son introduction garde la sienne.
+        if (!compteCourant()) {
+          await useAppareil.getState().finirSansCompte({ ajouts: r.ajouts, prenom: eRef.current.name.trim(), age: eRef.current.age ?? null, contrat, ia: eRef.current.ia ?? 'non' })
+          enregistrement.current = false
+          return
+        }
+        setSortie(true)
+        await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age, contrat)
         // L'accord pour l'IA, donné pendant l'introduction (jamais demandé plus tard).
         await useDonnees.getState().majReglages({ consentementIA: eRef.current.ia ?? 'non' })
         // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.

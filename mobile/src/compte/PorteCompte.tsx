@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
 import { A, GEIST, SORTIE } from '@/ui/app-briques'
 import { connecterApple, connecterGoogle, useSession } from './compte'
-import { introVueSurAppareil, marquerIntroVue } from './espace'
+import { marquerIntroVue, useAppareil } from './espace'
 import { LogoApple, LogoGoogle, useConnexion } from './CarteCompte'
 import { useAbonnement } from '@/abonnement/achats'
 import { EcranAbonnement } from '@/abonnement/EcranAbonnement'
@@ -35,9 +35,9 @@ function Pilule({ onPress, clair, children, label }: { onPress: () => void; clai
 }
 
 /**
- * La porte. Déconnecté, on arrive ici d'abord — jamais sur l'introduction.
- * « Sign In » pour revenir sur son compte, « Sign Up » pour en créer un ;
- * l'introduction ne se joue qu'après, pour un compte qui ne l'a pas faite.
+ * La porte. Un téléchargement neuf y arrive après l'introduction (« Sign Up ») ;
+ * un téléphone déjà servi, déconnecté, y arrive directement (« Sign In »). Un
+ * compte neuf qui se connecte ensuite joue son introduction ; un compte connu, non.
  *
  * Derrière la connexion, le mur : sans abonnement ni essai, l'app reste
  * fermée aussi (voir `EcranAbonnement`).
@@ -52,11 +52,14 @@ export function PorteCompte() {
   const marges = useSafeAreaInsets()
   const apparition = useRef(new Animated.Value(0)).current
 
-  // Un téléphone qui a déjà servi ouvre sur « Sign In » ; un téléphone neuf, sur « Sign Up ».
+  // Juste après l'introduction d'un téléchargement neuf : « Sign Up ». Un
+  // téléphone qui a déjà servi ouvre sur « Sign In ».
+  const introVue = useAppareil((e) => e.introVue)
+  const enAttente = useAppareil((e) => e.enAttente)
   const [inscription, setInscription] = useState<boolean | null>(null)
   useEffect(() => {
-    void introVueSurAppareil().then((vue) => setInscription(!vue))
-  }, [])
+    if (introVue !== undefined && inscription === null) setInscription(!introVue || enAttente)
+  }, [introVue, enAttente, inscription])
   useEffect(() => {
     if (introFaite) void marquerIntroVue()
   }, [introFaite])
