@@ -659,7 +659,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       // compterait deux fois (défaut réel du 2026-10-13, iPhone).
       if (session?.kind === 'ancre' && session.refId === ancre.id) continue
       const reduced = saturated.has(date) || freeDays.has(date)
-      const duration = reduced ? ancre.minimumMinutes : ancre.normalMaxMinutes
+      // Une journée s'arrête à minuit : une ancre ne la déborde jamais (le plan,
+      // le cadran et les plages de blocage sont tous bornés à 24 h).
+      const duration = Math.max(0, Math.min(reduced ? ancre.minimumMinutes : ancre.normalMaxMinutes, 1440 - ancre.anchorMinute))
+      if (duration <= 0) continue
       // L'ancre est du travail : rien ne commence moins de 5 min après sa fin.
       allocator.reserve(ancre.anchorMinute, Math.min(1440, ancre.anchorMinute + duration + PAUSE_ENTRE_TRAVAUX))
       blocks.push({

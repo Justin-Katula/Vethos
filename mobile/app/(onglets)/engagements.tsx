@@ -556,6 +556,7 @@ function Formulaire({ nature, ancres, fermer, creer }: { nature: NatureApp | nul
     if (K === 'TASK' && !dur) return setErr('How much work does it need?')
     if (K === 'GOAL' && !hebdo) return setErr('How much time each week?')
     if (K === 'ANCHOR' && !len) return setErr('How long does it last?')
+    if (K === 'ANCHOR' && debutA + len > 1440) return setErr('An anchor ends by midnight.')
     if (K === 'ANCHOR' && heurePrise(ancres, debutA, len)) return setErr('This time is taken every day.')
     if (K === 'ANCHOR' && !joursLibres.length) return setErr(jours.length ? 'Those days are taken at this time.' : 'Pick at least one day.')
     if (K === 'ANCHOR' && !choix) {
