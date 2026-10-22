@@ -39,7 +39,7 @@ import {
   vibrer,
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
-import type { TrancheAge } from '@/donnees/regle-sommeil'
+import { libelleTranche, TRANCHES_AGE, type TrancheAge } from '@/donnees/regle-sommeil'
 import { toneSample, type Mode } from '@shared/contract'
 import { useBlocage } from '@/blocage/etat'
 import { ApercuSelection } from '@/blocage/ApercuSelection'
@@ -713,11 +713,7 @@ export function EcranIA({ ctx }: { ctx: Ctx }) {
 
 // ——— L'âge : il fixe le plancher de la nuit ———
 
-const AGES: [TrancheAge, string][] = [
-  ['13-18', '13 – 18'],
-  ['19-24', '19 – 24'],
-  ['25+', '25+'],
-]
+const AGES: [TrancheAge, string][] = TRANCHES_AGE.map((t) => [t, libelleTranche(t)])
 
 export function EcranAge({ ctx }: { ctx: Ctx }) {
   const apres = useMinuteries()

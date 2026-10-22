@@ -11,7 +11,8 @@ import { GEIST } from '@/ui/primitives'
 const Vue = vueJetons()
 
 /** La hauteur d'une ligne (icône + nom) et l'espace entre deux, pour une police donnée. */
-const hauteurLigne = (taille: number) => Math.round(taille * 1.45)
+// L'icône d'iOS est plus haute que le texte : 1,45 × la police coupait les lignes.
+const hauteurLigne = (taille: number) => Math.round(taille * 1.9)
 const ESPACE = 12
 
 export function ApercuSelection({

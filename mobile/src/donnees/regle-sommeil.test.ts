@@ -6,9 +6,9 @@ const ref = { coucher: '23:00', lever: '08:00' }
 describe('la règle du sommeil', () => {
   it('tient le plancher de l’âge : 8 h de 13 à 18 ans, 7 h adulte', () => {
     const nuit = { coucher: '23:30', lever: '07:00' } // 7 h 30
-    expect(verifierSommeil(nuit, null, '19-24').ok).toBe(true)
-    expect(verifierSommeil(nuit, null, '25+').ok).toBe(true)
-    const ado = verifierSommeil(nuit, null, '13-18')
+    expect(verifierSommeil(nuit, null, '18-24').ok).toBe(true)
+    expect(verifierSommeil(nuit, null, '65+').ok).toBe(true)
+    const ado = verifierSommeil(nuit, null, '13-17')
     expect(ado.ok).toBe(false)
     expect(!ado.ok && ado.raison).toBe('A night is at least 8 hours.')
     expect(verifierSommeil({ coucher: '00:00', lever: '06:30' }, null).ok).toBe(false) // 6 h 30 < 7 h
@@ -36,5 +36,13 @@ describe('la règle du sommeil', () => {
     const v = verifierSommeil({ coucher: '00:30', lever: '08:00' }, { coucher: '23:30', lever: '08:00' })
     expect(v.utilise).toBe(60)
     expect(v.reste).toBe(60)
+  })
+})
+
+import { versTranche } from './regle-sommeil'
+
+describe('les anciennes tranches d’âge (2026-10-23)', () => {
+  it('sont relues dans les nouvelles', () => {
+    expect([versTranche('13-18'), versTranche('19-24'), versTranche('25+'), versTranche('45-54')]).toEqual(['13-17', '18-24', '25-34', '45-54'])
   })
 })

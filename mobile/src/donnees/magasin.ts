@@ -11,7 +11,7 @@ import {
   estCouleurDansFamille,
 } from '@shared/palettes'
 import { preparerTache, type BrouillonTache } from './creation'
-import { TRANCHES_AGE, type TrancheAge } from './regle-sommeil'
+import { TRANCHES_AGE, type TrancheAge, versTranche } from './regle-sommeil'
 import { ContractSchema, type Contract } from '@shared/contract'
 import type { AjoutsIntroduction } from '@/accueil/modele-introduction'
 
@@ -185,7 +185,7 @@ export const ReglagesSchema = z.object({
   /** Le plan si-alors de l'entretien WOOP avec le Coach : le déclencheur-événement de l'habitude. */
   planSiAlors: z.string().max(200).nullish(),
   trancheAge: z
-    .preprocess((v) => (v === 'ado' ? '13-18' : v === 'adulte' ? '25+' : v), z.enum(TRANCHES_AGE))
+    .preprocess(versTranche, z.enum(TRANCHES_AGE))
     .nullish(),
 })
 export type Reglages = z.infer<typeof ReglagesSchema>

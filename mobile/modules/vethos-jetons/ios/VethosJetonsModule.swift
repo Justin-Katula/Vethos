@@ -149,6 +149,10 @@ struct ListeJetons: View {
     let s = selectionRangee(modele.selectionId)
     let elements: [Element] =
       s.categoryTokens.map { .categorie($0) } + s.applicationTokens.map { .application($0) } + s.webDomainTokens.map { .site($0) }
+    // Dans un défilement ancré en haut : si la hauteur prévue côté JS est trop
+    // juste, la liste déborde vers le bas (et défile) au lieu d'être coupée en
+    // haut ET en bas.
+    ScrollView(.vertical, showsIndicators: false) {
     VStack(alignment: .leading, spacing: 12) {
       ForEach(elements, id: \.self) { e in
         HStack(spacing: 10) {
@@ -171,6 +175,8 @@ struct ListeJetons: View {
     }
     .font(.system(size: modele.taille, weight: .medium))
     .foregroundColor(modele.couleur)
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 

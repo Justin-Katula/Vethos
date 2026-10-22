@@ -13,8 +13,8 @@
  * Les écarts se mesurent sur le cercle de 24 h : 23:30 et 00:30 sont à 1 h.
  */
 // Le plancher vit dans `@shared` : le bureau refuse la même nuit que l'iPhone.
-import { plancherSommeil, TRANCHES_AGE, type TrancheAge } from '@shared/sommeil-plancher'
-export { plancherSommeil, TRANCHES_AGE, type TrancheAge }
+import { libelleTranche, plancherSommeil, TRANCHES_AGE, type TrancheAge, versTranche } from '@shared/sommeil-plancher'
+export { libelleTranche, plancherSommeil, TRANCHES_AGE, type TrancheAge, versTranche }
 export const SOMMEIL_MAX = 10 * 60
 export const MARGE_SOMMEIL = 2 * 60
 
