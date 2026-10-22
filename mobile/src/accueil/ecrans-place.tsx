@@ -4,7 +4,7 @@
  * puis le vrai moteur le pose sur le cadran, et la vraie semaine apparaît.
  */
 import { useEffect, useRef, useState } from 'react'
-import { Animated, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
+import { Animated, LayoutAnimation, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
 import { finTexte, type JourTemps } from '@/plan/lecture'
@@ -132,25 +132,32 @@ function Apercu({ tp }: { tp: Nature }) {
   )
 }
 
+const NOM_NATURE: Record<Nature, string> = { TASK: 'Task', GOAL: 'Goal', ANCHOR: 'Anchor' }
+
+/**
+ * Les trois façons de tenir une chose, chacune expliquée, et les choses de
+ * l'utilisateur posées DEDANS (chacune dans sa meilleure). Toucher une chose la
+ * soulève ; toucher une autre forme l'y dépose. Toutes sont gardées.
+ */
 export function EcranUne({ ctx }: { ctx: Ctx }) {
   const e = ctx.e
   const ids = choses(e)
   const ch = choisie(e, ctx.maintenant)
-  const tpc = natureDe(e, ch)
-  const picks = retenues(e)
-  const toucherPuce = (id: string) => {
+  const [levee, setLevee] = useState<string | null>(null)
+  const deposer = (t: Nature) => {
+    if (!levee) return
+    vibrer('medium')
+    LayoutAnimation.configureNext(LayoutAnimation.create(260, 'easeInEaseOut', 'opacity'))
+    ctx.maj((x) => ({ type: { ...x.type, [levee]: t } }))
+    setLevee(null)
+  }
+  const lever = (id: string) => {
     vibrer('light')
-    const on = picks.includes(id)
-    if (!on) ctx.maj(() => ({ picks: [...picks, id], chosen: id }))
-    else if (ch !== id) ctx.maj(() => ({ chosen: id }))
-    else if (picks.length > 1) {
-      const reste = picks.filter((x) => x !== id)
-      ctx.maj(() => ({ picks: reste, chosen: reste[0]! }))
-    }
+    setLevee(levee === id ? null : id)
   }
   const continuer = () => {
     vibrer('light')
-    ctx.maj((x) => ({ ...reglagesPour(x, ch, ctx.maintenant), chosen: ch, type: { ...x.type, [ch]: tpc } }))
+    ctx.maj((x) => ({ ...reglagesPour(x, ch, ctx.maintenant), picks: null, chosen: ch, type: { ...x.type, [ch]: natureDe(x, ch) } }))
     ctx.suivant()
   }
   return (
@@ -160,86 +167,78 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
         contentContainerStyle={{ paddingTop: ctx.haut, paddingHorizontal: 24, paddingBottom: 130 + ctx.bas }}
         showsVerticalScrollIndicator={false}
       >
-        {ids.length > 1 ? (
-          <Entree dl={100} reduit={ctx.reduit} style={{ marginBottom: 24 }}>
-            <Text style={T.petit}>Choose what Vethos takes on</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-              {ids.map((id) => {
-                const on = picks.includes(id)
-                const fo = id === ch
-                return (
-                  <Pressable
-                    key={id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    onPress={() => toucherPuce(id)}
-                    style={{
-                      height: 36,
-                      paddingHorizontal: 14,
-                      borderRadius: 999,
-                      justifyContent: 'center',
-                      backgroundColor: on ? C.t1 : C.s1,
-                      borderWidth: 1,
-                      borderColor: fo ? C.t1 : on ? 'rgba(242,242,242,0.5)' : 'rgba(242,242,242,0.16)',
-                      opacity: on && !fo ? 0.72 : 1,
-                    }}
-                  >
-                    <Text style={{ color: on ? '#000' : C.t2, fontFamily: GEIST.moyen, fontSize: 14 }}>{ITEM[id]!.label}</Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-          </Entree>
-        ) : null}
-        <Entree dl={210} reduit={ctx.reduit}>
-          <Titre>{`How should Vethos hold “${ITEM[ch]!.name}”?`}</Titre>
+        <Entree dl={150} reduit={ctx.reduit}>
+          <Titre>{ids.length > 1 ? 'How should Vethos hold them?' : `How should Vethos hold “${ITEM[ch]!.name}”?`}</Titre>
         </Entree>
-        <View style={{ gap: 8, marginTop: 24 }}>
-          {(['TASK', 'GOAL', 'ANCHOR'] as Nature[]).map((t, i) => (
-            <Entree key={t} dl={430 + i * 110} reduit={ctx.reduit}>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: t === tpc }}
-                accessibilityLabel={`${t}. ${TYPEL[t]}${ITEM[ch]!.fit === t ? ' Best fit.' : ''}`}
-                onPress={() => {
-                  vibrer('light')
-                  ctx.maj((x) => ({ type: { ...x.type, [ch]: t } }))
-                }}
-                style={({ pressed }) => ({
-                  padding: 14,
-                  borderRadius: 8,
-                  backgroundColor: C.s1,
-                  borderWidth: 1,
-                  borderColor: t === tpc ? 'rgba(242,242,242,0.7)' : 'transparent',
-                  transform: [{ scale: pressed ? 0.985 : 1 }],
-                })}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TYPEC[t], borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)' }} />
-                  <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
-                  <View style={{ flex: 1 }} />
-                  {ITEM[ch]!.fit === t ? (
-                    <View style={{ height: 20, paddingHorizontal: 8, borderRadius: 4, backgroundColor: '#2f2f2f', justifyContent: 'center' }}>
-                      <Text style={{ color: C.t1, fontFamily: GEIST.moyen, fontSize: 11 }}>Best fit</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20, marginTop: 4 }}>{TYPEL[t]}</Text>
+        <View style={{ gap: 12, marginTop: 24 }}>
+          {(['TASK', 'GOAL', 'ANCHOR'] as Nature[]).map((t, i) => {
+            const dedans = ids.filter((id) => natureDe(e, id) === t)
+            const cible = !!levee && natureDe(e, levee) !== t
+            return (
+              <Entree key={t} dl={330 + i * 110} reduit={ctx.reduit}>
                 <View
+                  accessible={!cible}
+                  accessibilityLabel={`${NOM_NATURE[t]}. ${TYPEL[t]}`}
                   style={{
-                    marginTop: 12,
-                    paddingTop: 12,
-                    paddingBottom: 2,
-                    borderTopWidth: 1,
-                    borderTopColor: 'rgba(242,242,242,0.07)',
-                    opacity: t === tpc ? 1 : 0.5,
+                    borderRadius: 16,
+                    padding: 16,
+                    backgroundColor: C.s1,
+                    borderWidth: 1,
+                    borderColor: cible ? 'rgba(242,242,242,0.45)' : 'rgba(242,242,242,0.06)',
                   }}
                 >
-                  <Apercu tp={t} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: TYPEC[t], borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)' }} />
+                    <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
+                  </View>
+                  <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20, marginTop: 6 }}>{TYPEL[t]}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, minHeight: 40 }}>
+                    {dedans.map((id) => {
+                      const on = levee === id
+                      return (
+                        <Pressable
+                          key={id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          accessibilityLabel={`${ITEM[id]!.name}, ${NOM_NATURE[t]}`}
+                          onPress={() => lever(id)}
+                          style={({ pressed }) => ({
+                            height: 40,
+                            paddingHorizontal: 14,
+                            borderRadius: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: on ? C.t1 : 'rgba(242,242,242,0.09)',
+                            borderWidth: 1,
+                            borderColor: on ? C.t1 : TRAIT[t],
+                            transform: [{ scale: on ? 1.04 : pressed ? 0.97 : 1 }],
+                          })}
+                        >
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: on ? '#000' : TRAIT[t] }} />
+                          <Text style={{ color: on ? '#000' : C.t1, fontFamily: GEIST.moyen, fontSize: 14 }}>{ITEM[id]!.name}</Text>
+                        </Pressable>
+                      )
+                    })}
+                    {cible ? (
+                      <View style={{ height: 40, paddingHorizontal: 14, borderRadius: 20, justifyContent: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(242,242,242,0.4)' }}>
+                        <Text style={{ color: C.t2, fontFamily: GEIST.moyen, fontSize: 14 }}>{`Move ${ITEM[levee!]!.name} here`}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {/* Une forme qui peut recevoir : toute la carte est la cible. */}
+                  {cible ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move ${ITEM[levee!]!.name} to ${NOM_NATURE[t]}`}
+                      onPress={() => deposer(t)}
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 16 }}
+                    />
+                  ) : null}
                 </View>
-              </Pressable>
-            </Entree>
-          ))}
+              </Entree>
+            )
+          })}
         </View>
       </ScrollView>
       <PiedDegrade bas={ctx.bas} dl={800} reduit={ctx.reduit}>
