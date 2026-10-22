@@ -1374,24 +1374,38 @@ export function EcranSemaine({
                       .filter((s) => s.nature !== 'sleep')
                       .map((s) => {
                         const a = Math.max(w0, s.debut)
+                        // Le bloc s'arrête où s'arrête le travail ; la pause qui suit
+                        // se dessine à part, en petit, au lieu de coller au suivant.
+                        const fTravail = Math.min(w1, finTexte(s))
                         const b = Math.min(w1, s.fin)
-                        if (b <= a) return null
+                        if (fTravail <= a) return null
                         const fixe = s.nature === 'fixed'
+                        const yA = Y(a) + 1
+                        const h = Math.max(3, Y(fTravail) - Y(a) - 2)
+                        const pause = s.pauseVisible && s.pause ? { y: Y(fTravail), h: Y(b) - Y(fTravail) } : null
                         return (
-                          <View
-                            key={s.id}
-                            style={{
-                              position: 'absolute',
-                              left: 2,
-                              right: 2,
-                              top: Y(a),
-                              height: Math.max(4, Y(b) - Y(a)),
-                              borderRadius: 5,
-                              backgroundColor: couleur(s.nature),
-                              borderWidth: fixe ? 1 : 0,
-                              borderColor: 'rgba(242,242,242,0.07)',
-                            }}
-                          />
+                          <View key={s.id} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="none">
+                            <View
+                              style={{
+                                position: 'absolute',
+                                left: 3,
+                                right: 3,
+                                top: yA,
+                                height: h,
+                                borderRadius: Math.min(5, h / 2),
+                                backgroundColor: fixe ? 'rgba(242,242,242,0.05)' : couleur(s.nature),
+                                borderWidth: fixe ? 1 : 0,
+                                borderColor: 'rgba(242,242,242,0.12)',
+                              }}
+                            />
+                            {pause && pause.h >= 2 ? (
+                              <View style={{ position: 'absolute', left: 0, right: 0, top: pause.y, height: pause.h, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }}>
+                                {[0, 1, 2].map((k) => (
+                                  <View key={k} style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.4)' }} />
+                                ))}
+                              </View>
+                            ) : null}
+                          </View>
                         )
                       })}
                     {td && nm >= w0 && nm <= w1 ? (
