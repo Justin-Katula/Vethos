@@ -141,6 +141,14 @@ export function fusionnerContigus(segments: readonly SegmentTemps[]): SegmentTem
   return out
 }
 
+/**
+ * La fin écrite d'un segment : celle du TRAVAIL. La pause de 5 min qui suit
+ * est dessinée sur la grille quand quelque chose la suit, mais écrire
+ * « 18:00 – 18:45 » puis « 18:45 – 20:15 » faisait croire à deux blocs collés.
+ */
+export const finTexte = (s: Pick<SegmentTemps, 'fin' | 'pause' | 'pauseVisible'>): number =>
+  s.pauseVisible && s.pause ? s.fin - s.pause : s.fin
+
 export function segmentActuel(segments: readonly SegmentTemps[], minute: number) {
   return segments.find((s) => s.nature !== 'sleep' && s.debut <= minute && minute < s.fin)
     ?? segments.find((s) => s.debut <= minute && minute < s.fin)

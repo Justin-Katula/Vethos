@@ -108,3 +108,14 @@ describe('Un même engagement sans vraie pause = un seul bloc', () => {
     expect(fusionnerContigus([seg('a', 't1', 600, 690, { tenue: true }), seg('b', 't1', 690, 780)])).toHaveLength(2)
   })
 })
+
+import { finTexte } from './lecture'
+
+describe('la fin écrite est celle du travail (2026-10-22)', () => {
+  it('pause dessinée : « 18:00 – 18:40 », pas « – 18:45 » collé au bloc suivant', () => {
+    expect(finTexte({ fin: 18 * 60 + 45, pause: 5, pauseVisible: true })).toBe(18 * 60 + 40)
+  })
+  it('pause cachée (rien ne suit) : la fin dessinée est déjà celle du travail', () => {
+    expect(finTexte({ fin: 18 * 60 + 40, pause: 5, pauseVisible: false })).toBe(18 * 60 + 40)
+  })
+})

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Animated, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
-import type { JourTemps } from '@/plan/lecture'
+import { finTexte, type JourTemps } from '@/plan/lecture'
 import { dateLocale } from '@/plan/format'
 import { FIXL, fmt, ITEM, JOURS_LONGS, MOIS, MOIS_LONGS, WL, type Fixe, type Nature } from './catalogue-introduction'
 import {
@@ -942,7 +942,7 @@ export function EcranPlace({ ctx, placement }: { ctx: Ctx; placement: Placement 
   const premier = premierBloc(placement)
   const jour = premier?.jour ?? placement.jours[0]
   const slot = premier ? premier.seg.debut : null
-  const du = premier ? Math.max(15, premier.seg.fin - premier.seg.debut) : 60
+  const du = premier ? Math.max(15, finTexte(premier.seg) - premier.seg.debut) : 60
   const tp = premier ? natureDuBloc(premier.seg.nature) ?? 'GOAL' : 'GOAL'
   const aujourdHui = jour?.date === placement.jours[0]?.date
   const maintenant = new Date()
@@ -1117,7 +1117,7 @@ export function EcranSemaine({
           .filter((s) => s.nature !== 'sleep')
           .map((s) => ({
             a: s.debut,
-            t: `${fmt(s.debut)} → ${fmt(s.fin)}`,
+            t: `${fmt(s.debut)} → ${fmt(finTexte(s))}`,
             l: s.titre,
             c: s.nature === 'fixed' ? 'rgba(141,141,141,0.45)' : couleur(s.nature),
             tc: s.nature === 'fixed' ? C.t2 : C.t1,

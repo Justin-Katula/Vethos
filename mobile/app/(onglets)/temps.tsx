@@ -19,7 +19,7 @@ import { verifierSommeil } from '@/donnees/regle-sommeil'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { usePlan } from '@/plan/Plan'
 import { cleDate } from '@/plan/moteur'
-import type { SegmentTemps } from '@/plan/lecture'
+import { finTexte, type SegmentTemps } from '@/plan/lecture'
 import { useSeances } from '@/seances/magasin-seances'
 import { RoueHeure } from '@/ui/Roue'
 import { accentApp } from '@/ui/lumiere'
@@ -233,7 +233,7 @@ export default function MonTemps() {
                       if (b <= a) return null
                       const h = Math.max(14, Y(b) - Y(a))
                       const n = natureSeg(s)
-                      const t = `${fmt(s.debut)} – ${fmt(s.fin)}`
+                      const t = `${fmt(s.debut)} – ${fmt(finTexte(s))}`
                       if (!n)
                         return (
                           <Pressable
@@ -450,7 +450,7 @@ function FeuilleSeance({
       </View>
       <Text style={{ marginTop: 12, color: A.t1, fontFamily: GEIST.demi, fontSize: 28, lineHeight: 34, letterSpacing: -0.6 }}>{s.titre}</Text>
       <Text style={{ marginTop: 4, color: A.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
-        {`${DAYS[iJour]?.L ?? ''} ${DAYS[iJour]?.n ?? ''} · ${fmt(s.debut)} – ${fmt(s.fin)} · ${hm(s.fin - s.debut)}`}
+        {`${DAYS[iJour]?.L ?? ''} ${DAYS[iJour]?.n ?? ''} · ${fmt(s.debut)} – ${fmt(finTexte(s))} · ${hm(finTexte(s) - s.debut)}`}
       </Text>
       <View style={{ marginTop: 20, gap: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -463,7 +463,7 @@ function FeuilleSeance({
             return (
               <View key={y.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 40, paddingHorizontal: 14, borderTopWidth: k ? 1 : 0, borderTopColor: 'rgba(242,242,242,0.06)' }}>
                 <Text style={{ width: 56, color: y.id === s.id ? A.t1 : A.t3, fontFamily: GEIST.moyen, fontSize: 13 }}>{`${DAYS[i]!.l} ${DAYS[i]!.n}`}</Text>
-                <Text style={{ flex: 1, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${fmt(y.debut)} – ${fmt(y.fin)}`}</Text>
+                <Text style={{ flex: 1, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${fmt(y.debut)} – ${fmt(finTexte(y))}`}</Text>
                 <Text style={{ color: c2, fontFamily: GEIST.moyen, fontSize: 12 }}>{t2}</Text>
               </View>
             )

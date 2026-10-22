@@ -11,7 +11,7 @@ import Svg, { Circle, Defs, Line, Mask, Path, Rect } from 'react-native-svg'
 import { useDonnees } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
 import { arrondiCinq, dateLocale } from '@/plan/format'
-import type { SegmentTemps } from '@/plan/lecture'
+import { finTexte, type SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 import { ArretSeance, BanniereProlongation, CarteJourLibre, DemarrerSeance } from '@/seances/ArretSeance'
 import { useSeances } from '@/seances/magasin-seances'
@@ -164,13 +164,13 @@ export default function Aujourdhui() {
 
   let maintenantCarte: { k: string; t: string; titre: string; point: string }
   if (N < WAKE || N >= BED) maintenantCarte = { k: 'NOW', t: `${fmt(BED)} – ${fmt(WAKE)}`, titre: 'The night is yours.', point: acc }
-  else if (cur) maintenantCarte = { k: 'NOW', t: `${fmt(cur.debut)} – ${fmt(cur.fin)}`, titre: cur.titre, point: couleurSeg(cur) }
-  else if (nxt) maintenantCarte = { k: 'UP NEXT', t: `${fmt(nxt.debut)} – ${fmt(nxt.fin)}`, titre: nxt.titre, point: couleurSeg(nxt) }
+  else if (cur) maintenantCarte = { k: 'NOW', t: `${fmt(cur.debut)} – ${fmt(finTexte(cur))}`, titre: cur.titre, point: couleurSeg(cur) }
+  else if (nxt) maintenantCarte = { k: 'UP NEXT', t: `${fmt(nxt.debut)} – ${fmt(finTexte(nxt))}`, titre: nxt.titre, point: couleurSeg(nxt) }
   else maintenantCarte = { k: 'YOUR OWN PACE', t: `${fmt(N)} – ${fmt(BED)}`, titre: 'Time that’s yours.', point: acc }
 
   const devant = blocs.filter((b) => b.debut > N).length
   const vivant = blocs.find((b) => b.debut <= N && N < b.fin)
-  let statut = !blocs.length ? 'Free day' : vivant ? `${vivant.titre} · until ${fmt(vivant.fin)}` : devant ? `${devant} ahead` : 'All done'
+  let statut = !blocs.length ? 'Free day' : vivant ? `${vivant.titre} · until ${fmt(finTexte(vivant))}` : devant ? `${devant} ahead` : 'All done'
   const FO = {
     cap: { iv: d.capIv, c: 'rgba(242,242,242,0.7)', cap: 'free across your day' },
     com: { iv: d.bk, c: acc, cap: 'committed today' },
@@ -203,7 +203,7 @@ export default function Aujourdhui() {
 
   const agenda = [
     { debut: WAKE, fin: WAKE, titre: 'Wake-up', c: 'rgba(242,242,242,0.16)', fixe: true },
-    ...visibles.map((s) => ({ debut: s.debut, fin: s.fin, titre: s.titre, c: couleurSeg(s), fixe: s.nature === 'fixed' })),
+    ...visibles.map((s) => ({ debut: s.debut, fin: s.fin, finEcrite: finTexte(s), titre: s.titre, c: couleurSeg(s), fixe: s.nature === 'fixed' })),
     { debut: BED, fin: BED, titre: 'Sleep', c: 'rgba(242,242,242,0.16)', fixe: true },
   ]
 
@@ -455,7 +455,7 @@ export default function Aujourdhui() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: 10, borderRadius: 8, backgroundColor: actif ? 'rgba(242,242,242,0.08)' : 'transparent', opacity: passe ? 0.45 : 1 }}
             >
               <Text style={{ width: 100, color: A.t3, fontFamily: MONO.normal, fontSize: 12 }}>
-                {x.debut === x.fin ? fmt(x.debut) : `${fmt(x.debut)} – ${fmt(x.fin)}`}
+                {x.debut === x.fin ? fmt(x.debut) : `${fmt(x.debut)} – ${fmt('finEcrite' in x ? x.finEcrite : x.fin)}`}
               </Text>
               <View style={{ width: 3, height: 20, borderRadius: 1, backgroundColor: x.c }} />
               <Text numberOfLines={1} style={{ flex: 1, color: x.fixe ? A.t2 : A.t1, fontFamily: GEIST.moyen, fontSize: 15 }}>{x.titre}</Text>
