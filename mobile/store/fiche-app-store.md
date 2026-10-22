@@ -93,6 +93,7 @@ Cocher ces types de données. Pour **chacun** : usage = **App Functionality** se
 | Purchases | **Purchase History** | Statut de l'abonnement (RevenueCat) |
 | User Content | **Other User Content** | Tâches, objectifs, ancres, et le texte écrit pour Stop / Later (examen IA) |
 | Usage Data | **Product Interaction** | Historique des séances (sauvegardé dans le compte) |
+| Other Data | **Other Data Types** | La tranche d'âge choisie dans l'onboarding (13–18, 19–24, 25+), sauvegardée avec les réglages |
 
 Ne rien cocher d'autre : pas de localisation, pas de contacts, pas de santé, pas de publicité, pas d'analytique, pas de diagnostics.
 
