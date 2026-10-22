@@ -48,7 +48,11 @@ export type ModuleEcran = {
   }) => void
   startMonitoring: (
     nom: string,
-    horaire: { intervalStart: { hour: number; minute: number }; intervalEnd: { hour: number; minute: number }; repeats: boolean },
+    horaire: {
+      intervalStart: { year?: number; month?: number; day?: number; hour: number; minute: number }
+      intervalEnd: { year?: number; month?: number; day?: number; hour: number; minute: number }
+      repeats: boolean
+    },
     evenements: unknown[],
   ) => Promise<unknown>
   stopMonitoring: () => void
@@ -238,8 +242,12 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         )
       }
 
+      const aujourdhui = cleDuJour(new Date())
+      const duJour = (p: Plage) => !p.date || p.date === aujourdhui
       for (const plage of plages) {
-        const activite = nomActivite(plage.blocId)
+        // Un jour passé : iOS ne le rappellerait jamais, inutile d'occuper une des vingt places.
+        if (plage.date && plage.date < aujourdhui) continue
+        const activite = nomActivite(plage.blocId, plage.date)
 
         // Surveiller ne bloque RIEN. `startMonitoring` dit seulement à iOS de
         // réveiller l'extension aux bornes de la fenêtre ; c'est ce qu'elle
@@ -288,8 +296,8 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         await natif.startMonitoring(
           activite,
           {
-            intervalStart: minuteVersComposantes(plage.debutMinute),
-            intervalEnd: minuteVersComposantes(plage.finMinute),
+            intervalStart: { ...jourVersComposantes(plage.date), ...minuteVersComposantes(plage.debutMinute) },
+            intervalEnd: { ...jourVersComposantes(plage.date), ...minuteVersComposantes(plage.finMinute) },
             repeats: false,
           },
           [],
@@ -301,7 +309,7 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       // borne est derrière nous, et le rappel ne viendra jamais. Le bouclier
       // de la séance en cours se lève donc ici, tout de suite. Celui-là est le
       // seul qui compte vraiment — c'est maintenant qu'on travaille.
-      const enCours = plages.find((p) => maintenant >= p.debutMinute && maintenant < p.finMinute)
+      const enCours = plages.find((p) => duJour(p) && maintenant >= p.debutMinute && maintenant < p.finMinute)
       if (enCours) {
         const parQui = `vethos:seance:${enCours.blocId}`
         if (enCours.exceptionId) {
@@ -383,8 +391,19 @@ const FILTRE_WEB = { type: 'auto' } as const
  * l'application surveille : sans prefixe on ne saurait plus, en lisant
  * `getActivities()`, ce qui vient de Vethos et ce qui vient d'ailleurs.
  */
-function nomActivite(blocId: string): string {
-  return `vethos.${blocId}`
+function nomActivite(blocId: string, date?: string): string {
+  return date ? `vethos.${blocId}.${date}` : `vethos.${blocId}`
+}
+
+function cleDuJour(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Un jour daté : iOS ne réveille l'extension que ce jour-là. */
+function jourVersComposantes(date?: string): { year?: number; month?: number; day?: number } {
+  if (!date) return {}
+  const [y, m, d] = date.split('-').map(Number)
+  return { year: y, month: m, day: d }
 }
 
 function minuteCourante(): number {

@@ -47,6 +47,17 @@ export function plagesAuto(a: {
 }
 
 /**
+ * Les jours à venir : la même plage d'écart à l'heure de chaque bloc, datée.
+ * iOS les applique même si Vethos n'est pas ouvert ce jour-là ; chaque
+ * ouverture les recalcule.
+ */
+export function plagesAVenir(jours: readonly { date: string; blocs: readonly PlacedBlock[] }[], selectionId: string): Plage[] {
+  return jours.flatMap((j) =>
+    plagesAuto({ blocsDuJour: j.blocs, confirmes: new Set(), nowMinute: -1, selectionId }).map((p) => ({ ...p, date: j.date })),
+  )
+}
+
+/**
  * Les plages à programmer : celles qui ne viennent pas d'un bloc non confirmé
  * du plan restent (séance en cours, urgence…) ; celles des blocs non confirmés
  * sont remplacées par `auto` — les blocs disparus du plan (reportés, replacés)
@@ -60,13 +71,16 @@ export function fusionnerAuto(a: {
 }): Plage[] {
   // Une ancre est toujours automatique (elle n'a pas de séance à elle).
   const automatique = (p: Plage) =>
+    // Un jour à venir n'a que des plages automatiques ; d'un calcul à l'autre
+    // elles sont toutes remplacées (celles d'hier comprises).
+    p.date !== undefined ||
     /^ancre-/.test(p.blocId) || (!a.confirmes.has(p.blocId) && (a.idsDuPlan.has(p.blocId) || /^(task|objective|ancre|promesse)-/.test(p.blocId)))
   return [...a.actives.filter((p) => !automatique(p)), ...a.auto]
 }
 
 /** Deux listes de plages équivalentes ? (évite de reprogrammer iOS chaque minute) */
 export function memesPlages(a: readonly Plage[], b: readonly Plage[]): boolean {
-  const cle = (p: Plage) => `${p.blocId}|${p.debutMinute}|${p.finMinute}|${p.selectionId}|${p.profond ? 1 : 0}|${p.exceptionId ?? ''}`
+  const cle = (p: Plage) => `${p.date ?? ''}|${p.blocId}|${p.debutMinute}|${p.finMinute}|${p.selectionId}|${p.profond ? 1 : 0}|${p.exceptionId ?? ''}`
   const x = a.map(cle).sort()
   const y = b.map(cle).sort()
   return x.length === y.length && x.every((v, i) => v === y[i])

@@ -33,6 +33,23 @@ export const C = {
 }
 export const SORTIE = Easing.bezier(0.23, 1, 0.32, 1)
 export const DEPLACEMENT = Easing.bezier(0.77, 0, 0.175, 1)
+
+/**
+ * Démarre une animation native une image APRÈS le montage. Lancée dans le même
+ * tic que la création de la vue, iOS la perdait parfois : la valeur restait à
+ * 0 (écran invisible) jusqu'au prochain rendu — taper une lettre, par exemple.
+ */
+export function lancer(a: Animated.CompositeAnimation): () => void {
+  let arrete = false
+  const id = requestAnimationFrame(() => {
+    if (!arrete) a.start()
+  })
+  return () => {
+    arrete = true
+    cancelAnimationFrame(id)
+    a.stop()
+  }
+}
 export { GEIST, MONO }
 
 export type Vibration = 'light' | 'medium' | 'heavy' | 'error' | 'warning' | 'success'
@@ -90,15 +107,15 @@ export function Entree({
 }) {
   const p = useRef(new Animated.Value(0)).current
   useEffect(() => {
-    const a = Animated.timing(p, {
-      toValue: 1,
-      duration: duree,
-      delay: dl,
-      easing: SORTIE,
-      useNativeDriver: true,
-    })
-    a.start()
-    return () => a.stop()
+    return lancer(
+      Animated.timing(p, {
+        toValue: 1,
+        duration: duree,
+        delay: dl,
+        easing: SORTIE,
+        useNativeDriver: true,
+      }),
+    )
   }, [dl, duree, p])
   const dy = reduit || fondu ? 0 : monte
   return (
@@ -120,9 +137,7 @@ export function Entree({
 export function useVers(valeur: number, duree = 530, easing = SORTIE, delai = 0) {
   const v = useRef(new Animated.Value(valeur)).current
   useEffect(() => {
-    const a = Animated.timing(v, { toValue: valeur, duration: duree, delay: delai, easing, useNativeDriver: true })
-    a.start()
-    return () => a.stop()
+    return lancer(Animated.timing(v, { toValue: valeur, duration: duree, delay: delai, easing, useNativeDriver: true }))
   }, [delai, duree, easing, v, valeur])
   return v
 }

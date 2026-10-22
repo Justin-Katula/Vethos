@@ -58,3 +58,26 @@ describe('Le blocage qui commence à l’heure', () => {
     expect(r.find((p) => p.blocId === 'task-a')).toEqual(seance)
   })
 })
+
+import { plagesAVenir } from './blocage-auto'
+import { fusionnerPlages, limiterAuxCapacitesIOS } from './contrat'
+
+describe('le blocage des jours à venir (2026-10-22)', () => {
+  it('chaque bloc de demain reçoit sa plage d’une heure, datée', () => {
+    const b = { ...bloc('task-d', 600, 720), date: '2026-10-16' } as PlacedBlock
+    expect(plagesAVenir([{ date: '2026-10-16', blocs: [b] }], 's')).toEqual([{ blocId: 'task-d', debutMinute: 600, finMinute: 660, selectionId: 's', date: '2026-10-16' }])
+  })
+  it('les plages datées d’un calcul précédent sont toutes remplacées', () => {
+    const vieille = { blocId: 'task-z', debutMinute: 600, finMinute: 660, selectionId: 's', date: '2026-10-16' }
+    expect(fusionnerAuto({ actives: [vieille], auto: [], idsDuPlan: new Set(), confirmes: new Set() })).toEqual([])
+  })
+  it('deux jours différents ne fusionnent jamais, et aujourd’hui passe avant le plafond', () => {
+    const auj = { blocId: 'a', debutMinute: 600, finMinute: 660, selectionId: 's' }
+    const dem = { blocId: 'b', debutMinute: 600, finMinute: 660, selectionId: 's', date: '2026-10-16' }
+    expect(fusionnerPlages([dem, auj])).toHaveLength(2)
+    const beaucoup = Array.from({ length: 25 }, (_, i) => ({ blocId: `f${i}`, debutMinute: 60 * (i % 20), finMinute: 60 * (i % 20) + 50, selectionId: 's', date: i < 20 ? '2026-10-16' : '2026-10-17' }))
+    const { retenues } = limiterAuxCapacitesIOS([...beaucoup, { blocId: 'aujourdhui', debutMinute: 1200, finMinute: 1230, selectionId: 's' }])
+    expect(retenues).toHaveLength(20)
+    expect(retenues[0]!.blocId).toBe('aujourdhui')
+  })
+})

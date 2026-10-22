@@ -125,6 +125,11 @@ export const PlageSchema = z
     profond: z.boolean().optional(),
     /** Urgence : ces apps-là passent, tout le reste reste écarté. */
     exceptionId: z.string().min(1).optional(),
+    /**
+     * Un jour À VENIR (AAAA-MM-JJ) : iOS bloque ce jour-là, Vethos fermé. Absent :
+     * aujourd'hui — les séances, pauses et urgences sont toujours du jour.
+     */
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })
   .refine((p) => p.finMinute > p.debutMinute, {
     message: 'A window must end after it starts.',
@@ -163,15 +168,23 @@ export const DUREE_MINIMALE_MINUTES = 15
  * Les plages doivent partager la même sélection : on ne fusionne pas deux blocs
  * qui écartent des choses différentes.
  */
+/** Aujourd'hui (sans date) avant les jours à venir, puis dans l'ordre de la journée. */
+export function parJourPuisHeure(a: Plage, b: Plage): number {
+  const ja = a.date ?? ''
+  const jb = b.date ?? ''
+  return ja === jb ? a.debutMinute - b.debutMinute : ja < jb ? -1 : 1
+}
+
 export function fusionnerPlages(plages: readonly Plage[]): Plage[] {
   if (plages.length === 0) return []
 
-  const triees = [...plages].sort((a, b) => a.debutMinute - b.debutMinute)
+  const triees = [...plages].sort(parJourPuisHeure)
   const sortie: Plage[] = []
 
   for (const plage of triees) {
     const derniere = sortie[sortie.length - 1]
     const memeSelection =
+      (derniere?.date ?? '') === (plage.date ?? '') &&
       derniere?.selectionId === plage.selectionId &&
       !!derniere?.profond === !!plage.profond &&
       derniere?.exceptionId === plage.exceptionId
@@ -207,18 +220,23 @@ export function limiterAuxCapacitesIOS(plages: readonly Plage[]): {
 
   // Toujours rendu dans l'ordre du temps, quelle que soit la branche : l'appelant
   // programme les surveillances les unes après les autres et n'a pas à retrier.
-  const parTemps = (liste: Plage[]): Plage[] =>
-    [...liste].sort((a, b) => a.debutMinute - b.debutMinute)
+  const parTemps = (liste: Plage[]): Plage[] => [...liste].sort(parJourPuisHeure)
 
   if (assezLongues.length <= MAX_SURVEILLANCES) {
     return { retenues: parTemps(assezLongues), ecarteesCourtes, ecarteesPlafond: 0 }
   }
 
-  const parDuree = [...assezLongues].sort(
+  // Aujourd'hui d'abord (les plus longues, comme avant) ; les jours à venir
+  // prennent ce qui reste, les plus proches d'abord — Vethos ouvert d'ici là
+  // les reprogrammera de toute façon.
+  const aujourdhui = assezLongues.filter((p) => !p.date)
+  const parDuree = [...aujourdhui].sort(
     (a, b) => b.finMinute - b.debutMinute - (a.finMinute - a.debutMinute),
   )
+  const avenir = assezLongues.filter((p) => !!p.date).sort(parJourPuisHeure)
+  const retenues = [...parDuree, ...avenir].slice(0, MAX_SURVEILLANCES)
   return {
-    retenues: parTemps(parDuree.slice(0, MAX_SURVEILLANCES)),
+    retenues: parTemps(retenues),
     ecarteesCourtes,
     ecarteesPlafond: assezLongues.length - MAX_SURVEILLANCES,
   }

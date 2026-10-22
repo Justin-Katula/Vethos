@@ -3,7 +3,7 @@ import { AppState } from 'react-native'
 import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
-import { fusionnerAuto, memesPlages, plagesAuto } from '@/blocage/blocage-auto'
+import { fusionnerAuto, memesPlages, plagesAuto, plagesAVenir } from '@/blocage/blocage-auto'
 import { empreinteRappels, rappelsAProgrammer } from '@/seances/rappels-plan'
 import { demanderAutorisation, preparerRappels, programmerRappels } from '@/seances/rappels'
 import { selectionEstVide } from '@/blocage/contrat'
@@ -220,8 +220,17 @@ function useSourcePlan() {
     // Une suspension ne vaut que pour SON jour.
     const leveeJusqua = levee && levee.date === calcul.aujourdHui ? levee.minute : null
     const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua })
-    const voulues = fusionnerAuto({ actives: b.plagesActives, auto, idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
-    const cle = JSON.stringify(voulues.map((p) => [p.blocId, p.debutMinute, p.finMinute]).sort())
+    // Demain et après-demain aussi : iOS bloque à l'heure même si Vethos n'est
+    // pas ouvert ce jour-là.
+    const avenir = plagesAVenir(
+      [1, 2].map((k) => {
+        const date = addDays(calcul.aujourdHui, k)
+        return { date, blocs: calcul.resultat.blocks.filter((x) => x.date === date && x.preview !== true) }
+      }),
+      selection.identifiant,
+    )
+    const voulues = fusionnerAuto({ actives: b.plagesActives, auto: [...auto, ...avenir], idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
+    const cle = JSON.stringify(voulues.map((p) => [p.date ?? '', p.blocId, p.debutMinute, p.finMinute]).sort())
     if (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives)) {
       dernieresVoulues.current = cle
       return
@@ -232,7 +241,7 @@ function useSourcePlan() {
     const bloc = prochain && blocsDuJour.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, theme, levee])
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.

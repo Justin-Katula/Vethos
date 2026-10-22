@@ -25,6 +25,7 @@ import {
   SORTIE,
   T,
   Titre,
+  lancer,
   useCompte,
   useVers,
   vibrer,
@@ -37,9 +38,7 @@ function useHorloge(jusqua: number, actif = true) {
   useEffect(() => {
     if (!actif) return
     t.setValue(0)
-    const a = Animated.timing(t, { toValue: jusqua, duration: jusqua, easing: Easing.linear, useNativeDriver: true })
-    a.start()
-    return () => a.stop()
+    return lancer(Animated.timing(t, { toValue: jusqua, duration: jusqua, easing: Easing.linear, useNativeDriver: true }))
   }, [actif, jusqua, t])
   return t
 }
@@ -52,68 +51,55 @@ function Calendrier({ m, pw, acc, reduit, maintenant }: { m: Mesure; pw: number;
   const BASE = 600
   const fin = BASE + rows.length * 120 + 31 * 8 + 300
   const t = useHorloge(fin, !reduit)
-  const dispo = Math.min(335, width - 48)
-  const d = Math.min(7, (dispo - 28 - 30 * 3) / 31)
+  // Un mois sur deux lignes de 16 soirs : des points deux fois plus gros, et
+  // l'étiquette du mois tient en entier à côté de son bloc.
+  const ETIQUETTE = 34
+  const ECART = 4
+  const dispo = Math.min(345, width - 48) - ETIQUETTE
+  const d = Math.min(14, Math.floor((dispo - 15 * ECART) / 16))
   const vu = (dl: number, duree = 300) =>
     reduit ? 1 : t.interpolate({ inputRange: [dl, dl + duree], outputRange: [0, 1], extrapolate: 'clamp' })
+  const point = (p: (typeof rows)[number]['dots'][number], i: number) => (
+    <Animated.View key={i} style={{ width: d, height: d, opacity: vu(BASE + p.dl) }}>
+      <View
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: d / 2,
+          backgroundColor: p.today ? C.t1 : p.rouge ? acc : C.s2,
+          opacity: p.futur ? 0.35 : 1,
+        }}
+      />
+      {p.ring ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: -3,
+            top: -3,
+            width: d + 6,
+            height: d + 6,
+            borderRadius: (d + 6) / 2,
+            borderWidth: 1.5,
+            borderColor: C.t1,
+          }}
+        />
+      ) : null}
+    </Animated.View>
+  )
   return (
-    <View style={{ marginTop: 32, gap: 5 }} accessible accessibilityLabel={`${rows.length} months of evenings. Each red dot is an evening pushed to tomorrow.`}>
+    <View style={{ marginTop: 28, gap: 10 }} accessible accessibilityLabel={`${rows.length} months of evenings. Each red dot is an evening pushed to tomorrow.`}>
       {rows.map((r) => (
-        <View key={r.label + r.dl} style={{ flexDirection: 'row', alignItems: 'center', height: d }}>
-          <Animated.Text style={{ width: 28, color: C.t3, fontFamily: GEIST.moyen, fontSize: 11, opacity: vu(BASE + r.dl, 420) }}>
+        <View key={r.label + r.dl} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Animated.Text style={{ width: ETIQUETTE, color: C.t3, fontFamily: GEIST.moyen, fontSize: 12, lineHeight: 16, opacity: vu(BASE + r.dl, 420) }}>
             {r.label}
           </Animated.Text>
-          <View style={{ flexDirection: 'row', gap: 3 }}>
-            {r.dots.map((p, i) => (
-              <Animated.View key={i} style={{ width: d, height: d, opacity: vu(BASE + p.dl) }}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: d / 2,
-                    backgroundColor: p.today ? C.t1 : p.rouge ? acc : C.s2,
-                    opacity: p.futur ? 0.35 : 1,
-                  }}
-                />
-                {p.ring ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: -2.5,
-                      top: -2.5,
-                      width: d + 5,
-                      height: d + 5,
-                      borderRadius: (d + 5) / 2,
-                      borderWidth: 1.2,
-                      borderColor: C.t1,
-                    }}
-                  />
-                ) : null}
-              </Animated.View>
-            ))}
+          <View style={{ gap: ECART }}>
+            <View style={{ flexDirection: 'row', gap: ECART }}>{r.dots.slice(0, 16).map(point)}</View>
+            <View style={{ flexDirection: 'row', gap: ECART }}>{r.dots.slice(16).map((p, i) => point(p, i + 16))}</View>
           </View>
         </View>
       ))}
     </View>
-  )
-}
-
-function Legende({ acc, reduit }: { acc: string; reduit: boolean }) {
-  const point = (couleur: string, o = 1) => (
-    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: couleur, opacity: o }} />
-  )
-  const item = (p: React.ReactNode, t: string) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      {p}
-      <Text style={{ color: C.t3, fontFamily: GEIST.normal, fontSize: 12, lineHeight: 16 }}>{t}</Text>
-    </View>
-  )
-  return (
-    <Entree fondu dl={900} reduit={reduit} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 16 }}>
-      {item(point(acc), 'Pushed to “tomorrow”')}
-      {item(point(C.t1), 'Today')}
-      {item(point(acc, 0.35), 'If nothing changes')}
-    </Entree>
   )
 }
 
@@ -133,16 +119,14 @@ function BlocChose({
   sortie: boolean
 }) {
   const apres = useMinuteries()
-  const [l1, setL1] = useState(false)
   const [l2, setL2] = useState(false)
   const compte = useCompte(m.big, { duree: 1200, delai: 300, reduit: ctx.reduit })
   const rangs = calendrier(m.start, m.finish, frequence(ctx.e).pw, ctx.maintenant).length
   useEffect(() => {
     apres(300, () => vibrer('light'))
     const r = 600 + rangs * 120 + 31 * 8 + 300
-    apres(ctx.reduit ? 400 : r, () => setL1(true))
-    apres(ctx.reduit ? 900 : r + 1000, () => setL2(true))
-    apres(ctx.reduit ? 1500 : r + 1600, onFin)
+    apres(ctx.reduit ? 400 : r, () => setL2(true))
+    apres(ctx.reduit ? 1000 : r + 700, onFin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const o = useVers(sortie ? 0 : 1, 530, DEPLACEMENT)
@@ -165,13 +149,7 @@ function BlocChose({
         <Text style={T.corps}>{m.sub}</Text>
       </Entree>
       <Calendrier m={m} pw={frequence(ctx.e).pw} acc={ctx.acc} reduit={ctx.reduit} maintenant={ctx.maintenant} />
-      <Legende acc={ctx.acc} reduit={ctx.reduit} />
       <View style={{ marginTop: 28, gap: 12 }}>
-        {l1 ? (
-          <Entree reduit={ctx.reduit}>
-            <Text style={T.corps}>{m.l1}</Text>
-          </Entree>
-        ) : null}
         {l2 ? (
           <Entree reduit={ctx.reduit}>
             <Text style={[T.corps, { color: C.t1, fontFamily: GEIST.demi }]}>{m.l2}</Text>
@@ -278,7 +256,7 @@ function Mot({ texte, couleur, visible, reduit }: { texte: string; couleur: stri
   const p = useRef(new Animated.Value(0)).current
   useEffect(() => {
     if (!visible) return
-    Animated.timing(p, { toValue: 1, duration: reduit ? 420 : 90, easing: SORTIE, useNativeDriver: true }).start()
+    return lancer(Animated.timing(p, { toValue: 1, duration: reduit ? 420 : 90, easing: SORTIE, useNativeDriver: true }))
   }, [p, reduit, visible])
   return (
     <Animated.Text
@@ -349,11 +327,18 @@ export function EcranPensee({ ctx }: { ctx: Ctx }) {
         </Animated.View>
         <View style={{ minHeight: 84, marginTop: 24 }}>
           {ligne ? (
-            <Entree reduit={ctx.reduit}>
-              <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 20, lineHeight: 28, textAlign: 'center' }}>
-                {`${fq.say} That’s about ${fois <= 1 ? 'once' : `${fois} times`} since you first decided.`}
-              </Text>
-            </Entree>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Entree reduit={ctx.reduit}>
+                <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 20, lineHeight: 28, textAlign: 'center' }}>
+                  {`You’ve said it ${fois <= 1 ? 'once' : `${fois} times`}.`}
+                </Text>
+              </Entree>
+              <Entree dl={700} reduit={ctx.reduit}>
+                <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 24, lineHeight: 30, letterSpacing: -0.4, textAlign: 'center' }}>
+                  Tomorrow never came.
+                </Text>
+              </Entree>
+            </View>
           ) : null}
         </View>
       </View>
@@ -489,9 +474,7 @@ export function EcranBascule({ ctx }: { ctx: Ctx }) {
 
 export function EcranVethos({ ctx }: { ctx: Ctx }) {
   const logo = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(logo, { toValue: 1, duration: 900, delay: 200, easing: SORTIE, useNativeDriver: true }).start()
-  }, [logo])
+  useEffect(() => lancer(Animated.timing(logo, { toValue: 1, duration: 900, delay: 200, easing: SORTIE, useNativeDriver: true })), [logo])
   return (
     <View style={{ flex: 1 }}>
       <View style={{ position: 'absolute', left: 24, right: 24, top: 0, bottom: 130, alignItems: 'center', justifyContent: 'center' }}>
@@ -511,7 +494,20 @@ export function EcranVethos({ ctx }: { ctx: Ctx }) {
           />
         </Animated.View>
         <Entree dl={1100} reduit={ctx.reduit} style={{ marginTop: 24 }}>
-          <Text style={{ color: C.t3, fontFamily: GEIST.moyen, fontSize: 19, lineHeight: 26, textAlign: 'center' }}>
+          <Text
+            style={{
+              color: C.t1,
+              opacity: 0.94,
+              fontFamily: GEIST.moyen,
+              fontSize: 19,
+              lineHeight: 26,
+              textAlign: 'center',
+              // Lisible même posé sur la lueur du jour.
+              textShadowColor: 'rgba(0,0,0,0.55)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 12,
+            }}
+          >
             You already know what matters.
           </Text>
         </Entree>

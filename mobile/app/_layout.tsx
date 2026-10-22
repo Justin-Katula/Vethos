@@ -76,6 +76,14 @@ function Coque() {
     // déjà lu pour CE compte reste affiché tel quel.
     if (tiroirDejaOuvert(compte, useDonnees.getState(), useSeances.getState())) return
     void (async () => {
+      // Déjà déconnecté et l'état vide déjà ouvert (l'introduction d'un
+      // téléchargement neuf tourne dessus) : ne pas le refermer. Le refermer
+      // démontait l'introduction pendant ses premières images.
+      const d0 = useDonnees.getState()
+      if (!compte && d0.chargees && d0.proprietaire === null && !d0.reglages.introductionFaite) {
+        definirCompte(null)
+        return
+      }
       // Plus rien ne s'écrit tant que le bon tiroir n'est pas ouvert.
       useDonnees.setState({ chargees: false, proprietaire: null })
       useSeances.setState({ chargees: false, proprietaire: null })

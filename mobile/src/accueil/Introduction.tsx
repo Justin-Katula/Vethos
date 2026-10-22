@@ -33,7 +33,7 @@ import {
   type Etape,
   type EtatIntro,
 } from './etat-introduction'
-import { C, DEPLACEMENT, SORTIE, useReduit, useVers } from './briques-introduction'
+import { C, DEPLACEMENT, lancer, SORTIE, useReduit, useVers } from './briques-introduction'
 import {
   EcranBonjour,
   EcranDetail,
@@ -73,7 +73,7 @@ const SCN: Record<string, [number, number, number, number, number, Mode]> = {
   '7': [0.5, -0.12, 1.05, 2.4, 0.03, 'a'],
   '8': [0.5, 0.54, 0.35, 9, 0.01, 'a'],
   '9': [0.5, 0.18, 1.2, 2.2, 0.02, 'h'],
-  '10': [0.5, 0.56, 1.35, 5.5, 0.015, 'h'],
+  '10': [0.5, 0.7, 1.1, 5.5, 0.015, 'h'],
   '11': [0.82, 0.92, 0.8, 2.4, 0.05, 'h'],
   '12a': [0.18, 0.92, 0.8, 2.4, 0.05, 'h'],
   '12b': [0.82, 0.1, 0.8, 2.6, 0.05, 'h'],
@@ -113,9 +113,21 @@ const cle = (st: Etape) => `${st.k}-${st.t ?? 0}`
 /** Un écran qui entre de 12 pt à droite, ou sort de 12 pt à gauche, en 530 ms. */
 function Scene({ sortant, glisse, reduit, children }: { sortant: boolean; glisse: boolean; reduit: boolean; children: React.ReactNode }) {
   const p = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(p, { toValue: sortant ? 2 : 1, duration: 530, easing: SORTIE, useNativeDriver: true }).start()
-  }, [p, sortant])
+  // L'écran qui part s'efface d'abord ; le suivant entre un peu après, au lieu
+  // d'apparaître d'un coup par-dessus.
+  useEffect(
+    () =>
+      lancer(
+        Animated.timing(p, {
+          toValue: sortant ? 2 : 1,
+          duration: sortant ? 380 : 560,
+          delay: sortant ? 0 : 220,
+          easing: SORTIE,
+          useNativeDriver: true,
+        }),
+      ),
+    [p, sortant],
+  )
   const d = reduit || !glisse ? 0 : 12
   return (
     <Animated.View
@@ -184,7 +196,7 @@ function IntroductionSombre() {
   // Les écrans sortis disparaissent une fois leur fondu fini.
   useEffect(() => {
     if (!scenes.some((s) => s.sortant)) return
-    const t = setTimeout(() => setScenes((s) => s.filter((x) => !x.sortant)), 560)
+    const t = setTimeout(() => setScenes((s) => s.filter((x) => !x.sortant)), 420)
     return () => clearTimeout(t)
   }, [scenes])
 

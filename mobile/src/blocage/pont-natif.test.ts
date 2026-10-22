@@ -433,3 +433,24 @@ describe('l’urgence et le mode profond d’une seule séance', () => {
     expect(appels.at(-1)).toBe('blockSelection:vethos.jamais')
   })
 })
+
+describe('les jours à venir (2026-10-22)', () => {
+  it('une plage datée est confiée à iOS avec son jour, et ne lève rien aujourd’hui', async () => {
+    const { natif, appels } = moduleEspion()
+    const demain = new Date()
+    demain.setDate(demain.getDate() + 1)
+    const date = `${demain.getFullYear()}-${String(demain.getMonth() + 1).padStart(2, '0')}-${String(demain.getDate()).padStart(2, '0')}`
+    await creerPontDepuis(natif).programmer([plage({ blocId: 'task-x' }), { ...plage({ blocId: 'task-y' }), date }], { maintenant: 9 * 60 + 30 })
+    expect(appels).toContain(`startMonitoring:vethos.task-y.${date}`)
+    const horaire = (natif.startMonitoring as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === `vethos.task-y.${date}`)![1]
+    expect(horaire.intervalStart).toEqual({ year: demain.getFullYear(), month: demain.getMonth() + 1, day: demain.getDate(), hour: 9, minute: 0 })
+    // La plage d'aujourd'hui (9 h – 10 h, il est 9 h 30) est levée tout de suite ; celle de demain, non.
+    expect(appels.filter((a) => a.startsWith('blockSelection:')).length).toBe(1)
+  })
+
+  it('un jour déjà passé n’occupe aucune surveillance', async () => {
+    const { natif, appels } = moduleEspion()
+    await creerPontDepuis(natif).programmer([{ ...plage({ blocId: 'vieux' }), date: '2020-01-01' }], { maintenant: 8 * 60 })
+    expect(appels.some((a) => a.includes('vieux'))).toBe(false)
+  })
+})
