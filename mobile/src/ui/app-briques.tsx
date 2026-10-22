@@ -33,10 +33,12 @@ export const natureDe = (kind: string): NatureApp | null =>
 
 /** La nuit : l'intensité ne descend pas plus bas, et la lueur reste à l'écran. */
 const LUEUR_NUIT_MIN = 0.9
+/** Sur un écran plein (connexion, abonnement), rien ne couvre le bas : la nuit reste une nuit. */
+const LUEUR_NUIT_ECRAN_PLEIN = 0.42
 const LUEUR_Y_MIN = 0.08
 
 /** La lumière de l'heure, rafraîchie chaque minute. */
-export function useLumiere() {
+export function useLumiere(ecranPlein = false) {
   const [H, setH] = useState(heureDecimale())
   useEffect(() => {
     const t = setInterval(() => setH(heureDecimale()), 60000)
@@ -45,7 +47,7 @@ export function useLumiere() {
   const L = lumiere(H)
   // La nuit, la lueur tombait à 0,42 et passait sous l'écran : sur un
   // téléphone, du noir. Elle garde un plancher et reste au bas de l'écran.
-  const lueur: Lueur = { x: L.lp[0], y: Math.max(L.lp[1], LUEUR_Y_MIN), i: Math.max(L.li, LUEUR_NUIT_MIN), lt: L.lt, tc: L.tc }
+  const lueur: Lueur = { x: L.lp[0], y: Math.max(L.lp[1], LUEUR_Y_MIN), i: Math.max(L.li, ecranPlein ? LUEUR_NUIT_ECRAN_PLEIN : LUEUR_NUIT_MIN), lt: L.lt, tc: L.tc }
   return { H, acc: accentApp(H), teinte: teinteApp(H), lueur }
 }
 

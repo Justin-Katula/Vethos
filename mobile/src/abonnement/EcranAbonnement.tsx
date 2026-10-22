@@ -87,7 +87,7 @@ function useEntree(n: number, reduit: boolean) {
  */
 export function EcranAbonnement() {
   const marges = useSafeAreaInsets()
-  const { lueur } = useLumiere()
+  const { lueur } = useLumiere(true)
   const reduit = useReduit()
   const { formules, acheter, restaurer } = useAbonnement()
   const [choix, setChoix] = useState<string | null>(null)

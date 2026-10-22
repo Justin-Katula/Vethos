@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
-import { A, GEIST, SORTIE } from '@/ui/app-briques'
+import { A, GEIST, SORTIE, useLumiere } from '@/ui/app-briques'
+import { FondLumiere } from '@/ui/FondLumiere'
+import { useReduit } from '@/accueil/briques-introduction'
 import { connecterApple, connecterGoogle, useSession } from './compte'
 import { marquerIntroVue, useAppareil } from './espace'
 import { LogoApple, LogoGoogle, useConnexion } from './CarteCompte'
@@ -50,6 +52,8 @@ export function PorteCompte() {
   const connexion = useConnexion()
   const introFaite = useDonnees((e) => e.chargees && e.reglages.introductionFaite)
   const marges = useSafeAreaInsets()
+  const { lueur } = useLumiere(true)
+  const reduit = useReduit()
   const apparition = useRef(new Animated.Value(0)).current
 
   // Juste après l'introduction d'un téléchargement neuf : « Sign Up ». Un
@@ -88,6 +92,7 @@ export function PorteCompte() {
   const { apple, google } = connexion.dispo
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: apparition, zIndex: 100 }]}>
+      <FondLumiere lueur={lueur} reduit={reduit} />
       <View style={{ flex: 1, width: '100%', maxWidth: 440, alignSelf: 'center', paddingHorizontal: 20, paddingTop: marges.top + 64, paddingBottom: marges.bottom + 24 }}>
         <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 28, letterSpacing: -0.6, textAlign: 'center' }}>
           {inscription ? 'Sign Up' : 'Sign In'}
