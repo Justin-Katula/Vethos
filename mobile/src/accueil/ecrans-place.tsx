@@ -140,23 +140,66 @@ function Apercu({ tp }: { tp: Nature }) {
  * - Goal : des séances qui se posent où il y a de la place, un jour ici, un jour là.
  * - Anchor : la même heure, les mêmes jours, épinglée — rien ne bouge.
  */
-function IllustrationNature({ t, reduit }: { t: Nature; reduit: boolean }) {
-  const p = useRef(new Animated.Value(reduit ? 1 : 0)).current
+const LEGENDE: Record<Nature, string> = {
+  TASK: 'Fills up. Then it’s done.',
+  GOAL: 'Finds room in your week.',
+  ANCHOR: 'Same time. Same days.',
+}
+
+/**
+ * Une forme à la fois : la sienne s'anime pendant que quelques mots disent ce
+ * qu'elle fait, puis elle passe la main à la suivante. Au repos, le dessin
+ * reste dans son état final, atténué.
+ */
+function IllustrationNature({ t, reduit, actif, onFin }: { t: Nature; reduit: boolean; actif: boolean; onFin: () => void }) {
+  const p = useRef(new Animated.Value(1)).current
+  const legende = useRef(new Animated.Value(0)).current
+  const fin = useRef(onFin)
+  fin.current = onFin
   useEffect(() => {
-    if (reduit) {
+    if (!actif) {
       p.setValue(1)
-      return
+      return lancer(Animated.timing(legende, { toValue: 0, duration: 260, easing: SORTIE, useNativeDriver: true }))
     }
-    const boucle = Animated.loop(
-      Animated.sequence([
-        Animated.timing(p, { toValue: 1, duration: t === 'ANCHOR' ? 900 : 2600, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
-        Animated.delay(t === 'ANCHOR' ? 2600 : 1100),
-        Animated.timing(p, { toValue: 0, duration: 420, easing: SORTIE, useNativeDriver: true }),
-        Animated.delay(250),
-      ]),
-    )
-    return lancer(boucle)
-  }, [p, reduit, t])
+    if (!reduit) p.setValue(0)
+    const a = Animated.sequence([
+      Animated.timing(legende, { toValue: 1, duration: 320, easing: SORTIE, useNativeDriver: true }),
+      reduit
+        ? Animated.delay(900)
+        : Animated.timing(p, { toValue: 1, duration: t === 'ANCHOR' ? 1100 : 2400, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      Animated.delay(1300),
+    ])
+    let arrete = false
+    const id = requestAnimationFrame(() => a.start(({ finished }) => finished && !arrete && fin.current()))
+    return () => {
+      arrete = true
+      cancelAnimationFrame(id)
+      a.stop()
+    }
+  }, [actif, legende, p, reduit, t])
+  return (
+    <View>
+      <View style={{ opacity: actif ? 1 : 0.45 }}>
+        <DessinNature t={t} p={p} />
+      </View>
+      <View style={{ height: 22, marginTop: 8, justifyContent: 'center' }}>
+        <Animated.Text
+          style={{
+            color: C.t1,
+            fontFamily: GEIST.moyen,
+            fontSize: 14,
+            opacity: legende,
+            transform: [{ translateY: legende.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) }],
+          }}
+        >
+          {LEGENDE[t]}
+        </Animated.Text>
+      </View>
+    </View>
+  )
+}
+
+function DessinNature({ t, p }: { t: Nature; p: Animated.Value }) {
   const couleur = TRAIT[t]
   const H = 52
 
@@ -275,6 +318,12 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
   const ids = choses(e)
   const ch = choisie(e, ctx.maintenant)
   const [levee, setLevee] = useState<string | null>(null)
+  // Une forme à la fois, dans l'ordre, puis on recommence.
+  const [tour, setTour] = useState(-1)
+  useEffect(() => {
+    const id = setTimeout(() => setTour(0), ctx.reduit ? 300 : 900)
+    return () => clearTimeout(id)
+  }, [ctx.reduit])
   const deposer = (t: Nature) => {
     if (!levee) return
     vibrer('medium')
@@ -323,7 +372,7 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
                     <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
                   </View>
                   <View style={{ marginTop: 14 }}>
-                    <IllustrationNature t={t} reduit={ctx.reduit} />
+                    <IllustrationNature t={t} reduit={ctx.reduit} actif={tour === i} onFin={() => setTour((i + 1) % 3)} />
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, minHeight: 40 }}>
                     {dedans.map((id) => {
