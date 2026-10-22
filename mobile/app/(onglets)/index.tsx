@@ -552,7 +552,7 @@ export default function Aujourdhui() {
           )}
           {nt ? (
             <View style={carte}>
-              {tete('Tasks', ouvertes.length, A.t3, String(restants), restants === 1 ? 'day' : 'days')}
+              {tete('Tasks', new Set(ouvertes.map((t) => t.parentId ?? t.id)).size, A.t3, String(restants), restants === 1 ? 'day' : 'days')}
               <View style={{ gap: 6 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
                   <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.moyen, fontSize: 12 }}>{nt.titre}</Text>
