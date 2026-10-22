@@ -147,19 +147,21 @@ const LEGENDE: Record<Nature, string> = {
 }
 
 /**
- * Une forme à la fois : la sienne s'anime pendant que quelques mots disent ce
- * qu'elle fait, puis elle passe la main à la suivante. Au repos, le dessin
- * reste dans son état final, atténué.
+ * Une forme à la fois, une seule fois : la sienne s'anime pendant que quelques
+ * mots disent ce qu'elle fait, puis elle passe la main à la suivante. Ensuite le
+ * dessin et les mots restent ; avant son tour, la carte attend, atténuée.
  */
-function IllustrationNature({ t, reduit, actif, onFin }: { t: Nature; reduit: boolean; actif: boolean; onFin: () => void }) {
+function IllustrationNature({ t, reduit, actif, montre, onFin }: { t: Nature; reduit: boolean; actif: boolean; montre: boolean; onFin: () => void }) {
   const p = useRef(new Animated.Value(1)).current
   const legende = useRef(new Animated.Value(0)).current
   const fin = useRef(onFin)
   fin.current = onFin
   useEffect(() => {
     if (!actif) {
+      // Déjà montrée : son dessin et ses mots restent. Pas encore : on attend son tour.
       p.setValue(1)
-      return lancer(Animated.timing(legende, { toValue: 0, duration: 260, easing: SORTIE, useNativeDriver: true }))
+      if (montre) legende.setValue(1)
+      return
     }
     if (!reduit) p.setValue(0)
     const a = Animated.sequence([
@@ -176,10 +178,10 @@ function IllustrationNature({ t, reduit, actif, onFin }: { t: Nature; reduit: bo
       cancelAnimationFrame(id)
       a.stop()
     }
-  }, [actif, legende, p, reduit, t])
+  }, [actif, montre, legende, p, reduit, t])
   return (
     <View>
-      <View style={{ opacity: actif ? 1 : 0.45 }}>
+      <View style={{ opacity: actif || montre ? 1 : 0.45 }}>
         <DessinNature t={t} p={p} />
       </View>
       <View style={{ height: 22, marginTop: 8, justifyContent: 'center' }}>
@@ -318,7 +320,7 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
   const ids = choses(e)
   const ch = choisie(e, ctx.maintenant)
   const [levee, setLevee] = useState<string | null>(null)
-  // Une forme à la fois, dans l'ordre, puis on recommence.
+  // Une forme à la fois, dans l'ordre, une seule fois ; puis tout reste affiché.
   const [tour, setTour] = useState(-1)
   useEffect(() => {
     const id = setTimeout(() => setTour(0), ctx.reduit ? 300 : 900)
@@ -372,7 +374,7 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
                     <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
                   </View>
                   <View style={{ marginTop: 14 }}>
-                    <IllustrationNature t={t} reduit={ctx.reduit} actif={tour === i} onFin={() => setTour((i + 1) % 3)} />
+                    <IllustrationNature t={t} reduit={ctx.reduit} actif={tour === i} montre={tour > i} onFin={() => setTour(i + 1)} />
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, minHeight: 40 }}>
                     {dedans.map((id) => {
