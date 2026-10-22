@@ -85,9 +85,8 @@ describe('le parcours et la création', () => {
   it('« depuis quand » une fois pour tout, puis une question par chose : le travail pour une tâche, le présent pour une habitude (2026-10-23)', () => {
     const f = parcours(base(), jeudi).map((s) => s.k)
     expect(f.slice(0, 8)).toEqual(['1', '1b', '2', '3', '4', '5a', '5b', '5c'])
-    // Plus d'écran de réglages : le résumé (11) suffit.
-    expect(f).not.toContain('12a')
-    expect(f).not.toContain('12b')
+    // La plus lourde passe en premier aux réglages ; une ancre en a deux.
+    expect(f).toContain('12b')
     expect(f[f.length - 1]).toBe('17')
   })
 

@@ -17,12 +17,10 @@ import {
   natureDe,
   nuitMinutes,
   nuitValide,
-  brouillonsDepuis,
   reglagesPour,
   retenues,
   type Ctx,
 } from './etat-introduction'
-import type { NatureIntroduction } from './modele-introduction'
 import {
   Bouton,
   BoutonTexte,
@@ -134,102 +132,117 @@ function Apercu({ tp }: { tp: Nature }) {
   )
 }
 
-/** Ce que Vethos prend en charge, en une ligne par chose. */
-function resumeDe(n: NatureIntroduction, x: { minutes: number; heuresHebdo: number; joursAncre: number[]; echeance: string }): string {
-  const h = (m: number) => (m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`)
-  if (n === 'objectif') return `${h(Math.round(x.heuresHebdo * 60))} a week`
-  if (n === 'ancre') return `${x.joursAncre.length === 1 ? 'Once' : `${x.joursAncre.length}×`} a week · ${h(x.minutes)}`
-  const d = dateLocale(x.echeance)
-  return `${h(x.minutes)} · before ${d.getDate()} ${MOIS[d.getMonth()]}`
-}
-
-const NATURES: Nature[] = ['TASK', 'GOAL', 'ANCHOR']
-const NOM_NATURE: Record<Nature, string> = { TASK: 'Task', GOAL: 'Goal', ANCHOR: 'Anchor' }
-
-/**
- * Rien à choisir (2026-10-23) : Vethos prend chaque chose de la façon qui lui
- * va le mieux, et le montre. « Edit » change la nature d'une seule ligne.
- */
 export function EcranUne({ ctx }: { ctx: Ctx }) {
   const e = ctx.e
   const ids = choses(e)
   const ch = choisie(e, ctx.maintenant)
-  const [ouvert, setOuvert] = useState<string | null>(null)
-  const dans = (j: number) => {
-    const d = new Date(ctx.maintenant)
-    d.setDate(d.getDate() + j)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const tpc = natureDe(e, ch)
+  const picks = retenues(e)
+  const toucherPuce = (id: string) => {
+    vibrer('light')
+    const on = picks.includes(id)
+    if (!on) ctx.maj(() => ({ picks: [...picks, id], chosen: id }))
+    else if (ch !== id) ctx.maj(() => ({ chosen: id }))
+    else if (picks.length > 1) {
+      const reste = picks.filter((x) => x !== id)
+      ctx.maj(() => ({ picks: reste, chosen: reste[0]! }))
+    }
   }
-  const avecReglages = { ...e, picks: null, ...reglagesPour(e, ch, ctx.maintenant) }
-  const { b, autres } = brouillonsDepuis(avecReglages, ctx.maintenant, dans)
-  const lignes = ids.map((id) => {
-    const x = id === ch ? b : autres.find((a) => a.id.endsWith(`-${id}`))
-    return { id, nature: natureDe(e, id), texte: x ? resumeDe(x.nature, x) : '' }
-  })
   const continuer = () => {
     vibrer('light')
-    ctx.maj((x) => ({ ...reglagesPour(x, ch, ctx.maintenant), picks: null, chosen: ch, type: { ...x.type, [ch]: natureDe(x, ch) } }))
+    ctx.maj((x) => ({ ...reglagesPour(x, ch, ctx.maintenant), chosen: ch, type: { ...x.type, [ch]: tpc } }))
     ctx.suivant()
   }
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
+        style={{ position: 'absolute', inset: 0 }}
         contentContainerStyle={{ paddingTop: ctx.haut, paddingHorizontal: 24, paddingBottom: 130 + ctx.bas }}
         showsVerticalScrollIndicator={false}
       >
-        <Entree dl={150} reduit={ctx.reduit}>
-          <Titre>Vethos takes it from here.</Titre>
-        </Entree>
-        <View style={{ gap: 10, marginTop: 24 }}>
-          {lignes.map((l, i) => (
-            <Entree key={l.id} dl={330 + i * 110} reduit={ctx.reduit}>
-              <View style={{ borderRadius: 12, backgroundColor: C.s1, padding: 14, gap: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: TYPEC[l.nature], borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)' }} />
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text numberOfLines={1} style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 21 }}>{ITEM[l.id]!.name}</Text>
-                    <Text style={{ color: C.t2, fontFamily: MONO.normal, fontSize: 12, lineHeight: 16 }}>{`${NOM_NATURE[l.nature]} · ${l.texte}`}</Text>
-                  </View>
+        {ids.length > 1 ? (
+          <Entree dl={100} reduit={ctx.reduit} style={{ marginBottom: 24 }}>
+            <Text style={T.petit}>Choose what Vethos takes on</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {ids.map((id) => {
+                const on = picks.includes(id)
+                const fo = id === ch
+                return (
                   <Pressable
+                    key={id}
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit ${ITEM[l.id]!.name}`}
-                    hitSlop={10}
-                    onPress={() => {
-                      vibrer('light')
-                      setOuvert(ouvert === l.id ? null : l.id)
+                    accessibilityState={{ selected: on }}
+                    onPress={() => toucherPuce(id)}
+                    style={{
+                      height: 36,
+                      paddingHorizontal: 14,
+                      borderRadius: 999,
+                      justifyContent: 'center',
+                      backgroundColor: on ? C.t1 : C.s1,
+                      borderWidth: 1,
+                      borderColor: fo ? C.t1 : on ? 'rgba(242,242,242,0.5)' : 'rgba(242,242,242,0.16)',
+                      opacity: on && !fo ? 0.72 : 1,
                     }}
-                    style={({ pressed }) => ({ height: 32, paddingHorizontal: 12, borderRadius: 16, justifyContent: 'center', backgroundColor: 'rgba(242,242,242,0.08)', opacity: pressed ? 0.7 : 1 })}
                   >
-                    <Text style={{ color: C.t1, fontFamily: GEIST.moyen, fontSize: 13 }}>{ouvert === l.id ? 'Done' : 'Edit'}</Text>
+                    <Text style={{ color: on ? '#000' : C.t2, fontFamily: GEIST.moyen, fontSize: 14 }}>{ITEM[id]!.label}</Text>
                   </Pressable>
+                )
+              })}
+            </View>
+          </Entree>
+        ) : null}
+        <Entree dl={210} reduit={ctx.reduit}>
+          <Titre>{`How should Vethos hold “${ITEM[ch]!.name}”?`}</Titre>
+        </Entree>
+        <View style={{ gap: 8, marginTop: 24 }}>
+          {(['TASK', 'GOAL', 'ANCHOR'] as Nature[]).map((t, i) => (
+            <Entree key={t} dl={430 + i * 110} reduit={ctx.reduit}>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: t === tpc }}
+                accessibilityLabel={`${t}. ${TYPEL[t]}${ITEM[ch]!.fit === t ? ' Best fit.' : ''}`}
+                onPress={() => {
+                  vibrer('light')
+                  ctx.maj((x) => ({ type: { ...x.type, [ch]: t } }))
+                }}
+                style={({ pressed }) => ({
+                  padding: 14,
+                  borderRadius: 8,
+                  backgroundColor: C.s1,
+                  borderWidth: 1,
+                  borderColor: t === tpc ? 'rgba(242,242,242,0.7)' : 'transparent',
+                  transform: [{ scale: pressed ? 0.985 : 1 }],
+                })}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TYPEC[t], borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)' }} />
+                  <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
+                  <View style={{ flex: 1 }} />
+                  {ITEM[ch]!.fit === t ? (
+                    <View style={{ height: 20, paddingHorizontal: 8, borderRadius: 4, backgroundColor: '#2f2f2f', justifyContent: 'center' }}>
+                      <Text style={{ color: C.t1, fontFamily: GEIST.moyen, fontSize: 11 }}>Best fit</Text>
+                    </View>
+                  ) : null}
                 </View>
-                {ouvert === l.id ? (
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {NATURES.map((t) => {
-                      const on = t === l.nature
-                      return (
-                        <Pressable
-                          key={t}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: on }}
-                          onPress={() => {
-                            vibrer('light')
-                            ctx.maj((x) => ({ type: { ...x.type, [l.id]: t } }))
-                          }}
-                          style={{ flex: 1, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.t1 : 'rgba(242,242,242,0.07)' }}
-                        >
-                          <Text style={{ color: on ? '#000' : C.t1, fontFamily: GEIST.moyen, fontSize: 14 }}>{NOM_NATURE[t]}</Text>
-                        </Pressable>
-                      )
-                    })}
-                  </View>
-                ) : null}
-              </View>
+                <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20, marginTop: 4 }}>{TYPEL[t]}</Text>
+                <View
+                  style={{
+                    marginTop: 12,
+                    paddingTop: 12,
+                    paddingBottom: 2,
+                    borderTopWidth: 1,
+                    borderTopColor: 'rgba(242,242,242,0.07)',
+                    opacity: t === tpc ? 1 : 0.5,
+                  }}
+                >
+                  <Apercu tp={t} />
+                </View>
+              </Pressable>
             </Entree>
           ))}
         </View>
       </ScrollView>
-      <PiedDegrade bas={ctx.bas} dl={700} reduit={ctx.reduit}>
+      <PiedDegrade bas={ctx.bas} dl={800} reduit={ctx.reduit}>
         <Bouton onPress={continuer}>Continue</Bouton>
       </PiedDegrade>
     </View>

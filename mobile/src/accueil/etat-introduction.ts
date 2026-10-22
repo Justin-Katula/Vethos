@@ -134,8 +134,8 @@ export function parcours(e: EtatIntro, maintenant: Date): Etape[] {
   const ids = choses(e)
   if (ids.length) f.push({ k: '5a' })
   ids.forEach((id, t) => f.push({ k: ITEM[id]!.kind === 'once' ? '5b' : '5c', t }))
-  // Plus d'écran de réglages : Vethos prend chaque chose à sa façon (écran 11, « Edit » pour changer).
-  f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' })
+  f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' }, { k: '12a' })
+  if (e.things.length && natureDe(e, choisie(e, maintenant)) !== 'GOAL') f.push({ k: '12b' })
   f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: 'contrat' }, { k: 'ia' }, { k: '17' })
   return f
 }
