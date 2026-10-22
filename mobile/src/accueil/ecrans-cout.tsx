@@ -351,7 +351,7 @@ export function EcranPensee({ ctx }: { ctx: Ctx }) {
           {ligne ? (
             <Entree reduit={ctx.reduit}>
               <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 20, lineHeight: 28, textAlign: 'center' }}>
-                {`${fq.say} That’s about ${fois} times since you first decided.`}
+                {`${fq.say} That’s about ${fois <= 1 ? 'once' : `${fois} times`} since you first decided.`}
               </Text>
             </Entree>
           ) : null}

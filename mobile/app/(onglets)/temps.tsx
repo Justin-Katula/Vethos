@@ -257,7 +257,7 @@ export default function MonTemps() {
                       const finBloc = Math.min(BED, avecPause ? (s.finEmpreinte ?? s.fin) : s.fin)
                       const hb = Math.max(14, Y(finBloc) - Y(a))
                       const hp = avecPause ? Math.max(4, Math.round(hb * (s.pause! / Math.max(1, finBloc - s.debut)))) : 0
-                      const tb = `${fmt(s.debut)}–${fmt(finBloc)}`
+                      const tb = `${fmt(s.debut)}–${fmt(Math.min(BED, finTexte(s)))}`
                       return (
                         <BlocTemps
                           key={s.id}

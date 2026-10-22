@@ -404,7 +404,7 @@ export function resume(ms: Mesure[]) {
   const w = Math.max(...ms.map((m) => m.weeks))
   return h >= 40 || !t
     ? { v: h, label: 'hours you’ll never get back.', eq: equivalence(h) }
-    : { v: t, label: 'times you let it slide.', eq: `That’s ${Math.max(1, Math.round(t / w))} times a week, every week.` }
+    : { v: t, label: 'times you let it slide.', eq: ((k) => `That’s ${k === 1 ? 'once' : k === 2 ? 'twice' : `${k} times`} a week, every week.`)(Math.max(1, Math.round(t / w))) }
 }
 
 // ——— Les calendriers ———

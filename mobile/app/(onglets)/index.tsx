@@ -22,6 +22,9 @@ import { autonomie } from '@shared/planning/habitudes'
 import { A, Chevron, Cadenas, fmt, GEIST, hm, MONO, Plus, TRAIT, TYPEC, useLumiere, type NatureApp } from '@/ui/app-briques'
 import { traitDe } from '@/ui/couleurs-engagement'
 
+const parSemaine = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`)
+const seances = (n: number) => `${n} ${n === 1 ? 'session' : 'sessions'}`
+
 const MOIS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const FIXE = '#5c5c5c'
@@ -542,7 +545,7 @@ export default function Aujourdhui() {
             <View style={carte}>
               {tete('Goals', goals.length, TYPEC.GOAL, String(Math.round(gH)), 'h')}
               {carres(goals, TYPEC.GOAL)}
-              <View style={{ gap: 4 }}>{goals.map((g) => ligne(`${g.nom} · ${g.n} times a week`, `${g.n * WK} sessions`))}</View>
+              <View style={{ gap: 4 }}>{goals.map((g) => ligne(`${g.nom} · ${parSemaine(g.n)} a week`, seances(g.n * WK)))}</View>
             </View>
           ) : (
             vide('No long-term goal declared', '', 'Set my first goal')
@@ -572,7 +575,7 @@ export default function Aujourdhui() {
             <View style={carte}>
               {tete('Anchors', ancres.length, TRAIT.ANCHOR, String(Math.round(aH)), 'h')}
               {carres(ancres.map((x) => ({ n: x.jours.length })), TRAIT.ANCHOR)}
-              <View style={{ gap: 4 }}>{ancres.map((x) => ligne(`${x.nom} · ${x.jours.length} times a week`, `${x.jours.length * WK} sessions`))}</View>
+              <View style={{ gap: 4 }}>{ancres.map((x) => ligne(`${x.nom} · ${parSemaine(x.jours.length)} a week`, seances(x.jours.length * WK)))}</View>
             </View>
           ) : null}
         </View>

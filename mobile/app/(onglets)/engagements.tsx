@@ -444,7 +444,7 @@ export default function Engagements() {
     section(
       'ANCHOR',
       d.ancres.length,
-      d.ancres.length ? `${d.ancres.reduce((q, a) => q + a.jours.length, 0)} fixed slots a week` : '',
+      d.ancres.length ? ((n) => `${n} fixed ${n === 1 ? 'slot' : 'slots'} a week`)(d.ancres.reduce((q, a) => q + a.jours.length, 0)) : '',
       couper(d.ancres).map(ligneAncre),
     ),
   ]
