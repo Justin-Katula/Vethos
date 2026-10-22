@@ -81,7 +81,13 @@ function Coque() {
       useSeances.setState({ chargees: false, proprietaire: null })
       definirCompte(null)
       await oublierTiroirCommun().catch(() => undefined)
-      if (!compte) return
+      // Déconnecté : un état vide, en mémoire. L'introduction d'un téléchargement
+      // neuf l'attend ; sans lui, elle restait sur le logo pour toujours (son
+      // propre `ouvrirSansCompte` passait AVANT la fermeture ci-dessus).
+      if (!compte) {
+        if (!annule) useDonnees.getState().ouvrirSansCompte()
+        return
+      }
       // Le téléphone et la sauvegarde en ligne se mettent d'accord : sur un
       // nouvel iPhone, c'est ici que le compte retrouve ses affaires.
       await accorder(compte).catch(() => undefined)
