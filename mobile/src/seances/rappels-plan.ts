@@ -34,8 +34,28 @@ export function rappelsAProgrammer(a: {
   /** Minuit du jour, en ms (heure locale). */
   minuitMs: number
   maintenantMs: number
+  /**
+   * Les jours suivants, tels que le plan les voit aujourd'hui. Sans eux, qui
+   * n'ouvrait pas Vethos un matin n'avait plus aucun rappel ce jour-là. Pour
+   * eux : le préavis et l'appel à l'heure, sans la série de relances.
+   */
+  aVenir?: readonly { minuitMs: number; blocs: readonly PlacedBlock[] }[]
 }): Rappel[] {
   const out: Rappel[] = []
+  for (const j of a.aVenir ?? []) {
+    for (const b of j.blocs) {
+      const cle = `${b.id}-${b.date}`
+      const avant = j.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
+      if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
+        out.push({ id: `rappel-${cle}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
+      }
+      if (b.kind === 'ancre') continue
+      const quand = j.minuitMs + b.startMinute * 60_000
+      if (quand > a.maintenantMs) {
+        out.push({ id: `rappel-${cle}-${b.startMinute}`, blocId: b.id, quand, titre: b.label, corps: 'It’s time. Not started yet — tap I’m starting.', reportable: reportable(b) })
+      }
+    }
+  }
   for (const b of a.blocsDuJour) {
     if (a.confirmes.has(b.id)) continue
     // 5 min avant : prévenu, pas encore appelé.

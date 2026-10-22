@@ -41,3 +41,17 @@ describe('Les rappels de « Je commence »', () => {
     expect(r.some((x) => x.blocId === 'task-d')).toBe(false)
   })
 })
+
+describe('Les jours suivants (2026-10-22)', () => {
+  it('demain : le préavis et l’appel à l’heure, sans la série de relances ; une ancre, le préavis seul', () => {
+    const demain = minuit + 86_400_000
+    const t = { ...bloc('task-c', 600, 660), date: '2026-10-16' } as PlacedBlock
+    const a = { ...bloc('ancre-gym', 1110, 1170, 'ancre'), date: '2026-10-16' } as PlacedBlock
+    const r = rappelsAProgrammer({ blocsDuJour: [], confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit + 1200 * 60_000, aVenir: [{ minuitMs: demain, blocs: [t, a] }] })
+    expect(r.map((x) => [x.id, x.quand])).toEqual([
+      ['rappel-task-c-2026-10-16-avant', demain + 595 * 60_000],
+      ['rappel-task-c-2026-10-16-600', demain + 600 * 60_000],
+      ['rappel-ancre-gym-2026-10-16-avant', demain + 1105 * 60_000],
+    ])
+  })
+})

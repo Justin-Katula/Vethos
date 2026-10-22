@@ -241,11 +241,20 @@ function useSourcePlan() {
     if (!prets) return
     const minuit = new Date(calcul.maintenant)
     minuit.setHours(0, 0, 0, 0)
+    // Demain et après-demain : préavis et appel à l'heure, au cas où Vethos
+    // ne serait pas ouvert d'ici là. Chaque ouverture les recalcule.
+    const aVenir = [1, 2].map((k) => {
+      const m = new Date(minuit)
+      m.setDate(m.getDate() + k)
+      const date = addDays(calcul.aujourdHui, k)
+      return { minuitMs: m.getTime(), blocs: calcul.resultat.blocks.filter((b) => b.date === date && b.preview !== true) }
+    })
     const rappels = rappelsAProgrammer({
       blocsDuJour,
       confirmes: new Set(Object.keys(confirmations.confirmedAt)),
       minuitMs: minuit.getTime(),
       maintenantMs: Date.now(),
+      aVenir,
     })
     const e = empreinteRappels(rappels)
     if (e === derniersRappels.current) return
@@ -255,7 +264,7 @@ function useSourcePlan() {
       if (rappels.length > 0) await demanderAutorisation()
       await programmerRappels(rappels)
     })()
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.maintenant])
+  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.maintenant, calcul.resultat, calcul.aujourdHui])
 
   // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
   // la cause est écrite dans la console de Metro (données rechargées, tâches
