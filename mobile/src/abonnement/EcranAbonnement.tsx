@@ -116,30 +116,7 @@ export function EcranAbonnement() {
       <FondLumiere lueur={lueur} reduit={reduit} />
 
       <Animated.View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: marges.top }, entree(0)]}>
-        <View style={{ width: 168, height: 168, alignItems: 'center', justifyContent: 'center' }}>
-          <View
-            style={{
-              position: 'absolute',
-              width: 168,
-              height: 168,
-              borderRadius: 84,
-              borderWidth: 1,
-              borderColor: 'rgba(242,242,242,0.10)',
-              backgroundColor: 'rgba(242,242,242,0.03)',
-            }}
-          />
-          <View
-            style={{
-              position: 'absolute',
-              width: 136,
-              height: 136,
-              borderRadius: 68,
-              borderWidth: 1,
-              borderColor: 'rgba(242,242,242,0.06)',
-            }}
-          />
-          <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 104, height: 104 }} resizeMode="contain" />
-        </View>
+        <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 120, height: 120 }} resizeMode="contain" />
 
         <Text
           accessibilityRole="header"
