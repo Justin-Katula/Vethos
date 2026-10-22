@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Animated, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { A, GEIST, MONO, SORTIE } from '@/ui/app-briques'
+import { useReduit } from '@/accueil/briques-introduction'
+import { FondLumiere } from '@/ui/FondLumiere'
+import { A, GEIST, MONO, SORTIE, useLumiere } from '@/ui/app-briques'
 import { economie, useAbonnement, type Formule } from './achats'
 
 /** Les conditions d'Apple (EULA standard) et la politique de confidentialité de Vethos. */
@@ -18,37 +20,37 @@ function Ligne({ f, choisie, badge, onPress }: { f: Formule; choisie: boolean; b
       accessibilityLabel={`${f.type === 'annuel' ? 'Yearly' : 'Monthly'}, ${f.prix}`}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 64,
-        borderRadius: 10,
-        borderWidth: choisie ? 1.5 : 1,
-        borderColor: choisie ? A.t1 : A.s,
-        backgroundColor: choisie ? 'rgba(242,242,242,0.06)' : 'transparent',
+        minHeight: 68,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: choisie ? A.t1 : 'transparent',
+        backgroundColor: choisie ? 'rgba(242,242,242,0.09)' : 'transparent',
         paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
         transform: [{ scale: pressed ? 0.985 : 1 }],
       })}
     >
       <View
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: 10,
+          width: 22,
+          height: 22,
+          borderRadius: 11,
           borderWidth: 1.5,
           borderColor: choisie ? A.t1 : A.t4,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        {choisie ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: A.t1 }} /> : null}
+        {choisie ? <View style={{ width: 11, height: 11, borderRadius: 5.5, backgroundColor: A.t1 }} /> : null}
       </View>
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16 }}>{f.type === 'annuel' ? 'Yearly' : 'Monthly'}</Text>
+          <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 17 }}>{f.type === 'annuel' ? 'Yearly' : 'Monthly'}</Text>
           {badge ? (
-            <View style={{ backgroundColor: A.rouge, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+            <View style={{ backgroundColor: A.rouge, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 }}>
               <Text style={{ color: '#fff', fontFamily: GEIST.demi, fontSize: 11 }}>{badge}</Text>
             </View>
           ) : null}
@@ -62,23 +64,39 @@ function Ligne({ f, choisie, badge, onPress }: { f: Formule; choisie: boolean; b
   )
 }
 
+/** Monte de 14 pt en apparaissant ; avec Réduire les animations, apparaît seulement. */
+function useEntree(n: number, reduit: boolean) {
+  const v = useRef(Array.from({ length: n }, () => new Animated.Value(0))).current
+  useEffect(() => {
+    Animated.stagger(
+      70,
+      v.map((x) => Animated.timing(x, { toValue: 1, duration: reduit ? 200 : 520, easing: SORTIE, useNativeDriver: true })),
+    ).start()
+  }, [v, reduit])
+  return (k: number) => {
+    const x = v[k] as Animated.Value
+    return { opacity: x, transform: [{ translateY: reduit ? 0 : x.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }
+  }
+}
+
 /**
  * Le mur : après la connexion, sans abonnement ni essai, l'app reste fermée.
  * Les prix viennent du Store, jamais d'ici. Ce qu'Apple exige est là : prix,
  * durée, conditions de l'essai, restaurer, conditions, confidentialité.
+ * La lueur de l'heure est celle de l'app : on est déjà chez Vethos.
  */
 export function EcranAbonnement() {
   const marges = useSafeAreaInsets()
+  const { lueur } = useLumiere()
+  const reduit = useReduit()
   const { formules, acheter, restaurer } = useAbonnement()
   const [choix, setChoix] = useState<string | null>(null)
   const [occupe, setOccupe] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const apparition = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(apparition, { toValue: 1, duration: 420, easing: SORTIE, useNativeDriver: true }).start()
-  }, [apparition])
+  const entree = useEntree(3, reduit)
 
-  const f = formules.find((x) => x.id === choix) ?? formules[0]
+  // L'annuel d'abord : c'est lui qui porte l'essai.
+  const f = formules.find((x) => x.id === choix) ?? formules.find((x) => x.type === 'annuel') ?? formules[0]
   const eco = economie(formules)
   const lien = confidentialite()
 
@@ -91,79 +109,140 @@ export function EcranAbonnement() {
     if (r === 'erreur') setMessage('Purchase didn’t go through.')
   }
 
+  const lienBas = { color: A.t2, fontFamily: GEIST.moyen, fontSize: 12 } as const
+
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: apparition, zIndex: 100 }]}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-        <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 96, height: 96 }} resizeMode="contain" />
-        {f?.essaiJours ? (
-          <Text accessibilityRole="header" style={{ marginTop: 24, color: A.t1, fontFamily: GEIST.demi, fontSize: 30, lineHeight: 36, letterSpacing: -0.8, textAlign: 'center' }}>
-            {`${f.essaiJours} days free.`}
-          </Text>
-        ) : null}
-      </View>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 100 }]}>
+      <FondLumiere lueur={lueur} reduit={reduit} />
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: marges.bottom + 12, gap: 10 }}>
-        {formules.map((x) => (
-          <Ligne
-            key={x.id}
-            f={x}
-            choisie={x.id === f?.id}
-            badge={x.type === 'annuel' && eco && eco > 0 ? `−${eco}%` : null}
-            onPress={() => setChoix(x.id)}
-          />
-        ))}
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !f || occupe }}
-          disabled={!f || occupe}
-          onPress={() => void payer()}
-          style={({ pressed }) => ({
-            marginTop: 6,
-            height: 54,
-            borderRadius: 10,
-            backgroundColor: A.t1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: !f || occupe ? 0.5 : 1,
-            transform: [{ scale: pressed ? 0.975 : 1 }],
-          })}
-        >
-          <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 17 }}>
-            {f?.essaiJours ? `Start ${f.essaiJours} days free` : 'Subscribe'}
-          </Text>
-        </Pressable>
-
-        {f ? (
-          <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17, textAlign: 'center' }}>
-            {f.essaiJours
-              ? `Free for ${f.essaiJours} days, then ${f.prix} per ${f.type === 'annuel' ? 'year' : 'month'}. Renews automatically. Cancel anytime in Settings.`
-              : `${f.prix} per ${f.type === 'annuel' ? 'year' : 'month'}. Renews automatically. Cancel anytime in Settings.`}
-          </Text>
-        ) : null}
-        {message ? <Text style={{ color: A.rouge, fontFamily: GEIST.moyen, fontSize: 13, textAlign: 'center' }}>{message}</Text> : null}
-
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 18, marginTop: 2 }}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={async () => {
-              setMessage(null)
-              if (!(await restaurer())) setMessage('No subscription found.')
+      <Animated.View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: marges.top }, entree(0)]}>
+        <View style={{ width: 168, height: 168, alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            style={{
+              position: 'absolute',
+              width: 168,
+              height: 168,
+              borderRadius: 84,
+              borderWidth: 1,
+              borderColor: 'rgba(242,242,242,0.10)',
+              backgroundColor: 'rgba(242,242,242,0.03)',
             }}
-            hitSlop={10}
-          >
-            <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 12 }}>Restore</Text>
-          </Pressable>
-          <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(CONDITIONS)} hitSlop={10}>
-            <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 12 }}>Terms</Text>
-          </Pressable>
-          {lien ? (
-            <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(lien)} hitSlop={10}>
-              <Text style={{ color: A.t2, fontFamily: GEIST.moyen, fontSize: 12 }}>Privacy</Text>
-            </Pressable>
+          />
+          <View
+            style={{
+              position: 'absolute',
+              width: 136,
+              height: 136,
+              borderRadius: 68,
+              borderWidth: 1,
+              borderColor: 'rgba(242,242,242,0.06)',
+            }}
+          />
+          <Image source={require('../../assets/vethos-logo-argent.png')} accessibilityLabel="Vethos" style={{ width: 104, height: 104 }} resizeMode="contain" />
+        </View>
+
+        <Text
+          accessibilityRole="header"
+          style={{ marginTop: 28, color: A.t1, fontFamily: GEIST.demi, fontSize: 36, lineHeight: 42, letterSpacing: -1.1, textAlign: 'center' }}
+        >
+          Vethos Pro
+        </Text>
+
+        <View style={{ height: 40, marginTop: 14, justifyContent: 'center' }}>
+          {f?.essaiJours ? (
+            <View
+              style={{
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: 'rgba(242,242,242,0.16)',
+                backgroundColor: 'rgba(242,242,242,0.06)',
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+              }}
+            >
+              <Text style={{ color: A.t1, fontFamily: MONO.normal, fontSize: 13, letterSpacing: 0.4 }}>{`${f.essaiJours} days free`}</Text>
+            </View>
           ) : null}
         </View>
+      </Animated.View>
+
+      <View style={{ paddingHorizontal: 16, paddingBottom: marges.bottom + 12, gap: 12 }}>
+        <Animated.View
+          style={[
+            {
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: 'rgba(242,242,242,0.08)',
+              backgroundColor: 'rgba(12,12,12,0.72)',
+              padding: 6,
+              gap: 4,
+            },
+            entree(1),
+          ]}
+        >
+          {formules.map((x) => (
+            <Ligne
+              key={x.id}
+              f={x}
+              choisie={x.id === f?.id}
+              badge={x.type === 'annuel' && eco && eco > 0 ? `−${eco}%` : null}
+              onPress={() => setChoix(x.id)}
+            />
+          ))}
+        </Animated.View>
+
+        <Animated.View style={[{ gap: 10 }, entree(2)]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !f || occupe }}
+            disabled={!f || occupe}
+            onPress={() => void payer()}
+            style={({ pressed }) => ({
+              height: 56,
+              borderRadius: 16,
+              backgroundColor: A.t1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: !f || occupe ? 0.5 : 1,
+              transform: [{ scale: pressed ? 0.975 : 1 }],
+            })}
+          >
+            <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 17 }}>
+              {f?.essaiJours ? `Start ${f.essaiJours} days free` : 'Subscribe'}
+            </Text>
+          </Pressable>
+
+          {f ? (
+            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingHorizontal: 8 }}>
+              {f.essaiJours
+                ? `Free for ${f.essaiJours} days, then ${f.prix} per ${f.type === 'annuel' ? 'year' : 'month'}. Renews automatically. Cancel anytime in Settings.`
+                : `${f.prix} per ${f.type === 'annuel' ? 'year' : 'month'}. Renews automatically. Cancel anytime in Settings.`}
+            </Text>
+          ) : null}
+          {message ? <Text style={{ color: A.rouge, fontFamily: GEIST.moyen, fontSize: 13, textAlign: 'center' }}>{message}</Text> : null}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 22 }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={async () => {
+                setMessage(null)
+                if (!(await restaurer())) setMessage('No subscription found.')
+              }}
+              hitSlop={12}
+            >
+              <Text style={lienBas}>Restore</Text>
+            </Pressable>
+            <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(CONDITIONS)} hitSlop={12}>
+              <Text style={lienBas}>Terms</Text>
+            </Pressable>
+            {lien ? (
+              <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(lien)} hitSlop={12}>
+                <Text style={lienBas}>Privacy</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
       </View>
-    </Animated.View>
+    </View>
   )
 }
