@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Easing, LayoutAnimation, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Pattern, Rect, Stop } from 'react-native-svg'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
 import { finTexte, type JourTemps } from '@/plan/lecture'
 import { dateLocale } from '@/plan/format'
@@ -1265,6 +1265,17 @@ export function EcranSemaine({
   const plein = !premier
   const [sel, setSel] = useState(() => Math.max(0, placement.jours.findIndex((j) => j === premier?.jour)))
   const [app, setApp] = useState(false)
+  // Les jours se posent l'un après l'autre, une seule fois.
+  const colonnes = useRef(placement.jours.map(() => new Animated.Value(ctx.reduit ? 1 : 0))).current
+  useEffect(() => {
+    if (ctx.reduit) return
+    return lancer(
+      Animated.stagger(
+        70,
+        colonnes.map((v) => Animated.timing(v, { toValue: 1, duration: 480, easing: SORTIE, useNativeDriver: true })),
+      ),
+    )
+  }, [colonnes, ctx.reduit])
   const ao = useVers(app ? 0 : 1, 900)
   const ho = useVers(app ? 1 : 0, 900, SORTIE, 400)
   const bo = useVers(app ? 0 : 1, 700)
@@ -1369,7 +1380,18 @@ export function EcranSemaine({
                       <Text style={{ color: on ? '#000' : td ? C.t1 : C.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>{d.getDate()}</Text>
                     </View>
                   </View>
-                  <View style={{ height: 220, marginTop: 8, borderLeftWidth: 1, borderLeftColor: 'rgba(242,242,242,0.05)', backgroundColor: on ? 'rgba(242,242,242,0.04)' : 'transparent' }}>
+                  <View style={{ height: 220, marginTop: 8, marginHorizontal: 2, borderRadius: 8, backgroundColor: on ? 'rgba(242,242,242,0.07)' : 'rgba(242,242,242,0.025)' }}>
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        opacity: colonnes[i] ?? 1,
+                        transform: [{ translateY: (colonnes[i] ?? new Animated.Value(1)).interpolate({ inputRange: [0, 1], outputRange: [ctx.reduit ? 0 : 8, 0] }) }],
+                      }}
+                    >
                     {j.segments
                       .filter((s) => s.nature !== 'sleep')
                       .map((s) => {
@@ -1393,11 +1415,27 @@ export function EcranSemaine({
                                 top: yA,
                                 height: h,
                                 borderRadius: Math.min(5, h / 2),
-                                backgroundColor: fixe ? 'rgba(242,242,242,0.05)' : couleur(s.nature),
+                                overflow: 'hidden',
+                                backgroundColor: fixe ? 'rgba(242,242,242,0.035)' : couleur(s.nature),
                                 borderWidth: fixe ? 1 : 0,
-                                borderColor: 'rgba(242,242,242,0.12)',
+                                borderColor: 'rgba(242,242,242,0.10)',
                               }}
-                            />
+                            >
+                              {fixe ? (
+                                // Les heures fixes : des hachures fines, « déjà pris ».
+                                <Svg width="100%" height={h}>
+                                  <Defs>
+                                    <Pattern id={`hachures-${s.id}`} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                      <Line x1={0} y1={0} x2={0} y2={6} stroke="rgba(242,242,242,0.09)" strokeWidth={2} />
+                                    </Pattern>
+                                  </Defs>
+                                  <Rect width="100%" height={h} fill={`url(#hachures-${s.id})`} />
+                                </Svg>
+                              ) : (
+                                // Un reflet d'un pixel en haut : le bloc prend du relief.
+                                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.22)' }} />
+                              )}
+                            </View>
                             {pause && pause.h >= 2 ? (
                               <View style={{ position: 'absolute', left: 0, right: 0, top: pause.y, height: pause.h, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 }}>
                                 {[0, 1, 2].map((k) => (
@@ -1408,6 +1446,7 @@ export function EcranSemaine({
                           </View>
                         )
                       })}
+                    </Animated.View>
                     {td && nm >= w0 && nm <= w1 ? (
                       <View style={{ position: 'absolute', left: 0, right: 0, top: Y(nm) - 1, height: 2, backgroundColor: ctx.acc }}>
                         <View style={{ position: 'absolute', left: -3, top: -2, width: 6, height: 6, borderRadius: 3, backgroundColor: ctx.acc }} />
