@@ -10,7 +10,7 @@ describe('ce que coûte « demain »', () => {
     expect(m.weeks).toBe(26)
     expect(m.lost).toBe(156)
     expect(m.unit).toBe('hours')
-    expect(m.l1).toBe('Since March, you meant 104 workouts. You went to 26.')
+    expect(m.l1).toBe('Since March, you meant 104 workouts. You did 26.')
     expect(m.l2).toBe('If nothing changes, another 78 workouts are gone by March.')
   })
 
@@ -82,9 +82,9 @@ describe('le parcours et la création', () => {
     stops: [0, 1],
   })
 
-  it('trois questions par chose ; la chose unique demande le travail, la répétée le but', () => {
+  it('« depuis quand » une fois pour tout, puis une question par chose : le travail pour une tâche, le présent pour une habitude (2026-10-23)', () => {
     const f = parcours(base(), jeudi).map((s) => s.k)
-    expect(f.slice(0, 11)).toEqual(['1', '1b', '2', '3', '4', '5a', '5b', '5c', '5a', '5g', '5c'])
+    expect(f.slice(0, 8)).toEqual(['1', '1b', '2', '3', '4', '5a', '5b', '5c'])
     // La plus lourde passe en premier aux réglages ; une ancre en a deux.
     expect(f).toContain('12b')
     expect(f[f.length - 1]).toBe('17')
@@ -112,7 +112,7 @@ describe('le parcours et la création', () => {
     }
     const { b, autres } = brouillonsDepuis(e, jeudi, () => '2026-10-22')
     expect(b.nature).toBe('ancre')
-    expect(b.nom).toBe('Go to the gym')
+    expect(b.nom).toBe('Work out')
     expect(b.joursAncre).toEqual([1, 3, 5])
     expect(b.activites).toEqual(['work'])
     expect(b.fixes.work.jours).toEqual([1, 2, 3, 4, 5])

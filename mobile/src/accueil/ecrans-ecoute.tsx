@@ -276,16 +276,21 @@ export function EcranDetail({ ctx }: { ctx: Ctx }) {
   const k = ctx.etape.k
   const t = ctx.etape.t ?? 0
   const ids = choses(ctx.e)
-  const id = ids[t] ?? ids[0]!
+  // « Depuis quand » : une seule fois, pour toutes les choses.
+  const pourTout = k === '5a'
+  const id = (pourTout ? ids[0] : ids[t]) ?? ids[0]!
   const it = ITEM[id]!
   const raw = ctx.e.det[id] ?? {}
-  const sous = it.kind === 'once' ? ['5a', '5b', '5c'] : ['5a', '5g', '5c']
-  const pos = sous.indexOf(k)
-  const tete = (ids.length > 1 ? `${t + 1} of ${ids.length} · ` : '') + it.label
+  const tete = pourTout ? (ids.length > 1 ? '' : it.label) : (ids.length > 1 ? `${t + 1} of ${ids.length} · ` : '') + it.label
   const repondre = (champ: Champ, i: number) => {
     if (occupe.current) return
     occupe.current = true
-    ctx.maj((e: EtatIntro) => ({ det: { ...e.det, [id]: { ...(e.det[id] ?? {}), [champ]: i } } }))
+    const cibles = pourTout ? ids : [id]
+    ctx.maj((e: EtatIntro) => {
+      const det = { ...e.det }
+      for (const c of cibles) det[c] = { ...(det[c] ?? {}), [champ]: i }
+      return { det }
+    })
     vibrer('medium')
     apres(500, ctx.suivant)
   }
@@ -293,7 +298,7 @@ export function EcranDetail({ ctx }: { ctx: Ctx }) {
   let options: Choix[] | [string, ...unknown[]][] = []
   let champ: Champ = 'since'
   if (k === '5a') {
-    titre = `Since when have you been meaning to ${it.since}?`
+    titre = ids.length > 1 ? 'How long has this been slipping?' : `Since when have you been meaning to ${it.since}?`
     options = SINCE
   } else if (k === '5b') {
     titre = 'How much work does it really need?'
@@ -320,14 +325,11 @@ export function EcranDetail({ ctx }: { ctx: Ctx }) {
   return (
     <View style={{ flex: 1 }}>
       <Haut ctx={ctx}>
-        <Entree dl={100} reduit={ctx.reduit}>
-          <Text style={T.gris}>{tete}</Text>
-        </Entree>
-        <Entree dl={100} reduit={ctx.reduit} style={{ flexDirection: 'row', gap: 4, marginTop: 12 }}>
-          {sous.map((s, i) => (
-            <View key={s} style={{ width: 24, height: 2, backgroundColor: i <= pos ? C.t1 : C.s2 }} />
-          ))}
-        </Entree>
+        {tete ? (
+          <Entree dl={100} reduit={ctx.reduit}>
+            <Text style={T.gris}>{tete}</Text>
+          </Entree>
+        ) : null}
         {k !== '5c' ? (
           <>
             <Entree dl={220} reduit={ctx.reduit} style={{ marginTop: 32 }}>

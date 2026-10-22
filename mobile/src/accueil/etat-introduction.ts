@@ -129,11 +129,11 @@ export const natureDe = (e: EtatIntro, id: string): Nature => e.type[id] ?? ITEM
 
 export function parcours(e: EtatIntro, maintenant: Date): Etape[] {
   const f: Etape[] = [{ k: '1' }, { k: '1b' }, { k: '2' }, { k: '3' }, { k: '4' }]
-  choses(e).forEach((id, t) => {
-    f.push({ k: '5a', t })
-    f.push({ k: ITEM[id]!.kind === 'once' ? '5b' : '5g', t })
-    f.push({ k: '5c', t })
-  })
+  // « Depuis quand » une seule fois pour tout ; puis UNE question par chose :
+  // le travail qu'il faut pour une tâche, ce qui se fait vraiment pour une habitude.
+  const ids = choses(e)
+  if (ids.length) f.push({ k: '5a' })
+  ids.forEach((id, t) => f.push({ k: ITEM[id]!.kind === 'once' ? '5b' : '5c', t }))
   f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' }, { k: '12a' })
   if (e.things.length && natureDe(e, choisie(e, maintenant)) !== 'GOAL') f.push({ k: '12b' })
   f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: 'contrat' }, { k: 'ia' }, { k: '17' })

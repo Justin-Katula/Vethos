@@ -220,9 +220,9 @@ const O = (id: string, label: string, since: string, name: string): Omit<Unique,
 
 const CAT: Record<string, Omit<Chose, 'prio'>[]> = {
   School: [
-    R('exams', 'Studying for my exams', 'study for your exams', 'study for your exams', 'Study for my exams', 5, 90, 'study sessions', 'did', 'GOAL'),
+    // Réviser ses notes, c'est étudier : une seule chose (2026-10-23).
+    R('exams', 'Studying', 'study', 'study', 'Study', 5, 90, 'study sessions', 'did', 'GOAL'),
     O('assign', 'An assignment I haven’t started', 'start that assignment', 'Finish my assignment'),
-    R('notes', 'Reviewing my notes', 'review your notes', 'review your notes', 'Review my notes', 3, 60, 'reviews', 'did', 'ANCHOR'),
   ],
   Career: [
     O('report', 'A report I keep delaying', 'finish that report', 'Finish the report'),
@@ -230,13 +230,13 @@ const CAT: Record<string, Omit<Chose, 'prio'>[]> = {
     R('skill', 'Learning a skill for my career', 'learn that skill', 'practice that skill', 'Learn my skill', 3, 60, 'practice sessions', 'did', 'GOAL'),
   ],
   'A project': [
-    R('grow', 'Growing it', 'work on growing your project', 'work on growing it', 'Grow my project', 3, 90, 'growth sessions', 'did', 'GOAL'),
+    // Le faire grandir et y travailler chaque semaine : la même chose.
+    R('weekly', 'Working on it', 'work on your project', 'work on your project', 'Work on my project', 3, 120, 'project sessions', 'did', 'GOAL'),
     O('v1', 'Building the first version', 'build the first version', 'Build the first version'),
-    R('weekly', 'Working on it every week', 'work on your project every week', 'work on your project', 'Work on my project', 3, 120, 'project sessions', 'did', 'GOAL'),
   ],
   Health: [
-    R('gym', 'Going to the gym', 'go to the gym', 'go to the gym', 'Go to the gym', 4, 120, 'workouts', 'went to', 'ANCHOR'),
-    R('run', 'Going for a run', 'go running', 'go for a run', 'Go for a run', 3, 45, 'runs', 'went on', 'ANCHOR'),
+    // La salle ou la course : s'entraîner.
+    R('gym', 'Working out', 'work out', 'work out', 'Work out', 4, 90, 'workouts', 'did', 'ANCHOR'),
     R('cook', 'Cooking real meals', 'cook real meals', 'cook a real meal', 'Cook real meals', 5, 60, 'real meals', 'cooked', 'ANCHOR'),
   ],
   Discipline: [
