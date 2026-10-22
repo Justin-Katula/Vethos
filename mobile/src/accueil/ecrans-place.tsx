@@ -4,7 +4,7 @@
  * puis le vrai moteur le pose sur le cadran, et la vraie semaine apparaît.
  */
 import { useEffect, useRef, useState } from 'react'
-import { Animated, LayoutAnimation, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
+import { Animated, Easing, LayoutAnimation, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
 import { finTexte, type JourTemps } from '@/plan/lecture'
@@ -32,6 +32,7 @@ import {
   Ligne,
   MONO,
   PiedDegrade,
+  lancer,
   SORTIE,
   T,
   Titre,
@@ -132,6 +133,136 @@ function Apercu({ tp }: { tp: Nature }) {
   )
 }
 
+
+/**
+ * Ce qu'est chaque forme, montré plutôt qu'écrit :
+ * - Task : des séances qui remplissent une barre jusqu'à la ligne d'arrivée, puis c'est fini.
+ * - Goal : des séances qui se posent où il y a de la place, un jour ici, un jour là.
+ * - Anchor : la même heure, les mêmes jours, épinglée — rien ne bouge.
+ */
+function IllustrationNature({ t, reduit }: { t: Nature; reduit: boolean }) {
+  const p = useRef(new Animated.Value(reduit ? 1 : 0)).current
+  useEffect(() => {
+    if (reduit) {
+      p.setValue(1)
+      return
+    }
+    const boucle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(p, { toValue: 1, duration: t === 'ANCHOR' ? 900 : 2600, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        Animated.delay(t === 'ANCHOR' ? 2600 : 1100),
+        Animated.timing(p, { toValue: 0, duration: 420, easing: SORTIE, useNativeDriver: true }),
+        Animated.delay(250),
+      ]),
+    )
+    return lancer(boucle)
+  }, [p, reduit, t])
+  const couleur = TRAIT[t]
+  const H = 52
+
+  if (t === 'TASK') {
+    const n = 4
+    return (
+      <View style={{ height: H, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1, flexDirection: 'row', gap: 4, height: 14 }}>
+            {Array.from({ length: n }, (_, k) => (
+              <View key={k} style={{ flex: 1, borderRadius: 4, backgroundColor: 'rgba(242,242,242,0.07)', overflow: 'hidden' }}>
+                <Animated.View
+                  style={{
+                    flex: 1,
+                    backgroundColor: C.t1,
+                    opacity: p.interpolate({ inputRange: [k / (n + 1), (k + 0.6) / (n + 1)], outputRange: [0, 0.85], extrapolate: 'clamp' }),
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+          {/* La ligne d'arrivée, puis la coche. */}
+          <View style={{ width: 2, height: 30, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.35)' }} />
+          <Animated.View
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              backgroundColor: C.t1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: p.interpolate({ inputRange: [0.82, 0.95], outputRange: [0, 1], extrapolate: 'clamp' }),
+              transform: [{ scale: p.interpolate({ inputRange: [0.82, 0.95], outputRange: [0.6, 1], extrapolate: 'clamp' }) }],
+            }}
+          >
+            <Svg width={12} height={12} viewBox="0 0 12 12">
+              <Path d="M2.5 6.4 5 8.8 9.6 3.6" fill="none" stroke="#000" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </Animated.View>
+        </View>
+      </View>
+    )
+  }
+
+  // Goal et Anchor : une semaine. Goal pose ses séances à des heures qui
+  // changent ; Anchor les épingle toutes à la même.
+  const jours = t === 'GOAL' ? [0, 1, 3, 5] : [0, 2, 4]
+  const depart: Record<number, number> = { 0: 4, 1: 30, 3: 12, 5: 34 }
+  const arrivee: Record<number, number> = { 0: 26, 1: 6, 3: 32, 5: 10 }
+  const HAUT = H - 14
+  const BLOC = 10
+  return (
+    <View style={{ height: H + 4 }}>
+      <View style={{ flexDirection: 'row', gap: 6, height: HAUT }}>
+        {WL.map((_, i) => {
+          const pris = jours.includes(i)
+          return (
+            <View key={i} style={{ flex: 1, borderRadius: 4, backgroundColor: 'rgba(242,242,242,0.05)' }}>
+              {pris ? (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    height: BLOC,
+                    borderRadius: 3,
+                    backgroundColor: couleur,
+                    top: t === 'ANCHOR' ? (HAUT - BLOC) / 2 : 0,
+                    opacity: t === 'ANCHOR' ? p.interpolate({ inputRange: [0, 0.6 + i * 0.05, 1], outputRange: [0.25, 1, 1], extrapolate: 'clamp' }) : 1,
+                    transform:
+                      t === 'GOAL'
+                        ? [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [depart[i] ?? 0, arrivee[i] ?? 0] }) }]
+                        : [],
+                  }}
+                />
+              ) : null}
+            </View>
+          )
+        })}
+        {/* L'ancre : une épingle horizontale, la même heure partout. */}
+        {t === 'ANCHOR' ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: HAUT / 2 - 0.5,
+              height: 1,
+              backgroundColor: 'rgba(242,242,242,0.35)',
+              opacity: p,
+            }}
+          />
+        ) : null}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+        {WL.map((d, i) => (
+          <Text key={i} style={{ flex: 1, textAlign: 'center', color: jours.includes(i) ? C.t2 : C.t4, fontFamily: GEIST.demi, fontSize: 10 }}>
+            {d}
+          </Text>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 const NOM_NATURE: Record<Nature, string> = { TASK: 'Task', GOAL: 'Goal', ANCHOR: 'Anchor' }
 
 /**
@@ -191,7 +322,9 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
                     <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: TYPEC[t], borderWidth: 1, borderColor: 'rgba(242,242,242,0.16)' }} />
                     <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 13, lineHeight: 18, letterSpacing: 1.4 }}>{t}</Text>
                   </View>
-                  <Text style={{ color: C.t2, fontFamily: GEIST.normal, fontSize: 14, lineHeight: 20, marginTop: 6 }}>{TYPEL[t]}</Text>
+                  <View style={{ marginTop: 14 }}>
+                    <IllustrationNature t={t} reduit={ctx.reduit} />
+                  </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, minHeight: 40 }}>
                     {dedans.map((id) => {
                       const on = levee === id
