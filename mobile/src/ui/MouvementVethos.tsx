@@ -6,7 +6,7 @@ import { useJetons } from '@/theme/Theme'
 export function ChargementVethos({
   pleinEcran,
   compact,
-  libelle = 'Chargement de Vethos',
+  libelle = 'Loading Vethos',
 }: {
   pleinEcran?: boolean
   compact?: boolean
