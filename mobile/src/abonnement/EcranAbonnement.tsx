@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useReduit } from '@/accueil/briques-introduction'
 import { FondLumiere } from '@/ui/FondLumiere'
 import { A, GEIST, MONO, SORTIE, useLumiere } from '@/ui/app-briques'
+import { deconnecter } from '@/compte/compte'
 import { economie, useAbonnement, type Formule } from './achats'
 
 /** Les conditions d'Apple (EULA standard) et la politique de confidentialité de Vethos. */
@@ -89,7 +90,7 @@ export function EcranAbonnement() {
   const marges = useSafeAreaInsets()
   const { lueur } = useLumiere(true)
   const reduit = useReduit()
-  const { formules, acheter, restaurer } = useAbonnement()
+  const { formules, acheter, restaurer, reessayer } = useAbonnement()
   const [choix, setChoix] = useState<string | null>(null)
   const [occupe, setOccupe] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -171,21 +172,29 @@ export function EcranAbonnement() {
         <Animated.View style={[{ gap: 10 }, entree(2)]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: !f || occupe }}
-            disabled={!f || occupe}
-            onPress={() => void payer()}
+            accessibilityState={{ disabled: occupe }}
+            disabled={occupe}
+            onPress={() => {
+              // Aucune formule reçue du Store : le bouton redemande au lieu de rester éteint.
+              if (!f) {
+                setOccupe(true)
+                void reessayer().finally(() => setOccupe(false))
+                return
+              }
+              void payer()
+            }}
             style={({ pressed }) => ({
               height: 56,
               borderRadius: 16,
               backgroundColor: A.t1,
               alignItems: 'center',
               justifyContent: 'center',
-              opacity: !f || occupe ? 0.5 : 1,
+              opacity: occupe ? 0.5 : 1,
               transform: [{ scale: pressed ? 0.975 : 1 }],
             })}
           >
             <Text style={{ color: '#000', fontFamily: GEIST.demi, fontSize: 17 }}>
-              {f?.essaiJours ? `Start ${f.essaiJours} days free` : 'Subscribe'}
+              {!f ? 'Try again' : f.essaiJours ? `Start ${f.essaiJours} days free` : 'Subscribe'}
             </Text>
           </Pressable>
 
@@ -217,6 +226,9 @@ export function EcranAbonnement() {
                 <Text style={lienBas}>Privacy</Text>
               </Pressable>
             ) : null}
+            <Pressable accessibilityRole="button" onPress={() => void deconnecter()} hitSlop={12}>
+              <Text style={lienBas}>Sign out</Text>
+            </Pressable>
           </View>
         </Animated.View>
       </View>

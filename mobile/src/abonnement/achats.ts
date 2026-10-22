@@ -32,6 +32,8 @@ type Etat = {
   etat: 'chargement' | 'actif' | 'inactif' | 'indisponible'
   formules: Formule[]
   initialiser: (utilisateur: string) => Promise<void>
+  /** Le Store n'a rendu aucune formule : on redemande, pour le même compte. */
+  reessayer: () => Promise<void>
   acheter: (id: string) => Promise<'ok' | 'annule' | 'erreur'>
   restaurer: () => Promise<boolean>
 }
@@ -63,6 +65,10 @@ type Paquets = Array<{
 }>
 
 let paquets: Paquets = []
+let ecoute = false
+let dernierUtilisateur: string | null = null
+/** Le Store qui ne répond pas ne garde pas l'app sur le logo : au-delà, on ouvre. */
+const DELAI_STORE_MS = 15_000
 const actif = (info: { entitlements: { active: Record<string, unknown> } }) => !!info.entitlements.active[DROIT]
 
 export const useAbonnement = create<Etat>((set, get) => ({
@@ -72,13 +78,22 @@ export const useAbonnement = create<Etat>((set, get) => ({
   async initialiser(utilisateur) {
     const k = cle()
     if (!k) return set({ etat: 'indisponible' })
+    dernierUtilisateur = utilisateur
+    const garde = setTimeout(() => {
+      if (get().etat === 'chargement') set({ etat: 'indisponible' })
+    }, DELAI_STORE_MS)
     try {
       const { default: Purchases, INTRO_ELIGIBILITY_STATUS } = await import('react-native-purchases')
       // L'abonné RevenueCat EST le compte Vethos : l'abonnement suit la
       // personne d'un téléphone à l'autre, pas l'appareil.
       if (await Purchases.isConfigured()) await Purchases.logIn(utilisateur)
       else Purchases.configure({ apiKey: k, appUserID: utilisateur })
-      Purchases.addCustomerInfoUpdateListener((info) => set({ etat: actif(info) ? 'actif' : 'inactif' }))
+      // Une seule écoute pour toute la vie de l'app : chaque connexion en
+      // ajoutait une de plus.
+      if (!ecoute) {
+        ecoute = true
+        Purchases.addCustomerInfoUpdateListener((info) => set({ etat: actif(info) ? 'actif' : 'inactif' }))
+      }
 
       const [info, offres] = await Promise.all([Purchases.getCustomerInfo(), Purchases.getOfferings()])
       paquets = (offres.current?.availablePackages ?? []) as unknown as Paquets
@@ -111,7 +126,13 @@ export const useAbonnement = create<Etat>((set, get) => ({
       // Le Store injoignable ne ferme pas l'app de quelqu'un qui a peut-être payé :
       // on retentera au prochain lancement.
       if (get().etat === 'chargement') set({ etat: 'indisponible' })
+    } finally {
+      clearTimeout(garde)
     }
+  },
+
+  async reessayer() {
+    if (dernierUtilisateur) await get().initialiser(dernierUtilisateur)
   },
 
   async acheter(id) {
