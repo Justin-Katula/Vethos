@@ -252,7 +252,8 @@ function IntroductionSombre() {
       try {
         const r = preparerIntroduction(useDonnees.getState(), b, new Date(), autres)
         const m = eRef.current.mode
-        const contrat = m ? signContract(m, new Date()) : null
+        // Plus d'écran de contrat : Ally par défaut (le ton bienveillant).
+        const contrat = signContract(m ?? 'ally', new Date())
         // Téléchargement neuf, pas encore de compte : les réponses attendent la
         // connexion (`useAppareil`). Un compte neuf les recevra ; un compte qui a
         // déjà fait son introduction garde la sienne.

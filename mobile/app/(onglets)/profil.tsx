@@ -4,7 +4,6 @@ import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
 import { A, Carte, Chevron, GEIST, MONO, useToast } from '@/ui/app-briques'
-import { effectiveContract, requestModeChange, signContract, type Mode } from '@shared/contract'
 import { usePlan } from '@/plan/Plan'
 import { coach } from '@/coach/client'
 import { CarteCompte } from '@/compte/CarteCompte'
@@ -26,20 +25,6 @@ export default function Profil() {
   const initiale = (nom.trim()[0] ?? '?').toUpperCase()
   const { seanceActive, maintenant } = usePlan()
   const toast = useToast()
-  const contrat = reglages.contrat ? effectiveContract(reglages.contrat, maintenant) : null
-  const choisirMode = (m: Mode) => {
-    if (!contrat) {
-      void majReglages({ contrat: signContract(m, new Date()) })
-      return
-    }
-    const r = requestModeChange(contrat, m, new Date(), !!seanceActive)
-    if (!r.ok) {
-      if (r.reason === 'during-block') toast('Not during a block.')
-      return
-    }
-    void majReglages({ contrat: r.contract })
-  }
-  const effetLe = contrat?.pending ? new Date(contrat.pending.effectiveAt) : null
   // Les demandes de retrait : une heure ici, puis elles disparaissent.
   const retrait = useRetrait()
   const abonne = useAbonnement((e) => e.etat === 'actif')
@@ -104,41 +89,6 @@ export default function Profil() {
           ))}
         </Carte>
       ) : null}
-
-      <Carte style={{ marginTop: 12, paddingTop: 18, paddingHorizontal: 16, paddingBottom: 16 }}>
-        <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Contract</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-          {(['ally', 'sergeant'] as const).map((m) => {
-            const actuel = (contrat?.pending?.mode ?? contrat?.mode) === m
-            return (
-              <Pressable
-                key={m}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: actuel }}
-                onPress={() => choisirMode(m)}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  height: 44,
-                  borderRadius: 10,
-                  backgroundColor: actuel ? 'rgba(242,242,242,0.14)' : 'rgba(242,242,242,0.05)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
-                })}
-              >
-                <Text style={{ color: actuel ? A.t1 : A.t3, fontFamily: GEIST.demi, fontSize: 15 }}>{m === 'ally' ? 'Ally' : 'Sergeant'}</Text>
-              </Pressable>
-            )
-          })}
-        </View>
-        {contrat ? (
-          <Text style={{ marginTop: 10, color: A.t3, fontFamily: MONO.normal, fontSize: 12 }}>
-            {effetLe
-              ? `From ${effetLe.getDate()} ${MOIS[effetLe.getMonth()]!.slice(0, 3)}, ${String(effetLe.getHours()).padStart(2, '0')}:${String(effetLe.getMinutes()).padStart(2, '0')}`
-              : `Signed ${new Date(contrat.signedAt).getDate()} ${MOIS[new Date(contrat.signedAt).getMonth()]!.slice(0, 3)}`}
-          </Text>
-        ) : null}
-      </Carte>
 
       {/* Le Coach n'a pas d'entrée à lui : il ne sert qu'aux moments de justification (Stop, Later). */}
       {coach().disponible ? (
