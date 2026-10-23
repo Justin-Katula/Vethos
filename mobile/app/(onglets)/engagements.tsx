@@ -5,7 +5,8 @@
  * d'ajout de SA nature. Tout ce qui s'affiche est mesuré ou planifié, jamais
  * déclaré.
  */
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
@@ -133,6 +134,20 @@ export default function Engagements() {
   const [historique, setHistorique] = useState(false)
   const [forme, setForme] = useState<NatureApp | null>(null)
   const defile = useRef<ScrollView>(null)
+  // Quitter l'onglet le remet à zéro : au retour, rien d'ouvert, pas d'historique.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setRetrait(null)
+        setOuvert(null)
+        setPage(null)
+        setHistorique(false)
+        setForme(null)
+        defile.current?.scrollTo({ y: 0, animated: false })
+      },
+      [],
+    ),
+  )
 
   const aujourdHui = dateLocale(cleDate(maintenant))
   const jours = (cle: string) => Math.round((dateLocale(cle).getTime() - aujourdHui.getTime()) / 864e5)

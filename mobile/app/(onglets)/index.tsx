@@ -3,9 +3,9 @@
  * de la journée, trois chiffres qu'on peut toucher, la projection, puis la
  * journée ligne par ligne. Tout est lu dans le vrai plan : rien n'est inventé.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Mask, Path, Rect } from 'react-native-svg'
 import { useDonnees } from '@/donnees/magasin'
@@ -203,6 +203,18 @@ export default function Aujourdhui() {
     carrousel.current?.scrollTo({ x: i * larg, animated: true })
     setSlide(i)
   }
+  // Quitter l'onglet le remet à zéro : au retour, on retrouve Today, pas Projection.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        carrousel.current?.scrollTo({ x: 0, animated: false })
+        setSlide(0)
+        setFocus(null)
+        setAnnee(false)
+      },
+      [],
+    ),
+  )
 
   const agenda = [
     { debut: WAKE, fin: WAKE, titre: 'Wake-up', c: 'rgba(242,242,242,0.16)', fixe: true },

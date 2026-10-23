@@ -8,7 +8,8 @@
  * montrent que ce qui était fixe : Vethos ne garde pas de plan d'hier, et
  * n'en inventera pas.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient, Path, Pattern, Stop, Rect } from 'react-native-svg'
@@ -79,6 +80,18 @@ export default function MonTemps() {
   const [fixe, setFixe] = useState(false)
   const [nouveau, setNouveau] = useState(false)
   const grille = useRef<ScrollView>(null)
+  // Quitter l'onglet le remet à zéro : au retour, la semaine d'aujourd'hui, rien d'ouvert.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setVis(AUJ)
+        setSel(null)
+        setFixe(false)
+        setNouveau(false)
+      },
+      [AUJ],
+    ),
+  )
   const pose = useRef(false)
 
   const larg = Math.min(width, 900)
