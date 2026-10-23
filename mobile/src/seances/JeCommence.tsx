@@ -1,5 +1,5 @@
 import { TOLERANCE_DEPART_MINUTES } from '@shared/planning/habitudes'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Keyboard, Modal, Pressable, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Polygon } from 'react-native-svg'
@@ -58,10 +58,17 @@ function Discret({ onPress, children }: { onPress: () => void; children: ReactNo
 export function JeCommence() {
   const marges = useSafeAreaInsets()
   const { H, lueur } = useLumiere()
-  const { enAttente, minute, confirmer, confiance, reports } = usePlan()
+  const { enAttente: enAttenteDuPlan, minute, confirmer, confiance, reports } = usePlan()
   const [encours, setEncours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [feuille, setFeuille] = useState<Feuille | null>(null)
+  // Une conversation est ouverte (raison, juge, heures) : la séance reste à
+  // l'écran même si le recalcul de la minute la retire du plan — sinon la
+  // fenêtre se fermait en pleine discussion, et la proposition ne se voyait
+  // jamais (vu le 2026-10-23 à 23 h 01, trop près du coucher).
+  const gele = useRef(enAttenteDuPlan)
+  if (enAttenteDuPlan && (!feuille || !gele.current || gele.current.id === enAttenteDuPlan.id)) gele.current = enAttenteDuPlan
+  const enAttente = enAttenteDuPlan ?? (feuille ? gele.current : null)
   // Un bouton touché sur une notification.
   const demande = useDemandeReport((e) => e.demande)
   useEffect(() => {

@@ -131,6 +131,20 @@ export default function Aujourdhui() {
     }
   }, [jour, N, reglages.coucher, reglages.lever])
 
+  // Quitter l'onglet le remet à zéro : au retour, on retrouve Today, pas Projection.
+  // Avant le retour anticipé du chargement : un hook ne s'appelle jamais sous condition.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        carrousel.current?.scrollTo({ x: 0, animated: false })
+        setSlide(0)
+        setFocus(null)
+        setAnnee(false)
+      },
+      [],
+    ),
+  )
+
   // Le chargement ne couvre l'écran qu'AVANT le premier affichage complet : un
   // rechargement des données ensuite ne doit pas faire disparaître l'écran.
   if (jour && chargees && d) dejaAffiche.current = true
@@ -203,18 +217,6 @@ export default function Aujourdhui() {
     carrousel.current?.scrollTo({ x: i * larg, animated: true })
     setSlide(i)
   }
-  // Quitter l'onglet le remet à zéro : au retour, on retrouve Today, pas Projection.
-  useFocusEffect(
-    useCallback(
-      () => () => {
-        carrousel.current?.scrollTo({ x: 0, animated: false })
-        setSlide(0)
-        setFocus(null)
-        setAnnee(false)
-      },
-      [],
-    ),
-  )
 
   const agenda = [
     { debut: WAKE, fin: WAKE, titre: 'Wake-up', c: 'rgba(242,242,242,0.16)', fixe: true },
