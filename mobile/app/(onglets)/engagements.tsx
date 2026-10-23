@@ -197,40 +197,42 @@ export default function Engagements() {
     const n = Math.max(1, g.parties.length)
     const perdu = manqueDe(g)
     return (
-      <Pressable key={t.id} accessibilityRole="button" accessibilityState={{ expanded: o }} onPress={() => basculer(t.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
-        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
-          <View style={{ width: 34, gap: 2 }}>
-            <Text style={{ color: k <= 7 ? acc : A.t1, fontFamily: GEIST.moyen, fontSize: 24, lineHeight: 24, letterSpacing: -1, fontVariant: ['tabular-nums'] }}>{Math.max(0, k)}</Text>
-            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{k === 1 ? 'day left' : 'days left'}</Text>
-          </View>
-          <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{t.titre}</Text>
-              <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(g.fait)} of ${hm(g.total)}`}</Text>
+      <View key={t.id} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: o }} onPress={() => basculer(t.id)}>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+            <View style={{ width: 34, gap: 2 }}>
+              <Text style={{ color: k <= 7 ? acc : A.t1, fontFamily: GEIST.moyen, fontSize: 24, lineHeight: 24, letterSpacing: -1, fontVariant: ['tabular-nums'] }}>{Math.max(0, k)}</Text>
+              <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{k === 1 ? 'day left' : 'days left'}</Text>
             </View>
-            <View style={{ height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.1)', overflow: 'hidden' }}>
-              <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: traitDe('TASK', t.couleur, t.id) }} />
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'}`}</Text>
-              <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
-                {Array.from({ length: 10 }, (_, i) => (
-                  <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
-                ))}
+            <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{t.titre}</Text>
+                <Text numberOfLines={1} style={{ flexShrink: 0, color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{`${hm(g.fait)} of ${hm(g.total)}`}</Text>
               </View>
-            </View>
-            {perdu >= 5 ? (
-              // Ce qui ne tiendra pas : dit sans détour, et pourquoi c'est impossible.
-              <View accessible accessibilityLabel={`${hm(perdu)} can't fit. Impossible before ${dateCourte(t.echeance)}.`} style={{ marginTop: 4, flexDirection: 'row', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.12)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.28)' }}>
-                <View style={{ width: 3, borderRadius: 2, backgroundColor: A.rouge }} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 15, lineHeight: 20, letterSpacing: -0.2 }}>{`${hm(perdu)} can't fit`}</Text>
-                  <Text style={{ color: 'rgba(240,82,95,0.8)', fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17 }}>{`Impossible before ${dateCourte(t.echeance)}`}</Text>
+              <View style={{ height: 2, borderRadius: 1, backgroundColor: 'rgba(242,242,242,0.1)', overflow: 'hidden' }}>
+                <View style={{ height: 2, width: `${g.total ? Math.min(100, (g.fait / g.total) * 100) : 0}%`, backgroundColor: traitDe('TASK', t.couleur, t.id) }} />
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{`${n} ${n > 1 ? 'parts' : 'part'}`}</Text>
+                <View accessibilityLabel={`Importance ${t.importance} out of 10`} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 10 }}>
+                  {Array.from({ length: 10 }, (_, i) => (
+                    <View key={i} style={{ width: 2, height: 3 + i * 0.7, borderRadius: 1, backgroundColor: i < t.importance ? (i >= 7 ? acc : A.t2) : 'rgba(242,242,242,0.12)' }} />
+                  ))}
                 </View>
               </View>
-            ) : null}
+              {perdu >= 5 ? (
+                // Ce qui ne tiendra pas : dit sans détour, et pourquoi c'est impossible.
+                <View accessible accessibilityLabel={`${hm(perdu)} can't fit. Impossible before ${dateCourte(t.echeance)}.`} style={{ marginTop: 4, flexDirection: 'row', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.12)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.28)' }}>
+                  <View style={{ width: 3, borderRadius: 2, backgroundColor: A.rouge }} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 15, lineHeight: 20, letterSpacing: -0.2 }}>{`${hm(perdu)} can't fit`}</Text>
+                    <Text style={{ color: 'rgba(240,82,95,0.8)', fontFamily: GEIST.normal, fontSize: 12, lineHeight: 17 }}>{`Impossible before ${dateCourte(t.echeance)}`}</Text>
+                  </View>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </View>
+        </Pressable>
         {enDernierCoup(t.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(t.id, 50)}</View> : null}
         {o ? (
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 50 }}>
@@ -256,7 +258,7 @@ export default function Engagements() {
             </View>
           </View>
         ) : null}
-      </Pressable>
+      </View>
     )
   }
 
@@ -285,27 +287,29 @@ export default function Engagements() {
       await d.majReglages({ propositionsCible: { ...(d.reglages.propositionsCible ?? {}), [o.id]: new Date().toISOString() } })
     }
     return (
-      <Pressable key={o.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
-        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-          <View style={{ width: 34, height: 34 }}>
-            <Svg width={34} height={34} viewBox="0 0 34 34" style={{ transform: [{ rotate: '-90deg' }] }}>
-              <Circle cx={17} cy={17} r={15} fill="none" stroke="rgba(242,242,242,0.1)" strokeWidth={2.5} />
-              <Circle cx={17} cy={17} r={15} fill="none" stroke={traitDe('GOAL', o.couleur, o.id)} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
-            </Svg>
-            <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{debut ? '' : `${Math.round(fr * 100)}%`}</Text>
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
-              <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{o.nom}</Text>
-              <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{debut ? `Week ${Math.floor(ageJours / 7) + 1}` : `${hm(fait2)} / ${hm(dose)}`}</Text>
+      <View key={o.id} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(o.id)}>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+            <View style={{ width: 34, height: 34 }}>
+              <Svg width={34} height={34} viewBox="0 0 34 34" style={{ transform: [{ rotate: '-90deg' }] }}>
+                <Circle cx={17} cy={17} r={15} fill="none" stroke="rgba(242,242,242,0.1)" strokeWidth={2.5} />
+                <Circle cx={17} cy={17} r={15} fill="none" stroke={traitDe('GOAL', o.couleur, o.id)} strokeWidth={2.5} strokeLinecap="round" strokeDasharray={`${(fr * 94.25).toFixed(1)} 94.25`} />
+              </Svg>
+              <Text style={{ position: 'absolute', width: 34, top: 11, textAlign: 'center', color: A.t2, fontFamily: GEIST.demi, fontSize: 10 }}>{debut ? '' : `${Math.round(fr * 100)}%`}</Text>
             </View>
-            <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{removalDate(contratSigne, o.id)
-                ? `Leaves ${jourCourt(removalDate(contratSigne, o.id)!)}`
-                : dose < o.cibleHebdoMinutes
-                  ? `This week ${hm(dose)} · toward ${hm(o.cibleHebdoMinutes)}`
-                  : `About ${hm(dose / 7)} a day · this week`}</Text>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{o.nom}</Text>
+                <Text style={{ color: A.t2, fontFamily: MONO.normal, fontSize: 12 }}>{debut ? `Week ${Math.floor(ageJours / 7) + 1}` : `${hm(fait2)} / ${hm(dose)}`}</Text>
+              </View>
+              <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 12 }}>{removalDate(contratSigne, o.id)
+                  ? `Leaves ${jourCourt(removalDate(contratSigne, o.id)!)}`
+                  : dose < o.cibleHebdoMinutes
+                    ? `This week ${hm(dose)} · toward ${hm(o.cibleHebdoMinutes)}`
+                    : `About ${hm(dose / 7)} a day · this week`}</Text>
+            </View>
           </View>
-        </View>
+        </Pressable>
         {enDernierCoup(o.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(o.id, 50)}</View> : null}
         {prop ? (
           <View style={{ marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.06)', gap: 10 }}>
@@ -338,33 +342,35 @@ export default function Engagements() {
             </View>
           </View>
         ) : null}
-      </Pressable>
+      </View>
     )
   }
 
   const ligneAncre = (a: (typeof d.ancres)[number]) => {
     const ou = ouvert === a.id
     return (
-      <Pressable key={a.id} accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(a.id)} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
-        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
-          <View style={{ width: 54, gap: 2 }}>
-            <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 18, lineHeight: 22, letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{fmt(a.minuteAncrage)}</Text>
-            <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{hm(a.dureeMinutes)}</Text>
-          </View>
-          <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
-            <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{a.nom}</Text>
-            <View style={{ flexDirection: 'row', gap: 4 }}>
-              {DOW.map((t, i) => {
-                const on = a.jours.includes((i + 1) % 7)
-                return (
-                  <View key={i} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: on ? traitDe('ANCHOR', a.couleur, a.id) : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: on ? A.t1 : A.t4, fontFamily: GEIST.demi, fontSize: 10 }}>{t}</Text>
-                  </View>
-                )
-              })}
+      <View key={a.id} style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: ou }} onPress={() => basculer(a.id)}>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+            <View style={{ width: 54, gap: 2 }}>
+              <Text style={{ color: A.t1, fontFamily: GEIST.moyen, fontSize: 18, lineHeight: 22, letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{fmt(a.minuteAncrage)}</Text>
+              <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 11 }}>{hm(a.dureeMinutes)}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 7, paddingTop: 1 }}>
+              <Text numberOfLines={1} style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 16, lineHeight: 20, letterSpacing: -0.2 }}>{a.nom}</Text>
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {DOW.map((t, i) => {
+                  const on = a.jours.includes((i + 1) % 7)
+                  return (
+                    <View key={i} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: on ? traitDe('ANCHOR', a.couleur, a.id) : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: on ? A.t1 : A.t4, fontFamily: GEIST.demi, fontSize: 10 }}>{t}</Text>
+                    </View>
+                  )
+                })}
+              </View>
             </View>
           </View>
-        </View>
+        </Pressable>
         {enDernierCoup(a.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(a.id, 70)}</View> : null}
         {ou ? (
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 70 }}>
@@ -378,7 +384,7 @@ export default function Engagements() {
             )}
           </View>
         ) : null}
-      </Pressable>
+      </View>
     )
   }
 
