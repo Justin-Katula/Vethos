@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ancreCollee, debutAvecPause, heurePrise, joursPris, type AncrePosee } from './ancres-libres'
+import { ancreCollee, debutAvecPause, heurePrise, heuresOccupees, joursPris, premierConflit, type AncrePosee } from './ancres-libres'
 
 const TOUS = [0, 1, 2, 3, 4, 5, 6]
 const sport: AncrePosee = { id: 's', nom: 'Gym', minuteAncrage: 17 * 60, dureeMinutes: 60, jours: [1, 3, 5] }
@@ -36,5 +36,23 @@ describe('où poser une ancre', () => {
   it('pas de jour commun, ou déjà 5 min d’écart : rien à demander', () => {
     expect(ancreCollee([sport], 18 * 60, 30, [2])).toBeNull()
     expect(ancreCollee([sport], 18 * 60 + 5, 30, [1])).toBeNull()
+  })
+})
+
+describe('heuresOccupees — le sommeil compte', () => {
+  const nuits = [{ startMinute: 0, endMinute: 420 }, { startMinute: 1410, endMinute: 1440 }]
+  const travail = { id: 'w', label: 'Work', categoryType: 'work', dayOfWeek: 1, startMinute: 540, endMinute: 1020 }
+  const pris = heuresOccupees([travail, { ...travail, id: 's', categoryType: 'sleep' }], nuits)
+
+  it('refuse une ancre dans la nuit, tous les jours', () => {
+    expect(premierConflit(pris, 360, 60, [3])?.sommeil).toBe(true)
+    expect(premierConflit(pris, 1380, 60, [6])?.sommeil).toBe(true)
+  })
+  it('refuse le travail seulement les jours de travail', () => {
+    expect(premierConflit(pris, 600, 60, [1])?.nom).toBe('Work')
+    expect(premierConflit(pris, 600, 60, [2])).toBeNull()
+  })
+  it('une ancre au lever ne demande pas de pause', () => {
+    expect(ancreCollee(pris, 420, 30, [2])).toBeNull()
   })
 })

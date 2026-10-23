@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
 import { useDonnees, type Tache } from '@/donnees/magasin'
 import { usePlan } from '@/plan/Plan'
-import { cleDate, versTachesMoteur } from '@/plan/moteur'
+import { cleDate, plagesSommeil, versTachesMoteur } from '@/plan/moteur'
 import { tempsPerdu } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
@@ -24,7 +24,7 @@ import { useSeances } from '@/seances/magasin-seances'
 import { maxTaskMinutesPerDay } from '@shared/planning/placement'
 import { allouerCouleurAncre, allouerCouleurObjectif, allouerCouleurTache } from '@shared/palettes'
 import { RoueDuree, RoueHeure, RoueJour } from '@/ui/Roue'
-import { ancreCollee, debutAvecPause, heurePrise, joursPris, type AncrePosee, type Voisine } from '@/plan/ancres-libres'
+import { ancreCollee, debutAvecPause, heurePrise, heuresOccupees, joursPris, type AncrePosee, type Voisine } from '@/plan/ancres-libres'
 import {
   A,
   BoutonFermer,
@@ -43,6 +43,7 @@ import {
   type NatureApp,
 } from '@/ui/app-briques'
 import { traitDe } from '@/ui/couleurs-engagement'
+import { SemaineOccupee } from '@/engagements/SemaineOccupee'
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MOIS3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -499,10 +500,8 @@ export default function Engagements() {
         nature={forme}
         ancres={[
           ...d.ancres,
-          // Les heures fixes (travail, école…) sont prises aussi : une ancre ne s'y pose jamais.
-          ...d.obligations
-            .filter((o) => !o.date && o.categoryType !== 'sleep')
-            .map((o) => ({ id: o.id, nom: o.label, minuteAncrage: o.startMinute, dureeMinutes: o.endMinute - o.startMinute, jours: [o.dayOfWeek] })),
+          // Le sommeil et les heures fixes (travail, école…) sont pris aussi : une ancre ne s'y pose jamais.
+          ...heuresOccupees(d.obligations, plagesSommeil(d.reglages)),
         ]}
         fermer={() => setForme(null)}
         creer={async (f) => {
@@ -665,6 +664,18 @@ function Formulaire({ nature, ancres, fermer, creer }: { nature: NatureApp | nul
                   <RoueDuree minutes={len} changer={(v) => (setLen(v), setErr(''), setVoisine(null))} maxHeures={8} etiquette="For" bande="rgba(242,242,242,0.08)" />
                 </View>
               </View>
+              <SemaineOccupee
+                pris={ancres}
+                debut={debutA}
+                duree={len}
+                jours={jours}
+                poser={(m, g) => {
+                  setA(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+                  setErr('')
+                  setVoisine(null)
+                  setJours((j) => (j.includes(g) ? j : [...j, g]))
+                }}
+              />
               <View style={{ flexDirection: 'row', gap: 6 }}>
                 {DOW.map((t, i) => {
                   const g = (i + 1) % 7

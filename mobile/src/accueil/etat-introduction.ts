@@ -217,6 +217,10 @@ export function brouillonsDepuis(
     ...(activites.includes('school') ? [enMinutes(e.w.scTo)] : []),
   )
   const depart = Math.ceil((finFixe ? finFixe + (fatigue ? 60 : 120) : fatigue ? 17 * 60 : 18 * 60 + 30) / 15) * 15
+  // Jamais dans le sommeil : l'ancre finit au coucher (ou à minuit) et ne commence pas avant le lever.
+  const coucher = enMinutes(e.w.bed)
+  const fenetre = (du: number) =>
+    Math.max(enMinutes(e.w.wake), Math.min(depart, (coucher >= 12 * 60 ? coucher : 1440) - du))
   const hh = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
   const b: BrouillonIntroduction = {
     id: `${base}-${ch}`,
@@ -226,7 +230,7 @@ export function brouillonsDepuis(
     minutes: nature === 'TASK' ? e.w.taskMin : nature === 'ANCHOR' ? e.w.anDur : 60,
     heuresHebdo: e.w.goalMin / 60,
     // Plus d'écran pour la choisir : la même heure naturelle que les autres, après les heures fixes.
-    heureAncre: hh(Math.min(depart, 1440 - (nature === 'ANCHOR' ? e.w.anDur : 60))),
+    heureAncre: hh(fenetre(nature === 'ANCHOR' ? e.w.anDur : 60)),
     joursAncre: versGetDay(e.days.an),
     coucher: e.w.bed,
     lever: e.w.wake,
@@ -255,7 +259,7 @@ export function brouillonsDepuis(
             ? Math.min(150 * 60, Math.max(60, Math.round((m.rem || 10) * 60)))
             : du,
         heuresHebdo: Math.max(0.25, (nd.per * nd.dur) / 60),
-        heureAncre: hh(Math.min(depart, 1440 - du)),
+        heureAncre: hh(fenetre(du)),
         joursAncre: jours.map((d) => (d + 1) % 7),
       }
     })

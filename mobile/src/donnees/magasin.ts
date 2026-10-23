@@ -11,6 +11,8 @@ import {
   estCouleurDansFamille,
 } from '@shared/palettes'
 import { preparerTache, type BrouillonTache } from './creation'
+import { heuresOccupees, premierConflit } from '@/plan/ancres-libres'
+import { plagesSommeil } from '@/plan/moteur'
 import { TRANCHES_AGE, type TrancheAge, versTranche } from './regle-sommeil'
 import { ContractSchema, type Contract } from '@shared/contract'
 import type { AjoutsIntroduction } from '@/accueil/modele-introduction'
@@ -522,16 +524,9 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
         )
       }
 
-      // Les heures fixes (travail, école…) sont déjà prises : jamais d'ancre dessus.
-      const fixe = get().obligations.find(
-        (o) =>
-          !o.date &&
-          o.categoryType !== 'sleep' &&
-          a.jours.includes(o.dayOfWeek) &&
-          a.minuteAncrage < o.endMinute &&
-          o.startMinute < a.minuteAncrage + a.dureeMinutes,
-      )
-      if (fixe) throw new Error(`This time is taken by ${fixe.label}.`)
+      // Le sommeil et les heures fixes (travail, école…) sont déjà pris : jamais d'ancre dessus.
+      const fixe = premierConflit(heuresOccupees(get().obligations, plagesSommeil(get().reglages)), a.minuteAncrage, a.dureeMinutes, a.jours)
+      if (fixe) throw new Error(fixe.sommeil ? 'This time is when you sleep.' : `This time is taken by ${fixe.nom}.`)
 
       const couleur =
         a.couleur && estCouleurDansFamille('ancre', a.couleur)
