@@ -2,6 +2,7 @@ import type { LearningState, SessionEvent, StopReason } from '@shared/schemas'
 import type { PlacedBlock, PlanningInput, PlanningResult } from './types'
 import { addDays, startOfWeek } from './dates'
 import { debutsLibres, placePourReporter, type Preference } from './trust'
+import type { Proposition } from '../coach/arbitre'
 
 // ═══ AVANT DE COMMENCER : BLOCAGE, RAPPELS, REPORTS (décidé le 2026-10-13) ═══
 //
@@ -123,6 +124,46 @@ export function optionsPlusTard(a: {
   const pref = a.preference ?? 'tot'
   const voulu = chercher(pref)
   return voulu.length > 0 || pref === 'tot' ? voulu : chercher('tot')
+}
+
+const hh = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+
+/**
+ * Une proposition du juge (`@shared/coach/arbitre`) traduite en heure réelle —
+ * ou la raison, en une phrase, pour laquelle elle ne tient pas. Cette phrase
+ * part à l'IA (le message de l'app, jamais compté comme une réponse).
+ */
+export function optionPourProposition(a: {
+  plan: PlanningResult
+  today: string
+  nowMinute: number
+  bloc: Pick<PlacedBlock, 'kind' | 'refId'>
+  /** L'empreinte du rattrapage, en minutes. */
+  span: number
+  deadline?: string | null
+  proposition: Proposition
+  journeePossible: boolean
+}): { ok: true; option: OptionPlusTard | 'journee' } | { ok: false; raison: string } {
+  if (a.bloc.kind !== 'task' && a.bloc.kind !== 'objective') return { ok: false, raison: 'This session cannot be moved.' }
+  const kind = a.bloc.kind
+  const demain = addDays(a.today, 1)
+  const p = a.proposition
+  if (p.type === 'all_tomorrow') {
+    return a.journeePossible ? { ok: true, option: 'journee' } : { ok: false, raison: 'Moving all of today to tomorrow is not possible: already used this week, or tomorrow cannot hold it.' }
+  }
+  if (p.type === 'tomorrow') {
+    if (a.deadline && a.deadline < demain) return { ok: false, raison: 'Tomorrow is past the deadline.' }
+    const d = debutsLibres(a.plan, demain, a.span, kind, a.bloc.refId, 0, 1440)[0]
+    return d === undefined ? { ok: false, raison: 'Tomorrow has no free time for it.' } : { ok: true, option: { date: demain, startMinute: d } }
+  }
+  const cible = Math.ceil((a.nowMinute + p.minutes) / 5) * 5
+  const d = debutsLibres(a.plan, a.today, a.span, kind, a.bloc.refId, cible, 1440)[0]
+  if (d !== undefined && d - cible <= 30) return { ok: true, option: { date: a.today, startMinute: d } }
+  const libres = debutsLibres(a.plan, a.today, a.span, kind, a.bloc.refId, Math.ceil((a.nowMinute + 15) / 5) * 5, 1440).slice(0, 3)
+  return {
+    ok: false,
+    raison: `Nothing free in ${p.minutes} min (around ${hh(cible)}).${libres.length ? ` Free starts today: ${libres.map(hh).join(', ')}.` : ' Nothing else free today.'}`,
+  }
 }
 
 /** Le travail posé un jour donné (tâches et objectifs), en minutes. */

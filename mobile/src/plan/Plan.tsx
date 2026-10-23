@@ -56,6 +56,7 @@ import {
   noterReport,
   texteSuffisant,
   optionsPlusTard,
+  optionPourProposition,
   pliesParReport,
   plusTardPermis,
   reportJourneePermis,
@@ -66,6 +67,7 @@ import { creerPromesses, echeanceDe, empreinteRattrapage, reactionRaison, type P
 import { addDays as ajouterJours, daysBetween } from '@shared/planning/dates'
 import { coach } from '@/coach/client'
 import type { ReponseArbitre } from '@shared/coach/client'
+import type { DemandeArbitre, Proposition } from '@shared/coach/arbitre'
 import { exclureDuTravail, historiquePourJuge, noterJustification, reglesFixes } from '@shared/planning/justification'
 import { lireSemaine, seancesTenues } from './lecture'
 import { liberationsDuJour } from './bonus-tache'
@@ -515,6 +517,74 @@ function useSourcePlan() {
   const tacheEnCours = (o: { kind: string; refId: string } | null | undefined) =>
     o?.kind === 'task' ? taches.find((t) => t.id === o.refId) : undefined
 
+  /**
+   * Ce qu'un Later peut offrir maintenant : la réaction à la raison, les heures
+   * possibles (chiffrées pour demain), « toute la journée à demain » si elle
+   * tient — et de quoi vérifier une proposition du juge.
+   */
+  const preparerReport = (bloc: BlocReportable, raison: StopReason) => {
+    const frais = useSeances.getState()
+    const { minute } = maintenantMinute()
+    const aujourdHui = cleDate(new Date())
+    const demain = ajouterJours(aujourdHui, 1)
+    const avant = planApres(frais.apprentissage, frais.confirmations)
+    const tache = tacheEnCours(bloc)
+    const reaction = reactionRaison(
+      raison,
+      {
+        heldMinutes: 0,
+        plannedMinutes: bloc.workMinutes,
+        attemptsBefore: tentativesRecentes(undefined),
+        kind: bloc.kind as 'task' | 'objective',
+        nowMinute: minute,
+        sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
+      },
+      { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: dernierJourDe(tache.echeance) }) : null },
+    )
+    const placement = reaction.placement
+    const span = empreinteRattrapage(bloc.workMinutes, placement.morceau)
+    const deadline = tache ? dernierJourDe(tache.echeance) : null
+    const vue = (o: OptionPlusTard): OptionPlusTardVue => ({
+      ...o,
+      placement,
+      demainMinutes: travailDuJour(planApres(reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui, raison, placement), frais.confirmations).plan, demain),
+    })
+    const options = optionsPlusTard({
+      plan: avant.plan, today: aujourdHui, nowMinute: minute,
+      bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: span },
+      deadline,
+      preference: placement.preference,
+    }).map(vue)
+    // « Tomorrow », en dernier recours : permis cette semaine, et seulement si tout tient encore.
+    const apres = planApres(noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' }), frais.confirmations)
+    const refs = avant.plan.blocks
+      .filter((x) => x.date === aujourdHui && (x.kind === 'task' || x.kind === 'objective'))
+      .map((x) => ({ kind: x.kind as 'task' | 'objective', refId: x.refId }))
+    const journee =
+      reportJourneePermis(frais.apprentissage, aujourdHui) && journeeReportable({ planApres: apres.plan, inputApres: apres.input, refs })
+        ? { aujourdhuiMinutes: travailDuJour(avant.plan, aujourdHui), demainAvant: travailDuJour(avant.plan, demain), demainApres: travailDuJour(apres.plan, demain) }
+        : null
+    return { reaction, options, journee, vue, avant, aujourdHui, minute, span, deadline }
+  }
+  const hhmm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+
+  /** Ce que le juge d'un Later sait de la journée — relu à chaque réponse. */
+  const horaireDuJuge = (bloc: BlocReportable, raison: StopReason): NonNullable<DemandeArbitre['horaire']> => {
+    const r = preparerReport(bloc, raison)
+    return {
+      maintenant: hhmm(r.minute),
+      coucher: coucher !== null ? hhmm(coucher) : null,
+      minutesAvantSommeil: coucher !== null ? (coucher - r.minute + 1440) % 1440 : null,
+      suivants: calcul.resultat.blocks
+        .filter((b) => b.date === r.aujourdHui && b.id !== bloc.id && b.startMinute >= r.minute && (b.kind === 'task' || b.kind === 'objective' || b.kind === 'ancre'))
+        .sort((x, y) => x.startMinute - y.startMinute)
+        .slice(0, 8)
+        .map((b) => ({ titre: b.label.slice(0, 80), debut: hhmm(b.startMinute), minutes: Math.max(0, Math.min(1440, b.workMinutes)) })),
+      options: r.options.slice(0, 8).map((o) => ({ jour: o.date === r.aujourdHui ? ('today' as const) : ('tomorrow' as const), debut: hhmm(o.startMinute) })),
+      journee: !!r.journee,
+    }
+  }
+
   const confiance = {
     niveau,
     /** L'attente entre « Oui, j'arrête » et le déblocage, en minutes. */
@@ -809,7 +879,7 @@ function useSourcePlan() {
       reagir: async (bloc: BlocReportable, raison: StopReason, texte?: string): Promise<ReactionPlusTard> => {
         // (Le texte est obligatoire : sans lui, la réaction s'affiche, mais aucune heure.)
         const frais = useSeances.getState()
-        const { d, minute } = maintenantMinute()
+        const { d } = maintenantMinute()
         if (texte && detecteDetresse(texte)) {
           await poser({
             apprentissage: { ...frais.apprentissage, lastSignalAt: { ...frais.apprentissage.lastSignalAt, [SUJET_DETRESSE]: d.toISOString() } },
@@ -818,45 +888,10 @@ function useSourcePlan() {
           await blocage().remplacerPlage(bloc.id, null)
           return { etape: 'message', message: MESSAGE_AIDE }
         }
-        const aujourdHui = cleDate(d)
-        const demain = ajouterJours(aujourdHui, 1)
-        const avant = planApres(frais.apprentissage, frais.confirmations)
-        const tache = tacheEnCours(bloc)
-        const reaction = reactionRaison(
-          raison,
-          {
-            heldMinutes: 0,
-            plannedMinutes: bloc.workMinutes,
-            attemptsBefore: tentativesRecentes(undefined),
-            kind: bloc.kind as 'task' | 'objective',
-            nowMinute: minute,
-            sleptHours: coucher !== null && lever !== null ? ((lever - coucher + 1440) % 1440) / 60 : null,
-          },
-          { niveau, echeance: tache ? echeanceDe(avant.plan, aujourdHui, { id: tache.id, deadline: dernierJourDe(tache.echeance) }) : null },
-        )
+        const { reaction, options, journee } = preparerReport(bloc, raison)
         if (!texteSuffisant(texte)) {
           return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, sansTexte: true, options: [], journee: null }
         }
-        const placement = reaction.placement
-        const options = optionsPlusTard({
-          plan: avant.plan, today: aujourdHui, nowMinute: minute,
-          bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId, workMinutes: empreinteRattrapage(bloc.workMinutes, placement.morceau) },
-          deadline: tache ? dernierJourDe(tache.echeance) : null,
-          preference: placement.preference,
-        }).map((o) => ({
-          ...o,
-          placement,
-          demainMinutes: travailDuJour(planApres(reporterPlusTard(frais.apprentissage, bloc, o, aujourdHui, raison, placement), frais.confirmations).plan, demain),
-        }))
-        // « Tomorrow », en dernier recours : permis cette semaine, et seulement si tout tient encore.
-        const apres = planApres(noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day' }), frais.confirmations)
-        const refs = avant.plan.blocks
-          .filter((x) => x.date === aujourdHui && (x.kind === 'task' || x.kind === 'objective'))
-          .map((x) => ({ kind: x.kind as 'task' | 'objective', refId: x.refId }))
-        const journee =
-          reportJourneePermis(frais.apprentissage, aujourdHui) && journeeReportable({ planApres: apres.plan, inputApres: apres.input, refs })
-            ? { aujourdhuiMinutes: travailDuJour(avant.plan, aujourdHui), demainAvant: travailDuJour(avant.plan, demain), demainApres: travailDuJour(apres.plan, demain) }
-            : null
         return { etape: 'reaction', lignes: reaction.lignes, dixMinutes: reaction.dixMinutes, sansTexte: false, options, journee }
       },
       /** « Ennuyeux » : 10 minutes d'abord, puis la question revient (comme « 10 more minutes » d'un Stop). */
@@ -917,6 +952,8 @@ function useSourcePlan() {
         raison: StopReason
         texte: string
         echanges: { question: string; sig: string; reponse: string }[]
+        /** Le message de l'app à l'IA : sa proposition ne tient pas. Pas une réponse de l'utilisateur. */
+        noteApp?: string
       }): Promise<ReponseArbitre> => {
         // Lu au moment même : l'accord vient peut-être d'être donné, une ligne plus haut.
         if (useDonnees.getState().reglages.consentementIA !== 'oui') return { action: 'indecis' }
@@ -941,7 +978,28 @@ function useSourcePlan() {
             echeanceJours: tache ? Math.max(0, daysBetween(aujourdHui, tache.echeance)) : null,
           },
           historique: historiquePourJuge(frais.apprentissage, aujourdHui),
+          ...(a.sorte === 'later' ? { horaire: horaireDuJuge(a.bloc, a.raison) } : {}),
+          ...(a.noteApp ? { noteApp: a.noteApp.slice(0, 400) } : {}),
         })
+      },
+      /**
+       * La proposition du juge, confrontée au plan : l'heure réelle qu'elle
+       * donne, ou la phrase à lui renvoyer. L'IA propose, l'app décide.
+       */
+      verifier: (bloc: BlocReportable, raison: StopReason, proposition: Proposition): { ok: true; choix: OptionPlusTardVue | 'journee' } | { ok: false; note: string } => {
+        const r = preparerReport(bloc, raison)
+        const v = optionPourProposition({
+          plan: r.avant.plan,
+          today: r.aujourdHui,
+          nowMinute: r.minute,
+          bloc: { kind: bloc.kind as 'task' | 'objective', refId: bloc.refId },
+          span: r.span,
+          deadline: r.deadline,
+          proposition,
+          journeePossible: !!r.journee,
+        })
+        if (!v.ok) return { ok: false, note: v.raison }
+        return { ok: true, choix: v.option === 'journee' ? 'journee' : r.vue(v.option) }
       },
       /** Les règles fixes : quelques mots ET une confiance d'au moins 2. */
       regles: (texte: string) => reglesFixes({ texte, niveau }),

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Easing, Keyboard, Pressable, Text, TextInput, View } from 'react-native'
 import { useReduit } from '@/accueil/briques-introduction'
-import { usePlan } from '@/plan/Plan'
+import { usePlan, type OptionPlusTardVue } from '@/plan/Plan'
 import { A, GEIST } from '@/ui/app-briques'
 import type { StopReason } from '@shared/schemas'
 import type { ReponseArbitre } from '@shared/coach/client'
@@ -84,7 +84,8 @@ export function Juge({
   moteur?: MoteurJuge
   acc: string
   encre: string
-  onAccepte: () => void
+  /** Accepté ; pour un Later, l'heure que l'IA a proposée et que l'app a validée. */
+  onAccepte: (choix?: OptionPlusTardVue | 'journee') => void
   onRefuse: () => void
   onAide: (message: string) => void
 }) {
@@ -95,6 +96,10 @@ export function Juge({
   const echanges = useRef<Echange[]>([])
   const depuis = useRef(Date.now())
   const lance = useRef(false)
+  // La proposition de l'IA, validée par l'app — et le message de l'app quand
+  // elle ne tient pas (envoyé une seule fois, jamais compté comme une réponse).
+  const choix = useRef<OptionPlusTardVue | 'journee' | undefined>(undefined)
+  const noteApp = useRef<string | null>(null)
 
   const conclure = async (verdict: 'accepte' | 'refuse', incoherence: { a: string; b: string } | null, regles: boolean) => {
     if (moteur) {
@@ -115,7 +120,7 @@ export function Juge({
       regles,
       depuisMs: depuis.current,
     })
-    if (verdict === 'accepte') onAccepte()
+    if (verdict === 'accepte') onAccepte(choix.current)
     else setEtat({ e: 'refus', incoherence })
   }
 
@@ -124,9 +129,19 @@ export function Juge({
     const r = moteur
       ? await moteur.juger(echanges.current)
       : sorte !== 'retrait' && bloc && raison
-        ? await justification.juger({ sorte, bloc, raison, texte, echanges: echanges.current })
+        ? await justification.juger({ sorte, bloc, raison, texte, echanges: echanges.current, ...(noteApp.current ? { noteApp: noteApp.current } : {}) })
         : ({ action: 'indecis' } as const)
     if (r.action === 'question') return setEtat({ e: 'question', question: r.question, sig: r.sig })
+    // Un Later accepté avec une proposition : l'app vérifie qu'elle tient. Sinon
+    // elle le dit à l'IA, une fois, et l'IA décide à nouveau.
+    if (r.action === 'decision' && r.decision === 'accepte' && sorte === 'later' && !moteur && bloc && raison && r.proposition) {
+      const v = justification.verifier(bloc, raison, r.proposition)
+      if (v.ok) choix.current = v.choix
+      else if (!noteApp.current) {
+        noteApp.current = v.note
+        return demander()
+      }
+    }
     if (r.action === 'decision') return conclure(r.decision, r.incoherence, false)
     if (r.action === 'aide') return onAide(r.message)
     // Indécis : hors ligne, serveur muet, plafond atteint, ou pas d'accord pour l'IA.

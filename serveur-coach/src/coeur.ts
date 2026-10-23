@@ -258,7 +258,7 @@ export function creerCoeur(
           if (v.ok) {
             if (v.verdict.action === 'question')
               return { status: 200, corps: { action: 'question', question: v.verdict.question, sig: hmac(`question:${id}:${v.verdict.question}`) } }
-            return { status: 200, corps: { action: 'decision', decision: v.verdict.decision, incoherence: v.verdict.incoherence } }
+            return { status: 200, corps: { action: 'decision', decision: v.verdict.decision, incoherence: v.verdict.incoherence, proposition: v.verdict.proposition ?? null } }
           }
           messages.push({ role: 'assistant', content: contenu }, { role: 'user', content: v.correction })
         } catch {

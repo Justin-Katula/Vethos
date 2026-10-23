@@ -55,7 +55,8 @@ describe('100 h demandées = 100 h placées', () => {
   })
 
   it('une charge qui ne tient pas : l’application place le MAXIMUM, et dit ce qu’il en manque', () => {
-    const p = computePlan(entree([tache(140)]), NOW)
+    // 200 h : même marges cédées (dernier palier), la charge ne tient pas.
+    const p = computePlan(entree([tache(200)]), NOW)
     expect(p.feasibility.globallyFeasible).toBe(false)
     expect(p.feasibility.deficits[0]!.deficitMinutes).toBeGreaterThan(0)
     // Elle ne s'arrête pas à 40 % (42 h) : elle remplit la capacité, pauses comprises
@@ -88,11 +89,13 @@ describe('100 h demandées = 100 h placées', () => {
     expect(p.capacities[0]!.fatiguePenaltyMinutes).toBe(0)
   })
 
-  it('en déficit, le repos descend à son plancher absolu de 60 min', () => {
+  it('en déficit, les marges cèdent : la réserve de repos est rendue (décidé le 2026-10-23)', () => {
     const calme = computePlan(entree([tache(20)]), NOW)
     const serre = computePlan(entree([tache(140)]), NOW)
-    expect(serre.capacities[1]!.restReservedMinutes).toBe(60)
+    expect(serre.capacities[1]!.restReservedMinutes).toBe(0)
+    expect(serre.capacities[1]!.wakeZoneMinutes).toBe(10)
     expect(calme.capacities[1]!.restReservedMinutes).toBeGreaterThan(60)
+    expect(calme.capacities[1]!.wakeZoneMinutes).toBe(30)
   })
 })
 
@@ -112,8 +115,8 @@ describe('bonus libéré : du travail en plus, jamais un déficit', () => {
   })
 
   it('un bonus qui ne tient pas ne crée aucun déficit', () => {
-    const p = computePlan(entree([tache(140, { bonusMinutes: 600 })]), NOW)
-    const seul = computePlan(entree([tache(140)]), NOW)
+    const p = computePlan(entree([tache(200, { bonusMinutes: 600 })]), NOW)
+    const seul = computePlan(entree([tache(200)]), NOW)
     expect(p.feasibility.deficits[0]!.deficitMinutes).toBe(seul.feasibility.deficits[0]!.deficitMinutes)
   })
 })

@@ -25,7 +25,24 @@ describe('Le juge — les garde-fous', () => {
     const r = lireVerdict('{"action":"decision","decision":"accept"}', demande({ echanges: [echange('Across town')] }))
     expect(r.ok).toBe(false)
     const ok = lireVerdict('{"action":"decision","decision":"accept"}', demande({ echanges: [echange('Across town'), echange('20 minutes')] }))
-    expect(ok).toEqual({ ok: true, verdict: { action: 'decision', decision: 'accepte', incoherence: null } })
+    expect(ok).toEqual({ ok: true, verdict: { action: 'decision', decision: 'accepte', incoherence: null, proposition: null } })
+  })
+
+  it('un Later accepté peut proposer quand — une proposition, que l’app vérifie', () => {
+    const horaire = { maintenant: '21:10', coucher: '23:30', minutesAvantSommeil: 140, suivants: [{ titre: 'Read', debut: '22:00', minutes: 45 }], options: [{ jour: 'today' as const, debut: '22:15' }], journee: false }
+    const deux = [echange('Across town'), echange('20 minutes')]
+    const r = lireVerdict('{"action":"decision","decision":"accept","proposal":{"type":"in_minutes","minutes":45}}', demande({ echanges: deux, horaire }))
+    expect(r).toMatchObject({ ok: true, verdict: { decision: 'accepte', proposition: { type: 'in_minutes', minutes: 45 } } })
+    // Toute la journée à demain n'est pas offerte : la proposition est ignorée.
+    const j = lireVerdict('{"action":"decision","decision":"accept","proposal":{"type":"all_tomorrow"}}', demande({ echanges: deux, horaire }))
+    expect(j).toMatchObject({ ok: true, verdict: { proposition: null } })
+    // Le message de l'app n'est pas une réponse : après lui, plus de question.
+    const q = lireVerdict('{"action":"question","question":"Where?"}', demande({ echanges: deux, horaire, noteApp: 'Nothing free in 45 min.' }))
+    expect(q.ok).toBe(false)
+    const m = messagesArbitre(demande({ echanges: deux, horaire, noteApp: 'Nothing free in 45 min.' }))
+    expect(m[1]!.content).toContain('"app_note":"Nothing free in 45 min."')
+    expect(m[1]!.content).toContain('"now":"21:10"')
+    expect(m[0]!.content).toContain('in_minutes')
   })
 
   it('après cinq réponses, plus de question : il décide', () => {

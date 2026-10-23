@@ -994,6 +994,12 @@ describe('D.3 — version minimale des ancres', () => {
   })
 })
 
+/**
+ * Le passage de base seul, sans les paliers qui relèvent le plafond puis font
+ * céder les marges : ce qu'on teste ici est la préemption elle-même.
+ */
+const sansPaliers = (...a: Parameters<typeof input>) => ({ ...input(...a), frontLoad: { families: [], level: 0.4 } })
+
 describe('D.2 — préemption', () => {
   const objectiveMinutesOn = (plan: PlanningResult, date: string): number =>
     plan.blocks
@@ -1021,7 +1027,7 @@ describe('D.2 — préemption', () => {
     // test ne prouverait plus rien sur la PROGRESSIVITÉ du vol.
     const gros = () => objective({ weeklyTargetMinutes: 620 })
 
-    const base = computePlan(input({ objectives: [gros()] }), NOW)
+    const base = computePlan(sansPaliers({ objectives: [gros()] }), NOW)
     const baseObjective = objectiveMinutesOn(base, TODAY)
     expect(baseObjective).toBeGreaterThan(TASK_CONSTANTS.minBlockMinutes * 2)
 
@@ -1033,7 +1039,7 @@ describe('D.2 — préemption', () => {
     // (déclenché sur `marginMinutes < 0`) n'aurait ABSOLUMENT rien cédé ici —
     // c'est exactement le trou que ce test ferme.
     const tendu = computePlan(
-      input({
+      sansPaliers({
         tasks: [task({ remainingMinutes: 240, deadline: TODAY })],
         objectives: [gros()],
       }),
@@ -1048,12 +1054,12 @@ describe('D.2 — préemption', () => {
   })
 
   it('l’avertissement passif apparaît entre 85 et 100 % et disparaît sous 85 %', () => {
-    const tendu = computePlan(input({ tasks: [task({ remainingMinutes: 240, deadline: TODAY })] }), NOW)
+    const tendu = computePlan(sansPaliers({ tasks: [task({ remainingMinutes: 240, deadline: TODAY })] }), NOW)
     expect(tendu.feasibility.tensionWarnings.some((w) => w.deadline === TODAY)).toBe(true)
     expect(tendu.feasibility.deficits).toHaveLength(0)
 
     // Tâche terminée pour l'essentiel : la tension retombe largement sous 85 %.
-    const detendu = computePlan(input({ tasks: [task({ remainingMinutes: 60, deadline: TODAY })] }), NOW)
+    const detendu = computePlan(sansPaliers({ tasks: [task({ remainingMinutes: 60, deadline: TODAY })] }), NOW)
     expect(detendu.feasibility.tensionWarnings).toHaveLength(0)
   })
 
@@ -2032,5 +2038,29 @@ describe('D.5 — une échéance au-delà de l’horizon', () => {
     for (const b of plan.blocks) if (b.kind === 'task') parJour.set(b.date, (parJour.get(b.date) ?? 0) + b.workMinutes)
     const moyenne = 1680 / 10
     for (const m of parJour.values()) expect(m).toBeLessThanOrEqual(moyenne * 1.25)
+  })
+})
+
+describe('les marges cèdent — dernier palier (décidé le 2026-10-23)', () => {
+  // 30 h dues demain, sans école : même à 100 % du jour, ça ne tient pas.
+  const charge = (lever: string) =>
+    computePlan(input({ schedule: sleepScheduleEntries('23:30', lever), tasks: [task({ remainingMinutes: 1800, deadline: addDays(TODAY, 1) })] }), NOW)
+  const finDuJour = (p: ReturnType<typeof computePlan>) => Math.max(...p.capacities[1]!.slots.map((s) => s.endMinute))
+
+  it('réveil et retour à 10 min, réserve de repos rendue', () => {
+    const p = charge('07:30')
+    expect(p.capacities[1]!.wakeZoneMinutes).toBe(10)
+    expect(p.capacities[1]!.restReservedMinutes).toBe(0)
+  })
+
+  it('la demi-heure avant le coucher cède seulement si la nuit fait au moins 7 h 30', () => {
+    expect(finDuJour(charge('07:30'))).toBe(23 * 60 + 30)
+    expect(finDuJour(charge('06:30'))).toBe(23 * 60)
+  })
+
+  it('une charge qui tient garde toutes ses marges', () => {
+    const p = computePlan(input({ schedule: sleepScheduleEntries('23:30', '07:30'), tasks: [task({ remainingMinutes: 120, deadline: addDays(TODAY, 3) })] }), NOW)
+    expect(p.capacities[1]!.wakeZoneMinutes).toBe(30)
+    expect(finDuJour(p)).toBe(23 * 60)
   })
 })

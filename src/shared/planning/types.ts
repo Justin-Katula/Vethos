@@ -305,8 +305,11 @@ export type PlanningInput = {
    * Interne au moteur : les tâches (familles) qui finiraient avec du travail
    * sans place — au passage suivant, elles se posent d'abord sur les grands
    * jours, avec un plafond du jour relevé à `level` (0,4 puis 0,6, 0,8, 1).
+   * `relache` : dernier palier — les marges du jour cèdent (réveil et retour à
+   * 10 min, réserve de repos rendue, transition du coucher rendue si la nuit
+   * fait au moins 7 h 30).
    */
-  frontLoad?: { families: readonly string[]; level: number }
+  frontLoad?: { families: readonly string[]; level: number; relache?: boolean; jusqua?: string }
   /** YYYY-MM-DD, jour de départ inclus. */
   today: string
   /** YYYY-MM-DD, dernier jour de l'horizon inclus. */

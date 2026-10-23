@@ -151,13 +151,12 @@ export function applyProtectedMargins(
   wakeZone: number = FRAGMENT_DEFAULTS.wakeZone,
   /** A.2.3 : même valeur crise-ajustée que `wakeZone` — même mécanisme, pas un système séparé. */
   postObligationBuffer: number = FRAGMENT_DEFAULTS.wakeZone,
+  /** La transition avant le coucher ; 0 seulement quand les marges cèdent (voir `relache`). */
+  preSleep: number = FRAGMENT_DEFAULTS.preSleepTransition,
 ): Interval[] {
   const protectedStarts = entries.map((e) => ({
     at: e.startMinute,
-    margin:
-      e.categoryType === 'sleep'
-        ? FRAGMENT_DEFAULTS.preSleepTransition
-        : FRAGMENT_DEFAULTS.preObligationPrep,
+    margin: e.categoryType === 'sleep' ? preSleep : FRAGMENT_DEFAULTS.preObligationPrep,
   }))
   const wakes = wakeMinutes(entries)
   // A.2.3 : buffer de retour, par instance, tous les jours où l'obligation a
@@ -312,6 +311,8 @@ export function buildDayCapacity(args: {
    */
   notBeforeMinute?: number
   windowAt?: (hour: number) => CognitiveWindow
+  /** La transition avant le coucher (30 min par défaut). */
+  preSleepMinutes?: number
 }): DayCapacity {
   const threshold = args.fragmentThreshold ?? FRAGMENT_DEFAULTS.deepWork
   const wakeZone = args.wakeZoneMinutes ?? FRAGMENT_DEFAULTS.wakeZone
@@ -321,6 +322,7 @@ export function buildDayCapacity(args: {
     args.entries,
     wakeZone,
     wakeZone,
+    args.preSleepMinutes ?? FRAGMENT_DEFAULTS.preSleepTransition,
   )
 
   // Le temps retiré par les marges protégées est indisponible au même titre

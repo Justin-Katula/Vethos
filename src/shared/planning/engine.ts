@@ -11,6 +11,7 @@ import type {
 } from './types'
 import {
   buildDayCapacity,
+  FRAGMENT_DEFAULTS,
   measureFragmentThreshold,
   scheduleEntriesForDate,
   wakeMinutes,
@@ -84,6 +85,8 @@ const WIP_TARGET_WEEKS = 2
  * tant que l'usage ne l'a pas montrée (A.4), donc rien n'est rationné sur une
  * qualité supposée.
  */
+/** La demi-heure avant le coucher ne cède que si la nuit fait au moins 7 h 30. */
+const NUIT_MIN_POUR_COUCHER = 450
 const DEEP_BUDGET_MINUTES = TASK_CONSTANTS.maxDeepBlocksPerDay * TASK_CONSTANTS.targetBlockMinutes
 
 /**
@@ -193,7 +196,15 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     )
     // A.2 : 30 min protégées après le lever ; 10 seulement si la crise est
     // prouvée — jamais moins, et l'écart reste chiffré sur le jour (C.3).
-    const wakeZoneMinutes = wakeZoneFor(isCrisis)
+    // Les marges cèdent (dernier palier, décidé le 2026-10-23) : seulement
+    // quand une tâche finirait sans place même à 100 % du jour. Réveil et
+    // retour à 10 min, réserve de repos rendue, et la demi-heure avant le
+    // coucher rendue aussi — si la nuit fait au moins 7 h 30.
+    // Seulement jusqu'à la dernière échéance en manque : les jours d'après gardent leurs marges.
+    const relache = input.frontLoad?.relache === true && date <= (input.frontLoad.jusqua ?? input.rangeEnd)
+    const nuit = entries.filter((e) => e.categoryType === 'sleep').reduce((t, e) => t + (e.endMinute - e.startMinute), 0)
+    const preSleepMinutes = relache && nuit >= NUIT_MIN_POUR_COUCHER ? 0 : undefined
+    const wakeZoneMinutes = relache ? FRAGMENT_DEFAULTS.wakeZoneFloor : wakeZoneFor(isCrisis)
     // Aujourd'hui seulement : rien avant "maintenant" n'est placeable — le
     // temps déjà passé ne peut plus accueillir un nouveau bloc (D.9). Un jour
     // futur (ou un jour écoulé reconstruit pour E.3, toujours strictement
@@ -227,11 +238,12 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
         fatiguePenaltyMinutes: 0,
         fragmentThreshold,
         wakeZoneMinutes,
+        preSleepMinutes,
         notBeforeMinute,
         windowAt,
       }).rawCapacityMinutes,
     )
-    const restFloor = isCrisis ? REST_FLOOR_ABSOLUTE_MINUTES : restFloorNormal
+    const restFloor = relache ? 0 : isCrisis ? REST_FLOOR_ABSOLUTE_MINUTES : restFloorNormal
 
     // E.4 : la fatigue se mesure sur les jours écoulés, jamais sur une
     // projection — sans mesure, pas de pénalité (G.3).
@@ -245,6 +257,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       fatiguePenaltyMinutes: 0,
       fragmentThreshold,
       wakeZoneMinutes,
+      preSleepMinutes,
       notBeforeMinute,
       windowAt,
     }).effectiveCapacityMinutes
@@ -278,6 +291,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       fatigueCrisisReliefMinutes: fatigueSansCrise.penaltyMinutes - fatigue.penaltyMinutes,
       fragmentThreshold,
       wakeZoneMinutes,
+      preSleepMinutes,
       delayMinutes: delayFor(date),
       notBeforeMinute,
       windowAt,
@@ -313,6 +327,10 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     if (d.feasible) continue
     for (const date of dates) if (date <= d.deadline) saturated.add(date)
   }
+  // Les marges cèdent parce qu'une tâche ne tient pas : ces jours-là sont en
+  // crise, même si la capacité rendue fait passer la densité sous 1 — sinon
+  // la première heure après le réveil se refermait et le palier plaçait MOINS.
+  if (input.frontLoad?.relache) for (const date of dates) if (date <= (input.frontLoad.jusqua ?? input.rangeEnd)) saturated.add(date)
 
   if (saturated.size > 0) {
     capacities = buildCapacities(saturated)
@@ -1048,8 +1066,11 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
       const ici = [...placedByTask.values()].reduce((x, m) => x + m, 0)
       let meilleur: PlanningResult | null = null
       let meilleurPose = ici
-      for (const level of [0.4, 0.6, 0.8, 1]) {
-        const essai = computePlan({ ...rawInput, frontLoad: { families: enManque, level } }, now)
+      const jusqua = activeTasks
+        .filter((t) => enManque.includes(t.parentTaskId ?? t.id))
+        .reduce((m, t) => (t.deadline > m ? t.deadline : m), input.today)
+      for (const palier of [{ level: 0.4 }, { level: 0.6 }, { level: 0.8 }, { level: 1 }, { level: 1, relache: true, jusqua }]) {
+        const essai = computePlan({ ...rawInput, frontLoad: { families: enManque, ...palier } }, now)
         const pose = essai.verdicts.reduce((x, v) => x + v.placedMinutes, 0)
         if (pose > meilleurPose) {
           meilleur = essai

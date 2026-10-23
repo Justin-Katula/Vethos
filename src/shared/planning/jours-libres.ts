@@ -58,7 +58,9 @@ export function jourLibrePropose(args: {
     p.blocks.filter((b) => b.kind === 'objective' && b.refId === id && b.date >= debut && b.date <= fin).reduce((t, b) => t + b.workMinutes, 0)
 
   for (const jour of candidats) {
-    const essai = computePlan({ ...input, freeDays: [...pris, jour] }, args.now)
+    // Sans les paliers : un jour libre ne se gagne jamais en rognant le repos,
+    // le réveil ou le coucher des autres jours (décidé le 2026-10-23).
+    const essai = computePlan({ ...input, freeDays: [...pris, jour], frontLoad: { families: [], level: 0.4 } }, args.now)
     const tachesTenues = essai.verdicts.every(
       (v) => v.placedMinutes >= (plan.verdicts.find((x) => x.taskId === v.taskId)?.placedMinutes ?? 0),
     )

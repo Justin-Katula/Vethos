@@ -7,7 +7,7 @@
 
 import { detecteDetresse, filtrerReponse, MESSAGE_AIDE } from './garde-fous'
 import type { DemandeCoach } from './prompt'
-import type { DemandeArbitre } from './arbitre'
+import { PropositionSchema, type DemandeArbitre, type Proposition } from './arbitre'
 
 /** Une réponse du Coach, et la signature du serveur qui l'accompagne (pour la renvoyer dans la conversation). */
 export type Tour = { texte: string; sig?: string }
@@ -27,7 +27,7 @@ export type ClientCoach = {
 
 export type ReponseArbitre =
   | { action: 'question'; question: string; sig: string }
-  | { action: 'decision'; decision: 'accepte' | 'refuse'; incoherence: { a: string; b: string } | null }
+  | { action: 'decision'; decision: 'accepte' | 'refuse'; incoherence: { a: string; b: string } | null; proposition?: Proposition | null }
   | { action: 'aide'; message: string }
   | { action: 'indecis' }
 
@@ -123,7 +123,13 @@ export function creerClientCoach(args: {
       if (c.action === 'question' && typeof c.question === 'string' && typeof c.sig === 'string') return { action: 'question', question: c.question, sig: c.sig }
       if (c.action === 'decision' && (c.decision === 'accepte' || c.decision === 'refuse')) {
         const i = c.incoherence as { a?: unknown; b?: unknown } | null | undefined
-        return { action: 'decision', decision: c.decision, incoherence: i && typeof i.a === 'string' && typeof i.b === 'string' ? { a: i.a, b: i.b } : null }
+        const p = PropositionSchema.safeParse(c.proposition)
+        return {
+          action: 'decision',
+          decision: c.decision,
+          incoherence: i && typeof i.a === 'string' && typeof i.b === 'string' ? { a: i.a, b: i.b } : null,
+          proposition: p.success ? p.data : null,
+        }
       }
       if (c.action === 'aide' && typeof c.message === 'string') return { action: 'aide', message: c.message }
       return { action: 'indecis' }

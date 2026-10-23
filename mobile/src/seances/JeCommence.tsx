@@ -235,9 +235,9 @@ export function JeCommence() {
             basMarge={marges.bottom}
             fermer={() => setFeuille(null)}
             onAide={(message) => setFeuille({ e: 'message', texte: message })}
-            raisonChoisie={async (raison, texte, reponseMs) => {
+            raisonChoisie={async (raison, texte, reponseMs, propose) => {
               const r = await reports.reagir(enAttente, raison, texte)
-              setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, texte: texte ?? '', reponseMs, r })
+              setFeuille(r.etape === 'message' ? { e: 'message', texte: r.message } : { e: 'reaction', raison, texte: texte ?? '', reponseMs, r, ...(propose ? { propose } : {}) })
             }}
             commencer={async (dix) => {
               const f = feuille
@@ -262,7 +262,7 @@ export function JeCommence() {
 }
 
 type Reaction = Extract<ReactionPlusTard, { etape: 'reaction' }>
-type EnReaction = { e: 'reaction'; raison: StopReason; texte: string; reponseMs?: number; r: Reaction }
+type EnReaction = { e: 'reaction'; raison: StopReason; texte: string; reponseMs?: number; r: Reaction; propose?: Reaction['options'][number] | 'journee' }
 type Feuille =
   | { e: 'raison' }
   | { e: 'juge'; raison: StopReason; texte: string; reponseMs: number }
@@ -303,7 +303,7 @@ function FeuillePlusTard({
   acc: string
   basMarge: number
   fermer: () => void
-  raisonChoisie: (raison: StopReason, texte: string | undefined, reponseMs: number) => Promise<void>
+  raisonChoisie: (raison: StopReason, texte: string | undefined, reponseMs: number, propose?: Reaction['options'][number] | 'journee') => Promise<void>
   commencer: (dix: boolean) => Promise<void>
   choisir: (f: EnReaction, o: Reaction['options'][number]) => Promise<void>
   reporterJournee: (f: EnReaction) => Promise<void>
@@ -378,7 +378,7 @@ function FeuillePlusTard({
             texte={feuille.texte}
             acc={acc}
             encre={encreSur(acc)}
-            onAccepte={() => void agir(() => raisonChoisie(feuille.raison, feuille.texte, feuille.reponseMs))}
+            onAccepte={(choix) => void agir(() => raisonChoisie(feuille.raison, feuille.texte, feuille.reponseMs, choix))}
             onRefuse={() => void commencer(false)}
             onAide={onAide}
           />
@@ -389,6 +389,34 @@ function FeuillePlusTard({
             {feuille.r.lignes.map((l) => (
               <Text key={l} accessibilityLiveRegion="polite" style={corps}>{l}</Text>
             ))}
+            {/* L'heure que l'IA a proposée et que l'app a validée : en tête, soulignée. */}
+            {feuille.propose && feuille.propose !== 'journee' ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={occupe}
+                onPress={() => {
+                  const p = feuille.propose
+                  if (p && p !== 'journee') void agir(() => choisir(feuille, p))
+                }}
+                style={({ pressed }) => ({ ...ligne, borderWidth: 1.5, borderColor: acc, opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={{ color: acc, fontFamily: GEIST.demi, fontSize: 16, fontVariant: ['tabular-nums'] }}>
+                  {`${feuille.propose.date === cle ? 'Today' : 'Tomorrow'} ${enHeure(feuille.propose.startMinute)}`}
+                </Text>
+                <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>{`Tomorrow · ${hm(feuille.propose.demainMinutes)}`}</Text>
+              </Pressable>
+            ) : null}
+            {feuille.propose === 'journee' && feuille.r.journee ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={occupe}
+                onPress={() => void agir(() => reporterJournee(feuille))}
+                style={({ pressed }) => ({ ...ligne, borderWidth: 1.5, borderColor: acc, opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={{ color: acc, fontFamily: GEIST.demi, fontSize: 15 }}>{`All of today · ${hm(feuille.r.journee.aujourdhuiMinutes)}`}</Text>
+                <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>{`Tomorrow · ${hm(feuille.r.journee.demainApres)}`}</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               onPress={() => void commencer(feuille.r.dixMinutes)}
@@ -396,7 +424,9 @@ function FeuillePlusTard({
             >
               <Text style={{ color: encreSur(acc), fontFamily: GEIST.demi, fontSize: 17 }}>{feuille.r.dixMinutes ? 'Just 10 minutes' : 'I’m starting'}</Text>
             </Pressable>
-            {feuille.r.options.map((o) => (
+            {feuille.r.options
+              .filter((o) => !(feuille.propose && feuille.propose !== 'journee' && feuille.propose.date === o.date && feuille.propose.startMinute === o.startMinute))
+              .map((o) => (
               <Pressable
                 key={`${o.date}-${o.startMinute}`}
                 accessibilityRole="button"
@@ -410,7 +440,7 @@ function FeuillePlusTard({
                 <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12, fontVariant: ['tabular-nums'] }}>{`Tomorrow · ${hm(o.demainMinutes)}`}</Text>
               </Pressable>
             ))}
-            {feuille.r.journee ? (
+            {feuille.r.journee && feuille.propose !== 'journee' ? (
               <Pressable
                 accessibilityRole="button"
                 disabled={occupe}
