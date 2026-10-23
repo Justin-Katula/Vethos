@@ -133,7 +133,13 @@ export default function Onglets() {
       <FournisseurToast>
         <Gardien />
         <Tabs
-          screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+          // Les scènes sont transparentes (la lueur passe dessous). Sur le web,
+          // l'onglet quitté reste monté derrière (z-index -1) et se voyait à
+          // travers l'onglet actif : il est caché tant qu'il n'est pas actif.
+          screenOptions={({ navigation }) => ({
+            headerShown: false,
+            sceneStyle: { backgroundColor: 'transparent', ...(Platform.OS === 'web' && !navigation.isFocused() ? { display: 'none' as const } : {}) },
+          })}
           tabBar={(p) => <Barre state={p.state} navigation={p.navigation as unknown as PropsBarre['navigation']} teinte={teinte} />}
         >
           <Tabs.Screen name="index" />
