@@ -45,7 +45,7 @@ function useHorloge(jusqua: number, actif = true) {
 
 // ——— 7 · Le coût ———
 
-function Calendrier({ m, pw, acc, reduit, maintenant }: { m: Mesure; pw: number; acc: string; reduit: boolean; maintenant: Date }) {
+function Calendrier({ m, pw, acc, reduit, maintenant, hauteurMax }: { m: Mesure; pw: number; acc: string; reduit: boolean; maintenant: Date; hauteurMax: number }) {
   const { width } = useWindowDimensions()
   const rows = useMemo(() => calendrier(m.start, m.finish, pw, maintenant), [m.start, m.finish, pw, maintenant])
   const BASE = 600
@@ -53,10 +53,15 @@ function Calendrier({ m, pw, acc, reduit, maintenant }: { m: Mesure; pw: number;
   const t = useHorloge(fin, !reduit)
   // Un mois sur deux lignes de 16 soirs : des points deux fois plus gros, et
   // l'étiquette du mois tient en entier à côté de son bloc.
+  // Toute la largeur, et jamais plus bas que la place qui reste : avec beaucoup
+  // de mois, les points rapetissent au lieu de déborder sous l'écran.
   const ETIQUETTE = 34
   const ECART = 4
-  const dispo = Math.min(345, width - 48) - ETIQUETTE
-  const d = Math.min(14, Math.floor((dispo - 15 * ECART) / 16))
+  const ENTRE_MOIS = 8
+  const dispo = width - 48 - ETIQUETTE
+  const parLargeur = Math.floor((dispo - 15 * ECART) / 16)
+  const parHauteur = Math.floor((hauteurMax - (rows.length - 1) * ENTRE_MOIS - rows.length * ECART) / (rows.length * 2))
+  const d = Math.max(5, Math.min(18, parLargeur, parHauteur))
   const vu = (dl: number, duree = 300) =>
     reduit ? 1 : t.interpolate({ inputRange: [dl, dl + duree], outputRange: [0, 1], extrapolate: 'clamp' })
   const point = (p: (typeof rows)[number]['dots'][number], i: number) => (
@@ -87,7 +92,7 @@ function Calendrier({ m, pw, acc, reduit, maintenant }: { m: Mesure; pw: number;
     </Animated.View>
   )
   return (
-    <View style={{ marginTop: 28, gap: 10 }} accessible accessibilityLabel={`${rows.length} months of evenings. Each red dot is an evening pushed to tomorrow.`}>
+    <View style={{ marginTop: 24, gap: ENTRE_MOIS }} accessible accessibilityLabel={`${rows.length} months of evenings. Each red dot is an evening pushed to tomorrow.`}>
       {rows.map((r) => (
         <View key={r.label + r.dl} style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Animated.Text style={{ width: ETIQUETTE, color: C.t3, fontFamily: GEIST.moyen, fontSize: 12, lineHeight: 16, opacity: vu(BASE + r.dl, 420) }}>
@@ -119,6 +124,7 @@ function BlocChose({
   sortie: boolean
 }) {
   const apres = useMinuteries()
+  const { height: hauteurEcran } = useWindowDimensions()
   const [l2, setL2] = useState(false)
   const compte = useCompte(m.big, { duree: 1200, delai: 300, reduit: ctx.reduit })
   const rangs = calendrier(m.start, m.finish, frequence(ctx.e).pw, ctx.maintenant).length
@@ -148,7 +154,15 @@ function BlocChose({
       <Entree dl={310} reduit={ctx.reduit}>
         <Text style={T.corps}>{m.sub}</Text>
       </Entree>
-      <Calendrier m={m} pw={frequence(ctx.e).pw} acc={ctx.acc} reduit={ctx.reduit} maintenant={ctx.maintenant} />
+      <Calendrier
+        m={m}
+        pw={frequence(ctx.e).pw}
+        acc={ctx.acc}
+        reduit={ctx.reduit}
+        maintenant={ctx.maintenant}
+        // L'écran moins l'en-tête (chiffre, phrase), la phrase du bas et le bouton.
+        hauteurMax={hauteurEcran - ctx.haut - ctx.bas - 330}
+      />
       <View style={{ marginTop: 28, gap: 12 }}>
         {l2 ? (
           <Entree reduit={ctx.reduit}>

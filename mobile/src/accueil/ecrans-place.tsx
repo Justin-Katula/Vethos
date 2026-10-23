@@ -326,6 +326,16 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
     const id = setTimeout(() => setTour(0), ctx.reduit ? 300 : 900)
     return () => clearTimeout(id)
   }, [ctx.reduit])
+  // Les choses de l'utilisateur se posent dans leur forme dès que celle-ci s'est
+  // montrée : on les voit arriver, une à une.
+  const poses = useRef([0, 1, 2].map(() => new Animated.Value(0))).current
+  useEffect(() => {
+    if (tour < 1) return
+    const v = poses[tour - 1]
+    if (!v) return
+    vibrer('light')
+    return lancer(Animated.timing(v, { toValue: 1, duration: ctx.reduit ? 200 : 700, easing: SORTIE, useNativeDriver: true }))
+  }, [tour, poses, ctx.reduit])
   const deposer = (t: Nature) => {
     if (!levee) return
     vibrer('medium')
@@ -377,9 +387,21 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
                     <IllustrationNature t={t} reduit={ctx.reduit} actif={tour === i} montre={tour > i} onFin={() => setTour(i + 1)} />
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, minHeight: 40 }}>
-                    {dedans.map((id) => {
+                    {dedans.map((id, k) => {
                       const on = levee === id
+                      const v = poses[i]!
+                      const a0 = Math.min(0.6, k * 0.18)
                       return (
+                        <Animated.View
+                          key={id}
+                          style={{
+                            opacity: v.interpolate({ inputRange: [a0, a0 + 0.4], outputRange: [0, 1], extrapolate: 'clamp' }),
+                            transform: [
+                              { translateY: v.interpolate({ inputRange: [a0, a0 + 0.4], outputRange: [ctx.reduit ? 0 : -14, 0], extrapolate: 'clamp' }) },
+                              { scale: v.interpolate({ inputRange: [a0, a0 + 0.4], outputRange: [ctx.reduit ? 1 : 0.9, 1], extrapolate: 'clamp' }) },
+                            ],
+                          }}
+                        >
                         <Pressable
                           key={id}
                           accessibilityRole="button"
@@ -393,15 +415,16 @@ export function EcranUne({ ctx }: { ctx: Ctx }) {
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 8,
-                            backgroundColor: on ? C.t1 : 'rgba(242,242,242,0.09)',
+                            backgroundColor: on ? C.t1 : 'rgba(242,242,242,0.14)',
                             borderWidth: 1,
-                            borderColor: on ? C.t1 : TRAIT[t],
+                            borderColor: on ? C.t1 : 'rgba(242,242,242,0.22)',
                             transform: [{ scale: on ? 1.04 : pressed ? 0.97 : 1 }],
                           })}
                         >
-                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: on ? '#000' : TRAIT[t] }} />
-                          <Text style={{ color: on ? '#000' : C.t1, fontFamily: GEIST.moyen, fontSize: 14 }}>{ITEM[id]!.name}</Text>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: on ? '#000' : t === 'TASK' ? C.t1 : TRAIT[t] }} />
+                          <Text style={{ color: on ? '#000' : C.t1, fontFamily: GEIST.demi, fontSize: 15 }}>{ITEM[id]!.name}</Text>
                         </Pressable>
+                        </Animated.View>
                       )
                     })}
                     {cible ? (
@@ -1204,6 +1227,11 @@ export function EcranPlace({ ctx, placement }: { ctx: Ctx; placement: Placement 
             }}
           >
             <Svg width={taille} height={taille} viewBox="0 0 400 400">
+              {/* L'aiguille tourne AVEC le bloc et s'arrête sur son début exact. */}
+              {(() => {
+                const [hx, hy] = pt(0, 150)
+                return <Line x1={200} y1={200} x2={hx} y2={hy} stroke={C.t3} strokeWidth={1.5} strokeLinecap="round" />
+              })()}
               <Path d={arc(0, du, 168)} fill="none" stroke={TRAIT[tp]} strokeWidth={8} />
               {[0, du].map((m) => {
                 const [x1, y1] = pt(m, 161)
@@ -1213,12 +1241,17 @@ export function EcranPlace({ ctx, placement }: { ctx: Ctx; placement: Placement 
             </Svg>
           </Animated.View>
         ) : null}
+        {/* L'heure de maintenant s'efface quand le bloc commence à tourner. */}
+        <Animated.View style={{ position: 'absolute', inset: 0, opacity: slot != null ? bo.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) : 1 }}>
+          <Svg width={taille} height={taille} viewBox="0 0 400 400">
+            <G>
+              <Line x1={200} y1={200} x2={nx} y2={ny} stroke={C.t3} strokeWidth={1.5} strokeLinecap="round" />
+              <Circle cx={nx} cy={ny} r={7} fill={ctx.acc} stroke="#000" strokeWidth={3} />
+            </G>
+          </Svg>
+        </Animated.View>
         <Svg style={{ position: 'absolute', inset: 0 }} width={taille} height={taille} viewBox="0 0 400 400">
-          <G>
-            <Line x1={200} y1={200} x2={nx} y2={ny} stroke={C.t3} strokeWidth={1.5} strokeLinecap="round" />
-            <Circle cx={200} cy={200} r={3} fill={C.t3} />
-            <Circle cx={nx} cy={ny} r={7} fill={ctx.acc} stroke="#000" strokeWidth={3} />
-          </G>
+          <Circle cx={200} cy={200} r={3} fill={C.t3} />
         </Svg>
         <Heures taille={taille} police={11} />
         <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>

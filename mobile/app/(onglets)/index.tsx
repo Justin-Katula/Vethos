@@ -299,8 +299,16 @@ export default function Aujourdhui() {
                 ))}
                 {N > WAKE ? <Path d={arc(WAKE, Math.min(N, BED), 168)} fill="none" stroke={A.t1} strokeWidth={2} strokeOpacity={0.35} /> : null}
                 {blocs.map((b) => (
-                  <Path key={b.id} d={arc(b.debut, b.fin, 168)} fill="none" stroke={traitDe(naturePlan(b)!, b.couleur, b.ref)} strokeWidth={8} strokeOpacity={b.fin <= N ? 0.45 : 1} />
+                  <Path key={b.id} d={arc(b.debut, finTexte(b), 168)} fill="none" stroke={traitDe(naturePlan(b)!, b.couleur, b.ref)} strokeWidth={8} strokeOpacity={b.fin <= N ? 0.45 : 1} />
                 ))}
+                {/* Le début et la fin de chaque bloc : deux traits noirs très fins, comme dans l'introduction. */}
+                {blocs.flatMap((b) =>
+                  [b.debut, finTexte(b)].map((m, k) => {
+                    const [x1, y1] = pt(m, 163)
+                    const [x2, y2] = pt(m, 173)
+                    return <Line key={`${b.id}-${k}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#000" strokeWidth={1.2} />
+                  }),
+                )}
               </Svg>
               {focus
                 ? FO[focus].iv.map(([p, q], i) => <Path key={i} d={arc(p, q, 176)} fill="none" stroke={FO[focus].c} strokeWidth={3} strokeLinecap="round" />)
