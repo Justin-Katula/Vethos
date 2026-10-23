@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, Text, useWindowDimensions, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { A, Carte, GEIST, Plus } from '@/ui/app-briques'
 import { idAjout, selectionEstVide, type Selection } from './contrat'
 import { useBlocage } from './etat'
@@ -22,11 +23,14 @@ export function ListeBlocage({
   selection,
   verrou,
   pret,
+  pleineHauteur = false,
 }: {
   role: Exclude<RoleSelecteur, 'urgence'>
   titre: string
-  sous: string
+  sous?: string
   selection: Selection | null
+  /** Toute la hauteur de l'écran : la liste défile au lieu d'être une petite boîte. */
+  pleineHauteur?: boolean
   /** Une séance est en cours : ni ajout, ni retrait. */
   verrou: boolean
   /** Temps d'écran est autorisé. */
@@ -49,7 +53,11 @@ export function ListeBlocage({
     void poser({ ...selection, nbApplications: c.applicationCount, nbCategories: c.categoryCount, nbSitesWeb: c.webDomainCount })
   }
 
-  const hauteur = Math.max(0, total * 23 + (total - 1) * 12)
+  // La ligne d'iOS (icône + nom) est plus haute que le texte : 1,9 × la police.
+  const { height: hauteurEcran } = useWindowDimensions()
+  const marges = useSafeAreaInsets()
+  const naturelle = Math.max(0, total * Math.round(16 * 1.9) + (total - 1) * 12)
+  const hauteur = pleineHauteur ? Math.min(naturelle, Math.max(200, hauteurEcran - marges.top - 300)) : naturelle
 
   return (
     <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -59,7 +67,7 @@ export function ListeBlocage({
             <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>{titre}</Text>
             <Text style={{ color: A.t4, fontFamily: GEIST.moyen, fontSize: 15 }}>{total}</Text>
           </View>
-          <Text style={{ marginTop: 2, color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{sous}</Text>
+          {sous ? <Text style={{ marginTop: 2, color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{sous}</Text> : null}
         </View>
         {pret && !verrou ? (
           <Pressable

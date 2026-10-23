@@ -44,6 +44,7 @@ import { libelleTranche, TRANCHES_AGE, type TrancheAge } from '@/donnees/regle-s
 import { toneSample, type Mode } from '@shared/contract'
 import { useBlocage } from '@/blocage/etat'
 import { ApercuSelection } from '@/blocage/ApercuSelection'
+import { selectionEstVide } from '@/blocage/contrat'
 
 export const TYPEC: Record<Nature, string> = { TASK: '#505359', GOAL: '#e03131', ANCHOR: '#2c3a56' }
 /** Sur un trait fin, l'ancre remonte d'un ton pour rester lisible. */
@@ -637,11 +638,10 @@ export function EcranProtection({
     setOccupe(true)
     try {
       if (await proteger()) {
-        // Les catégories entières (Social, Games, Entertainment) d'abord : elles
-        // couvrent aussi les apps installées plus tard. Vethos ne voit que leur
-        // nombre — il redemande s'il n'y en a aucune.
+        // Des apps choisies une à une : c'est elles que la page Blocking montre
+        // ensuite. Rien de choisi : on redemande.
         const s = useBlocage.getState().selection
-        if (!useBlocage.getState().simule && (!s || s.nbCategories === 0)) {
+        if (!useBlocage.getState().simule && (!s || selectionEstVide(s))) {
           setSansCategorie(true)
           return
         }
@@ -662,7 +662,7 @@ export function EcranProtection({
         {!verrou ? (
           <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
             <Text style={{ color: sansCategorie ? C.t1 : C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
-              {sansCategorie ? 'Pick at least one whole category.' : 'Tap Social, Games and Entertainment.'}
+              {sansCategorie ? 'Pick at least one app.' : 'Pick the apps that pull you away.'}
             </Text>
           </Entree>
         ) : null}

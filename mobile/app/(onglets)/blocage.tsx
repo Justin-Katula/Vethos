@@ -1,12 +1,10 @@
 /**
- * Blocking, à la Opal : trois listes, chacune montrant ce qu'elle contient
- * (icônes et noms dessinés par iOS — jamais lus par Vethos), un « × » par
- * élément et un « + ». Rien ne se modifie pendant une séance.
- *
- * - Distraction : écarté pendant les séances.
- * - Never allowed : écarté tout le temps.
- * - Always allowed : jamais écarté, même en mode profond.
+ * Blocking : une seule liste, ce qui est bloqué pendant les séances (icônes et
+ * noms dessinés par iOS — jamais lus par Vethos), qui défile sur toute la
+ * hauteur, un « × » par élément et un « + ». Rien ne se modifie pendant une séance.
+ * La liste gardée (mode profond) reste en coulisses, sans écran.
  */
+import { useEffect } from 'react'
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useBlocage } from '@/blocage/etat'
@@ -21,6 +19,13 @@ export default function Blocage() {
   const { seanceEnCours } = usePlan()
   const accordee = autorisation === 'accordee' || simule
   const refusee = autorisation === 'refusee' || autorisation === 'revoquee'
+
+  // « Never allowed » n'existe plus (2026-10-23) : une liste invisible qui bloquerait
+  // tout le temps serait un piège. On la vide une fois.
+  const poserJamais = useBlocage((e) => e.poserJamais)
+  useEffect(() => {
+    if (jamais) void poserJamais(null)
+  }, [jamais, poserJamais])
 
   const autoriser = async () => {
     if (refusee) return void Linking.openSettings()
@@ -43,9 +48,7 @@ export default function Blocage() {
             </Pressable>
           </Carte>
         ) : null}
-        <ListeBlocage role="ecarte" titre="Distraction" sous="Blocked during your sessions" selection={selection} verrou={seanceEnCours} pret={accordee} />
-        <ListeBlocage role="jamais" titre="Never allowed" sous="Blocked all the time" selection={jamais} verrou={seanceEnCours} pret={accordee} />
-        <ListeBlocage role="garde" titre="Always allowed" sous="Never blocked, even in deep focus" selection={gardee} verrou={seanceEnCours} pret={accordee} />
+        <ListeBlocage role="ecarte" titre="Blocked" selection={selection} verrou={seanceEnCours} pret={accordee} pleineHauteur />
       </View>
     </ScrollView>
   )
