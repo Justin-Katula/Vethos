@@ -136,7 +136,7 @@ export function parcours(e: EtatIntro, maintenant: Date): Etape[] {
   ids.forEach((id, t) => f.push({ k: ITEM[id]!.kind === 'once' ? '5b' : '5c', t }))
   // Les trois formes, avec toutes les choses dedans (11) ; plus d'écran de réglages.
   f.push({ k: '6' }, { k: '7' }, { k: '8' }, { k: '9' }, { k: '10' }, { k: '11' })
-  f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: 'ia' }, { k: '17' })
+  f.push({ k: '13' }, { k: 'age' }, { k: '14' }, { k: '15' }, { k: '16' }, { k: '17' })
   return f
 }
 export const indexDe = (f: Etape[], st: Etape) => f.findIndex((x) => x.k === st.k && (x.t ?? 0) === (st.t ?? 0))

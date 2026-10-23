@@ -264,8 +264,7 @@ function IntroductionSombre() {
         }
         setSortie(true)
         await finaliserIntroduction(r.ajouts, eRef.current.name.trim(), eRef.current.age, contrat)
-        // L'accord pour l'IA, donné pendant l'introduction (jamais demandé plus tard).
-        await useDonnees.getState().majReglages({ consentementIA: eRef.current.ia ?? 'non' })
+        // L'accord pour l'IA se demande au premier Stop ou Later, plus ici.
         // Pas de noir entre l'introduction et l'app : la vraie interface apparaît dessous.
         router.replace('/')
         Animated.timing(monde, { toValue: 0, duration: reduit ? 200 : 650, easing: SORTIE, useNativeDriver: true }).start(() => {

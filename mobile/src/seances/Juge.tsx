@@ -10,13 +10,14 @@ import type { StopReason } from '@shared/schemas'
  *
  * L'utilisateur voit l'application, pas une conversation : une question à la
  * fois, en titre, une réponse, « Send ». Trois points pendant l'examen.
- * L'accord pour l'IA se donne pendant l'introduction (règle 5.1.2 d'Apple) ;
- * sans accord, hors ligne ou sans réponse, les règles fixes décident.
+ * L'accord pour l'IA se donne à la toute première excuse, une seule fois (règle
+ * 5.1.2 d'Apple) ; sans accord, hors ligne ou sans réponse, les règles fixes décident.
  */
 
 type Bloc = { id: string; kind: string; refId: string; label: string; startMinute: number; workMinutes: number }
 type Echange = { question: string; sig: string; reponse: string }
 type Etat =
+  | { e: 'accord' }
   | { e: 'attente' }
   | { e: 'question'; question: string; sig: string }
   | { e: 'refus'; incoherence: { a: string; b: string } | null }
@@ -75,7 +76,8 @@ export function Juge({
   onAide: (message: string) => void
 }) {
   const { justification } = usePlan()
-  const [etat, setEtat] = useState<Etat>({ e: 'attente' })
+  // La toute première excuse : une seule question, puis plus jamais (règle 5.1.2 d'Apple).
+  const [etat, setEtat] = useState<Etat>(() => (justification.consentement === null ? { e: 'accord' } : { e: 'attente' }))
   const [reponse, setReponse] = useState('')
   const echanges = useRef<Echange[]>([])
   const depuis = useRef(Date.now())
@@ -120,6 +122,29 @@ export function Juge({
     echanges.current = [...echanges.current, { question: etat.question, sig: etat.sig, reponse: reponse.trim().slice(0, 500) }]
     setReponse('')
     void demander()
+  }
+
+  if (etat.e === 'accord') {
+    const choisir = async (oui: boolean) => {
+      await justification.consentir(oui)
+      setEtat({ e: 'attente' })
+    }
+    return (
+      <View style={{ gap: 12 }}>
+        <Text accessibilityRole="header" style={titre}>Your answer is reviewed by AI.</Text>
+        <Text style={corps}>It’s sent to our server and to DeepSeek.</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void choisir(true)}
+          style={({ pressed }) => ({ height: 52, borderRadius: 12, backgroundColor: acc, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}
+        >
+          <Text style={{ color: encre, fontFamily: GEIST.demi, fontSize: 17 }}>Continue</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => void choisir(false)} hitSlop={8} style={({ pressed }) => ({ height: 40, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 15 }}>Use fixed rules</Text>
+        </Pressable>
+      </View>
+    )
   }
 
   if (etat.e === 'attente') return <Points couleur={acc} />

@@ -110,7 +110,6 @@ function Coque() {
         const d = useDonnees.getState()
         if (!d.reglages.introductionFaite) {
           await d.finaliserIntroduction(attente.ajouts as never, attente.prenom, attente.age as never, attente.contrat as never)
-          await useDonnees.getState().majReglages({ consentementIA: attente.ia })
         }
         await useAppareil.getState().liberer()
       }

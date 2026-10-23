@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDonnees } from '@/donnees/magasin'
 import { A, Carte, Chevron, GEIST, MONO, useToast } from '@/ui/app-briques'
 import { usePlan } from '@/plan/Plan'
-import { coach } from '@/coach/client'
 import { CarteCompte } from '@/compte/CarteCompte'
 import { gererAbonnement, useAbonnement } from '@/abonnement/achats'
 import { useRetrait } from '@/engagements/useRetrait'
@@ -90,26 +89,6 @@ export default function Profil() {
         </Carte>
       ) : null}
 
-      {/* Le Coach n'a pas d'entrée à lui : il ne sert qu'aux moments de justification (Stop, Later). */}
-      {coach().disponible ? (
-        // L'accord pour que l'IA examine les demandes de Stop et de Later — changeable à tout moment.
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityState={{ checked: reglages.consentementIA === 'oui' }}
-          onPress={() => void majReglages({ consentementIA: reglages.consentementIA === 'oui' ? 'non' : 'oui' })}
-          style={({ pressed }) => ({ marginTop: 12, transform: [{ scale: pressed ? 0.985 : 1 }] })}
-        >
-          <Carte style={{ paddingVertical: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>AI review</Text>
-              <Text style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>Reviews your justifications</Text>
-            </View>
-            <View style={{ width: 44, height: 26, borderRadius: 13, padding: 3, backgroundColor: reglages.consentementIA === 'oui' ? A.t1 : 'rgba(242,242,242,0.16)', alignItems: reglages.consentementIA === 'oui' ? 'flex-end' : 'flex-start' }}>
-              <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: reglages.consentementIA === 'oui' ? '#000' : A.t2 }} />
-            </View>
-          </Carte>
-        </Pressable>
-      ) : null}
       {/* Gérer ou annuler l'abonnement : la feuille d'Apple, sans quitter l'app. */}
       {abonne ? (
         <Pressable

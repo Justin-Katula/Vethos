@@ -918,7 +918,8 @@ function useSourcePlan() {
         texte: string
         echanges: { question: string; sig: string; reponse: string }[]
       }): Promise<ReponseArbitre> => {
-        if (reglages.consentementIA !== 'oui') return { action: 'indecis' }
+        // Lu au moment même : l'accord vient peut-être d'être donné, une ligne plus haut.
+        if (useDonnees.getState().reglages.consentementIA !== 'oui') return { action: 'indecis' }
         if (a.bloc.kind !== 'task' && a.bloc.kind !== 'objective') return { action: 'indecis' }
         const frais = useSeances.getState()
         const aujourdHui = cleDate(new Date())
