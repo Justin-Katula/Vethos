@@ -522,6 +522,17 @@ export const useDonnees = create<EtatDonnees>((set, get) => {
         )
       }
 
+      // Les heures fixes (travail, école…) sont déjà prises : jamais d'ancre dessus.
+      const fixe = get().obligations.find(
+        (o) =>
+          !o.date &&
+          o.categoryType !== 'sleep' &&
+          a.jours.includes(o.dayOfWeek) &&
+          a.minuteAncrage < o.endMinute &&
+          o.startMinute < a.minuteAncrage + a.dureeMinutes,
+      )
+      if (fixe) throw new Error(`This time is taken by ${fixe.label}.`)
+
       const couleur =
         a.couleur && estCouleurDansFamille('ancre', a.couleur)
           ? a.couleur

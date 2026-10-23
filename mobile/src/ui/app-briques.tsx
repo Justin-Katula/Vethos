@@ -3,7 +3,7 @@
  * lumière de l'heure, le toast, la feuille qui monte, la carte arrondie.
  */
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, Easing, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Animated, Easing, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg'
 import { accentApp, heureDecimale, lumiere, teinteApp } from './lumiere'
@@ -176,7 +176,9 @@ export function Feuille({
                 position: 'absolute',
                 left: 8,
                 right: 8,
-                // Le clavier ouvert : la feuille se pose juste au-dessus, champ et bouton visibles.
+                // Le clavier ouvert : la feuille se pose juste au-dessus. Trop haute
+                // pour la place qui reste, elle DÉFILE au lieu de pousser ses premiers
+                // champs hors de l'écran.
                 bottom: clavier > 0 ? clavier + 8 : Math.max(8, marges.bottom - 26),
                 borderRadius: 40,
                 backgroundColor: 'rgba(22,22,22,0.97)',
@@ -190,10 +192,17 @@ export function Feuille({
             ]}
           >
             {/* Toucher la feuille hors d'un champ ferme le clavier. */}
-            <Pressable accessible={false} onPress={Keyboard.dismiss} style={{ flexShrink: 1 }}>
-              <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(242,242,242,0.2)', alignSelf: 'center', marginBottom: 16 }} />
-              {children}
-            </Pressable>
+            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: 'rgba(242,242,242,0.2)', alignSelf: 'center', marginBottom: 16 }} />
+            <ScrollView
+              style={{ flexGrow: 0, flexShrink: 1 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Pressable accessible={false} onPress={Keyboard.dismiss}>
+                {children}
+              </Pressable>
+            </ScrollView>
           </Animated.View>
         </View>
       </View>

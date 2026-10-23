@@ -482,7 +482,13 @@ export default function Engagements() {
       <FeuilleRetrait cible={retrait} fermer={() => setRetrait(null)} />
       <Formulaire
         nature={forme}
-        ancres={d.ancres}
+        ancres={[
+          ...d.ancres,
+          // Les heures fixes (travail, école…) sont prises aussi : une ancre ne s'y pose jamais.
+          ...d.obligations
+            .filter((o) => !o.date && o.categoryType !== 'sleep')
+            .map((o) => ({ id: o.id, nom: o.label, minuteAncrage: o.startMinute, dureeMinutes: o.endMinute - o.startMinute, jours: [o.dayOfWeek] })),
+        ]}
         fermer={() => setForme(null)}
         creer={async (f) => {
           if (f.K === 'TASK') {

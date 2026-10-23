@@ -208,23 +208,6 @@ export function brouillonsDepuis(
         ...(e.fixed.includes('School') ? (['school'] as const) : []),
         ...(e.fixed.includes('My days change') ? (['variable'] as const) : []),
       ]
-  const b: BrouillonIntroduction = {
-    id: `${base}-${ch}`,
-    nature: VERS_NATURE[nature],
-    nom: ITEM[ch]!.name,
-    echeance: e.w.due,
-    minutes: nature === 'TASK' ? e.w.taskMin : nature === 'ANCHOR' ? e.w.anDur : 60,
-    heuresHebdo: e.w.goalMin / 60,
-    heureAncre: e.w.anAt,
-    joursAncre: versGetDay(e.days.an),
-    coucher: e.w.bed,
-    lever: e.w.wake,
-    activites,
-    fixes: {
-      work: { debut: e.w.wkFrom, fin: e.w.wkTo, jours: versGetDay(e.days.wk) },
-      school: { debut: e.w.scFrom, fin: e.w.scTo, jours: versGetDay(e.days.sc) },
-    },
-  }
   // L'heure « naturelle » d'une ancre placée par Vethos : après la fin des heures
   // fixes, plus tôt s'il a dit être trop fatigué le soir.
   const fatigue = e.stops.includes(1)
@@ -235,6 +218,24 @@ export function brouillonsDepuis(
   )
   const depart = Math.ceil((finFixe ? finFixe + (fatigue ? 60 : 120) : fatigue ? 17 * 60 : 18 * 60 + 30) / 15) * 15
   const hh = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  const b: BrouillonIntroduction = {
+    id: `${base}-${ch}`,
+    nature: VERS_NATURE[nature],
+    nom: ITEM[ch]!.name,
+    echeance: e.w.due,
+    minutes: nature === 'TASK' ? e.w.taskMin : nature === 'ANCHOR' ? e.w.anDur : 60,
+    heuresHebdo: e.w.goalMin / 60,
+    // Plus d'écran pour la choisir : la même heure naturelle que les autres, après les heures fixes.
+    heureAncre: hh(Math.min(depart, 1440 - (nature === 'ANCHOR' ? e.w.anDur : 60))),
+    joursAncre: versGetDay(e.days.an),
+    coucher: e.w.bed,
+    lever: e.w.wake,
+    activites,
+    fixes: {
+      work: { debut: e.w.wkFrom, fin: e.w.wkTo, jours: versGetDay(e.days.wk) },
+      school: { debut: e.w.scFrom, fin: e.w.scTo, jours: versGetDay(e.days.sc) },
+    },
+  }
   const autres: EngagementIntroduction[] = retenues(e)
     .filter((id) => id !== ch)
     .map((id) => {
