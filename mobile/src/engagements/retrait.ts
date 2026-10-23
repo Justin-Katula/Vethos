@@ -5,10 +5,13 @@
  * DERNIER COUP : sa prochaine séance, puis il s'éteint tout seul. Jamais
  * pendant une séance.
  *
- * Tout ce qui est dit pour retirer entre au CARNET. L'IA ne le lit pas à
- * chaque fois : seulement quand le FLAIR se lève — une série de retraits, un
- * engagement lâché à peine créé, ou une raison déjà donnée. Alors elle pose
- * ses questions, et peut refuser.
+ * Tout ce qui est dit pour retirer entre au CARNET — gardé pour l'app, jamais
+ * montré. L'IA ne le lit pas à chaque fois : seulement quand le FLAIR se lève
+ * — une série de retraits, ou une raison déjà donnée. Alors elle pose ses
+ * questions, et peut refuser.
+ *
+ * Retiré dans l'heure qui suit sa création : c'était une ERREUR. Il part tout
+ * de suite, sans question ni dernier coup.
  */
 import type { SessionEvent } from '@shared/schemas'
 
@@ -53,10 +56,17 @@ export const CARNET_MAX = 60
 export const DERNIER_COUP_SANS_SEANCE_MS = 24 * 60 * 60_000
 export const FLAIR_SERIE_JOURS = 14
 export const FLAIR_SERIE_N = 2
-export const FLAIR_NEUF_JOURS = 3
+/** Retiré moins d'une heure après sa création : une erreur. */
+export const ERREUR_MS = 60 * 60_000
 export const FLAIR_DEJA_DIT_JOURS = 30
 
-export type Flair = 'serie' | 'neuf' | 'deja-dit'
+export type Flair = 'serie' | 'deja-dit'
+
+/** Créé il y a moins d'une heure : le retirer, c'est corriger une erreur. */
+export const estUneErreur = (creeLe: string, maintenantMs: number) => {
+  const t = new Date(creeLe).getTime()
+  return Number.isFinite(t) && maintenantMs - t >= 0 && maintenantMs - t < ERREUR_MS
+}
 
 const mots = (t: string) => new Set(t.toLowerCase().normalize('NFD').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((m) => m.length >= 4))
 
@@ -72,13 +82,12 @@ export function memeRaison(a: string, b: string): boolean {
 
 /**
  * Faut-il que le juge lise le carnet ? Rien la plupart du temps : seulement
- * une série (déjà deux demandes en 14 jours), un engagement lâché avant
- * d'avoir servi (moins de 3 jours, ou aucune séance), ou une raison déjà donnée.
+ * une série (déjà deux demandes en 14 jours) ou une raison déjà donnée. Une
+ * chose jamais commencée n'est pas un signe : c'était peut-être une erreur.
  */
-export function flair(a: { carnet: readonly EntreeCarnet[]; texte: string; joursDepuisCreation: number; seances: number; maintenantMs: number }): Flair | null {
+export function flair(a: { carnet: readonly EntreeCarnet[]; texte: string; maintenantMs: number }): Flair | null {
   const age = (e: EntreeCarnet) => (a.maintenantMs - new Date(e.a).getTime()) / 86_400_000
   if (a.carnet.filter((e) => age(e) >= 0 && age(e) < FLAIR_SERIE_JOURS).length >= FLAIR_SERIE_N) return 'serie'
-  if (a.joursDepuisCreation < FLAIR_NEUF_JOURS || a.seances === 0) return 'neuf'
   if (a.carnet.some((e) => age(e) >= 0 && age(e) < FLAIR_DEJA_DIT_JOURS && memeRaison(e.texte, a.texte))) return 'deja-dit'
   return null
 }

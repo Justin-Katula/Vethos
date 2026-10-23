@@ -64,8 +64,8 @@ export function useRetrait() {
   }
 }
 
-/** Retire pour de bon un engagement dont le dernier coup est passé. */
-async function eteindre(c: DernierCoup) {
+/** Retire pour de bon : dernier coup passé, ou erreur corrigée dans l'heure. */
+export async function eteindre(c: Pick<DernierCoup, 'nature' | 'refId'>) {
   const s = useDonnees.getState()
   if (c.nature === 'TASK') {
     for (const p of s.taches.filter((t) => t.parentId === c.refId)) await s.supprimerTache(p.id)

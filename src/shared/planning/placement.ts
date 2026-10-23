@@ -180,6 +180,12 @@ export function computeTaskDayTarget(args: {
   remainingNeed: number
   dayCapacity: number
   remainingDayCapacities: number[]
+  /**
+   * Second passage du moteur, pour une tâche qui finirait sans place : sous
+   * pression, elle se pose d'abord sur les grands jours au lieu de compter
+   * sur des soirs que d'autres engagements prennent déjà.
+   */
+  avance?: number
 }): { target: number; capOverride: boolean } {
   const cap40 = Math.floor(args.dayCapacity * TASK_CONSTANTS.maxPercentPerDay)
   const idealTotal = args.remainingDayCapacities.reduce(
@@ -204,6 +210,23 @@ export function computeTaskDayTarget(args: {
   const totalCapacity = args.remainingDayCapacities.reduce((s, c) => s + c, 0)
   const share = computeProportionalShare(args.dayCapacity, totalCapacity, args.remainingNeed)
 
+  if (args.avance) {
+    // Jamais moins que : le plafond relevé du jour (ou tout le besoin), ce que
+    // les jours suivants ne prendront pas sous leur propre plafond, un vrai bloc.
+    // Défaut réel du 2026-10-23 : 12 h dues mercredi, travail en semaine. La part
+    // proportionnelle comptait sur les 80 min des soirs, que l'objectif prenait
+    // déjà ; les restes, sous 25 min, n'étaient jamais posés — « 1 h 05 can't
+    // fit » avec 7 h vides le samedi.
+    const niveau = Math.min(1, Math.max(TASK_CONSTANTS.maxPercentPerDay, args.avance))
+    const plafond = Math.floor(args.dayCapacity * niveau)
+    const plafondsSuivants = args.remainingDayCapacities.slice(1).reduce((s, c) => s + Math.floor(c * niveau), 0)
+    const target = Math.min(
+      args.dayCapacity,
+      args.remainingNeed,
+      Math.max(share, Math.min(plafond, args.remainingNeed), args.remainingNeed - plafondsSuivants, TASK_CONSTANTS.minBlockMinutes),
+    )
+    return { target, capOverride: target > cap40 }
+  }
   if (share <= cap40) return { target: Math.min(share, args.dayCapacity), capOverride: false }
   // Même la répartition dépasse 40 % : la tâche ne tient pas sous le plafond.
   return { target: Math.min(share, args.dayCapacity), capOverride: true }

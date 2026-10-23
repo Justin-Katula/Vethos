@@ -17,7 +17,8 @@ import { tempsPerdu } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
 import { Braise, FeuilleRetrait, quandDernierCoup, type CibleRetrait } from '@/engagements/FeuilleRetrait'
-import { useRetrait } from '@/engagements/useRetrait'
+import { eteindre, useRetrait } from '@/engagements/useRetrait'
+import { estUneErreur } from '@/engagements/retrait'
 import { propositionCible } from '@/engagements/ajuster-cible'
 import { cancelObjectiveRemoval, removalDate } from '@shared/contract'
 import { useSeances } from '@/seances/magasin-seances'
@@ -141,6 +142,11 @@ export default function Engagements() {
   }
   const demanderRetrait = (c: CibleRetrait) => {
     if (bloquePendantSeance() || !garde()) return
+    // Retiré dans l'heure qui suit sa création : c'était une erreur, il part tout de suite.
+    if (estUneErreur(c.creeLe, Date.now())) {
+      void eteindre(c).then(() => toast(`${c.nom} removed.`))
+      return
+    }
     setRetrait(c)
   }
   const fait = useSeances((e) => e.apprentissage.workedMinutesByRef)

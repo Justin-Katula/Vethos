@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent } from '@shared/schemas'
-import { aEteindre, dernierCoup, faitsPourGarder, flair, memeRaison, noterAuCarnet, type EntreeCarnet } from './retrait'
+import { aEteindre, dernierCoup, estUneErreur, faitsPourGarder, flair, memeRaison, noterAuCarnet, type EntreeCarnet } from './retrait'
 
 const T0 = new Date(2026, 9, 14, 15, 0).getTime()
 const ev = (refId: string, held: number, started = true) =>
@@ -68,7 +68,7 @@ describe('le dernier coup', () => {
 })
 
 describe('le carnet et le flair', () => {
-  const base = { texte: 'I found a better course online', joursDepuisCreation: 10, seances: 4, maintenantMs: T0 }
+  const base = { texte: 'I found a better course online', maintenantMs: T0 }
 
   it('rien la plupart du temps : le juge ne lit pas le carnet', () => {
     expect(flair({ ...base, carnet: [entree(20)] })).toBeNull()
@@ -76,9 +76,10 @@ describe('le carnet et le flair', () => {
   it('une série : déjà deux demandes en 14 jours', () => {
     expect(flair({ ...base, carnet: [entree(2), entree(9)] })).toBe('serie')
   })
-  it('lâché avant d’avoir servi', () => {
-    expect(flair({ ...base, carnet: [], joursDepuisCreation: 1 })).toBe('neuf')
-    expect(flair({ ...base, carnet: [], seances: 0 })).toBe('neuf')
+  it("jamais commencé n'est pas un signe ; retiré dans l'heure, c'est une erreur", () => {
+    expect(flair({ ...base, carnet: [] })).toBeNull()
+    expect(estUneErreur(new Date(T0 - 59 * 60_000).toISOString(), T0)).toBe(true)
+    expect(estUneErreur(new Date(T0 - 61 * 60_000).toISOString(), T0)).toBe(false)
   })
   it('une raison déjà donnée', () => {
     expect(memeRaison('I have no time for this', 'honestly no time for this anymore')).toBe(true)

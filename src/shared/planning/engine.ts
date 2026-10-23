@@ -912,6 +912,7 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
           remainingNeed: members.reduce((s, t) => s + (remainingNeed.get(t.id) ?? 0), 0),
           dayCapacity: cap.effectiveCapacityMinutes,
           remainingDayCapacities,
+          avance: input.frontLoad?.families.includes(familyKey) ? input.frontLoad.level : undefined,
         })
         family = { left: target, capOverride, ids: new Set(members.map((t) => t.id)) }
         familyLeft.set(familyKey, family)
@@ -1027,6 +1028,37 @@ export function computePlan(rawInput: PlanningInput, now: Date = new Date()): Pl
     // E.1 : la pause vient APRÈS le travail, et seulement si quelque chose
     // commence dans les 30 min qui suivent. Sinon le bloc finit avec le travail.
     settleBreaks(blocks, date, dayEntries)
+  }
+
+  // Passages suivants : une tâche finirait avec du travail sans place alors que
+  // son échéance tient dans l'horizon — elle se pose d'abord sur les grands
+  // jours, plafond relevé par paliers (40, 60, 80, 100 %) jusqu'à ce que tout
+  // tienne. Seulement elle, et seulement si ça place davantage : 12 h demandées
+  // = 12 h posées tant que les jours le permettent.
+  if (!rawInput.frontLoad) {
+    const manque = (r: { verdicts: TaskVerdict[] }) => r.verdicts.reduce((x, v) => x + Math.max(0, v.neededMinutes - v.placedMinutes), 0)
+    const enManque = [
+      ...new Set(
+        activeTasks
+          .filter((t) => t.deadline <= input.rangeEnd && (remainingNeed.get(t.id) ?? 0) >= TASK_CONSTANTS.minBlockMinutes)
+          .map((t) => t.parentTaskId ?? t.id),
+      ),
+    ]
+    if (enManque.length) {
+      const ici = [...placedByTask.values()].reduce((x, m) => x + m, 0)
+      let meilleur: PlanningResult | null = null
+      let meilleurPose = ici
+      for (const level of [0.4, 0.6, 0.8, 1]) {
+        const essai = computePlan({ ...rawInput, frontLoad: { families: enManque, level } }, now)
+        const pose = essai.verdicts.reduce((x, v) => x + v.placedMinutes, 0)
+        if (pose > meilleurPose) {
+          meilleur = essai
+          meilleurPose = pose
+        }
+        if (manque(essai) < TASK_CONSTANTS.minBlockMinutes) break
+      }
+      if (meilleur) return meilleur
+    }
   }
 
   // ─── C.3.1. Un verdict par tâche, jamais un verdict binaire global ──────

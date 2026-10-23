@@ -5040,7 +5040,7 @@ var REQUETE = {
   retrait: "remove the commitment for good"
 };
 var RETRAIT = `
-- This is a removal. "accept" lets it go after one last session; "refuse" keeps it. The history holds their past removal requests (request "remove the commitment for good") next to their Stops and Laters. Removing things soon after creating them, removing again and again, or giving the same reason as before point to giving up, not to a real change: probe harder then, and refuse when the answers stay vague. A concrete change (done another way, no longer needed, a real constraint with facts) can be accepted.`;
+- This is a removal. "accept" lets it go after one last session; "refuse" keeps it. The history holds their past removal requests (request "remove the commitment for good") next to their Stops and Laters. Removing again and again, or giving the same reason as before, points to giving up, not to a real change. Something never started is not a sign by itself (it may have been a mistake): probe harder then, and refuse when the answers stay vague. A concrete change (done another way, no longer needed, a real constraint with facts) can be accepted.`;
 function messagesArbitre(d) {
   const contexte = {
     request: REQUETE[d.sorte],

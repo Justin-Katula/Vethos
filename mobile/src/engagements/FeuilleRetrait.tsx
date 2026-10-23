@@ -83,18 +83,12 @@ export function Braise({ taille = 14, forte = false }: { taille?: number; forte?
   )
 }
 
-/** Ce que le flair a vu, dit en quelques mots. */
-const LIBELLE_FLAIR: Record<Flair, (n: number, jours: number) => string> = {
-  serie: (n) => `${n + 1}${n + 1 === 2 ? 'nd' : n + 1 === 3 ? 'rd' : 'th'} removal in 14 days`,
-  neuf: (_n, jours) => (jours === 0 ? 'Created today' : `${jours} ${jours === 1 ? 'day' : 'days'} old`),
-  'deja-dit': () => 'Same reason as before',
-}
-
 /**
  * « Remove » : s'expliquer, voir ce qu'on perdrait. « Keep it » ferme tout
- * (la raison reste au carnet). « Remove anyway » : si le flair se lève, le juge
- * lit le carnet et pose ses questions ; sinon — ou s'il accepte — l'engagement
- * a droit à un dernier coup, puis s'éteint.
+ * (la raison reste au carnet, jamais montré). « Remove anyway » : si le flair
+ * se lève, le juge lit le carnet et pose ses questions, sans dire pourquoi ;
+ * sinon — ou s'il accepte — l'engagement a droit à un dernier coup, puis
+ * s'éteint. Retiré dans l'heure qui suit sa création : une erreur, rien de tout ça.
  */
 export function FeuilleRetrait({ cible, fermer }: { cible: CibleRetrait | null; fermer: () => void }) {
   const { maintenant, confiance } = usePlan()
@@ -207,7 +201,6 @@ export function FeuilleRetrait({ cible, fermer }: { cible: CibleRetrait | null; 
       <Text style={{ color: A.t3, fontFamily: GEIST.moyen, fontSize: 12 }}>{libelle}</Text>
     </View>
   )
-  const serie = carnet.filter((x) => maintenant.getTime() - new Date(x.a).getTime() < 14 * 86_400_000).length
 
   return (
     <Feuille ouverte={!!cible} fermer={quitter} style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
@@ -262,7 +255,7 @@ export function FeuilleRetrait({ cible, fermer }: { cible: CibleRetrait | null; 
           <Pressable
             accessibilityRole="button"
             onPress={() => {
-              const v = flair({ carnet, texte, joursDepuisCreation: f.jours, seances: f.seances, maintenantMs: Date.now() })
+              const v = flair({ carnet, texte, maintenantMs: Date.now() })
               setVu(v)
               if (v) setEtape('juge')
               else void eteindreBientot()
@@ -275,14 +268,7 @@ export function FeuilleRetrait({ cible, fermer }: { cible: CibleRetrait | null; 
       ) : null}
 
       {cible && f && moteur && etape === 'juge' ? (
-        <View style={{ gap: 14 }}>
-          {vu ? (
-            // Le flair : l'app a remarqué quelque chose, et le montre sans le commenter.
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingVertical: 6, paddingLeft: 8, paddingRight: 12, borderRadius: 999, backgroundColor: 'rgba(240,82,95,0.1)', borderWidth: 1, borderColor: 'rgba(240,82,95,0.22)' }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: A.rouge }} />
-              <Text style={{ color: 'rgba(255,190,184,0.95)', fontFamily: MONO.normal, fontSize: 12 }}>{LIBELLE_FLAIR[vu](serie, f.jours)}</Text>
-            </View>
-          ) : null}
+        <View>
           <Juge sorte="retrait" texte={texte} acc={A.t1} encre="#000" moteur={moteur} onAccepte={() => undefined} onRefuse={quitter} onAide={() => quitter()} />
         </View>
       ) : null}

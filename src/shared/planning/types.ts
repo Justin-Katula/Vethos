@@ -301,6 +301,12 @@ export type PlanningResult = {
 // ─── Entrée du moteur ─────────────────────────────────────────────────────
 
 export type PlanningInput = {
+  /**
+   * Interne au moteur : les tâches (familles) qui finiraient avec du travail
+   * sans place — au passage suivant, elles se posent d'abord sur les grands
+   * jours, avec un plafond du jour relevé à `level` (0,4 puis 0,6, 0,8, 1).
+   */
+  frontLoad?: { families: readonly string[]; level: number }
   /** YYYY-MM-DD, jour de départ inclus. */
   today: string
   /** YYYY-MM-DD, dernier jour de l'horizon inclus. */
