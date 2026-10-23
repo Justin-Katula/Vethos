@@ -77,8 +77,8 @@
             <td>Apple (payment) and RevenueCat (subscription status)</td>
           </tr>
           <tr>
-            <td>AI review of your requests to end or postpone a session (only if you allow it): the reason you pick, what you write, your answers to the follow-up questions, facts about the session (title, planned and done minutes, attempts to open blocked apps, deadline), your trust level, and your requests from the last 30 days</td>
-            <td>To ask follow-up questions and decide whether the session can end early or be postponed</td>
+            <td>AI review of your requests to end or postpone a session, or to remove a commitment (only if you allow it): the reason you pick, what you write, your answers to the follow-up questions, facts about the session (title, planned and done minutes, attempts to open blocked apps, deadline, the current time, your bedtime and the sessions that follow today), facts about the commitment (title, age, time and sessions already put in), your trust level, and your requests from the last 30 days</td>
+            <td>To ask follow-up questions, decide whether the session can end early or be postponed (and suggest when), or whether the commitment can be removed</td>
             <td>Supabase (our server) and DeepSeek (the language model)</td>
           </tr>
           <tr>
@@ -90,16 +90,18 @@
       </table>
       <p>We never sell your data, show you ads, or use advertising identifiers or analytics trackers.</p>
 
-      <h2>AI review of requests to end or postpone a session</h2>
+      <h2>AI review of requests to end or postpone a session, or remove a commitment</h2>
       <p>
         In Vethos, a work session can be ended before its planned end with the <strong>Stop</strong> button, and a session
         that has not started yet can be pushed to a later time with the <strong>Later</strong> button. Both ask you to
-        write what happened.
+        write what happened. Removing a task, goal or anchor also asks you why; the reasons you give are kept in the app.
       </p>
       <p>
         If you allow it, Vethos uses AI to review the request: it may ask up to five follow-up questions, compare your
         answers with your requests from the last 30 days (older ones count less), and decide whether the session can end
-        early or be postponed. Vethos asks for your permission the first time you write a reason, before anything is
+        early or be postponed, and suggest when to start again. For a removal, the AI is only asked when you have
+        removed several things recently or give a reason you already gave; it then also sees your past removal reasons.
+        Vethos asks for your permission the first time you write a reason, before anything is
         sent. To change your choice later, email us. Without permission, when you are offline, or if the review is unavailable, fixed
         rules decide instead and nothing is sent.
       </p>
