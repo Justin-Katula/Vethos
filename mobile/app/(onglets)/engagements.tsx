@@ -16,7 +16,7 @@ import { cleDate, plagesSommeil, versTachesMoteur } from '@/plan/moteur'
 import { tempsPerdu } from '@shared/planning/charge-message'
 import { dateLocale } from '@/plan/format'
 import { useGardeContrat } from '@/seances/garde-contrat'
-import { FeuilleRetrait, type CibleRetrait } from '@/engagements/FeuilleRetrait'
+import { Braise, FeuilleRetrait, quandDernierCoup, type CibleRetrait } from '@/engagements/FeuilleRetrait'
 import { useRetrait } from '@/engagements/useRetrait'
 import { propositionCible } from '@/engagements/ajuster-cible'
 import { cancelObjectiveRemoval, removalDate } from '@shared/contract'
@@ -120,9 +120,25 @@ export default function Engagements() {
   const jourCourt = (x: Date) =>
     `${x.getDate()} ${MOIS3[x.getMonth()]}, ${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
   // Retirer ne se fait pas d'un geste : on s'explique, on voit ce qu'on perdrait,
-  // et si l'on insiste, la demande attend une heure dans Profil.
+  // et si l'on insiste, l'engagement vit un dernier coup, puis s'éteint.
   const [retrait, setRetrait] = useState<CibleRetrait | null>(null)
-  const { bloquePendantSeance } = useRetrait()
+  const { bloquePendantSeance, enDernierCoup, garder } = useRetrait()
+  /** À la place de « Remove » : la braise, l'heure du dernier coup, et « Keep it ». */
+  const finDeCourse = (refId: string, gauche = 0) => {
+    const c = enDernierCoup(refId)
+    if (!c) return null
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginLeft: gauche }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+          <Braise taille={12} />
+          <Text numberOfLines={1} style={{ flexShrink: 1, color: 'rgba(255,190,184,0.95)', fontFamily: MONO.normal, fontSize: 12 }}>{`Last round · ${quandDernierCoup(c, maintenant)}`}</Text>
+        </View>
+        <Pilule contour onPress={() => void garder(refId).then(() => toast('Kept.'))}>
+          Keep it
+        </Pilule>
+      </View>
+    )
+  }
   const demanderRetrait = (c: CibleRetrait) => {
     if (bloquePendantSeance() || !garde()) return
     setRetrait(c)
@@ -209,6 +225,7 @@ export default function Engagements() {
             ) : null}
           </View>
         </View>
+        {enDernierCoup(t.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(t.id, 50)}</View> : null}
         {o ? (
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 50 }}>
             {t.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{t.intention}</Text> : null}
@@ -222,12 +239,14 @@ export default function Engagements() {
               >
                 +25 min
               </Pilule>
-              <Pilule
-                contour
-                onPress={() => demanderRetrait({ nature: 'TASK', refId: t.id, nom: t.titre, ids: [t.id, ...g.parties.map((p) => p.id)], total: g.total, creeLe: t.creeeLe })}
-              >
-                Remove
-              </Pilule>
+              {enDernierCoup(t.id) ? null : (
+                <Pilule
+                  contour
+                  onPress={() => demanderRetrait({ nature: 'TASK', refId: t.id, nom: t.titre, ids: [t.id, ...g.parties.map((p) => p.id)], total: g.total, creeLe: t.creeeLe, echeance: t.echeance })}
+                >
+                  Remove
+                </Pilule>
+              )}
             </View>
           </View>
         ) : null}
@@ -281,6 +300,7 @@ export default function Engagements() {
                   : `About ${hm(dose / 7)} a day · this week`}</Text>
           </View>
         </View>
+        {enDernierCoup(o.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(o.id, 50)}</View> : null}
         {prop ? (
           <View style={{ marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.06)', gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
@@ -304,9 +324,11 @@ export default function Engagements() {
                   Keep
                 </Pilule>
               ) : null}
-              <Pilule contour onPress={() => demanderRetrait({ nature: 'GOAL', refId: o.id, nom: o.nom, ids: [o.id], total: null, creeLe: o.creeLe })}>
-                Remove
-              </Pilule>
+              {enDernierCoup(o.id) ? null : (
+                <Pilule contour onPress={() => demanderRetrait({ nature: 'GOAL', refId: o.id, nom: o.nom, ids: [o.id], total: null, creeLe: o.creeLe })}>
+                  Remove
+                </Pilule>
+              )}
             </View>
           </View>
         ) : null}
@@ -337,14 +359,17 @@ export default function Engagements() {
             </View>
           </View>
         </View>
+        {enDernierCoup(a.id) ? <View style={{ paddingTop: 10 }}>{finDeCourse(a.id, 70)}</View> : null}
         {ou ? (
           <View style={{ gap: 12, paddingTop: 12, paddingLeft: 70 }}>
             {a.intention ? <Text style={{ color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{a.intention}</Text> : null}
-            <View style={{ flexDirection: 'row' }}>
-              <Pilule contour onPress={() => demanderRetrait({ nature: 'ANCHOR', refId: a.id, nom: a.nom, ids: [a.id], total: null, creeLe: a.creeeLe })}>
-                Remove
-              </Pilule>
-            </View>
+            {enDernierCoup(a.id) ? null : (
+              <View style={{ flexDirection: 'row' }}>
+                <Pilule contour onPress={() => demanderRetrait({ nature: 'ANCHOR', refId: a.id, nom: a.nom, ids: [a.id], total: null, creeLe: a.creeeLe })}>
+                  Remove
+                </Pilule>
+              </View>
+            )}
           </View>
         ) : null}
       </Pressable>

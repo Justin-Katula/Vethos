@@ -4,6 +4,7 @@ import { useReduit } from '@/accueil/briques-introduction'
 import { usePlan } from '@/plan/Plan'
 import { A, GEIST } from '@/ui/app-briques'
 import type { StopReason } from '@shared/schemas'
+import type { ReponseArbitre } from '@shared/coach/client'
 
 /**
  * Le juge d'un Stop ou d'un Later, à l'écran (`@shared/coach/arbitre`).
@@ -15,7 +16,17 @@ import type { StopReason } from '@shared/schemas'
  */
 
 type Bloc = { id: string; kind: string; refId: string; label: string; startMinute: number; workMinutes: number }
-type Echange = { question: string; sig: string; reponse: string }
+export type Echange = { question: string; sig: string; reponse: string }
+
+/**
+ * Un autre juge que celui des séances — un retrait d'engagement : il fournit
+ * sa propre demande au serveur, sa propre trace et ses règles fixes.
+ */
+export type MoteurJuge = {
+  juger: (echanges: Echange[]) => Promise<ReponseArbitre>
+  conclure: (a: { reponses: string[]; verdict: 'accepte' | 'refuse'; regles: boolean }) => Promise<void>
+  regles: () => 'accepte' | 'refuse'
+}
 type Etat =
   | { e: 'accord' }
   | { e: 'attente' }
@@ -64,11 +75,13 @@ export function Juge({
   onAccepte,
   onRefuse,
   onAide,
+  moteur,
 }: {
-  sorte: 'stop' | 'later'
-  bloc: Bloc
-  raison: StopReason
+  sorte: 'stop' | 'later' | 'retrait'
+  bloc?: Bloc
+  raison?: StopReason
   texte: string
+  moteur?: MoteurJuge
   acc: string
   encre: string
   onAccepte: () => void
@@ -84,6 +97,13 @@ export function Juge({
   const lance = useRef(false)
 
   const conclure = async (verdict: 'accepte' | 'refuse', incoherence: { a: string; b: string } | null, regles: boolean) => {
+    if (moteur) {
+      await moteur.conclure({ reponses: echanges.current.map((x) => x.reponse), verdict, regles })
+      if (verdict === 'accepte') onAccepte()
+      else setEtat({ e: 'refus', incoherence })
+      return
+    }
+    if (sorte === 'retrait' || !bloc || !raison) return
     await justification.conclure({
       sorte,
       bloc,
@@ -101,12 +121,16 @@ export function Juge({
 
   const demander = async () => {
     setEtat({ e: 'attente' })
-    const r = await justification.juger({ sorte, bloc, raison, texte, echanges: echanges.current })
+    const r = moteur
+      ? await moteur.juger(echanges.current)
+      : sorte !== 'retrait' && bloc && raison
+        ? await justification.juger({ sorte, bloc, raison, texte, echanges: echanges.current })
+        : ({ action: 'indecis' } as const)
     if (r.action === 'question') return setEtat({ e: 'question', question: r.question, sig: r.sig })
     if (r.action === 'decision') return conclure(r.decision, r.incoherence, false)
     if (r.action === 'aide') return onAide(r.message)
     // Indécis : hors ligne, serveur muet, plafond atteint, ou pas d'accord pour l'IA.
-    return conclure(justification.regles(texte), null, true)
+    return conclure(moteur ? moteur.regles() : justification.regles(texte), null, true)
   }
 
   useEffect(() => {
@@ -177,7 +201,7 @@ export function Juge({
 
   return (
     <View style={{ gap: 12 }}>
-      <Text accessibilityRole="header" style={titre}>Keep going.</Text>
+      <Text accessibilityRole="header" style={titre}>{sorte === 'retrait' ? 'Not this time.' : 'Keep going.'}</Text>
       {etat.incoherence ? (
         <View style={{ gap: 6 }}>
           <Text style={corps}>{`“${etat.incoherence.a}”`}</Text>
@@ -189,7 +213,7 @@ export function Juge({
         onPress={onRefuse}
         style={({ pressed }) => ({ height: 52, borderRadius: 12, backgroundColor: acc, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] })}
       >
-        <Text style={{ color: encre, fontFamily: GEIST.demi, fontSize: 17 }}>{sorte === 'later' ? 'I’m starting' : 'I’ll continue'}</Text>
+        <Text style={{ color: encre, fontFamily: GEIST.demi, fontSize: 17 }}>{sorte === 'retrait' ? 'Keep it' : sorte === 'later' ? 'I’m starting' : 'I’ll continue'}</Text>
       </Pressable>
     </View>
   )

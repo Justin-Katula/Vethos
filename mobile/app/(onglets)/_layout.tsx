@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg'
 import { FondLumiere } from '@/ui/FondLumiere'
+import { useExtinctions } from '@/engagements/useRetrait'
 import { A, FournisseurToast, GEIST, useLumiere } from '@/ui/app-briques'
 
 /**
@@ -118,12 +119,19 @@ function Barre({ state, navigation, teinte }: PropsBarre) {
   )
 }
 
+/** Éteint ce dont le dernier coup est passé, quel que soit l'onglet ouvert. */
+function Gardien() {
+  useExtinctions()
+  return null
+}
+
 export default function Onglets() {
   const { lueur, teinte } = useLumiere()
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <FondLumiere lueur={lueur} />
       <FournisseurToast>
+        <Gardien />
         <Tabs
           screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
           tabBar={(p) => <Barre state={p.state} navigation={p.navigation as unknown as PropsBarre['navigation']} teinte={teinte} />}

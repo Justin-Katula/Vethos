@@ -17,6 +17,8 @@ export type AncrePosee = {
   minuteAncrage: number
   dureeMinutes: number
   jours: number[]
+  /** Sa couleur (une autre ancre). */
+  couleur?: string
   /** Le sommeil : pris comme le reste, mais une ancre peut le suivre sans pause. */
   sommeil?: boolean
 }

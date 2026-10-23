@@ -7,8 +7,6 @@ import { A, Carte, Chevron, GEIST, MONO, useToast } from '@/ui/app-briques'
 import { usePlan } from '@/plan/Plan'
 import { CarteCompte } from '@/compte/CarteCompte'
 import { gererAbonnement, useAbonnement } from '@/abonnement/achats'
-import { useRetrait } from '@/engagements/useRetrait'
-import { minutesRestantes } from '@/engagements/retrait'
 
 const MOIS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -24,10 +22,7 @@ export default function Profil() {
   const initiale = (nom.trim()[0] ?? '?').toUpperCase()
   const { seanceActive, maintenant } = usePlan()
   const toast = useToast()
-  // Les demandes de retrait : une heure ici, puis elles disparaissent.
-  const retrait = useRetrait()
   const abonne = useAbonnement((e) => e.etat === 'actif')
-  const NATURE = { TASK: 'Task', GOAL: 'Goal', ANCHOR: 'Anchor' } as const
   return (
     <ScrollView contentContainerStyle={{ paddingTop: marges.top + 20, paddingHorizontal: 20, paddingBottom: 120 }}>
       <Pressable
@@ -57,37 +52,6 @@ export default function Profil() {
           {`On Vethos since ${MOIS[depuis.getMonth()]} ${depuis.getFullYear()}`}
         </Text>
       </Carte>
-
-      {retrait.demandes.length ? (
-        <Carte style={{ marginTop: 12, paddingTop: 18, paddingHorizontal: 16, paddingBottom: 8 }}>
-          <Text accessibilityRole="header" style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 20, lineHeight: 26, letterSpacing: -0.4 }}>Removal requests</Text>
-          {retrait.demandes.map((x) => (
-            <View key={x.id} style={{ marginTop: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: A.ligne, gap: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                <Text numberOfLines={1} style={{ flexShrink: 1, color: A.t1, fontFamily: GEIST.demi, fontSize: 16 }}>{x.nom}</Text>
-                <Text style={{ color: A.t3, fontFamily: MONO.normal, fontSize: 12 }}>{`${NATURE[x.nature]} · ${minutesRestantes(x, maintenant.getTime())} min left`}</Text>
-              </View>
-              <Text numberOfLines={2} style={{ color: A.t3, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{`“${x.texte}”`}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void retrait.oublier(x.id)}
-                  style={({ pressed }) => ({ flex: 1, height: 40, borderRadius: 10, backgroundColor: 'rgba(242,242,242,0.1)', alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
-                >
-                  <Text style={{ color: A.t1, fontFamily: GEIST.demi, fontSize: 14 }}>Keep</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void retrait.retirer(x)}
-                  style={({ pressed }) => ({ flex: 1, height: 40, borderRadius: 10, backgroundColor: 'rgba(240,82,95,0.16)', alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
-                >
-                  <Text style={{ color: A.rouge, fontFamily: GEIST.demi, fontSize: 14 }}>Remove</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </Carte>
-      ) : null}
 
       {/* Gérer ou annuler l'abonnement : la feuille d'Apple, sans quitter l'app. */}
       {abonne ? (

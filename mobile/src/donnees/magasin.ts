@@ -153,24 +153,45 @@ export const ReglagesSchema = z.object({
    * tierce). Sans accord : les règles fixes. Changeable dans Profil.
    */
   consentementIA: z.enum(['oui', 'non']).nullish(),
-  /**
-   * « Remove anyway » : la demande attend une heure dans Profil, où seulement
-   * l'engagement se retire pour de bon (`@/engagements/retrait`).
-   */
   /** Une proposition de cible (baisser, monter) déjà répondue : l'instant, par objectif. Rien d'autre avant 7 jours. */
   propositionsCible: z.record(z.string(), z.string()).optional(),
-  demandesRetrait: z
+  /**
+   * « Remove anyway » accepté : l'engagement vit son dernier coup — sa
+   * prochaine séance — puis s'éteint tout seul (`@/engagements/retrait`).
+   */
+  derniersCoups: z
     .array(
       z.object({
-        id: z.string(),
-        nature: z.enum(['TASK', 'GOAL', 'ANCHOR']),
         refId: z.string(),
+        nature: z.enum(['TASK', 'GOAL', 'ANCHOR']),
         nom: z.string().max(80),
-        texte: z.string().max(500),
+        ids: z.array(z.string()).max(200),
         a: z.string(),
+        jusqua: z.string(),
+        seance: z.object({ date: z.string(), debut: z.number() }).nullable(),
       }),
     )
     .max(50)
+    .optional(),
+  /** Le carnet : tout ce qui a été dit pour retirer. Le juge ne le lit que quand le flair se lève. */
+  carnetRetraits: z
+    .array(
+      z.object({
+        id: z.string(),
+        refId: z.string(),
+        nature: z.enum(['TASK', 'GOAL', 'ANCHOR']),
+        nom: z.string().max(80),
+        texte: z.string().max(500),
+        reponses: z.array(z.string().max(500)).max(5),
+        a: z.string(),
+        joursDepuisCreation: z.number(),
+        minutesFaites: z.number(),
+        seances: z.number(),
+        issue: z.enum(['garde', 'dernier-coup', 'refuse']),
+        flair: z.boolean(),
+      }),
+    )
+    .max(60)
     .optional(),
   /** Source unique du sommeil, comme sur le bureau. */
   coucher: z.string().default('23:30'),
