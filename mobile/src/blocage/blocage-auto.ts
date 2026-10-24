@@ -85,3 +85,66 @@ export function memesPlages(a: readonly Plage[], b: readonly Plage[]): boolean {
   const y = b.map(cle).sort()
   return x.length === y.length && x.every((v, i) => v === y[i])
 }
+
+/**
+ * Le bloc en attente de « Je commence » ne glisse plus.
+ *
+ * Tant qu'il n'est pas confirmé, le moteur le replace à « maintenant » à chaque
+ * minute (même tâche, nouvel id, nouveau début) : sa fenêtre d'une heure
+ * glissait avec lui, et le blocage ne se levait jamais tant que Vethos restait
+ * ouvert. On le ramène à sa PREMIÈRE observation (`observedPending`, la même
+ * mémoire que l'horloge des séances) : même id, même début, même fin.
+ *
+ * Et une fois cette heure passée sans « Je commence » (la séance est ratée),
+ * le reste de la même tâche que le moteur replace aussitôt à « maintenant »
+ * ne rebloque pas : on lève, comme la règle le dit. Les blocs prévus plus
+ * tard, eux, bloquent à leur heure.
+ */
+export function blocsPourLeBlocage(a: {
+  blocs: readonly PlacedBlock[]
+  nowMinute: number
+  observe: { blockId: string; kind: string; refId: string; startMinute: number; endMinute: number } | null
+  /** Les références dont une séance a déjà été ratée aujourd'hui. */
+  rateesAujourdHui: ReadonlySet<string>
+}): PlacedBlock[] {
+  const o = a.observe
+  const out: PlacedBlock[] = []
+  for (const b of a.blocs) {
+    const commence = b.startMinute <= a.nowMinute && a.nowMinute < b.endMinute
+    if (commence && o && o.refId === b.refId && o.kind === b.kind && a.nowMinute < o.endMinute) {
+      out.push({ ...b, id: o.blockId, startMinute: o.startMinute, endMinute: o.endMinute })
+      continue
+    }
+    // Replacé à « maintenant » après une séance ratée : plus de blocage automatique.
+    if (commence && b.kind !== 'ancre' && a.rateesAujourdHui.has(b.refId)) continue
+    out.push(b)
+  }
+  return out
+}
+
+/** La dernière minute qu'iOS sait nommer : minuit n'existe que comme 00:00 du lendemain. */
+export const DERNIERE_MINUTE = 1439
+
+/**
+ * Le sommeil bloque aussi : du coucher au lever, chaque nuit. Une nuit franchit
+ * minuit, iOS ne surveille qu'un jour à la fois : elle devient deux plages
+ * datées (le soir, puis le matin du lendemain).
+ */
+export function plagesDeSommeil(a: {
+  jours: readonly string[]
+  nuits: readonly { startMinute: number; endMinute: number }[]
+  selectionId: string
+  aujourdHui: string
+  nowMinute: number
+}): Plage[] {
+  const out: Plage[] = []
+  for (const date of a.jours) {
+    for (const n of a.nuits) {
+      const fin = Math.min(n.endMinute, DERNIERE_MINUTE)
+      if (fin <= n.startMinute) continue
+      if (date === a.aujourdHui && fin <= a.nowMinute) continue
+      out.push({ blocId: `sommeil-${n.startMinute}`, date, debutMinute: n.startMinute, finMinute: fin, selectionId: a.selectionId })
+    }
+  }
+  return out
+}

@@ -4,6 +4,7 @@ import * as Crypto from 'expo-crypto'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
+import { useBlocage } from '@/blocage/etat'
 import { oublierLocalement } from './nuage'
 import { config, supabase } from './supabase'
 
@@ -124,7 +125,22 @@ export async function connecterGoogle(): Promise<Resultat> {
   }
 }
 
+/**
+ * Sans compte, plus rien ne doit rester bloqué : les plages programmées chez
+ * iOS (séances, blocs à venir, sommeil) continuaient sinon de lever leurs
+ * boucliers toutes seules, Vethos déconnecté. On lève tout AVANT de fermer la
+ * session — après, le plan qui les recalculait n'existe plus.
+ */
+async function leverLeBlocage(): Promise<void> {
+  try {
+    await useBlocage.getState().toutLever()
+  } catch {
+    // Rien de programmé, ou pas de Temps d'écran : rien à lever.
+  }
+}
+
 export async function deconnecter(): Promise<void> {
+  await leverLeBlocage()
   await supabase()?.auth.signOut()
   // Le module Google natif garde lui aussi le dernier compte : on l'oublie,
   // pour que la prochaine connexion propose le choix.
@@ -159,6 +175,7 @@ export async function supprimerCompte(): Promise<Resultat> {
   // quitte aussi ce téléphone.
   const id = data.session?.user.id
   if (id) await oublierLocalement(id).catch(() => undefined)
+  await leverLeBlocage()
   await sb.auth.signOut({ scope: 'local' })
   return { ok: true }
 }

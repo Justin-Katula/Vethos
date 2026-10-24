@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlacedBlock } from '@shared/planning/types'
-import { fusionnerAuto, memesPlages, plagesAuto } from './blocage-auto'
+import { blocsPourLeBlocage, fusionnerAuto, memesPlages, plagesAuto, plagesDeSommeil } from './blocage-auto'
 
 const bloc = (id: string, start: number, end: number): PlacedBlock =>
   ({ id, date: '2026-10-15', startMinute: start, endMinute: end, durationMinutes: end - start, breakMinutes: 0, workMinutes: end - start, kind: 'task', refId: 'r', label: 'X', color: '#000', cognitiveWindow: 'NORMALE' }) as PlacedBlock
@@ -79,5 +79,51 @@ describe('le blocage des jours à venir (2026-10-22)', () => {
     const { retenues } = limiterAuxCapacitesIOS([...beaucoup, { blocId: 'aujourdhui', debutMinute: 1200, finMinute: 1230, selectionId: 's' }])
     expect(retenues).toHaveLength(20)
     expect(retenues[0]!.blocId).toBe('aujourdhui')
+  })
+})
+
+describe('le bloc en attente ne glisse plus (2026-10-24)', () => {
+  const bloc = (id: string, refId: string, debut: number, fin: number, kind: 'task' | 'ancre' = 'task') =>
+    ({ id, refId, kind, date: '2026-10-24', startMinute: debut, endMinute: fin, workMinutes: fin - debut }) as unknown as PlacedBlock
+  const observe = { blockId: 'task-t-1080', kind: 'task', refId: 't', startMinute: 1080, endMinute: 1165 }
+
+  it('replacé à « maintenant », il garde sa première heure : le blocage finit une heure après le début prévu', () => {
+    // Il est 18 h 40 : le moteur a fait glisser le bloc de 18 h 00 à 18 h 40.
+    const blocs = blocsPourLeBlocage({ blocs: [bloc('task-t-1120', 't', 1120, 1205)], nowMinute: 1120, observe, rateesAujourdHui: new Set() })
+    expect(blocs[0]).toMatchObject({ id: 'task-t-1080', startMinute: 1080, endMinute: 1165 })
+    const plages = plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 1120, selectionId: 's' })
+    expect(plages).toEqual([{ blocId: 'task-t-1080', debutMinute: 1080, finMinute: 1140, selectionId: 's' }])
+    // À 19 h 01, l'heure est passée : plus rien ne bloque.
+    expect(plagesAuto({ blocsDuJour: blocs, confirmes: new Set(), nowMinute: 1141, selectionId: 's' })).toEqual([])
+  })
+
+  it('après une séance ratée, la même tâche replacée à « maintenant » ne rebloque pas ; un bloc prévu plus tard, si', () => {
+    const blocs = blocsPourLeBlocage({
+      blocs: [bloc('task-t-1170', 't', 1170, 1255), bloc('task-t-1300', 't', 1300, 1385)],
+      nowMinute: 1170,
+      observe: null,
+      rateesAujourdHui: new Set(['t']),
+    })
+    expect(blocs.map((b) => b.id)).toEqual(['task-t-1300'])
+  })
+
+  it('une ancre bloque toujours à son heure', () => {
+    const blocs = blocsPourLeBlocage({ blocs: [bloc('ancre-a', 'a', 1170, 1230, 'ancre')], nowMinute: 1180, observe: null, rateesAujourdHui: new Set(['a']) })
+    expect(blocs).toHaveLength(1)
+  })
+})
+
+describe('le sommeil bloque (2026-10-24)', () => {
+  const nuits = [{ startMinute: 0, endMinute: 450 }, { startMinute: 1410, endMinute: 1440 }]
+
+  it('chaque nuit : le soir jusqu’à 23:59, puis le matin jusqu’au lever, datés', () => {
+    const p = plagesDeSommeil({ jours: ['2026-10-24', '2026-10-25'], nuits, selectionId: 's', aujourdHui: '2026-10-24', nowMinute: 600 })
+    expect(p.map((x) => `${x.date} ${x.debutMinute}-${x.finMinute}`)).toEqual(['2026-10-24 1410-1439', '2026-10-25 0-450', '2026-10-25 1410-1439'])
+  })
+
+  it('les plages de sommeil sont automatiques : recalculées à chaque fois', () => {
+    const sommeil = plagesDeSommeil({ jours: ['2026-10-24'], nuits, selectionId: 's', aujourdHui: '2026-10-24', nowMinute: 600 })
+    const r = fusionnerAuto({ actives: sommeil, auto: [], idsDuPlan: new Set(), confirmes: new Set() })
+    expect(r).toEqual([])
   })
 })

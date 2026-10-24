@@ -3,7 +3,7 @@ import { AppState } from 'react-native'
 import { useDonnees } from '@/donnees/magasin'
 import { useSeances } from '@/seances/magasin-seances'
 import { useBlocage } from '@/blocage/etat'
-import { fusionnerAuto, memesPlages, plagesAuto, plagesAVenir } from '@/blocage/blocage-auto'
+import { blocsPourLeBlocage, fusionnerAuto, memesPlages, plagesAuto, plagesAVenir, plagesDeSommeil } from '@/blocage/blocage-auto'
 import { empreinteRappels, rappelsAProgrammer } from '@/seances/rappels-plan'
 import { demanderAutorisation, preparerRappels, programmerRappels } from '@/seances/rappels'
 import { selectionEstVide } from '@/blocage/contrat'
@@ -49,7 +49,7 @@ import {
   type OptionRattrapage,
 } from '@shared/planning/trust'
 import { IDENTIFIANT_URGENCE } from '@/blocage/contrat'
-import { cleDate, dernierJourDe, entreeEtPlan } from './moteur'
+import { cleDate, dernierJourDe, entreeEtPlan, plagesSommeil } from './moteur'
 import {
   evenementDuReport,
   journeeReportable,
@@ -212,6 +212,10 @@ function useSourcePlan() {
   // lui-même, Vethos fermé. On ne reprogramme iOS que si les plages voulues
   // ont changé — pas à chaque minute.
   const dernieresVoulues = useRef<string | null>(null)
+  // Au premier passage après l'ouverture, on reprogramme iOS quoi qu'il arrive :
+  // les plages relues de la mémoire disent ce que Vethos avait DEMANDÉ, pas ce
+  // qu'iOS tient encore (une mise à jour, un redémarrage peuvent l'avoir vidé).
+  const programmeDepuisOuverture = useRef(false)
   const levee = useBlocage((e) => e.levee)
   useEffect(() => {
     if (!prets) return
@@ -221,7 +225,22 @@ function useSourcePlan() {
     const confirmes = new Set(Object.keys(confirmations.confirmedAt))
     // Une suspension ne vaut que pour SON jour.
     const leveeJusqua = levee && levee.date === calcul.aujourdHui ? levee.minute : null
-    const auto = plagesAuto({ blocsDuJour, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua })
+    // Le bloc en attente garde sa première heure ; une séance ratée ne rebloque pas.
+    const rateesAujourdHui = new Set(
+      (apprentissage.sessionEvents ?? []).filter((e) => e.date === calcul.aujourdHui && !e.started && e.kind !== 'ancre').map((e) => e.refId),
+    )
+    const blocsBlocage = blocsPourLeBlocage({ blocs: blocsDuJour, nowMinute: calcul.minute, observe: confirmations.observedPending ?? null, rateesAujourdHui })
+    const auto = [
+      ...plagesAuto({ blocsDuJour: blocsBlocage, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua }),
+      // Du coucher au lever, aujourd'hui, demain et après-demain.
+      ...plagesDeSommeil({
+        jours: [0, 1, 2].map((k) => addDays(calcul.aujourdHui, k)),
+        nuits: plagesSommeil(reglages),
+        selectionId: selection.identifiant,
+        aujourdHui: calcul.aujourdHui,
+        nowMinute: calcul.minute,
+      }),
+    ]
     // Demain et après-demain aussi : iOS bloque à l'heure même si Vethos n'est
     // pas ouvert ce jour-là.
     const avenir = plagesAVenir(
@@ -231,19 +250,25 @@ function useSourcePlan() {
       }),
       selection.identifiant,
     )
-    const voulues = fusionnerAuto({ actives: b.plagesActives, auto: [...auto, ...avenir], idsDuPlan: new Set(blocsDuJour.map((x) => x.id)), confirmes })
+    const voulues = fusionnerAuto({
+      actives: b.plagesActives,
+      auto: [...auto, ...avenir],
+      idsDuPlan: new Set([...blocsDuJour, ...blocsBlocage].map((x) => x.id)),
+      confirmes,
+    })
     const cle = JSON.stringify(voulues.map((p) => [p.date ?? '', p.blocId, p.debutMinute, p.finMinute]).sort())
-    if (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives)) {
+    if (programmeDepuisOuverture.current && (cle === dernieresVoulues.current || memesPlages(voulues, b.plagesActives))) {
       dernieresVoulues.current = cle
       return
     }
+    programmeDepuisOuverture.current = true
     dernieresVoulues.current = cle
     // Le bouclier nomme le prochain bloc écarté — sauf pendant une séance, qui garde le sien.
     const prochain = [...auto].sort((x, y) => x.debutMinute - y.debutMinute)[0]
-    const bloc = prochain && blocsDuJour.find((x) => x.id === prochain.blocId)
+    const bloc = prochain && blocsBlocage.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee])
+  }, [prets, blocsDuJour, confirmations.confirmedAt, confirmations.observedPending, apprentissage.sessionEvents, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee, reglages.coucher, reglages.lever])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.

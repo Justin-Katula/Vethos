@@ -454,3 +454,23 @@ describe('les jours à venir (2026-10-22)', () => {
     expect(appels.some((a) => a.includes('vieux'))).toBe(false)
   })
 })
+
+describe('les fenêtres d’aujourd’hui (2026-10-24)', () => {
+  const aujourdhui = new Date()
+  const jour = { year: aujourdhui.getFullYear(), month: aujourdhui.getMonth() + 1, day: aujourdhui.getDate() }
+
+  it('une plage d’aujourd’hui part AVEC son jour : iOS ne la cherche plus demain', async () => {
+    const { natif } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage({ blocId: 'task-z' })], { maintenant: 9 * 60 + 30 })
+    const horaire = (natif.startMonitoring as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === 'vethos.task-z')![1]
+    expect(horaire.intervalStart).toEqual({ ...jour, hour: 9, minute: 0 })
+    expect(horaire.intervalEnd).toEqual({ ...jour, hour: 10, minute: 0 })
+  })
+
+  it('une fin à minuit devient 23:59 (24:00 se lirait 00:00, avant le début)', async () => {
+    const { natif } = moduleEspion()
+    await creerPontDepuis(natif).programmer([plage({ blocId: 'sommeil-1410', debutMinute: 1410, finMinute: 1440 })], { maintenant: 8 * 60 })
+    const horaire = (natif.startMonitoring as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === 'vethos.sommeil-1410')![1]
+    expect(horaire.intervalEnd).toEqual({ ...jour, hour: 23, minute: 59 })
+  })
+})

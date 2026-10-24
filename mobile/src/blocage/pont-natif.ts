@@ -296,8 +296,13 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
         await natif.startMonitoring(
           activite,
           {
-            intervalStart: { ...jourVersComposantes(plage.date), ...minuteVersComposantes(plage.debutMinute) },
-            intervalEnd: { ...jourVersComposantes(plage.date), ...minuteVersComposantes(plage.finMinute) },
+            // Toujours datée, aujourd'hui compris : une fenêtre sans jour, déjà
+            // commencée, iOS la cherchait à sa PROCHAINE occurrence — demain — et
+            // la fin de la séance d'aujourd'hui ne venait jamais lever le bouclier.
+            intervalStart: { ...jourVersComposantes(plage.date ?? aujourdhui), ...minuteVersComposantes(plage.debutMinute) },
+            // 24:00 n'existe pas pour iOS (il lirait 00:00, avant le début) : la
+            // fin la plus tardive d'un jour est 23:59.
+            intervalEnd: { ...jourVersComposantes(plage.date ?? aujourdhui), ...minuteVersComposantes(Math.min(plage.finMinute, 1439)) },
             repeats: false,
           },
           [],
