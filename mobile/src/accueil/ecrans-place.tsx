@@ -1298,6 +1298,13 @@ export function EcranSemaine({
   const plein = !premier
   const [sel, setSel] = useState(() => Math.max(0, placement.jours.findIndex((j) => j === premier?.jour)))
   const [app, setApp] = useState(false)
+  // Le titre d'abord ; ce qu'il veut dire le remplace, une fois la semaine posée.
+  const [sens, setSens] = useState(false)
+  const apresSens = useMinuteries()
+  useEffect(() => {
+    apresSens(ctx.reduit ? 600 : 2200, () => setSens(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Les jours se posent l'un après l'autre, une seule fois.
   const colonnes = useRef(placement.jours.map(() => new Animated.Value(ctx.reduit ? 1 : 0))).current
   useEffect(() => {
@@ -1350,6 +1357,8 @@ export function EcranSemaine({
     : []
   const dSel = jourSel ? dateLocale(jourSel.date) : maintenant
   const auj = new Date()
+  const titreO = useVers(sens ? 0 : 1, 450)
+  const sensO = useVers(sens ? 1 : 0, 530, SORTIE, sens && !ctx.reduit ? 250 : 0)
   const entrerVraiment = () => {
     vibrer('medium')
     setApp(true)
@@ -1360,12 +1369,15 @@ export function EcranSemaine({
       <View style={{ position: 'absolute', left: 24, right: 24, top: ctx.haut }}>
         <View style={{ minHeight: 118 }}>
           <Animated.View style={{ position: 'absolute', inset: 0, opacity: ao }}>
-            <Entree dl={150} reduit={ctx.reduit}>
-              <Titre>{plein ? 'Your week is full. Vethos sees it.' : 'This is what one decision changes.'}</Titre>
-            </Entree>
-            <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 8 }}>
-              <Text style={T.corps}>{placement.erreur || (plein ? 'Free up some hours, or adjust the commitment.' : corps)}</Text>
-            </Entree>
+            {/* Une phrase à la fois, à la même taille : le titre, puis ce qu'il veut dire à sa place. */}
+            <Animated.View style={{ position: 'absolute', inset: 0, opacity: titreO }}>
+              <Entree dl={150} reduit={ctx.reduit}>
+                <Titre>{plein ? 'Your week is full. Vethos sees it.' : 'This is what one decision changes.'}</Titre>
+              </Entree>
+            </Animated.View>
+            <Animated.View style={{ position: 'absolute', inset: 0, opacity: sensO }}>
+              <Titre>{placement.erreur || (plein ? 'Free up some hours, or adjust the commitment.' : corps)}</Titre>
+            </Animated.View>
           </Animated.View>
           <Animated.View pointerEvents="none" style={{ position: 'absolute', inset: 0, opacity: ho }}>
             <Text style={T.gris}>{`${JOURS_LONGS[(auj.getDay() + 6) % 7]} ${auj.getDate()} ${MOIS_LONGS[auj.getMonth()]}`}</Text>
