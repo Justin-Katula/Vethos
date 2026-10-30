@@ -6,6 +6,7 @@ import { useBlocage } from '@/blocage/etat'
 import { blocsPourLeBlocage, fusionnerAuto, memesPlages, plagesAuto, plagesAVenir, plagesDeSommeil } from '@/blocage/blocage-auto'
 import { empreinteRappels, rappelsAProgrammer } from '@/seances/rappels-plan'
 import { demanderAutorisation, preparerRappels, programmerRappels } from '@/seances/rappels'
+import { hhmm as hhmmJournal, noter } from '@/journal/journal'
 import { selectionEstVide } from '@/blocage/contrat'
 import { plageDeSeance } from '@/blocage/pont-seance'
 import { arreter, confirmer, seanceActive, tictac } from '@/seances/pendule'
@@ -207,6 +208,17 @@ function useSourcePlan() {
     [calcul.resultat, calcul.aujourdHui],
   )
 
+  // Le bloc en attente garde sa première heure (et son id) ; une séance ratée
+  // ne rebloque pas. Le blocage ET les rappels partent de cette liste : nourris
+  // du plan brut, les rappels suivaient le bloc qui glisse à « maintenant »,
+  // et « I'm starting » sur la notification portait un id que plus rien n'avait.
+  const blocsBlocage = useMemo(() => {
+    const rateesAujourdHui = new Set(
+      (apprentissage.sessionEvents ?? []).filter((e) => e.date === calcul.aujourdHui && !e.started && e.kind !== 'ancre').map((e) => e.refId),
+    )
+    return blocsPourLeBlocage({ blocs: blocsDuJour, nowMinute: calcul.minute, observe: confirmations.observedPending ?? null, rateesAujourdHui })
+  }, [blocsDuJour, calcul.minute, calcul.aujourdHui, confirmations.observedPending, apprentissage.sessionEvents])
+
   // Le blocage commence à l'heure, sans attendre « Je commence » : chaque bloc
   // pas encore confirmé reçoit son écart (une heure au plus), qu'iOS applique
   // lui-même, Vethos fermé. On ne reprogramme iOS que si les plages voulues
@@ -225,11 +237,6 @@ function useSourcePlan() {
     const confirmes = new Set(Object.keys(confirmations.confirmedAt))
     // Une suspension ne vaut que pour SON jour.
     const leveeJusqua = levee && levee.date === calcul.aujourdHui ? levee.minute : null
-    // Le bloc en attente garde sa première heure ; une séance ratée ne rebloque pas.
-    const rateesAujourdHui = new Set(
-      (apprentissage.sessionEvents ?? []).filter((e) => e.date === calcul.aujourdHui && !e.started && e.kind !== 'ancre').map((e) => e.refId),
-    )
-    const blocsBlocage = blocsPourLeBlocage({ blocs: blocsDuJour, nowMinute: calcul.minute, observe: confirmations.observedPending ?? null, rateesAujourdHui })
     const auto = [
       ...plagesAuto({ blocsDuJour: blocsBlocage, confirmes, nowMinute: calcul.minute, selectionId: selection.identifiant, leveeJusqua }),
       // Du coucher au lever, aujourd'hui, demain et après-demain.
@@ -268,7 +275,7 @@ function useSourcePlan() {
     const bloc = prochain && blocsBlocage.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
     void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, confirmations.confirmedAt, confirmations.observedPending, apprentissage.sessionEvents, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee, reglages.coucher, reglages.lever])
+  }, [prets, blocsDuJour, blocsBlocage, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee, reglages.coucher, reglages.lever])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.
@@ -286,7 +293,7 @@ function useSourcePlan() {
       return { minuitMs: m.getTime(), blocs: calcul.resultat.blocks.filter((b) => b.date === date && b.preview !== true) }
     })
     const rappels = rappelsAProgrammer({
-      blocsDuJour,
+      blocsDuJour: blocsBlocage,
       confirmes: new Set(Object.keys(confirmations.confirmedAt)),
       minuitMs: minuit.getTime(),
       maintenantMs: Date.now(),
@@ -300,7 +307,7 @@ function useSourcePlan() {
       if (rappels.length > 0) await demanderAutorisation()
       await programmerRappels(rappels)
     })()
-  }, [prets, blocsDuJour, confirmations.confirmedAt, calcul.maintenant, calcul.resultat, calcul.aujourdHui])
+  }, [prets, blocsBlocage, confirmations.confirmedAt, calcul.maintenant, calcul.resultat, calcul.aujourdHui])
 
   // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
   // la cause est écrite dans la console de Metro (données rechargées, tâches
@@ -742,6 +749,7 @@ function useSourcePlan() {
       })
       if (!c) return false
       await poser({ apprentissage: frais.apprentissage, confirmations: c })
+      noter('Stop', `Stop confirmed; shield holds until ${hhmmJournal(c.stopPending!.untilMinute)}.`)
       const plage = blocage().plagesActives.find((p) => p.blocId === o.blockId)
       // Le reste du créneau du bloc arrêté est libre : un autre bloc qui viendrait
       // s'y glisser ne se bloque pas aussitôt.
@@ -931,6 +939,7 @@ function useSourcePlan() {
         const c = frais.confirmations
         const confirmations = c.observedPending?.blockId === bloc.id ? { ...c, observedPending: null } : c
         const l = reporterPlusTard(frais.apprentissage, bloc, option, aujourdHui, raison, option.placement)
+        noter('Later', `“${bloc.label}” moved to ${option.date === aujourdHui ? 'today' : option.date} ${hhmmJournal(option.startMinute)}.`)
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         // Libre jusqu'à l'heure choisie (aujourd'hui), ou jusqu'à la fin du bloc reporté à demain.
         await blocage().suspendre(option.date === aujourdHui ? option.startMinute : bloc.startMinute + bloc.workMinutes)
@@ -945,6 +954,7 @@ function useSourcePlan() {
         const enCours = c.observedPending && c.observedPending.blockId in c.confirmedAt
         const confirmations = c.observedPending && !enCours ? { ...c, observedPending: null } : c
         const l = noterReport(frais.apprentissage, { date: aujourdHui, kind: 'day', reason: raison })
+        noter('Tomorrow', `Rest of today moved to the next days (from “${bloc.label}”).`)
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         // Toute la journée est reportée : plus rien d'automatique ne bloque aujourd'hui.
         await blocage().suspendre(1440)
@@ -1173,8 +1183,12 @@ function useSourcePlan() {
         spontaneous: !overlayDueFor({ learning: apprentissage, block: bloc, nowMinute: minute, today: calcul.aujourdHui }),
       })
       const suivant = confirmer({ maintenant: instant, bloc, etat: { apprentissage, confirmations }, contexte })
-      if (suivant.refuse) return { ok: false as const, raison: suivant.refuse }
+      if (suivant.refuse) {
+        noter('Session', `“I’m starting” refused for “${bloc.label}”: ${suivant.refuse}.`)
+        return { ok: false as const, raison: suivant.refuse }
+      }
       await poser({ apprentissage: suivant.apprentissage, confirmations: suivant.confirmations })
+      noter('Session', `Started “${bloc.label}” at ${hhmmJournal(minute)} (block ${hhmmJournal(bloc.startMinute)}–${hhmmJournal(bloc.endMinute)}).`)
 
       // D.8 : le bouclier se leve MAINTENANT, et pour la duree de la tache.
       // Il n'existe aucune session de blocage autonome — sans ce geste-ci,

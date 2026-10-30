@@ -276,6 +276,8 @@ export type OptionsProgrammation = {
    * ce cas-là invérifiable.
    */
   maintenant?: number
+  /** Une ligne pour le journal des testeurs (une fenêtre refusée par iOS). */
+  journal?: (texte: string) => void
 }
 
 /** L'identifiant de la liste gardée en mode profond. Fixe, comme l'autre. */
@@ -348,6 +350,8 @@ export type PontEcran = {
    * app écartée. Rangés par l'extension ; ni l'app ni le site ne sortent.
    */
   lireTentatives: () => number[]
+  /** Les réveils de l'extension (début, fin de chaque fenêtre), pour le journal des testeurs. */
+  evenementsExtension?: () => { activite: string; rappel: string; aMs: number }[]
   /**
    * La pause d'urgence : la séance reste bloquée, sauf les apps choisies
    * (3 au plus). Le rappel de la surveillance, à la reprise, rebloque tout.

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type * as ModuleNotifications from 'expo-notifications'
 import type { Rappel } from './rappels-plan'
+import { noter } from '@/journal/journal'
 
 /**
  * Les notifications de rappel — le seul endroit qui parle au module natif.
@@ -34,7 +35,7 @@ function natif(): typeof ModuleNotifications | null {
  * - `commencer` : « I'm starting » → la séance démarre, sans ouvrir l'app,
  *   à l'instant `a` où le bouton a été touché.
  */
-export type DemandeNotification = { type: 'tard' } | { type: 'commencer'; blocId: string; a: number }
+export type DemandeNotification = { type: 'tard' } | { type: 'commencer'; blocId: string; refId?: string; a: number }
 
 export const useDemandeReport = create<{ demande: DemandeNotification | null; poser: (d: DemandeNotification | null) => void }>((set) => ({
   demande: null,
@@ -52,13 +53,23 @@ function recevoir(r: ModuleNotifications.NotificationResponse, enDirect = true) 
     // Rien à effacer.
   }
   const blocId = r.notification.request.content.data?.blocId
+  const refId = r.notification.request.content.data?.refId
   // Relue au lancement : on ne sait pas QUAND le bouton a été touché. Fraîche
   // (iOS vient de réveiller Vethos pour ça), elle compte ; ancienne, on ne
   // démarre rien en douce — l'écran « Je commence » est là.
   const fraiche = enDirect || Date.now() - r.notification.date < 3 * 60_000
+  const titre = r.notification.request.content.title ?? ''
+  noter(
+    'Notification',
+    r.actionIdentifier === 'commencer'
+      ? `“I’m starting” tapped on “${titre}”${fraiche ? '' : ' (too old, ignored)'}`
+      : r.actionIdentifier === 'tard'
+        ? `“Later” tapped on “${titre}”`
+        : `Opened “${titre}”`,
+  )
   if (r.actionIdentifier === 'commencer' && typeof blocId === 'string' && fraiche) {
     // L'instant du toucher : le travail compte d'ici, ni avant ni après.
-    useDemandeReport.getState().poser({ type: 'commencer', blocId, a: Date.now() })
+    useDemandeReport.getState().poser({ type: 'commencer', blocId, ...(typeof refId === 'string' ? { refId } : {}), a: Date.now() })
   } else if (r.actionIdentifier === 'tard') {
     useDemandeReport.getState().poser({ type: 'tard' })
   }
@@ -141,6 +152,13 @@ export async function programmerRappels(rappels: readonly Rappel[]): Promise<voi
   if (!N) return
   try {
     await N.cancelAllScheduledNotificationsAsync()
+    const prochain = rappels[0]
+    noter(
+      'Reminders',
+      rappels.length === 0
+        ? 'All cancelled, none scheduled.'
+        : `${rappels.length} scheduled. Next ${new Date(prochain!.quand).toTimeString().slice(0, 5)} “${prochain!.titre}”.`,
+    )
     for (const r of rappels) {
       await N.scheduleNotificationAsync({
         identifier: r.id,
@@ -153,7 +171,7 @@ export async function programmerRappels(rappels: readonly Rappel[]): Promise<voi
               ? { categoryIdentifier: CATEGORIE_AVANT }
               : {}
             : { categoryIdentifier: r.reportable ? CATEGORIE : CATEGORIE_ANCRE }),
-          data: { blocId: r.blocId },
+          data: { blocId: r.blocId, refId: r.refId },
         },
         trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: new Date(r.quand) },
       })

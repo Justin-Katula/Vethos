@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlacedBlock } from '@shared/planning/types'
-import { RAPPELS_EN_ATTENTE_MAX, rappelsAProgrammer } from './rappels-plan'
+import { RAPPELS_EN_ATTENTE_MAX, memeBloc, rappelsAProgrammer } from './rappels-plan'
 
 const minuit = new Date(2026, 9, 15).getTime()
 const bloc = (id: string, start: number, end: number, kind: PlacedBlock['kind'] = 'task'): PlacedBlock =>
@@ -53,5 +53,19 @@ describe('Les jours suivants (2026-10-22)', () => {
       ['rappel-task-c-2026-10-16-600', demain + 600 * 60_000],
       ['rappel-ancre-gym-2026-10-16-avant', demain + 1105 * 60_000],
     ])
+  })
+})
+
+describe('« I’m starting » sur la notification (2026-10-30)', () => {
+  it('le bloc dont l’id a glissé depuis la programmation reste le même : on le reconnaît par sa tâche', () => {
+    // Programmé à 10:00 sous task-r-…-600 ; à 10:07, le bloc en attente s'appelle task-r-…-607.
+    expect(memeBloc({ id: 'task-r-2026-10-30-607', refId: 'r' }, { blocId: 'task-r-2026-10-30-600', refId: 'r' })).toBe(true)
+    expect(memeBloc({ id: 'task-s-2026-10-30-607', refId: 's' }, { blocId: 'task-r-2026-10-30-600', refId: 'r' })).toBe(false)
+    // Une notification d'avant ce correctif (sans refId) : l'id seul.
+    expect(memeBloc({ id: 'a', refId: 'r' }, { blocId: 'a' })).toBe(true)
+  })
+  it('chaque rappel porte la tâche', () => {
+    const r = rappelsAProgrammer({ blocsDuJour: [bloc('task-a', 600, 690)], confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit })
+    expect(r.every((x) => x.refId === 'r')).toBe(true)
   })
 })

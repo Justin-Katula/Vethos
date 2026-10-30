@@ -16,6 +16,7 @@ import { avecPlage, plagesDuJour } from './pont-seance'
 import { pontEcran } from './ecran-natif'
 import { habillageBouclier, titrePourBouclier } from './bouclier'
 import type { NomTheme } from '@/theme/jetons'
+import { hhmm, noter } from '@/journal/journal'
 
 const CLE = 'vethos:blocage:v1'
 
@@ -41,7 +42,12 @@ type EtatBlocage = {
   jamais: Selection | null
   mode: ModeBlocage
   filtrerLeWeb: boolean
-  /** Ce qui est réellement programmé sur l'appareil, après les limites d'iOS. */
+  /**
+   * Les plages voulues, une par bloc, AVANT fusion et plafond — iOS, lui, reçoit
+   * la version fusionnée. Rangées fusionnées, deux blocs collés n'en faisaient
+   * plus qu'un, au nom du premier : le « Later », la pause ou le Stop du second
+   * ne trouvaient plus leur plage et ne levaient rien.
+   */
   plagesActives: Plage[]
   /**
    * Un report accepté (« Later », la journée, une ancre « dans 5 min ») : le
@@ -311,16 +317,25 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
         gardeeId: get().gardee?.identifiant ?? null,
         jamaisId: get().jamais && !selectionEstVide(get().jamais!) ? get().jamais!.identifiant : null,
         filtrerLeWeb: get().filtrerLeWeb,
+        journal: (t) => noter('iOS', t),
       })
+      const aujourdhui = cleDuJour()
       set({
-        plagesActives: retenues,
+        plagesActives: plages.filter((p) => !p.date || p.date >= aujourdhui).map((p) => ({ ...p })),
         ecartees: { courtes: ecarteesCourtes, plafond: ecarteesPlafond },
       })
       await ranger(get())
       // On demande a iOS ce qu'il fait, tout de suite apres le lui avoir
       // demande. C'est la seule ligne de ce fichier qui ne soit pas une
       // declaration d'intention — les deux ont deja diverge en silence.
-      get().verifier()
+      const leve = get().verifier()
+      noter(
+        'Blocking',
+        `${retenues.length} window${retenues.length === 1 ? '' : 's'} sent to iOS` +
+          (ecarteesCourtes + ecarteesPlafond > 0 ? ` (${ecarteesCourtes} too short, ${ecarteesPlafond} over 20 dropped)` : '') +
+          (retenues.length > 0 ? `: ${retenues.map((p) => `${p.date ? p.date.slice(5) + ' ' : ''}${hhmm(p.debutMinute)}–${hhmm(p.finMinute)} ${p.blocId.split('-')[0]}`).join(', ')}` : '') +
+          `. Shield now: ${leve ? 'UP' : 'down'}.`,
+      )
     } finally {
       set({ occupe: false })
     }
@@ -352,6 +367,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     set({ occupe: true })
     try {
       await pontEcran().toutLever()
+      noter('Blocking', 'Everything lifted (all windows removed).')
       set({ plagesActives: [], titreSeance: null, ecartees: { courtes: 0, plafond: 0 } })
       await ranger(get())
       get().verifier()
@@ -363,6 +379,7 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   async suspendre(jusqua) {
     // Datée : une suspension d'aujourd'hui ne déborde jamais sur demain, même app restée ouverte.
     set({ levee: { date: cleDuJour(), minute: Math.max(0, Math.min(1440, Math.round(jusqua))) } })
+    noter('Blocking', jusqua <= 0 ? 'Auto-blocking pause cancelled.' : `Auto-blocking paused until ${hhmm(Math.min(1440, jusqua))}.`)
     await ranger(get())
   },
 }))

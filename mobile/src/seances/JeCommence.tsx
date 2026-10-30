@@ -11,6 +11,8 @@ import { A, fmt, GEIST, hm, MONO, useHauteurClavier, useLumiere } from '@/ui/app
 import { FondLumiere } from '@/ui/FondLumiere'
 import { accentIntro, encreSur } from '@/ui/lumiere'
 import { annoncer, useDemandeReport } from './rappels'
+import { memeBloc } from './rappels-plan'
+import { noter } from '@/journal/journal'
 import { Juge } from './Juge'
 import { texteSuffisant } from '@shared/planning/report'
 
@@ -85,10 +87,18 @@ export function JeCommence() {
     if (Date.now() - demande.a > 30 * 60_000) return void useDemandeReport.getState().poser(null)
     if (!enAttente) return
     useDemandeReport.getState().poser(null)
-    if (enAttente.id !== demande.blocId) return
+    // Le même travail, même si son id a changé depuis la programmation du
+    // rappel. Un autre bloc : on le dit, au lieu de ne rien faire en silence
+    // (les rappels continuaient, et on se croyait en séance).
+    if (!memeBloc(enAttente, demande)) {
+      noter('Session', `Notification start not matched: waiting block is “${enAttente.label}”.`)
+      void annoncer(enAttente.label, 'Couldn’t start. Open Vethos.')
+      return
+    }
     const b = enAttente
     void (async () => {
       const r = await confirmer(b, new Date(demande.a))
+      noter('Session', r.ok ? `Started from the notification: “${b.label}”.` : `Start from the notification failed: “${b.label}”.`)
       const debut = new Date(demande.a)
       const fin = debut.getHours() * 60 + debut.getMinutes() + (b.endMinute - b.startMinute)
       // Dit tout de suite, pour qu'on ne croie jamais avoir commencé quand ce n'est pas le cas.

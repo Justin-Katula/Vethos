@@ -127,3 +127,17 @@ describe('le sommeil bloque (2026-10-24)', () => {
     expect(r).toEqual([])
   })
 })
+
+describe('Après un « Later » (2026-10-30)', () => {
+  it('la plage d’un objectif (id obj-…) disparu du plan n’est plus gardée', () => {
+    // Le moteur écrit `obj-`, le filtre attendait `objective-` : la plage restait jusqu'au bout de son heure.
+    const vieille = { blocId: 'obj-g-2026-10-30-600', debutMinute: 600, finMinute: 660, selectionId: 's' }
+    expect(fusionnerAuto({ actives: [vieille], auto: [], idsDuPlan: new Set(), confirmes: new Set() })).toEqual([])
+  })
+  it('la séance confirmée et l’urgence restent', () => {
+    const seance = { blocId: 'obj-g-2026-10-30-600', debutMinute: 600, finMinute: 690, selectionId: 's' }
+    const urgence = { blocId: 'urgence-obj-g-2026-10-30-600', debutMinute: 620, finMinute: 635, selectionId: 's' }
+    const r = fusionnerAuto({ actives: [seance, urgence], auto: [], idsDuPlan: new Set(), confirmes: new Set([seance.blocId]) })
+    expect(r).toEqual([seance, urgence])
+  })
+})

@@ -85,6 +85,8 @@ export type ModuleEcran = {
   isWebContentFilterPolicyActive: () => boolean
   /** L'App Group partagé avec les extensions (lecture seule ici). */
   userDefaultsGet?: <T>(cle: string) => T | undefined
+  /** Le dernier réveil de l'extension, par surveillance et par borne. */
+  getEvents?: () => { activityName: string; callbackName: string; lastCalledAt: Date }[]
 }
 
 /**
@@ -293,6 +295,7 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
           ],
         })
 
+        try {
         await natif.startMonitoring(
           activite,
           {
@@ -307,6 +310,11 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
           },
           [],
         )
+        } catch (e) {
+          // Une fenêtre refusée ne doit pas emporter les suivantes, ni le
+          // bouclier de la séance en cours plus bas.
+          options.journal?.(`iOS refused ${plage.date ?? 'today'} ${heure(plage.debutMinute)}–${heure(plage.finMinute)}: ${e instanceof Error ? e.message : String(e)}`)
+        }
       }
 
       // `intervalDidStart` ne se déclenche qu'au FRANCHISSEMENT de la borne.
@@ -337,6 +345,16 @@ export function creerPontDepuis(natif: ModuleEcran): PontEcran {
       }
 
       return plages.length
+    },
+
+    evenementsExtension() {
+      try {
+        return (natif.getEvents?.() ?? [])
+          .filter((e) => e.activityName.startsWith('vethos.'))
+          .map((e) => ({ activite: e.activityName, rappel: e.callbackName, aMs: e.lastCalledAt.getTime() }))
+      } catch {
+        return []
+      }
     },
 
     lireTentatives() {
@@ -414,6 +432,10 @@ function jourVersComposantes(date?: string): { year?: number; month?: number; da
 function minuteCourante(): number {
   const d = new Date()
   return d.getHours() * 60 + d.getMinutes()
+}
+
+function heure(minute: number): string {
+  return `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
 }
 
 /** Les composantes horaires qu'attend `DeviceActivitySchedule`. */

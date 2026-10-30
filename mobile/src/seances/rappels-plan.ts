@@ -18,6 +18,8 @@ export const PREAVIS_MINUTES = 5
 export type Rappel = {
   id: string
   blocId: string
+  /** La tâche ou l'objectif : l'id d'un bloc peut changer, la référence non. */
+  refId: string
   /** L'instant d'envoi (ms). */
   quand: number
   titre: string
@@ -47,12 +49,12 @@ export function rappelsAProgrammer(a: {
       const cle = `${b.id}-${b.date}`
       const avant = j.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
       if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
-        out.push({ id: `rappel-${cle}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
+        out.push({ id: `rappel-${cle}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
       }
       if (b.kind === 'ancre') continue
       const quand = j.minuitMs + b.startMinute * 60_000
       if (quand > a.maintenantMs) {
-        out.push({ id: `rappel-${cle}-${b.startMinute}`, blocId: b.id, quand, titre: b.label, corps: 'It’s time. Not started yet — tap I’m starting.', reportable: reportable(b) })
+        out.push({ id: `rappel-${cle}-${b.startMinute}`, blocId: b.id, refId: b.refId, quand, titre: b.label, corps: 'It’s time. Not started yet — tap I’m starting.', reportable: reportable(b) })
       }
     }
   }
@@ -61,7 +63,7 @@ export function rappelsAProgrammer(a: {
     // 5 min avant : prévenu, pas encore appelé.
     const avant = a.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
     if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
-      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
+      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
     }
     // Une ancre démarre toute seule : seulement le préavis.
     if (b.kind === 'ancre') continue
@@ -72,6 +74,7 @@ export function rappelsAProgrammer(a: {
       out.push({
         id: `rappel-${b.id}-${m}`,
         blocId: b.id,
+        refId: b.refId,
         quand,
         titre: b.label,
         // Sans « I'm starting », rien n'a commencé : le rappel le dit, pour qu'on
@@ -86,3 +89,8 @@ export function rappelsAProgrammer(a: {
 
 /** Une empreinte stable : on ne reprogramme que si elle change. */
 export const empreinteRappels = (r: readonly Rappel[]) => r.map((x) => `${x.id}@${x.quand}`).join('|')
+
+/** Le bouton d'une notification vise-t-il ce bloc ? Par l'id, ou par la tâche (l'id glisse avec l'heure). */
+export function memeBloc(enAttente: { id: string; refId: string }, demande: { blocId: string; refId?: string }): boolean {
+  return enAttente.id === demande.blocId || (demande.refId !== undefined && demande.refId === enAttente.refId)
+}

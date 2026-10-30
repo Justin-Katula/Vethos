@@ -6,6 +6,7 @@ import { useDonnees } from '@/donnees/magasin'
 import { A, Carte, Chevron, GEIST, MONO, useToast } from '@/ui/app-briques'
 import { usePlan } from '@/plan/Plan'
 import { CarteCompte } from '@/compte/CarteCompte'
+import { CarteJournal } from '@/journal/CarteJournal'
 import { gererAbonnement, useAbonnement } from '@/abonnement/achats'
 
 const MOIS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -67,6 +68,7 @@ export default function Profil() {
         </Pressable>
       ) : null}
       <CarteCompte />
+      <CarteJournal />
     </ScrollView>
   )
 }

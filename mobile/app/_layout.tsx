@@ -20,6 +20,8 @@ import { FournisseurPlan } from '@/plan/Plan'
 import { JeCommence } from '@/seances/JeCommence'
 import { ZoomSeance } from '@/seances/ZoomSeance'
 import { ecouterReponses } from '@/seances/rappels'
+import { chargerJournal, noter } from '@/journal/journal'
+import { lireDrapeauTesteur } from '@/journal/testeur'
 import { Introduction } from '@/accueil/Introduction'
 import { PorteCompte } from '@/compte/PorteCompte'
 import { useSession } from '@/compte/compte'
@@ -46,6 +48,7 @@ function Coque() {
   useEffect(() => {
     const abonnement = AppState.addEventListener('change', (etat) => {
       if (etat === 'active') void relire()
+      noter('App', etat === 'active' ? 'Opened' : etat === 'background' ? 'Closed' : etat)
     })
     return () => abonnement.remove()
   }, [relire])
@@ -60,6 +63,10 @@ function Coque() {
   // l'autre. Déconnecté, il n'y a pas de tiroir du tout.
   const session = useSession()
   const compte = session === undefined ? undefined : (session?.user.id ?? null)
+  // Testeur ou non : le journal n'écrit que pour les comptes marqués dans Supabase.
+  useEffect(() => {
+    if (compte !== undefined) void lireDrapeauTesteur(compte)
+  }, [compte])
   // Ce que l'appareil sait avant tout compte : l'introduction déjà vue ici ?
   const introVue = useAppareil((e) => e.introVue)
   const enAttente = useAppareil((e) => e.enAttente)
@@ -187,6 +194,7 @@ function IntroductionSansCompte() {
 // Dès le premier instant : un « I'm starting » touché sur une notification peut
 // avoir réveillé Vethos en arrière-plan — la réponse ne doit pas se perdre.
 ecouterReponses()
+void chargerJournal().then(() => noter('App', 'Launched'))
 
 export default function Racine() {
   const [policesPretes, erreurPolices] = useFonts({

@@ -70,11 +70,15 @@ export function fusionnerAuto(a: {
   confirmes: ReadonlySet<string>
 }): Plage[] {
   // Une ancre est toujours automatique (elle n'a pas de séance à elle).
+  // Hors ancre, seules deux plages ne viennent pas du plan : la séance
+  // confirmée et l'urgence. Tout le reste est remplacé. (On énumérait les
+  // préfixes du plan — `objective-` alors que le moteur écrit `obj-` : la
+  // plage d'un objectif reporté restait programmée jusqu'au bout de son heure.)
   const automatique = (p: Plage) =>
     // Un jour à venir n'a que des plages automatiques ; d'un calcul à l'autre
     // elles sont toutes remplacées (celles d'hier comprises).
     p.date !== undefined ||
-    /^ancre-/.test(p.blocId) || (!a.confirmes.has(p.blocId) && (a.idsDuPlan.has(p.blocId) || /^(task|objective|ancre|promesse)-/.test(p.blocId)))
+    /^ancre-/.test(p.blocId) || (!a.confirmes.has(p.blocId) && !/^urgence-/.test(p.blocId))
   return [...a.actives.filter((p) => !automatique(p)), ...a.auto]
 }
 
