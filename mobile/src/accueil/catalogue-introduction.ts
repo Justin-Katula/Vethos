@@ -331,6 +331,12 @@ export type Mesure = {
   lostR: number
   l1: string
   l2: string
+  /**
+   * Le ticket : les calculs déjà faits, une ligne à la fois — depuis quand,
+   * combien prévu, combien fait, combien perdu (la dernière, en fort). Pas de
+   * prédiction : le futur appartient à l'écran de l'année qui vient.
+   */
+  ticket: string[]
   finish: Date | null
   rem: number
   miss: number
@@ -362,8 +368,9 @@ export function mesurer(id: string, d: Details, aujourdHui: Date): Mesure {
         : finish
           ? `At this pace, it’s only done in ${MOIS_LONGS[finish.getMonth()]}${finish.getFullYear() !== today.getFullYear() ? ` ${finish.getFullYear()}` : ''}.`
           : 'At this pace, it’s done.'
+    const ticket = [`Since ${sM}.`, `${meant} hours planned.`, put === 0 ? '0 put in.' : `${put} put in.`, `${Math.round(lost)} hours gone.`]
     return {
-      id, weeks, start, lost, lostR: Math.round(lost), l1, l2, finish, rem, miss: 0,
+      id, weeks, start, lost, lostR: Math.round(lost), l1, l2, ticket, finish, rem, miss: 0,
       big: Math.round(lost), unit: 'hours', sub: 'already lost since you first decided.',
     }
   }
@@ -377,8 +384,14 @@ export function mesurer(id: string, d: Details, aujourdHui: Date): Mesure {
   const l2 = fut > 0 ? `If nothing changes, another ${fut} ${it.noun} are gone by ${hM}.` : 'If nothing changes, nothing more is lost.'
   const miss = meant - went
   const useS = lost < 40 && miss > 0
+  const ticket = [
+    `Since ${sM}.`,
+    `${meant} ${it.noun} planned.`,
+    `${went} done.`,
+    useS ? `${miss} ${it.noun} skipped.` : `${Math.round(lost)} hours gone.`,
+  ]
   return {
-    id, weeks, start, lost, lostR: Math.round(lost), l1, l2, finish: null, rem: 0, miss,
+    id, weeks, start, lost, lostR: Math.round(lost), l1, l2, ticket, finish: null, rem: 0, miss,
     big: useS ? miss : Math.round(lost),
     unit: useS ? it.noun : 'hours',
     sub: useS ? 'skipped since you first decided.' : 'already lost since you first decided.',

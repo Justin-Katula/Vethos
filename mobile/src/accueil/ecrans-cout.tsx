@@ -115,6 +115,7 @@ function BlocChose({
   n,
   onFin,
   sortie,
+  avant,
 }: {
   ctx: Ctx
   m: Mesure
@@ -122,6 +123,8 @@ function BlocChose({
   n: number
   onFin: () => void
   sortie: boolean
+  /** Les heures perdues des choses déjà montrées, si le total se compte en heures (sinon null). */
+  avant: number | null
 }) {
   const apres = useMinuteries()
   const { height: hauteurEcran } = useWindowDimensions()
@@ -132,6 +135,10 @@ function BlocChose({
   const premier = i === 0
   const [etape, setEtape] = useState(premier ? 0 : 1)
   const COMPTE = premier ? 2200 : 1300
+  const LIGNE = 650
+  // La boule de neige : dès la deuxième chose, ses heures s'ajoutent à celles d'avant.
+  const boule = avant !== null && i > 0
+  const cumul = useCompte((avant ?? 0) + m.lostR, { de: avant ?? 0, duree: 1400, delai: 500, actif: etape === 4, reduit: ctx.reduit })
   const compte = useCompte(m.big, { duree: COMPTE, delai: 300, reduit: ctx.reduit })
   const rangs = calendrier(m.start, m.finish, frequence(ctx.e).pw, ctx.maintenant).length
   useEffect(() => {
@@ -148,7 +155,14 @@ function BlocChose({
     if (premier) apres(sens, () => setEtape(1))
     apres(soirs, () => setEtape(2))
     apres(suite, () => setEtape(3))
-    apres(suite + 900, onFin)
+    // Le ticket tombe ligne à ligne ; puis ces heures rejoignent celles d'avant.
+    const ticketFini = suite + 350 + (m.ticket.length - 1) * LIGNE + 700
+    apres(ticketFini - 700, () => vibrer('medium'))
+    if (boule) {
+      apres(ticketFini + 200, () => setEtape(4))
+      apres(ticketFini + 200 + 1600, () => vibrer('light'))
+      apres(ticketFini + 200 + 2400, onFin)
+    } else apres(ticketFini + 500, onFin)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const o = useVers(sortie ? 0 : 1, 530, DEPLACEMENT)
@@ -156,6 +170,7 @@ function BlocChose({
   // Le chiffre commence au milieu de l'écran, seul ; il monte quand le reste arrive.
   const seul = useVers(etape === 0 ? 1 : 0, 700, DEPLACEMENT)
   const montee = seul.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, hauteurEcran * 0.26)] })
+  const enTete = useVers(etape >= 3 && !ctx.reduit ? 0 : 1, 450)
   const soirsVisibles = useVers(etape === 2 ? 1 : 0, etape === 3 ? 450 : 1, DEPLACEMENT)
   // La place qui reste vraiment sous l'en-tête, mesurée — pas devinée.
   const [hauteurSoirs, setHauteurSoirs] = useState(Math.max(200, hauteurEcran - ctx.haut - ctx.bas - 300))
@@ -165,6 +180,7 @@ function BlocChose({
         <Entree dl={100} reduit={ctx.reduit}>
           <Text style={T.gris}>{(n > 1 ? `${i + 1} of ${n} · ` : '') + ITEM[m.id]!.label}</Text>
         </Entree>
+        <Animated.View style={{ opacity: enTete }}>
         <Entree dl={200} reduit={ctx.reduit} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 12 }}>
           <Text
             accessibilityLabel={`${m.big} ${m.unit}`}
@@ -181,6 +197,7 @@ function BlocChose({
             </Entree>
           ) : null}
         </View>
+        </Animated.View>
       </Animated.View>
       <View style={{ flex: 1, marginTop: 24 }} onLayout={(ev) => setHauteurSoirs(Math.max(160, Math.floor(ev.nativeEvent.layout.height)))}>
         {etape === 2 || (etape === 3 && !ctx.reduit) ? (
@@ -188,12 +205,29 @@ function BlocChose({
             <Calendrier m={m} pw={frequence(ctx.e).pw} acc={ctx.acc} reduit={ctx.reduit} maintenant={ctx.maintenant} hauteurMax={hauteurSoirs} />
           </Animated.View>
         ) : null}
-        {etape === 3 ? (
-          <Entree dl={ctx.reduit ? 0 : 350} reduit={ctx.reduit} style={{ position: 'absolute', left: 0, right: 0, top: '30%' }}>
-            <Text style={[PHRASE, { fontSize: 30, lineHeight: 36, letterSpacing: -0.7 }]}>{m.l2}</Text>
-          </Entree>
-        ) : null}
       </View>
+        {/* Le chiffre s'efface : le ticket le refait, ligne à ligne, et retombe dessus. */}
+        {etape >= 3 ? (
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 56, gap: 6 }}>
+            {m.ticket.map((l, k) => {
+              const dernier = k === m.ticket.length - 1
+              return (
+                <Entree key={k} dl={ctx.reduit ? 0 : 350 + k * LIGNE} reduit={ctx.reduit} style={dernier ? { marginTop: 10 } : undefined}>
+                  <Text style={dernier ? [PHRASE, { color: ctx.ink, fontSize: 34, lineHeight: 40, letterSpacing: -0.9 }] : [PHRASE, { color: C.t2 }]}>{l}</Text>
+                </Entree>
+              )
+            })}
+            {etape === 4 ? (
+              <Entree reduit={ctx.reduit} style={{ marginTop: 28 }}>
+                <Text style={[PHRASE, { color: C.t2 }]}>{`${avant} + ${m.lostR}`}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 2 }}>
+                  <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 56, lineHeight: 60, letterSpacing: -1.8, fontVariant: ['tabular-nums'] }}>{cumul}</Text>
+                  <Text style={{ color: C.t1, fontFamily: GEIST.demi, fontSize: 22, lineHeight: 28 }}>hours so far</Text>
+                </View>
+              </Entree>
+            ) : null}
+          </View>
+        ) : null}
     </Animated.View>
   )
 }
@@ -208,7 +242,11 @@ export function EcranCout({ ctx }: { ctx: Ctx }) {
   const [eq, setEq] = useState(false)
   const [fin, setFin] = useState(false)
   const r = resume(ms)
-  const total = useCompte(r.v, { duree: 1200, delai: 400, actif: somme, reduit: ctx.reduit })
+  // Le total se compte en heures : chaque chose y a déjà versé les siennes,
+  // l'écran final arrive sur le chiffre atteint — il ne recompte pas de zéro.
+  const enHeures = r.label.startsWith('hours') && ms.every((x) => x.unit === 'hours')
+  const dejaCompte = enHeures && ms.length > 1
+  const total = useCompte(r.v, { de: dejaCompte ? r.v : 0, duree: 1200, delai: 400, actif: somme, reduit: ctx.reduit })
   const beaucoup = ms.length > 3
 
   const suivante = () => {
@@ -232,7 +270,9 @@ export function EcranCout({ ctx }: { ctx: Ctx }) {
   const m = ms[i]
   return (
     <View style={{ flex: 1 }}>
-      {!somme && m ? <BlocChose key={m.id} ctx={ctx} m={m} i={i} n={ms.length} onFin={blocFini} sortie={sortie} /> : null}
+      {!somme && m ? (
+        <BlocChose key={m.id} ctx={ctx} m={m} i={i} n={ms.length} onFin={blocFini} sortie={sortie} avant={enHeures ? ms.slice(0, i).reduce((a, x) => a + x.lostR, 0) : null} />
+      ) : null}
       {somme ? (
         <View style={{ position: 'absolute', left: 24, right: 24, top: ctx.haut }}>
           <Entree dl={100} reduit={ctx.reduit}>

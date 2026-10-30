@@ -12,6 +12,7 @@ describe('ce que coûte « demain »', () => {
     expect(m.unit).toBe('hours')
     expect(m.l1).toBe('Since March, you meant 104 workouts. You did 26.')
     expect(m.l2).toBe('If nothing changes, another 78 workouts are gone by March.')
+    expect(m.ticket).toEqual(['Since March.', '104 workouts planned.', '26 done.', expect.stringMatching(/ (hours gone|workouts skipped)\.$/)])
   })
 
   it('sous 40 h perdues, on compte les séances plutôt que les heures', () => {
