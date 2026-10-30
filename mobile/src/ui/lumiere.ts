@@ -93,9 +93,13 @@ export function accentApp(H: number) {
 /** La teinte du jour, en hex, pour les reflets des surfaces. */
 export const teinteApp = (H: number) => hex(lumiere(H).tc.map((x) => x * 255) as RVB)
 
-/** L'accent de l'introduction : bleu la nuit, ambre à midi, rouge le soir, violet tard. */
+/**
+ * L'accent de l'introduction : bleu la nuit, blanc chaud l'après-midi, orange
+ * puis rouge le soir, violet tard. (L'ambre de 12 h à 15 h 30 se lisait comme
+ * du jaune en plein après-midi : retiré le 2026-10-30.)
+ */
 const KF: [number, string][] = [
-  [0, '#6a73f0'], [5, '#6a73f0'], [7, '#4f8ff5'], [10, '#8fb2f5'], [12, '#e9a93f'], [15.5, '#e9a93f'],
+  [0, '#6a73f0'], [5, '#6a73f0'], [7, '#4f8ff5'], [10, '#8fb2f5'], [11.5, '#ece4d8'], [16, '#ece4d8'],
   [17.5, '#e0782c'], [19.5, '#dc4a26'], [21, '#cf1b29'], [23, '#8c45d6'], [24, '#6a73f0'],
 ]
 function accentRvb(h: number): RVB {
