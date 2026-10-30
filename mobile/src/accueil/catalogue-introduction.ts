@@ -53,13 +53,6 @@ export const FREQ: Frequence[] = [
     say: 'You said “rarely”.',
   },
 ]
-export const SOUS_FREQ = [
-  'The day ends, and it slides again.',
-  'Some days yes, most days later.',
-  'Now and then.',
-  'It almost never slips.',
-]
-
 export type Choix = [string, number]
 export const SINCE: Choix[] = [
   ['About a month', 4],

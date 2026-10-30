@@ -127,8 +127,11 @@ function BlocChose({
   const { height: hauteurEcran } = useWindowDimensions()
   // Un temps après l'autre : le chiffre seul, qui compte ; ce qu'il veut dire ;
   // les soirs, un à un ; puis les soirs s'en vont et laissent la suite.
-  const [etape, setEtape] = useState(0)
-  const COMPTE = 2200
+  // La première chose prend son temps ; les suivantes ne rejouent pas la même
+  // mise en scène : le chiffre et sa phrase arrivent ensemble, les soirs suivent.
+  const premier = i === 0
+  const [etape, setEtape] = useState(premier ? 0 : 1)
+  const COMPTE = premier ? 2200 : 1300
   const compte = useCompte(m.big, { duree: COMPTE, delai: 300, reduit: ctx.reduit })
   const rangs = calendrier(m.start, m.finish, frequence(ctx.e).pw, ctx.maintenant).length
   useEffect(() => {
@@ -138,11 +141,11 @@ function BlocChose({
       apres(1000, onFin)
       return
     }
-    const sens = COMPTE + 500
-    const soirs = sens + 1100
+    const sens = premier ? COMPTE + 500 : 0
+    const soirs = premier ? sens + 1100 : COMPTE + 400
     const suite = soirs + dureeCalendrier(rangs) + 1400
     apres(COMPTE + 300, () => vibrer('medium'))
-    apres(sens, () => setEtape(1))
+    if (premier) apres(sens, () => setEtape(1))
     apres(soirs, () => setEtape(2))
     apres(suite, () => setEtape(3))
     apres(suite + 900, onFin)

@@ -136,37 +136,26 @@ function Apercu({ tp }: { tp: Nature }) {
 
 
 /**
- * Ce qu'est chaque forme, montré plutôt qu'écrit :
+ * Une forme à la fois, une seule fois, montrée plutôt qu'écrite : la sienne
+ * s'anime, puis elle passe la main à la suivante. Ensuite le dessin reste ;
+ * avant son tour, la carte attend, atténuée.
  * - Task : des séances qui remplissent une barre jusqu'à la ligne d'arrivée, puis c'est fini.
  * - Goal : des séances qui se posent où il y a de la place, un jour ici, un jour là.
  * - Anchor : la même heure, les mêmes jours, épinglée — rien ne bouge.
  */
-const LEGENDE: Record<Nature, string> = {
-  TASK: 'Fills up. Then it’s done.',
-  GOAL: 'Finds room in your week.',
-  ANCHOR: 'Same time. Same days.',
-}
-
-/**
- * Une forme à la fois, une seule fois : la sienne s'anime pendant que quelques
- * mots disent ce qu'elle fait, puis elle passe la main à la suivante. Ensuite le
- * dessin et les mots restent ; avant son tour, la carte attend, atténuée.
- */
 function IllustrationNature({ t, reduit, actif, montre, onFin }: { t: Nature; reduit: boolean; actif: boolean; montre: boolean; onFin: () => void }) {
   const p = useRef(new Animated.Value(1)).current
-  const legende = useRef(new Animated.Value(0)).current
   const fin = useRef(onFin)
   fin.current = onFin
   useEffect(() => {
     if (!actif) {
-      // Déjà montrée : son dessin et ses mots restent. Pas encore : on attend son tour.
+      // Déjà montrée : son dessin reste. Pas encore : on attend son tour.
       p.setValue(1)
-      if (montre) legende.setValue(1)
       return
     }
     if (!reduit) p.setValue(0)
     const a = Animated.sequence([
-      Animated.timing(legende, { toValue: 1, duration: 320, easing: SORTIE, useNativeDriver: true }),
+      Animated.delay(320),
       reduit
         ? Animated.delay(900)
         : Animated.timing(p, { toValue: 1, duration: t === 'ANCHOR' ? 1100 : 2400, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
@@ -179,24 +168,11 @@ function IllustrationNature({ t, reduit, actif, montre, onFin }: { t: Nature; re
       cancelAnimationFrame(id)
       a.stop()
     }
-  }, [actif, montre, legende, p, reduit, t])
+  }, [actif, p, reduit, t])
   return (
     <View>
       <View style={{ opacity: actif || montre ? 1 : 0.45 }}>
         <DessinNature t={t} p={p} />
-      </View>
-      <View style={{ height: 22, marginTop: 8, justifyContent: 'center' }}>
-        <Animated.Text
-          style={{
-            color: C.t1,
-            fontFamily: GEIST.moyen,
-            fontSize: 14,
-            opacity: legende,
-            transform: [{ translateY: legende.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) }],
-          }}
-        >
-          {LEGENDE[t]}
-        </Animated.Text>
       </View>
     </View>
   )
@@ -659,11 +635,9 @@ export function EcranProtection({
         <Entree dl={150} reduit={ctx.reduit}>
           <Titre>Give it your undivided attention.</Titre>
         </Entree>
-        {!verrou ? (
-          <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
-            <Text style={{ color: sansCategorie ? C.t1 : C.t2, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>
-              {sansCategorie ? 'Pick at least one app.' : 'Pick the apps that pull you away.'}
-            </Text>
+        {!verrou && sansCategorie ? (
+          <Entree reduit={ctx.reduit} style={{ marginTop: 12 }}>
+            <Text style={{ color: C.t1, fontFamily: GEIST.normal, fontSize: 15, lineHeight: 21 }}>Pick at least one app.</Text>
           </Entree>
         ) : null}
         {verrou && selection && !simule ? (

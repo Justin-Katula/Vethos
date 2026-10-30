@@ -14,7 +14,6 @@ import {
   NOWO,
   PRIOS,
   SINCE,
-  SOUS_FREQ,
   STOPS,
   WORK,
   type Choix,
@@ -120,13 +119,10 @@ export function EcranPriorites({ ctx }: { ctx: Ctx }) {
         <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
           <Titre>What matters most to you right now?</Titre>
         </Entree>
-        <Entree dl={370} reduit={ctx.reduit} style={{ marginTop: 8 }}>
-          <Text style={T.gris}>Choose everything that’s true.</Text>
-        </Entree>
         <View style={{ gap: 8, marginTop: 24 }}>
-          {PRIOS.map(([p, sous], i) => (
+          {PRIOS.map(([p], i) => (
             <Entree key={p} dl={480 + i * 110} reduit={ctx.reduit}>
-              <Ligne titre={p} sous={sous} forme="check" pris={ctx.e.prios.includes(p)} onPress={() => bascule(p)} />
+              <Ligne titre={p} forme="check" pris={ctx.e.prios.includes(p)} onPress={() => bascule(p)} />
             </Entree>
           ))}
         </View>
@@ -184,7 +180,7 @@ export function EcranFrequence({ ctx }: { ctx: Ctx }) {
           <View style={{ gap: 8, marginTop: 24 }}>
             {FREQ.map((f, i) => (
               <Entree key={f.k} dl={480 + i * 110} reduit={ctx.reduit}>
-                <Ligne titre={f.k} sous={SOUS_FREQ[i]} forme="radio" pris={ctx.e.freq === i} onPress={() => toucher(i)} />
+                <Ligne titre={f.k} forme="radio" pris={ctx.e.freq === i} onPress={() => toucher(i)} />
               </Entree>
             ))}
           </View>
@@ -231,9 +227,6 @@ export function EcranRepousse({ ctx }: { ctx: Ctx }) {
       <Defile ctx={ctx}>
         <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
           <Titre>{frequence(ctx.e).title}</Titre>
-        </Entree>
-        <Entree dl={370} reduit={ctx.reduit} style={{ marginTop: 8 }}>
-          <Text style={T.gris}>Choose everything that’s true.</Text>
         </Entree>
         <View style={{ gap: 24, marginTop: 24 }}>
           {groupes.map((g) => (
@@ -363,9 +356,6 @@ export function EcranFreins({ ctx }: { ctx: Ctx }) {
       <Haut ctx={ctx}>
         <Entree dl={260} reduit={ctx.reduit} style={{ marginTop: 12 }}>
           <Titre>What usually stops you?</Titre>
-        </Entree>
-        <Entree dl={370} reduit={ctx.reduit} style={{ marginTop: 8 }}>
-          <Text style={T.gris}>Choose everything that’s true.</Text>
         </Entree>
         <View style={{ gap: 8, marginTop: 24 }}>
           {STOPS.map((s, i) => (

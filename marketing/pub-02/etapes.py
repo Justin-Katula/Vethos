@@ -6,10 +6,10 @@ Les gestes de l'onboarding, dans l'ordre. Chaque étape : (geste, cible, attente
 ETAPES = [
     ('taper', 'Alex', 0.6),
     ('clic', 'Continue', 1.5),
-    ('clic_label', 'School. Make room to learn.', 0.5),
-    ('clic_label', 'A project. Bring an idea to life.', 0.5),
+    ('clic_label', 'School', 0.5),
+    ('clic_label', 'A project', 0.5),
     ('clic', 'Continue', 1.5),
-    ('clic_label', 'Almost every evening. The day ends, and it slides again.', 1.5),
+    ('clic_label', 'Almost every evening', 1.5),
     ('clic', 'Studying', 0.4),
     ('clic', 'Building the first version', 0.4),
     ('clic', 'the one', 1.5),
