@@ -31,6 +31,7 @@ import {
   vibrer,
 } from './briques-introduction'
 import { useMinuteries } from './ecrans-ecoute'
+import { encreSur } from '@/ui/lumiere'
 
 /** Une horloge en millisecondes, de 0 à `jusqua`, pour synchroniser des centaines de points. */
 function useHorloge(jusqua: number, actif = true) {
@@ -72,11 +73,13 @@ function Calendrier({ m, pw, acc, reduit, maintenant, hauteurMax }: { m: Mesure;
           position: 'absolute',
           inset: 0,
           borderRadius: rayon,
-          backgroundColor: p.today ? C.t1 : p.rouge ? acc : C.s2,
+          // Aujourd'hui n'est pas un soir perdu : la case neutre, cerclée — pas une
+          // case blanche, que le blanc chaud de l'après-midi rendait identique aux autres.
+          backgroundColor: p.today ? C.s2 : p.rouge ? acc : C.s2,
           opacity: p.futur ? 0.35 : 1,
         }}
       />
-      {p.ring ? (
+      {p.ring || p.today ? (
         <View style={{ position: 'absolute', left: -3, top: -3, width: d + 6, height: d + 6, borderRadius: rayon + 2, borderWidth: 1.5, borderColor: C.t1 }} />
       ) : null}
     </Animated.View>
@@ -469,6 +472,10 @@ export function EcranBascule({ ctx }: { ctx: Ctx }) {
   const capO = useVers(cap ? 1 : 0, 700, SORTIE, cap && !ctx.reduit ? 350 : 0)
   const grilleO = useVers(cap && !ctx.reduit ? 0 : 1, 450)
   const cote = (Math.min(345, width - 48) - 19 * 4) / 20
+  // Un soir rendu s'allume en blanc ; mais quand la couleur de l'heure est
+  // déjà claire (blanc chaud l'après-midi), le blanc ne se verrait pas : il
+  // redevient un soir ordinaire, gris (opaque : il couvre la case colorée).
+  const libere = encreSur(ctx.acc) === '#000000' ? '#2a2a2a' : C.t1
   const fin = ajouter(midi(ctx.maintenant), 364)
   return (
     <Animated.View style={{ flex: 1, opacity: tout }}>
@@ -526,7 +533,7 @@ export function EcranBascule({ ctx }: { ctx: Ctx }) {
                       position: 'absolute',
                       inset: 0,
                       borderRadius: 3,
-                      backgroundColor: C.t1,
+                      backgroundColor: libere,
                       opacity: !b ? 0 : ctx.reduit ? 1 : vague.interpolate({ inputRange: [wd, wd + 420], outputRange: [0, 1], extrapolate: 'clamp' }),
                     }}
                   />
