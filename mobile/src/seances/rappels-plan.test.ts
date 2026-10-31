@@ -34,11 +34,27 @@ describe('Les rappels de « Je commence »', () => {
     expect(r[0]).toMatchObject({ corps: 'Starts in 5 min', avant: true, reportable: false })
   })
 
-  it('jamais plus de 60 en attente : les plus proches d’abord', () => {
+  it('jamais plus de 60 en attente — mais chaque bloc garde son appel à l’heure, même le dernier', () => {
     const blocs = [bloc('task-a', 600, 690), bloc('task-b', 720, 810), bloc('task-c', 840, 930), bloc('task-d', 960, 1050)]
     const r = rappelsAProgrammer({ blocsDuJour: blocs, confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit })
     expect(r).toHaveLength(RAPPELS_EN_ATTENTE_MAX)
-    expect(r.some((x) => x.blocId === 'task-d')).toBe(false)
+    for (const b of blocs) expect(r.some((x) => x.blocId === b.id && x.quand === minuit + b.startMinute * 60_000)).toBe(true)
+    // Rendus dans l'ordre du temps.
+    expect(r.map((x) => x.quand)).toEqual([...r.map((x) => x.quand)].sort((x, y) => x - y))
+  })
+
+  it('une journée chargée n’efface plus les appels des jours suivants (Vethos fermé, 2026-10-31)', () => {
+    // Avant : 4 blocs aujourd'hui × 21 rappels remplissaient les 60 places, et demain ne sonnait jamais.
+    const blocs = [bloc('task-a', 600, 690), bloc('task-b', 720, 810), bloc('task-c', 840, 930), bloc('task-d', 960, 1050)]
+    const jours = [1, 2, 3, 4, 5, 6].map((k) => ({ minuitMs: minuit + k * 86_400_000, blocs: [{ ...bloc(`task-j${k}`, 1080, 1170), date: `2026-10-${15 + k}` } as PlacedBlock] }))
+    const r = rappelsAProgrammer({ blocsDuJour: blocs, confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit, aVenir: jours })
+    for (const j of jours) expect(r.some((x) => x.blocId === j.blocs[0]!.id && x.corps.startsWith('It’s time'))).toBe(true)
+  })
+
+  it('ouvert en retard : le premier rappel encore à venir passe avant les relances des autres', () => {
+    const blocs = [bloc('task-a', 600, 690), bloc('task-b', 615, 700), bloc('task-c', 630, 720), bloc('task-d', 640, 730)]
+    const r = rappelsAProgrammer({ blocsDuJour: blocs, confirmes: new Set(), minuitMs: minuit, maintenantMs: minuit + 620 * 60_000 })
+    for (const b of blocs) expect(r.some((x) => x.blocId === b.id)).toBe(true)
   })
 })
 

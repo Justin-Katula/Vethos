@@ -43,18 +43,21 @@ export function rappelsAProgrammer(a: {
    */
   aVenir?: readonly { minuitMs: number; blocs: readonly PlacedBlock[] }[]
 }): Rappel[] {
-  const out: Rappel[] = []
+  // Le rang décide qui garde sa place quand iOS n'en a pas pour tous (60) :
+  // l'appel à l'heure de CHAQUE bloc d'abord (sans lui, rien ne dit que c'est
+  // l'heure tant que Vethos reste fermé), puis les préavis, puis les relances.
+  const out: (Rappel & { rang: number })[] = []
   for (const j of a.aVenir ?? []) {
     for (const b of j.blocs) {
       const cle = `${b.id}-${b.date}`
       const avant = j.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
       if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
-        out.push({ id: `rappel-${cle}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
+        out.push({ id: `rappel-${cle}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true, rang: b.kind === 'ancre' ? 0 : 1 })
       }
       if (b.kind === 'ancre') continue
       const quand = j.minuitMs + b.startMinute * 60_000
       if (quand > a.maintenantMs) {
-        out.push({ id: `rappel-${cle}-${b.startMinute}`, blocId: b.id, refId: b.refId, quand, titre: b.label, corps: 'It’s time. Not started yet — tap I’m starting.', reportable: reportable(b) })
+        out.push({ id: `rappel-${cle}-${b.startMinute}`, blocId: b.id, refId: b.refId, quand, titre: b.label, corps: 'It’s time. Not started yet — tap I’m starting.', reportable: reportable(b), rang: 0 })
       }
     }
   }
@@ -63,10 +66,11 @@ export function rappelsAProgrammer(a: {
     // 5 min avant : prévenu, pas encore appelé.
     const avant = a.minuitMs + (b.startMinute - PREAVIS_MINUTES) * 60_000
     if (b.startMinute >= PREAVIS_MINUTES && avant > a.maintenantMs) {
-      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true })
+      out.push({ id: `rappel-${b.id}-avant`, blocId: b.id, refId: b.refId, quand: avant, titre: b.label, corps: `Starts in ${PREAVIS_MINUTES} min`, reportable: reportable(b), avant: true, rang: b.kind === 'ancre' ? 0 : 1 })
     }
     // Une ancre démarre toute seule : seulement le préavis.
     if (b.kind === 'ancre') continue
+    let premierAVenir = true
     for (const m of minutesDeRappel(b)) {
       const quand = a.minuitMs + m * 60_000
       if (quand <= a.maintenantMs) continue
@@ -81,10 +85,18 @@ export function rappelsAProgrammer(a: {
         // ne croie jamais être déjà en séance.
         corps: retard === 0 ? 'It’s time. Not started yet — tap I’m starting.' : `${retard} min late. Not started yet — tap I’m starting.`,
         reportable: reportable(b),
+        // Le premier rappel encore à venir compte comme l'appel : déjà en retard
+        // à l'ouverture, c'est lui qui dit « c'est l'heure ».
+        rang: premierAVenir ? 0 : 2,
       })
+      premierAVenir = false
     }
   }
-  return out.sort((x, y) => x.quand - y.quand).slice(0, RAPPELS_EN_ATTENTE_MAX)
+  return out
+    .sort((x, y) => x.rang - y.rang || x.quand - y.quand)
+    .slice(0, RAPPELS_EN_ATTENTE_MAX)
+    .sort((x, y) => x.quand - y.quand)
+    .map(({ rang: _rang, ...r }) => r)
 }
 
 /** Une empreinte stable : on ne reprogramme que si elle change. */

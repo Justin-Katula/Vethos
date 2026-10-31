@@ -125,11 +125,17 @@ function useSourcePlan() {
   const theme = useNomTheme()
 
   const [instant, setInstant] = useState(() => Math.floor(Date.now() / 60_000) * 60_000)
+  // Chaque retour au premier plan compte comme une ouverture : iOS et les
+  // rappels sont reposés en entier, sur le plan tel qu'il est devenu.
+  const [ouvertures, setOuvertures] = useState(0)
   useEffect(() => {
     const actualiser = () => setInstant(Math.floor(Date.now() / 60_000) * 60_000)
     const intervalle = setInterval(actualiser, 1000)
     const retour = AppState.addEventListener('change', (etat) => {
-      if (etat === 'active') actualiser()
+      if (etat === 'active') {
+        actualiser()
+        setOuvertures((n) => n + 1)
+      }
     })
     return () => { clearInterval(intervalle); retour.remove() }
   }, [])
@@ -228,9 +234,14 @@ function useSourcePlan() {
   // les plages relues de la mémoire disent ce que Vethos avait DEMANDÉ, pas ce
   // qu'iOS tient encore (une mise à jour, un redémarrage peuvent l'avoir vidé).
   const programmeDepuisOuverture = useRef(false)
+  const ouvertureVue = useRef(0)
   const levee = useBlocage((e) => e.levee)
   useEffect(() => {
     if (!prets) return
+    if (ouvertureVue.current !== ouvertures) {
+      ouvertureVue.current = ouvertures
+      programmeDepuisOuverture.current = false
+    }
     const b = useBlocage.getState()
     const selection = b.selection
     if (!selection || selectionEstVide(selection)) return
@@ -274,19 +285,29 @@ function useSourcePlan() {
     const prochain = [...auto].sort((x, y) => x.debutMinute - y.debutMinute)[0]
     const bloc = prochain && blocsBlocage.find((x) => x.id === prochain.blocId)
     if (bloc && prochain && !calcul.seanceActive) b.habiller({ theme, titreBloc: bloc.label, finMinute: prochain.finMinute })
-    void b.appliquerPlan(voulues)
-  }, [prets, blocsDuJour, blocsBlocage, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee, reglages.coucher, reglages.lever])
+    // Recalculé au moment de son tour : une séance posée entre-temps (« I'm
+    // starting ») est dans les plages en vigueur, et n'est pas effacée.
+    const toutAuto = [...auto, ...avenir]
+    const idsDuPlan = new Set([...blocsDuJour, ...blocsBlocage].map((x) => x.id))
+    void b.appliquerPlan((actives) => fusionnerAuto({ actives, auto: toutAuto, idsDuPlan, confirmes }))
+  }, [prets, ouvertures, blocsDuJour, blocsBlocage, confirmations.confirmedAt, calcul.minute, calcul.seanceActive, calcul.aujourdHui, calcul.resultat, theme, levee, reglages.coucher, reglages.lever])
 
   // Les rappels de « Je commence » : toutes les 3 min dès le début du bloc,
   // vingt au plus, jusqu'à la confirmation. Reprogrammés quand ils changent.
   const derniersRappels = useRef<string | null>(null)
+  const ouvertureRappels = useRef(-1)
   useEffect(() => {
     if (!prets) return
+    // À chaque ouverture, on repose tout, même inchangé : iOS a pu en perdre.
+    if (ouvertureRappels.current !== ouvertures) {
+      ouvertureRappels.current = ouvertures
+      derniersRappels.current = null
+    }
     const minuit = new Date(calcul.maintenant)
     minuit.setHours(0, 0, 0, 0)
-    // Demain et après-demain : préavis et appel à l'heure, au cas où Vethos
+    // Toute la semaine du plan : préavis et appel à l'heure, au cas où Vethos
     // ne serait pas ouvert d'ici là. Chaque ouverture les recalcule.
-    const aVenir = [1, 2].map((k) => {
+    const aVenir = [1, 2, 3, 4, 5, 6].map((k) => {
       const m = new Date(minuit)
       m.setDate(m.getDate() + k)
       const date = addDays(calcul.aujourdHui, k)
@@ -307,7 +328,7 @@ function useSourcePlan() {
       if (rappels.length > 0) await demanderAutorisation()
       await programmerRappels(rappels)
     })()
-  }, [prets, blocsBlocage, confirmations.confirmedAt, calcul.maintenant, calcul.resultat, calcul.aujourdHui])
+  }, [prets, ouvertures, blocsBlocage, confirmations.confirmedAt, calcul.maintenant, calcul.resultat, calcul.aujourdHui])
 
   // Diagnostic de développement : si le plan perd des blocs d'un instant à l'autre,
   // la cause est écrite dans la console de Metro (données rechargées, tâches
@@ -958,8 +979,7 @@ function useSourcePlan() {
         await poser({ apprentissage: { ...l, sessionEvents: [...(l.sessionEvents ?? []), trace].slice(-3000) }, confirmations })
         // Toute la journée est reportée : plus rien d'automatique ne bloque aujourd'hui.
         await blocage().suspendre(1440)
-        const plages = blocage().plagesActives.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt)))
-        await blocage().appliquerPlan(plages)
+        await blocage().appliquerPlan((a) => a.filter((p) => !blocsDuJour.some((x) => x.id === p.blocId && !(x.id in frais.confirmations.confirmedAt))))
       },
     },
     /**
@@ -1150,7 +1170,7 @@ function useSourcePlan() {
       await poser({ apprentissage: r.apprentissage, confirmations: r.confirmations })
       const blocage = useBlocage.getState()
       if (blocId && blocage.plagesActives.some((p) => p.blocId === blocId)) {
-        await blocage.appliquerPlan(blocage.plagesActives.filter((p) => p.blocId !== blocId))
+        await blocage.appliquerPlan((a) => a.filter((p) => p.blocId !== blocId))
       }
       // Le texte d'un arrêt RESTE sur l'appareil (principe : données locales) :
       // il n'est lu que par les mots-clés, jamais envoyé au Coach.

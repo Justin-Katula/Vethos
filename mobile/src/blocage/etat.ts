@@ -20,6 +20,8 @@ import { hhmm, noter } from '@/journal/journal'
 
 const CLE = 'vethos:blocage:v1'
 
+let fileProgrammation: Promise<void> = Promise.resolve()
+
 /** La cle du jour, dans la meme convention que le moteur : local, jamais UTC. */
 function cleDuJour(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -102,7 +104,15 @@ type EtatBlocage = {
   habiller: (args: { theme: NomTheme; finMinute: number; titreBloc?: string | null }) => void
   /** Demande a iOS ce qu'il fait vraiment, au lieu de le supposer. */
   verifier: () => boolean
-  appliquerPlan: (plages: readonly Plage[]) => Promise<void>
+  /**
+   * Programme iOS. Une liste, ou mieux une fonction des plages en vigueur au
+   * moment où son tour vient : les programmations passent une à une, et une
+   * liste calculée avant son tour pouvait effacer ce que la précédente venait
+   * de poser (la séance de « I'm starting », écrasée par le recalcul du plan).
+   */
+  appliquerPlan: (plages: readonly Plage[] | ((actives: readonly Plage[]) => readonly Plage[])) => Promise<void>
+  /** Interne : la programmation elle-même. Passer par `appliquerPlan`, qui les met en file. */
+  appliquerPlanMaintenant: (plages: readonly Plage[]) => Promise<void>
   /**
    * D.8 : ouvre le bouclier pour une seance qu'on vient de confirmer.
    *
@@ -230,26 +240,26 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
     // La liste gardee ne vit pas seulement chez nous : `enableBlockAllMode` la
     // lit sur l'appareil. La reposer tout de suite evite qu'une seance en
     // cours continue avec l'ancienne, ce que rien a l'ecran ne montrerait.
-    if (get().plagesActives.length > 0) await get().appliquerPlan(get().plagesActives)
+    if (get().plagesActives.length > 0) await get().appliquerPlan((a) => a)
   },
 
   async poserJamais(jamais) {
     set({ jamais })
     await ranger(get())
     // Écarté tout le temps : on reprogramme tout de suite, séance ou pas.
-    await get().appliquerPlan(get().plagesActives)
+    await get().appliquerPlan((a) => a)
   },
 
   async choisirMode(mode) {
     set({ mode })
     await ranger(get())
-    if (get().plagesActives.length > 0) await get().appliquerPlan(get().plagesActives)
+    if (get().plagesActives.length > 0) await get().appliquerPlan((a) => a)
   },
 
   async basculerFiltreWeb() {
     set({ filtrerLeWeb: !get().filtrerLeWeb })
     await ranger(get())
-    if (get().plagesActives.length > 0) await get().appliquerPlan(get().plagesActives)
+    if (get().plagesActives.length > 0) await get().appliquerPlan((a) => a)
   },
 
   habiller(args) {
@@ -297,10 +307,20 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
         finMinute: plage.finMinute,
       })
     }
-    await get().appliquerPlan(avecPlage(get().plagesActives, plage))
+    await get().appliquerPlan((a) => avecPlage(a, plage))
   },
 
-  async appliquerPlan(plages) {
+  appliquerPlan(entree) {
+    // Une programmation à la fois. Deux appels entremêlés (une minute qui
+    // passe pendant qu'iOS reçoit la liste) : le second effaçait tout au milieu
+    // de la boucle du premier, et iOS gardait un mélange des deux.
+    fileProgrammation = fileProgrammation
+      .then(() => get().appliquerPlanMaintenant(typeof entree === 'function' ? entree(get().plagesActives) : entree))
+      .catch(() => undefined)
+    return fileProgrammation
+  },
+
+  async appliquerPlanMaintenant(plages) {
     const selection = get().selection
     // Sans liste de distractions, « Never allowed » doit encore tenir.
     if (!selection && !get().jamais) return
@@ -342,9 +362,8 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   },
 
   async pauser(blocId, reprendMinute, urgenceId) {
-    const plages = get().plagesActives
-    if (!plages.some((p) => p.blocId === blocId)) return
-    await get().appliquerPlan(plages.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(reprendMinute, p.finMinute - 1) } : p)))
+    if (!get().plagesActives.some((p) => p.blocId === blocId)) return
+    await get().appliquerPlan((a) => a.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(reprendMinute, p.finMinute - 1) } : p)))
     const selection = get().selection
     if (urgenceId && selection) {
       pontEcran().bloquerSauf({ selectionId: selection.identifiant, exceptionId: urgenceId, profond: get().mode === 'profond' })
@@ -353,14 +372,15 @@ export const useBlocage = create<EtatBlocage>((set, get) => ({
   },
 
   async reprendre(blocId, minute) {
-    const plages = get().plagesActives
-    if (!plages.some((p) => p.blocId === blocId)) return
-    await get().appliquerPlan(plages.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(minute, p.debutMinute) } : p)))
+    if (!get().plagesActives.some((p) => p.blocId === blocId)) return
+    await get().appliquerPlan((a) => a.map((p) => (p.blocId === blocId ? { ...p, debutMinute: Math.min(minute, p.debutMinute) } : p)))
   },
 
   async remplacerPlage(blocId, nouvelle) {
-    const autres = get().plagesActives.filter((p) => p.blocId !== blocId)
-    await get().appliquerPlan(nouvelle ? [...autres, nouvelle] : autres)
+    await get().appliquerPlan((a) => {
+      const autres = a.filter((p) => p.blocId !== blocId)
+      return nouvelle ? [...autres, nouvelle] : autres
+    })
   },
 
   async toutLever() {

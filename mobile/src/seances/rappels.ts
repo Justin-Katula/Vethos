@@ -146,8 +146,22 @@ export async function demanderAutorisation(): Promise<boolean> {
   }
 }
 
-/** Remplace tous les rappels programmés par ceux-ci. */
-export async function programmerRappels(rappels: readonly Rappel[]): Promise<void> {
+/**
+ * Remplace tous les rappels programmés par ceux-ci.
+ *
+ * Une écriture à la fois, et seule la dernière demande compte : deux
+ * programmations entremêlées (la minute qui change pendant qu'on écrit)
+ * effaçaient les rappels de l'autre, ou les doublaient.
+ */
+let fileRappels: Promise<void> = Promise.resolve()
+let derniereDemande = 0
+export function programmerRappels(rappels: readonly Rappel[]): Promise<void> {
+  const n = ++derniereDemande
+  fileRappels = fileRappels.then(() => (n === derniereDemande ? ecrireRappels(rappels) : undefined))
+  return fileRappels
+}
+
+async function ecrireRappels(rappels: readonly Rappel[]): Promise<void> {
   const N = natif()
   if (!N) return
   try {
