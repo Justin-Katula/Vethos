@@ -147,7 +147,7 @@ export async function demanderAutorisation(): Promise<boolean> {
 }
 
 /**
- * Remplace tous les rappels programmés par ceux-ci.
+ * Fait correspondre les rappels programmés à ceux-ci.
  *
  * Une écriture à la fois, et seule la dernière demande compte : deux
  * programmations entremêlées (la minute qui change pendant qu'on écrit)
@@ -161,35 +161,55 @@ export function programmerRappels(rappels: readonly Rappel[]): Promise<void> {
   return fileRappels
 }
 
+/** Une empreinte courte : le même rappel (heure, texte, boutons) garde le même identifiant. */
+function empreinte(texte: string): string {
+  let h = 5381
+  for (let i = 0; i < texte.length; i++) h = ((h << 5) + h + texte.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+/**
+ * On ne touche qu'à ce qui change : les rappels déjà en place restent, les
+ * périmés partent, les nouveaux arrivent — les plus proches d'abord. Tout
+ * effacer puis tout reposer laissait iOS sans rappels si Vethos était fermé
+ * au milieu de l'écriture.
+ */
 async function ecrireRappels(rappels: readonly Rappel[]): Promise<void> {
   const N = natif()
   if (!N) return
   try {
-    await N.cancelAllScheduledNotificationsAsync()
-    const prochain = rappels[0]
-    noter(
-      'Reminders',
-      rappels.length === 0
-        ? 'All cancelled, none scheduled.'
-        : `${rappels.length} scheduled. Next ${new Date(prochain!.quand).toTimeString().slice(0, 5)} “${prochain!.titre}”.`,
-    )
-    for (const r of rappels) {
+    const voulus = rappels.map((r) => {
+      const categorie = r.avant ? (r.reportable ? CATEGORIE_AVANT : undefined) : r.reportable ? CATEGORIE : CATEGORIE_ANCRE
+      return { r, categorie, id: `${r.id}|${empreinte(`${r.quand}|${r.titre}|${r.corps}|${categorie ?? ''}|${r.refId}`)}` }
+    })
+    const ids = new Set(voulus.map((v) => v.id))
+    const enPlace = (await N.getAllScheduledNotificationsAsync()).map((n) => n.identifier)
+    const dejaLa = new Set(enPlace)
+    const nouveaux = voulus.filter((v) => !dejaLa.has(v.id))
+    // Le ménage d'abord (iOS n'en garde que 64 : les nouveaux ne doivent pas
+    // être ceux qu'il jette), puis les nouveaux, le plus proche en tête. Les
+    // rappels toujours valables ne quittent jamais la file.
+    const perimes = enPlace.filter((id) => !ids.has(id))
+    for (const id of perimes) await N.cancelScheduledNotificationAsync(id)
+    for (const { r, categorie, id } of nouveaux) {
       await N.scheduleNotificationAsync({
-        identifier: r.id,
+        identifier: id,
         content: {
           title: r.titre,
           body: r.corps,
           sound: 'default',
-          ...(r.avant
-            ? r.reportable
-              ? { categoryIdentifier: CATEGORIE_AVANT }
-              : {}
-            : { categoryIdentifier: r.reportable ? CATEGORIE : CATEGORIE_ANCRE }),
+          ...(categorie ? { categoryIdentifier: categorie } : {}),
           data: { blocId: r.blocId, refId: r.refId },
         },
         trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: new Date(r.quand) },
       })
     }
+    const prochain = rappels[0]
+    noter(
+      'Reminders',
+      (rappels.length === 0 ? 'None scheduled.' : `${rappels.length} scheduled. Next ${new Date(prochain!.quand).toTimeString().slice(0, 5)} “${prochain!.titre}”.`) +
+        ` (+${nouveaux.length} new, −${perimes.length} removed)`,
+    )
   } catch {
     // Module absent ou autorisation refusée : rien à programmer.
   }

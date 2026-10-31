@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "deploymentTarget": "16.4",
       "infoPlist": {
-        "NSFamilyControlsUsageDescription": "Vethos uses Screen Time to set aside the apps you picked yourself, for the length of a session you started. Nothing leaves your phone — iOS never tells Vethos which apps they are.",
+        "NSFamilyControlsUsageDescription": "Vethos uses Screen Time to set aside the apps you picked yourself, during the work sessions and sleep hours of your plan. Nothing leaves your phone — iOS never tells Vethos which apps they are.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
