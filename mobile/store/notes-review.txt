@@ -1,0 +1,13 @@
+Sign-in: Vethos only offers Sign in with Apple and Sign in with Google, so no demo account is needed. Any Apple ID works with "Continue with Apple".
+
+Subscription: after sign-in, Vethos requires Vethos Pro. Please use a sandbox account: the yearly plan includes a 1-week free trial. Restore, Terms of Use (Apple standard EULA) and Privacy Policy are on the subscription screen.
+
+Screen Time: blocking uses the Family Controls framework (FamilyActivityPicker, ManagedSettings, DeviceActivity). During onboarding, Vethos asks for Screen Time access ("Lock my distractions"); allow it, then pick apps to block. Apps can be changed later in the Blocking tab. The picked apps are shielded only during the user's own plan: when a planned work session starts (up to 1 hour until the user taps "I'm starting", then until the session ends) and during the sleep hours the user set in onboarding. Vethos never sees which apps were picked.
+
+To see it quickly: Commitments tab → + → add a task due tomorrow → the Today tab shows the session; tap "I'm starting" when it begins.
+
+Notifications: Vethos reminds the user when a planned session starts ("I'm starting" / "Later" buttons on the notification).
+
+AI review (guideline 5.1.2): when a user ends a session early (Stop), postpones it (Later), or repeatedly removes commitments, they write what happened. The first time they write a reason, Vethos asks for permission ("Your answer is reviewed by AI." → Continue / Use fixed rules) before anything is sent. With permission, the text is reviewed by a language model (DeepSeek) through our server. Without permission, fixed rules decide and nothing is sent.
+
+Account deletion: Profile (avatar on the Today tab) → Account → Delete account.
