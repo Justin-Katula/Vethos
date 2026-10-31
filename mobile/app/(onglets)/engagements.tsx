@@ -7,7 +7,7 @@
  */
 import { useCallback, useRef, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
-import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle } from 'react-native-svg'
 import { useDonnees, type Tache } from '@/donnees/magasin'
@@ -39,6 +39,7 @@ import {
   Plus,
   TitrePage,
   TRAIT,
+  useHauteurClavier,
   useLumiere,
   useToast,
   type NatureApp,
@@ -596,6 +597,9 @@ function Formulaire({ nature, ancres, fermer, creer }: { nature: NatureApp | nul
   }
   if (!nature && precedent.current) precedent.current = null
   const { acc } = useLumiere()
+  const clavier = useHauteurClavier()
+  const { height: hauteurEcran } = useWindowDimensions()
+  const marges = useSafeAreaInsets()
   const [titre, ph, cta] = FORM[K]
   const pret = nom.trim().length > 0 && plan.trim().length > 0
   const champ = { height: 44, borderRadius: 8, backgroundColor: 'rgba(242,242,242,0.07)', paddingHorizontal: 14, color: A.t1, fontFamily: GEIST.moyen, fontSize: 15 } as const
@@ -633,7 +637,9 @@ function Formulaire({ nature, ancres, fermer, creer }: { nature: NatureApp | nul
     }
   }
   return (
-    <Feuille ouverte={ouvert} fermer={fermer} voile={false} style={{ paddingHorizontal: 14, paddingBottom: 16, maxHeight: 720 }}>
+    // 720 au plus — mais jamais plus que la place au-dessus du clavier : un 720 fixe
+    // écrasait la hauteur que la feuille calcule, et le nom qu'on tapait sortait par le haut.
+    <Feuille ouverte={ouvert} fermer={fermer} voile={false} style={{ paddingHorizontal: 14, paddingBottom: 16, maxHeight: clavier > 0 ? Math.min(720, hauteurEcran - clavier - marges.top - 16) : 720 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 8, paddingRight: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: TRAIT[K] }} />
