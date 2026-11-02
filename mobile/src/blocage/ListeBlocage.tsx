@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Pressable, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { A, Carte, GEIST, Plus } from '@/ui/app-briques'
@@ -57,7 +57,16 @@ export function ListeBlocage({
   const { height: hauteurEcran } = useWindowDimensions()
   const marges = useSafeAreaInsets()
   const naturelle = Math.max(0, total * Math.round(16 * 1.9) + (total - 1) * 12)
-  const hauteur = pleineHauteur ? Math.min(naturelle, Math.max(200, hauteurEcran - marges.top - 300)) : naturelle
+  // Pleine hauteur : la liste grandit avec ce qu'on bloque, jusqu'à toucher la
+  // barre d'onglets — sans passer dessous, sans qu'il faille faire défiler la
+  // page pour la voir. Au-delà, elle défile en elle-même. Le haut de la liste
+  // est mesuré à l'écran, pas deviné.
+  const debut = useRef<View>(null)
+  const [haut, setHaut] = useState<number | null>(null)
+  const barre = 49 + Math.max(marges.bottom, 12)
+  const sousLaListe = 16 + 12 + (verrou ? 28 : 0) // le bas de la carte, un souffle au-dessus de la barre, « Locked… »
+  const place = haut === null ? hauteurEcran - marges.top - 300 : hauteurEcran - haut - barre - sousLaListe
+  const hauteur = pleineHauteur ? Math.min(naturelle, Math.max(120, Math.floor(place))) : naturelle
 
   return (
     <Carte style={{ paddingTop: 18, paddingHorizontal: 16, paddingBottom: 16 }}>
@@ -82,7 +91,11 @@ export function ListeBlocage({
       </View>
 
       {!vide && selection ? (
-        <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}>
+        <View
+          ref={debut}
+          onLayout={() => debut.current?.measureInWindow((_x, y) => setHaut(y + 14))}
+          style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: A.ligne }}
+        >
           {Vue ? (
             <Vue
               selectionId={selection.identifiant}
