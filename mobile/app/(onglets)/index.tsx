@@ -15,7 +15,6 @@ import { finTexte, type SegmentTemps } from '@/plan/lecture'
 import { ChargementVethos } from '@/ui/MouvementVethos'
 import { ArretSeance, BanniereProlongation, CarteJourLibre, DemarrerSeance } from '@/seances/ArretSeance'
 import { useSeances } from '@/seances/magasin-seances'
-import { RevueDimanche } from '@/coach/RevueDimanche'
 import { afterMissLine, effectiveContract } from '@shared/contract'
 import { peutParler } from '@shared/coach/coach'
 import { autonomie } from '@shared/planning/habitudes'
@@ -275,7 +274,7 @@ export default function Aujourdhui() {
 
       <BanniereProlongation />
       <CarteJourLibre />
-      <RevueDimanche />
+      {/* La revue de la semaine n'est plus montrée : le moteur fait ses calculs et les garde pour lui. */}
 
       {ligneRate ? (
         <Text style={{ marginTop: 8, marginHorizontal: 20, color: A.t2, fontFamily: GEIST.normal, fontSize: 13, lineHeight: 18 }}>{ligneRate}</Text>
