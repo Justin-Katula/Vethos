@@ -1,0 +1,811 @@
+:root {
+  --bg-base: #070708;
+  --bg-elevated: rgba(18, 18, 20, 0.94);
+  --bg-card: rgba(26, 26, 29, 0.78);
+  --bg-card-hover: rgba(38, 38, 42, 0.88);
+  --border-subtle: rgba(216, 216, 216, 0.1);
+  --border-strong: rgba(216, 216, 216, 0.22);
+  --text-primary: #e8e8e8;
+  --text-secondary: #b4b4b6;
+  --text-muted: #7e7e82;
+  --accent: #d8d8d8;
+  --accent-hover: #f0f0f0;
+  --accent-soft: rgba(216, 216, 216, 0.16);
+  --cool: #9ec7d7;
+  --warm: #d3b16b;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 28px rgba(0, 0, 0, 0.52);
+  --shadow-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 56px rgba(0, 0, 0, 0.62);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+svg {
+  display: block;
+}
+
+code {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+}
+
+.background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.falling-layer {
+  position: absolute;
+  inset: -20% 0;
+  background-repeat: repeat;
+  opacity: 0.88;
+  filter: blur(9px);
+  transform: translateZ(0);
+}
+
+.falling-layer-a {
+  background-image:
+    radial-gradient(4px 100px at 0 235px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 235px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 117.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 252px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 252px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 126px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 150px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 150px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 75px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 253px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 253px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 126.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 204px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 204px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 102px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 134px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 134px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 67px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 179px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 179px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 89.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 299px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 299px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 149.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 215px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 215px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 107.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 281px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 281px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 140.5px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 158px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 158px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 79px, rgba(232, 232, 232, 0.42) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 210px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(4px 100px at 300px 210px, rgba(232, 232, 232, 0.42), transparent),
+    radial-gradient(1.5px 1.5px at 150px 105px, rgba(232, 232, 232, 0.42) 100%, transparent 150%);
+  background-size:
+    300px 235px, 300px 235px, 300px 235px,
+    300px 252px, 300px 252px, 300px 252px,
+    300px 150px, 300px 150px, 300px 150px,
+    300px 253px, 300px 253px, 300px 253px,
+    300px 204px, 300px 204px, 300px 204px,
+    300px 134px, 300px 134px, 300px 134px,
+    300px 179px, 300px 179px, 300px 179px,
+    300px 299px, 300px 299px, 300px 299px,
+    300px 215px, 300px 215px, 300px 215px,
+    300px 281px, 300px 281px, 300px 281px,
+    300px 158px, 300px 158px, 300px 158px,
+    300px 210px, 300px 210px, 300px 210px;
+  animation: falling-a 150s linear infinite;
+}
+
+.falling-layer-b {
+  background-image:
+    radial-gradient(4px 100px at 0 235px, rgba(158, 199, 215, 0.2), transparent),
+    radial-gradient(4px 100px at 300px 235px, rgba(158, 199, 215, 0.2), transparent),
+    radial-gradient(1.5px 1.5px at 150px 117.5px, rgba(158, 199, 215, 0.24) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 253px, rgba(211, 177, 107, 0.13), transparent),
+    radial-gradient(4px 100px at 300px 253px, rgba(211, 177, 107, 0.13), transparent),
+    radial-gradient(1.5px 1.5px at 150px 126.5px, rgba(211, 177, 107, 0.16) 100%, transparent 150%),
+    radial-gradient(4px 100px at 0 179px, rgba(158, 199, 215, 0.16), transparent),
+    radial-gradient(4px 100px at 300px 179px, rgba(158, 199, 215, 0.16), transparent),
+    radial-gradient(1.5px 1.5px at 150px 89.5px, rgba(158, 199, 215, 0.18) 100%, transparent 150%);
+  background-size:
+    300px 235px, 300px 235px, 300px 235px,
+    300px 253px, 300px 253px, 300px 253px,
+    300px 179px, 300px 179px, 300px 179px;
+  animation: falling-b 180s linear infinite;
+}
+
+.mesh-layer {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 2px, var(--bg-base) 2px);
+  background-size: 8px 8px;
+  opacity: 0.95;
+}
+
+@keyframes falling-a {
+  from {
+    background-position: 0px 220px, 3px 220px, 151.5px 337.5px, 25px 24px, 28px 24px, 176.5px 150px, 50px 16px, 53px 16px, 201.5px 91px, 75px 224px, 78px 224px, 226.5px 230.5px, 100px 19px, 103px 19px, 251.5px 121px, 125px 120px, 128px 120px, 276.5px 187px, 150px 31px, 153px 31px, 301.5px 120.5px, 175px 235px, 178px 235px, 326.5px 384.5px, 200px 121px, 203px 121px, 351.5px 228.5px, 225px 224px, 228px 224px, 376.5px 364.5px, 250px 26px, 253px 26px, 401.5px 105px, 275px 75px, 278px 75px, 426.5px 180px;
+  }
+  to {
+    background-position: 0px 6800px, 3px 6800px, 151.5px 6917.5px, 25px 13632px, 28px 13632px, 176.5px 13758px, 50px 5416px, 53px 5416px, 201.5px 5491px, 75px 17175px, 78px 17175px, 226.5px 17301.5px, 100px 5119px, 103px 5119px, 251.5px 5221px, 125px 8428px, 128px 8428px, 276.5px 8495px, 150px 9876px, 153px 9876px, 301.5px 9965.5px, 175px 13391px, 178px 13391px, 326.5px 13540.5px, 200px 14741px, 203px 14741px, 351.5px 14848.5px, 225px 18770px, 228px 18770px, 376.5px 18910.5px, 250px 5082px, 253px 5082px, 401.5px 5161px, 275px 6375px, 278px 6375px, 426.5px 6480px;
+  }
+}
+
+@keyframes falling-b {
+  from {
+    background-position: 50px 16px, 53px 16px, 201.5px 91px, 125px 120px, 128px 120px, 276.5px 187px, 200px 121px, 203px 121px, 351.5px 228.5px;
+  }
+  to {
+    background-position: 50px 5416px, 53px 5416px, 201.5px 5491px, 125px 8428px, 128px 8428px, 276.5px 8495px, 200px 14741px, 203px 14741px, 351.5px 14848.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .falling-layer {
+    animation: none;
+  }
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 48px;
+  border-bottom: 1px solid rgba(216, 216, 216, 0.08);
+  background: rgba(2, 2, 2, 0.76);
+  backdrop-filter: blur(16px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.nav-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), color 200ms var(--ease-out);
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible {
+  border-color: var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.nav-links .nav-download {
+  border-color: rgba(216, 216, 216, 0.34);
+  background: var(--accent);
+  color: #050505;
+}
+
+.nav-links .nav-download:hover,
+.nav-links .nav-download:focus-visible {
+  border-color: rgba(255, 255, 255, 0.46);
+  background: var(--accent-hover);
+  color: #050505;
+}
+
+.hero {
+  display: flex;
+  min-height: 78svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  padding: 58px 24px 34px;
+}
+
+.hero-content {
+  width: min(920px, 100%);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  letter-spacing: 0;
+}
+
+h1 {
+  margin: 8px 0 0;
+  font-size: 72px;
+  line-height: 1;
+  font-weight: 760;
+}
+
+.hero-copy {
+  width: min(690px, 100%);
+  margin: 18px auto 0;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.button {
+  position: relative;
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: var(--radius-md);
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 750;
+  text-align: center;
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+.button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.button:hover,
+.button:focus-visible {
+  transform: translateY(-1px);
+}
+
+.button-primary {
+  border-color: rgba(216, 216, 216, 0.42);
+  background: var(--accent);
+  color: #050505;
+}
+
+.button-primary:hover,
+.button-primary:focus-visible {
+  border-color: rgba(255, 255, 255, 0.62);
+  background: var(--accent-hover);
+}
+
+.button-secondary {
+  border-color: var(--border-subtle);
+  background: rgba(12, 12, 13, 0.76);
+  color: var(--text-primary);
+}
+
+.button-secondary:hover,
+.button-secondary:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+.download-note {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.app-preview {
+  display: grid;
+  width: min(1040px, 100%);
+  min-height: 390px;
+  grid-template-columns: 210px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: rgba(8, 8, 9, 0.9);
+  box-shadow: var(--shadow-elevated);
+}
+
+.preview-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-right: 1px solid var(--border-subtle);
+  background: rgba(6, 6, 7, 0.78);
+  padding: 20px;
+}
+
+.preview-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.preview-logo {
+  width: 24px;
+  height: 24px;
+  border: 6px solid #858585;
+  border-top-color: #c9cdd2;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.side-item {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.side-item.active {
+  border-color: var(--border-subtle);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.preview-main {
+  padding: 26px;
+}
+
+.preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.preview-top strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 28px;
+}
+
+.micro-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-pill {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  border: 1px solid rgba(158, 199, 215, 0.26);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  background: rgba(158, 199, 215, 0.08);
+  color: #cce2ea;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+}
+
+.time-ring {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 50%;
+  background:
+    conic-gradient(from -90deg, #111113 0deg 92deg, #a8a8ac 92deg 138deg, #1f2024 138deg 214deg, var(--cool) 214deg 254deg, #151518 254deg 360deg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 22px 50px rgba(0, 0, 0, 0.48);
+}
+
+.time-ring::before {
+  position: absolute;
+  inset: 22px;
+  content: "";
+  border-radius: inherit;
+  background: #060607;
+}
+
+.time-ring span {
+  position: absolute;
+  inset: 104px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 8px rgba(216, 216, 216, 0.08);
+}
+
+.preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mini-panel,
+.info-panel,
+.release-card,
+.steps li {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  transition: border-color 250ms var(--ease-out), background 250ms var(--ease-out), box-shadow 250ms var(--ease-out), transform 250ms var(--ease-out);
+}
+
+.mini-panel:hover,
+.info-panel:hover,
+.release-card:hover,
+.steps li:hover {
+  border-color: var(--border-strong);
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%, transparent),
+    var(--bg-card-hover);
+  background-size: 6px 6px, auto, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 14px 34px rgba(0, 0, 0, 0.42);
+  transform: translateY(-1px);
+}
+
+.mini-panel {
+  min-height: 84px;
+  border-radius: var(--radius-md);
+  padding: 16px 16px 16px 22px;
+}
+
+.panel-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--cool);
+}
+
+.panel-bar.muted {
+  background: var(--accent);
+}
+
+.panel-bar.warm {
+  background: var(--warm);
+}
+
+.mini-panel strong,
+.info-panel h3,
+.release-card strong,
+.steps strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.mini-panel p,
+.info-panel p,
+.release-card p,
+.steps p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.section {
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 54px 0;
+}
+
+.section-heading {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+
+.section-heading.compact {
+  align-items: start;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.18;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.info-panel {
+  min-height: 210px;
+  border-radius: var(--radius-md);
+  padding: 22px;
+}
+
+.icon-box {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--accent);
+}
+
+.icon-box svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.install-section {
+  padding-bottom: 82px;
+}
+
+.install-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 390px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.release-card {
+  border-radius: var(--radius-md);
+  padding: 24px;
+}
+
+.release-label {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  margin-bottom: 20px;
+  border: 1px solid rgba(158, 199, 215, 0.24);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  background: rgba(158, 199, 215, 0.08);
+  color: #cce2ea;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.release-card strong {
+  font-size: 26px;
+}
+
+.full-width {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  border-radius: var(--radius-md);
+  padding: 18px;
+}
+
+.steps li > span {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 920px) {
+  .site-header {
+    padding: 16px 24px;
+  }
+
+  .nav-links a:not(.nav-download) {
+    display: none;
+  }
+
+  h1 {
+    font-size: 56px;
+  }
+
+  .hero-copy {
+    font-size: 16px;
+  }
+
+  .app-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-sidebar {
+    display: none;
+  }
+
+  .preview-grid,
+  .section-heading,
+  .install-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .time-ring {
+    width: min(300px, 100%);
+    margin: 0 auto;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .site-header {
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .brand span {
+    display: none;
+  }
+
+  .nav-links .nav-download {
+    min-width: 132px;
+    justify-content: center;
+  }
+
+  .hero {
+    min-height: 80svh;
+    padding: 42px 16px 24px;
+  }
+
+  h1 {
+    font-size: 44px;
+  }
+
+  .hero-actions,
+  .button {
+    width: 100%;
+  }
+
+  .hero-actions {
+    gap: 10px;
+  }
+
+  .app-preview {
+    min-height: 0;
+    border-radius: var(--radius-md);
+  }
+
+  .preview-main {
+    padding: 18px;
+  }
+
+  .preview-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preview-top strong {
+    font-size: 24px;
+  }
+
+  .section {
+    width: min(100% - 28px, 1120px);
+    padding: 42px 0;
+  }
+
+  .section-heading h2 {
+    font-size: 28px;
+  }
+}
